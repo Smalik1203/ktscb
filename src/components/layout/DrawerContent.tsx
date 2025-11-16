@@ -9,22 +9,21 @@ import {
   DrawerItem,
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
-import { 
+import {
   LayoutDashboard,
-  CalendarDays, 
-  CalendarRange, 
-  NotebookText, 
-  UserCheck, 
-  UsersRound, 
-  LineChart, 
-  CreditCard, 
-  LogOut, 
-  Bell, 
-  Settings2, 
-  User, 
+  CalendarDays,
+  CalendarRange,
+  NotebookText,
+  UserCheck,
+  UsersRound,
+  LineChart,
+  CreditCard,
+  LogOut,
+  Bell,
+  Settings2,
+  User,
   ChevronRight,
   Star,
-  Activity,
   CheckCircle2,
   UserPlus,
   List,
@@ -332,44 +331,66 @@ export function DrawerContent(props: DrawerContentComponentProps) {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'superadmin': return colors.error[500];
-      case 'cb_admin': return colors.primary[600];
-      case 'admin': return colors.secondary[600];
-      case 'teacher': return colors.success[600];
-      case 'student': return colors.info[600];
+      case 'superadmin': return '#ef4444'; // Red
+      case 'cb_admin': return '#1E4EB8'; // Sapphire Blue (ClassBridge)
+      case 'admin': return '#2563eb'; // Blue
+      case 'teacher': return '#9DFF7A'; // Lime Green (ClassBridge)
+      case 'student': return '#4FA3FF'; // Sky Blue (ClassBridge)
       default: return colors.neutral[500];
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Clean Header */}
-      <Animated.View 
+      {/* Clean Header with Gradient */}
+      <Animated.View
         style={[
-          styles.header,
+          styles.headerWrapper,
           {
-            paddingTop: insets.top + spacing.md,
+            paddingTop: insets.top + spacing.sm,
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }]
           }
         ]}
       >
-        <View style={styles.userSection}>
-          <View style={[styles.avatar, { backgroundColor: getRoleColor(role || '') }]}>
-            <User size={20} color={colors.surface.primary} />
+        <LinearGradient
+          colors={['#1E4EB8', '#2563eb', '#4FA3FF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerGradient}
+        >
+          <View style={styles.userSection}>
+            {/* Avatar with initials */}
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {(profile?.full_name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                </Text>
+              </View>
+            </View>
+
+            {/* User Details */}
+            <View style={styles.userDetails}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {profile?.full_name || 'User'}
+              </Text>
+              <View style={styles.roleContainer}>
+                <Text style={styles.userRole}>
+                  {displayText}
+                </Text>
+              </View>
+            </View>
+
+            {/* Logout Button */}
+            <TouchableOpacity
+              style={styles.headerLogoutButton}
+              onPress={handleLogout}
+              activeOpacity={0.7}
+            >
+              <LogOut size={19} color={colors.text.inverse} />
+            </TouchableOpacity>
           </View>
-          <View style={styles.userDetails}>
-            <Text style={styles.userName} numberOfLines={1}>
-              {profile?.full_name || 'User'}
-            </Text>
-            <Text style={[styles.userRole, { color: getRoleColor(role || '') }]}>
-              {displayText}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.headerLogoutButton} onPress={handleLogout}>
-            <LogOut size={16} color={colors.error[600]} />
-          </TouchableOpacity>
-        </View>
+        </LinearGradient>
       </Animated.View>
 
       <Animated.View 
@@ -401,9 +422,9 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                     ]}
                     onPress={() => handleItemPress(item)}
                   >
-                    <item.icon 
-                      size={20} 
-                      color={activeItem === item.key ? colors.primary[600] : colors.text.secondary} 
+                    <item.icon
+                      size={21}
+                      color={activeItem === item.key ? colors.primary[600] : colors.text.secondary}
                     />
                     <Text style={[
                       styles.menuItemLabel,
@@ -441,9 +462,9 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                             ]}
                             onPress={() => handleItemPress(subItem)}
                           >
-                            <subItem.icon 
-                              size={18} 
-                              color={isSubItemActive ? colors.primary[600] : colors.text.secondary} 
+                            <subItem.icon
+                              size={19}
+                              color={isSubItemActive ? colors.primary[600] : colors.text.secondary}
                             />
                             <Text style={[
                               styles.menuItemLabel,
@@ -464,14 +485,6 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         </DrawerContentScrollView>
       </Animated.View>
 
-      {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md }]}>
-        <View style={styles.schoolNameSection}>
-          <Text style={styles.schoolNameText} numberOfLines={1}>
-            {profile?.school_name || profile?.school_code || 'School Portal'}
-          </Text>
-        </View>
-      </View>
     </View>
   );
 }
@@ -480,61 +493,86 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface.primary,
-    ...shadows.lg,
-    elevation: 8,
   },
-  header: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    backgroundColor: colors.surface.primary,
+  headerWrapper: {
+    marginBottom: 0,
+  },
+  headerGradient: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    paddingBottom: 20,
   },
   userSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginRight: 10,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: typography.fontWeight.bold as any,
+    color: colors.text.inverse,
+    letterSpacing: 0.5,
   },
   userDetails: {
     flex: 1,
   },
   userName: {
-    fontSize: typography.fontSize.base,
+    fontSize: 18,
     fontWeight: typography.fontWeight.semibold as any,
-    color: colors.text.primary,
-    marginBottom: 2,
+    color: colors.text.inverse,
+    marginBottom: 3,
+  },
+  roleContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    alignSelf: 'flex-start',
   },
   userRole: {
-    fontSize: typography.fontSize.sm,
+    fontSize: 13,
     fontWeight: typography.fontWeight.medium as any,
+    color: colors.text.inverse,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   headerLogoutButton: {
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.error[50],
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   scrollView: {
     flex: 1,
   },
   menu: {
-    padding: spacing.md,
+    paddingHorizontal: 10,
+    paddingTop: 16,
+    paddingBottom: 10,
   },
   section: {
-    marginBottom: spacing.lg,
+    marginBottom: 18,
   },
   sectionLabel: {
     color: colors.text.tertiary,
-    fontSize: typography.fontSize.xs,
+    fontSize: 13,
     fontWeight: typography.fontWeight.semibold as any,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.sm,
@@ -544,10 +582,10 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     borderRadius: borderRadius.md,
-    marginVertical: 2,
+    marginVertical: 4,
   },
   menuItemActive: {
     backgroundColor: colors.primary[50],
@@ -555,10 +593,10 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.primary[600],
   },
   menuItemLabel: {
-    fontSize: typography.fontSize.base,
+    fontSize: 17,
     fontWeight: typography.fontWeight.medium as any,
     color: colors.text.primary,
-    marginLeft: spacing.md,
+    marginLeft: 10,
     flex: 1,
   },
   menuItemLabelActive: {
@@ -566,15 +604,15 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold as any,
   },
   subMenuItem: {
-    marginLeft: spacing.lg,
-    paddingVertical: spacing.sm,
+    marginLeft: 18,
+    paddingVertical: 10,
     backgroundColor: colors.background.secondary,
     borderRadius: borderRadius.sm,
-    marginVertical: 1,
+    marginVertical: 4,
   },
   subMenuItemLabel: {
-    fontSize: typography.fontSize.sm,
-    marginLeft: spacing.sm,
+    fontSize: 15,
+    marginLeft: 10,
     color: colors.text.secondary,
   },
   chevron: {
@@ -598,26 +636,6 @@ const styles = StyleSheet.create({
     color: colors.surface.primary,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold as any,
-  },
-  footer: {
-    padding: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-    backgroundColor: colors.surface.primary,
-  },
-  schoolNameSection: {
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-  },
-  schoolNameText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold as any,
-    color: colors.text.primary,
-    textAlign: 'center',
   },
 });
 

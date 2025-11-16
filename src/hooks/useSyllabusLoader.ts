@@ -84,11 +84,11 @@ export function useSyllabusLoader(classId?: string, schoolCode?: string): Syllab
       };
     },
     enabled: !!classId && !!schoolCode,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes - syllabus changes infrequently
     gcTime: 30 * 60 * 1000, // 30 minutes
-    retry: 3,
+    retry: 2, // Reduce retries for faster failure feedback
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true, // ✅ Ensures fresh data when user returns
     refetchOnMount: true,
   });
 

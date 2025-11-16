@@ -12,6 +12,9 @@
       }
     },
     "preview": {
+      "android": {
+        "buildType": "apk"
+      },
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
@@ -19,7 +22,7 @@
     },
     "production": {
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
       },
       "autoIncrement": true,
       "env": {

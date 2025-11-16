@@ -79,17 +79,11 @@ export function useDashboardStats(userId: string, classInstanceId?: string, role
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       const weekStartStr = weekStart.toISOString().split('T')[0];
-      
-      // Get today's classes
-      const { data: todaysClasses, error: classesError } = await supabase
-        .from(DB.tables.timetableSlots)
-        .select('id')
-        .eq('class_instance_id', classInstanceId)
-        .eq('class_date', today);
-      
-      if (classesError) throw classesError;
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
-      // For students, get student ID from auth_user_id
+      // For students, get student ID first (required for subsequent queries)
       let studentId = userId;
       if (role === 'student') {
         const { data: studentData } = await supabase
@@ -97,13 +91,13 @@ export function useDashboardStats(userId: string, classInstanceId?: string, role
           .select('id')
           .eq('auth_user_id', userId)
           .maybeSingle();
-        
+
         if (studentData) {
           studentId = studentData.id;
         } else {
-          // If student not found, return early with zero attendance
+          // If student not found, return early with zeros
           return {
-            todaysClasses: todaysClasses?.length || 0,
+            todaysClasses: 0,
             attendancePercentage: 0,
             weekAttendance: 0,
             pendingAssignments: 0,
@@ -114,115 +108,124 @@ export function useDashboardStats(userId: string, classInstanceId?: string, role
         }
       }
 
-      // Get attendance percentage for current month (only for students)
-      let attendancePercentage = 0;
-      let weekAttendance = 0;
-      
+      // ⚡ OPTIMIZED: Batch all independent queries in parallel
+      const currentMonth = new Date().toISOString().substring(0, 7);
+
       if (role === 'student') {
-        const currentMonth = new Date().toISOString().substring(0, 7);
-        const { data: attendanceData, error: attendanceError } = await supabase
-          .from(DB.tables.attendance)
-          .select('status')
-          .eq('student_id', studentId)
-          .gte('date', `${currentMonth}-01`)
-          .lt('date', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0]);
-        
-        if (attendanceError) throw attendanceError;
+        // Run all student queries in parallel
+        const [
+          todaysClassesResult,
+          attendanceResult,
+          weekAttendanceResult,
+          tasksResult,
+          submissionsResult,
+          upcomingTestsResult,
+        ] = await Promise.all([
+          supabase
+            .from(DB.tables.timetableSlots)
+            .select('id', { count: 'exact', head: true })
+            .eq('class_instance_id', classInstanceId)
+            .eq('class_date', today),
+          supabase
+            .from(DB.tables.attendance)
+            .select('status')
+            .eq('student_id', studentId)
+            .gte('date', `${currentMonth}-01`)
+            .lt('date', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().split('T')[0]),
+          supabase
+            .from(DB.tables.attendance)
+            .select('status')
+            .eq('student_id', studentId)
+            .gte('date', weekStartStr)
+            .lte('date', today),
+          supabase
+            .from('tasks')
+            .select('id')
+            .eq('class_instance_id', classInstanceId)
+            .eq('is_active', true),
+          supabase
+            .from('task_submissions')
+            .select('task_id, status')
+            .eq('student_id', studentId),
+          supabase
+            .from('tests')
+            .select('id')
+            .eq('class_instance_id', classInstanceId)
+            .gte('test_date', today)
+            .lte('test_date', nextWeekStr)
+            .eq('status', 'active'),
+        ]);
 
-        const totalAttendance = attendanceData?.length || 0;
-        const presentCount = attendanceData?.filter(a => a.status === 'present').length || 0;
-        attendancePercentage = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
+        // Calculate attendance
+        const totalAttendance = attendanceResult.data?.length || 0;
+        const presentCount = attendanceResult.data?.filter(a => a.status === 'present').length || 0;
+        const attendancePercentage = totalAttendance > 0 ? Math.round((presentCount / totalAttendance) * 100) : 0;
 
-        // Get week attendance
-        const { data: weekAttendanceData } = await supabase
-          .from(DB.tables.attendance)
-          .select('status')
-          .eq('student_id', studentId)
-          .gte('date', weekStartStr)
-          .lte('date', today);
+        const weekTotal = weekAttendanceResult.data?.length || 0;
+        const weekPresent = weekAttendanceResult.data?.filter(a => a.status === 'present').length || 0;
+        const weekAttendance = weekTotal > 0 ? Math.round((weekPresent / weekTotal) * 100) : 0;
 
-        const weekTotal = weekAttendanceData?.length || 0;
-        const weekPresent = weekAttendanceData?.filter(a => a.status === 'present').length || 0;
-        weekAttendance = weekTotal > 0 ? Math.round((weekPresent / weekTotal) * 100) : 0;
-      }
-
-      // Get pending assignments from tasks table
-      // For students: only count unsubmitted tasks
-      // For admins: count all active tasks
-      let pendingAssignments = 0;
-      
-      if (role === 'student') {
-        // Get all active tasks for student's class (including overdue)
-        const { data: tasksData } = await supabase
-          .from('tasks')
-          .select('id')
-          .eq('class_instance_id', classInstanceId)
-          .eq('is_active', true);
-
-        // Get student submissions (check for any submission, not just submitted status)
-        const { data: submissions } = await supabase
-          .from('task_submissions')
-          .select('task_id, status')
-          .eq('student_id', studentId);
-
-        // Count tasks that are not submitted or graded (pending = unsubmitted)
+        // Calculate pending assignments
         const submittedOrGradedTaskIds = new Set(
-          submissions?.filter(s => s.status === 'submitted' || s.status === 'graded').map(s => s.task_id) || []
+          submissionsResult.data?.filter(s => s.status === 'submitted' || s.status === 'graded').map(s => s.task_id) || []
         );
-        
-        // Count only unsubmitted tasks (including overdue)
-        pendingAssignments = tasksData?.filter(task => !submittedOrGradedTaskIds.has(task.id)).length || 0;
+        const pendingAssignments = tasksResult.data?.filter(task => !submittedOrGradedTaskIds.has(task.id)).length || 0;
+
+        return {
+          todaysClasses: todaysClassesResult.count || 0,
+          attendancePercentage,
+          weekAttendance,
+          pendingAssignments,
+          upcomingTests: upcomingTestsResult.data?.length || 0,
+          achievements: 0,
+          totalStudents: 0,
+        };
       } else {
-        // For admins, count all active tasks (including overdue)
-        const { data: tasksData } = await supabase
-          .from('tasks')
-          .select('id')
-          .eq('class_instance_id', classInstanceId)
-          .eq('is_active', true);
+        // Run all admin queries in parallel
+        const [
+          todaysClassesResult,
+          tasksResult,
+          upcomingTestsResult,
+          studentsResult,
+        ] = await Promise.all([
+          supabase
+            .from(DB.tables.timetableSlots)
+            .select('id', { count: 'exact', head: true })
+            .eq('class_instance_id', classInstanceId)
+            .eq('class_date', today),
+          supabase
+            .from('tasks')
+            .select('id')
+            .eq('class_instance_id', classInstanceId)
+            .eq('is_active', true),
+          supabase
+            .from('tests')
+            .select('id')
+            .eq('class_instance_id', classInstanceId)
+            .gte('test_date', today)
+            .lte('test_date', nextWeekStr)
+            .eq('status', 'active'),
+          supabase
+            .from('student')
+            .select('id', { count: 'exact', head: true })
+            .eq('class_instance_id', classInstanceId),
+        ]);
 
-        pendingAssignments = tasksData?.length || 0;
+        return {
+          todaysClasses: todaysClassesResult.count || 0,
+          attendancePercentage: 0,
+          weekAttendance: 0,
+          pendingAssignments: tasksResult.data?.length || 0,
+          upcomingTests: upcomingTestsResult.data?.length || 0,
+          achievements: 0,
+          totalStudents: studentsResult.count || 0,
+        };
       }
-
-      // Get upcoming tests (next 7 days)
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      const nextWeekStr = nextWeek.toISOString().split('T')[0];
-
-      const { data: upcomingTestsData } = await supabase
-        .from('tests')
-        .select('id')
-        .eq('class_instance_id', classInstanceId)
-        .gte('test_date', today)
-        .lte('test_date', nextWeekStr)
-        .eq('status', 'active');
-
-      const upcomingTests = upcomingTestsData?.length || 0;
-
-      // Get total students if admin
-      let totalStudents = 0;
-      if (role === 'admin' || role === 'superadmin') {
-        const { data: studentsData } = await supabase
-          .from('student')
-          .select('id')
-          .eq('class_instance_id', classInstanceId);
-        totalStudents = studentsData?.length || 0;
-      }
-
-      // Get achievements (test scores, perfect attendance, etc.)
-      const achievements = 0; // TODO: Implement achievements system
-
-      return {
-        todaysClasses: todaysClasses?.length || 0,
-        attendancePercentage,
-        weekAttendance,
-        pendingAssignments,
-        upcomingTests,
-        achievements,
-        totalStudents,
-      };
     },
     enabled: !!userId && !!classInstanceId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000, // 2 minutes - fresh data without aggressive polling
+    refetchOnWindowFocus: true, // ✅ Fresh data when user returns
+    refetchOnMount: true, // ✅ Fresh data on screen load
   });
 }
 
@@ -336,6 +339,8 @@ export function useRecentActivity(userId: string, classInstanceId?: string) {
     },
     enabled: !!userId,
     staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: true,
+    refetchOnMount: true
   });
 }
 
@@ -380,7 +385,9 @@ export function useUpcomingEvents(schoolCode: string, classInstanceId?: string) 
       }));
     },
     enabled: !!schoolCode,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes - events change less frequently
+    refetchOnWindowFocus: true,
+    refetchOnMount: true
   });
 }
 
@@ -448,7 +455,9 @@ export function useFeeOverview(authUserId: string) {
       };
     },
     enabled: !!authUserId,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes - fees change less frequently
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 }
 
@@ -530,7 +539,9 @@ export function useTaskOverview(authUserId: string, classInstanceId?: string) {
       return overview;
     },
     enabled: !!authUserId && !!classInstanceId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000, // 2 minutes - task data changes frequently
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 }
 
@@ -569,66 +580,88 @@ export function useSyllabusOverview(classInstanceId: string) {
       });
 
       const subjects = Array.from(uniqueSubjects.values());
+      const subjectIds = subjects.map(s => s.id);
 
-      // Fetch progress for each subject
-      const subjectProgress = await Promise.all(
-        subjects.map(async (subject: any) => {
-          // Fetch syllabus tree
-          const { data: syllabiData } = await supabase
-            .from('syllabi')
-            .select('id')
-            .eq('class_instance_id', classInstanceId)
-            .eq('subject_id', subject.id)
-            .maybeSingle();
+      // ⚡ OPTIMIZED: Batch fetch all data at once (4 queries instead of 31+)
+      const [syllabiResult, allProgressResult] = await Promise.all([
+        // Query 1: Get all syllabi for all subjects
+        supabase
+          .from('syllabi')
+          .select('id, subject_id')
+          .eq('class_instance_id', classInstanceId)
+          .in('subject_id', subjectIds),
 
-          if (!syllabiData?.id) {
-            return {
-              subjectId: subject.id,
-              subjectName: subject.subject_name,
-              progress: 0,
-              totalTopics: 0,
-              completedTopics: 0,
-            };
-          }
+        // Query 2: Get all progress for this class
+        supabase
+          .from('syllabus_progress')
+          .select('syllabus_topic_id, subject_id')
+          .eq('class_instance_id', classInstanceId)
+          .in('subject_id', subjectIds)
+          .not('syllabus_topic_id', 'is', null),
+      ]);
 
-          // Get topics for this syllabus
-          const { data: chapters } = await supabase
-            .from('syllabus_chapters')
-            .select('id')
-            .eq('syllabus_id', syllabiData.id);
-
-          const chapterIds = chapters?.map(c => c.id) || [];
-          
-          const { data: topics } = await supabase
-            .from('syllabus_topics')
-            .select('id')
-            .in('chapter_id', chapterIds);
-
-          const totalTopics = topics?.length || 0;
-
-          // Get completed topics from syllabus_progress
-          const { data: progressData } = await supabase
-            .from('syllabus_progress')
-            .select('syllabus_topic_id')
-            .eq('class_instance_id', classInstanceId)
-            .eq('subject_id', subject.id)
-            .not('syllabus_topic_id', 'is', null);
-
-          const completedTopics = new Set(
-            progressData?.map(p => p.syllabus_topic_id).filter(Boolean) || []
-          ).size;
-
-          const progress = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
-
-          return {
-            subjectId: subject.id,
-            subjectName: subject.subject_name,
-            progress,
-            totalTopics,
-            completedTopics,
-          };
-        })
+      const syllabusMap = new Map(
+        (syllabiResult.data || []).map(s => [s.subject_id, s.id])
       );
+      const syllabusIds = Array.from(syllabusMap.values());
+
+      // Query 3 & 4: Batch fetch all chapters and topics
+      const [chaptersResult, allProgressBySubject] = await Promise.all([
+        syllabusIds.length > 0
+          ? supabase
+              .from('syllabus_chapters')
+              .select('id, syllabus_id')
+              .in('syllabus_id', syllabusIds)
+          : Promise.resolve({ data: [] }),
+        // Group progress by subject
+        Promise.resolve(
+          (allProgressResult.data || []).reduce((acc: any, p: any) => {
+            if (!acc[p.subject_id]) acc[p.subject_id] = new Set();
+            acc[p.subject_id].add(p.syllabus_topic_id);
+            return acc;
+          }, {} as Record<string, Set<string>>)
+        ),
+      ]);
+
+      // Build chapter -> syllabus mapping
+      const chapterToSyllabusMap = new Map(
+        (chaptersResult.data || []).map(c => [c.id, c.syllabus_id])
+      );
+      const chapterIds = Array.from(chapterToSyllabusMap.keys());
+
+      // Query 4: Fetch all topics at once
+      const { data: allTopics } = chapterIds.length > 0
+        ? await supabase
+            .from('syllabus_topics')
+            .select('id, chapter_id')
+            .in('chapter_id', chapterIds)
+        : { data: [] };
+
+      // Group topics by syllabus_id
+      const topicsBySyllabus = (allTopics || []).reduce((acc: any, topic: any) => {
+        const syllabusId = chapterToSyllabusMap.get(topic.chapter_id);
+        if (syllabusId) {
+          if (!acc[syllabusId]) acc[syllabusId] = [];
+          acc[syllabusId].push(topic.id);
+        }
+        return acc;
+      }, {} as Record<string, string[]>);
+
+      // Build subject progress (all in memory - no more queries!)
+      const subjectProgress = subjects.map((subject: any) => {
+        const syllabusId = syllabusMap.get(subject.id);
+        const totalTopics = syllabusId ? (topicsBySyllabus[syllabusId]?.length || 0) : 0;
+        const completedTopics = (allProgressBySubject[subject.id]?.size || 0);
+        const progress = totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+        return {
+          subjectId: subject.id,
+          subjectName: subject.subject_name,
+          progress,
+          totalTopics,
+          completedTopics,
+        };
+      });
 
       // Calculate overall progress
       const totalTopics = subjectProgress.reduce((sum, s) => sum + s.totalTopics, 0);
@@ -642,7 +675,9 @@ export function useSyllabusOverview(classInstanceId: string) {
       };
     },
     enabled: !!classInstanceId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 3 * 60 * 1000, // 3 minutes - syllabus progress changes moderately
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 }
 

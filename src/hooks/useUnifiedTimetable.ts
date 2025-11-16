@@ -181,14 +181,14 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
       return { slots: enrichedSlots as TimetableSlot[], taughtSlotIds };
     },
     enabled: !!classId && !!dateStr,
-    staleTime: 30 * 1000, // 30 seconds - shorter for better sync
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3,
+    staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh for navigation
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer
+    retry: 2, // Reduce retries for faster failure feedback
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: true, // Refetch when app comes to focus
-    refetchOnMount: true,
-    refetchInterval: 30 * 1000, // Auto-refetch every 30 seconds
-    refetchIntervalInBackground: false, // Don't refetch in background to save battery
+    refetchOnWindowFocus: true, // ✅ Ensures fresh data when user returns to app
+    refetchOnMount: true, // ✅ Ensures fresh data on screen load
+    // ❌ Removed refetchInterval - no more aggressive polling
+    // User gets fresh data when it matters (on focus/mount) without wasting resources
   });
 
   // Helper function to renumber slots sequentially
@@ -229,11 +229,20 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
   const handleTimeAdjustment = async (slotId: string, updates: UpdateSlotPayload) => {
     if (!updates.start_time && !updates.end_time) return;
 
+    // Get slot info in ONE query instead of 2 separate queries
+    const { data: slotInfo } = await supabase
+      .from('timetable_slots')
+      .select('class_instance_id, class_date, school_code')
+      .eq('id', slotId)
+      .single();
+
+    if (!slotInfo) return;
+
     const { data: daySlots, error } = await supabase
       .from('timetable_slots')
       .select('id, start_time, end_time')
-      .eq('class_instance_id', (await supabase.from('timetable_slots').select('class_instance_id').eq('id', slotId).maybeSingle()).data?.class_instance_id)
-      .eq('class_date', (await supabase.from('timetable_slots').select('class_date').eq('id', slotId).maybeSingle()).data?.class_date)
+      .eq('class_instance_id', slotInfo.class_instance_id)
+      .eq('class_date', slotInfo.class_date)
       .order('start_time', { ascending: true });
 
     if (error) {
@@ -336,11 +345,20 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         await handleTimeAdjustment(id, updates);
       }
 
-      await renumberSlotsSequentially(
-        (await supabase.from('timetable_slots').select('class_instance_id').eq('id', id).maybeSingle()).data?.class_instance_id,
-        (await supabase.from('timetable_slots').select('class_date').eq('id', id).maybeSingle()).data?.class_date,
-        (await supabase.from('timetable_slots').select('school_code').eq('id', id).maybeSingle()).data?.school_code
-      );
+      // Get slot info in ONE query instead of 3 separate queries
+      const { data: slotData } = await supabase
+        .from('timetable_slots')
+        .select('class_instance_id, class_date, school_code')
+        .eq('id', id)
+        .single();
+
+      if (slotData) {
+        await renumberSlotsSequentially(
+          slotData.class_instance_id,
+          slotData.class_date,
+          slotData.school_code
+        );
+      }
     },
     onSuccess: () => {
       // Invalidate all timetable queries for better cross-device sync

@@ -10,6 +10,7 @@ import { useSubjects } from '../../hooks/useSubjects';
 import { useAdmins } from '../../hooks/useAdmins';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { ThreeStateView } from '../common/ThreeStateView';
+import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import dayjs from 'dayjs';
 import { router } from 'expo-router';
@@ -909,15 +910,11 @@ export function ModernTimetableScreen() {
 
         {/* No Class Selected - Responsive Card */}
         {!selectedClassId && (
-          <View style={styles.selectClassCard}>
-            <View style={styles.selectClassInner}>
-              <BookOpen size={isTablet ? 64 : (isSmallScreen ? 40 : 56)} color="#d4d4d4" />
-              <Text style={styles.selectClassTitle}>Select a Class</Text>
-              <Text style={styles.selectClassSubtitle}>
-                Choose a class from the list above to view and manage its timetable.
-              </Text>
-            </View>
-          </View>
+          <EmptyStateIllustration
+            type="general"
+            title="Select a Class"
+            description="Choose a class from the list above to view and manage its timetable."
+          />
         )}
 
         {/* Clean Timetable Content */}
@@ -925,13 +922,19 @@ export function ModernTimetableScreen() {
         <View style={styles.timetableContentContainer}>
           
           {selectedClassId && slots.length === 0 ? (
-            <ThreeStateView
-              state="empty"
-              emptyMessage={`No timetable for ${dayjs(selectedDate).format('MMM D, YYYY')}`}
-              emptyAction={{
-                label: 'Add Period',
-                onPress: () => setShowActionsModal(true),
-              }}
+            <EmptyStateIllustration
+              type="calendar"
+              title="No Timetable"
+              description={`No timetable for ${dayjs(selectedDate).format('MMM D, YYYY')}`}
+              action={
+                <TouchableOpacity
+                  style={styles.emptyActionButton}
+                  onPress={() => setShowActionsModal(true)}
+                >
+                  <Plus size={20} color={colors.text.inverse} />
+                  <RNText style={styles.emptyActionButtonText}>Add Period</RNText>
+                </TouchableOpacity>
+              }
             />
           ) : (
             <View style={styles.cleanTimetableGrid}>
@@ -2027,82 +2030,20 @@ const styles = StyleSheet.create({
   cleanTimetableGrid: {
     gap: 8,
   },
-  cleanEmptyState: {
+  // Empty State Action Button
+  emptyActionButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 40,
-    backgroundColor: '#f9fafb',
-    borderRadius: 16,
-    marginTop: 20,
-    width: '100%',
-    alignSelf: 'stretch',
-    minHeight: 280,
+    gap: spacing.sm,
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.button,
   },
-  cleanEmptyStateMobile: {
-    paddingVertical: 24,
-    borderRadius: 12,
-    marginTop: 12,
-    minHeight: 240,
-  },
-  cleanEmptyStateTablet: {
-    paddingVertical: 56,
-    borderRadius: 18,
-    marginTop: 24,
-    minHeight: 320,
-  },
-
-  // Select Class Card (when no class is chosen)
-  selectClassCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    marginHorizontal: 20,
-    marginTop: 12,
-    marginBottom: 12,
-    alignSelf: 'stretch',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    minHeight: 420,
-  },
-  selectClassInner: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: isTablet ? 56 : 40,
-    paddingHorizontal: isTablet ? 40 : 24,
-  },
-  selectClassTitle: {
-    marginTop: 8,
-    fontSize: isTablet ? 24 : 20,
-    fontWeight: '700',
-    color: '#111827',
-    textAlign: 'center',
-  },
-  selectClassSubtitle: {
-    marginTop: 6,
-    fontSize: isTablet ? 16 : 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    maxWidth: 640,
-    alignSelf: 'center',
-  },
-  cleanEmptyIcon: {
-    marginBottom: 16,
-  },
-  cleanEmptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  cleanEmptyMessage: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 20,
+  emptyActionButtonText: {
+    color: colors.text.inverse,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
   },
   cleanPeriodCard: {
     backgroundColor: colors.surface.primary,
@@ -2464,82 +2405,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary[600],
   },
 
-  // Empty States
-  emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: 80,
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.xl,
-    margin: spacing.sm,
-    ...shadows.sm,
-  },
-  emptyStateIcon: {
-    marginBottom: spacing.lg,
-  },
-  emptyStateTitle: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  emptyStateMessage: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.normal,
-    color: colors.text.primary,
-    textAlign: 'center',
-    lineHeight: typography.lineHeight.relaxed,
-  },
-
   // Timetable
   scrollView: {
     flex: 1,
   },
   slotsContainer: {
     padding: spacing.lg,
-  },
-  emptyTimetableContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: 80,
-    backgroundColor: colors.surface.primary,
-  },
-  emptyTimetableIcon: {
-    marginBottom: spacing.lg,
-  },
-  emptyTimetableTitle: {
-    fontSize: 24,
-    color: '#000000',
-    fontWeight: '600',
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  emptyTimetableMessage: {
-    fontSize: 16,
-    color: '#374151',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: spacing.lg,
-  },
-  emptyStateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: '#6366f1',
-    borderRadius: borderRadius.lg,
-    gap: spacing.sm,
-    ...shadows.sm,
-  },
-  emptyStateButtonText: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '600',
   },
 
   // Slot Cards

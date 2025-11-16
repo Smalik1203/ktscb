@@ -12,6 +12,7 @@ import { colors, spacing, typography, borderRadius, shadows } from '../../../lib
 import { TestList } from '../../components/tests/TestList';
 import { CreateTestForm } from '../../components/tests/CreateTestForm';
 import { Card as UICard, LoadingView, ErrorView, EmptyState } from '../../components/ui';
+import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
 
 export default function AssessmentsScreen() {
   const { profile, user } = useAuth();
@@ -263,21 +264,23 @@ export default function AssessmentsScreen() {
 
         {/* Empty State */}
         {!testsLoading && filteredTests.length === 0 && (
-          <View style={styles.emptyCardContainer}>
-            <View style={styles.largeEmptyCard}>
-              <EmptyState
-                title="No Tests"
-                message={canCreateTest 
-                  ? "Get started by creating your first assessment"
-                  : "No assessments available yet"
-                }
-                icon={<BookOpen size={64} color={colors.neutral[300]} />}
-                actionLabel={canCreateTest ? "Create Test" : undefined}
-                onAction={canCreateTest ? handleCreateNewTest : undefined}
-                variant="card"
-              />
-            </View>
-          </View>
+          <EmptyStateIllustration
+            type="tests"
+            title="No Tests"
+            description={canCreateTest
+              ? "Get started by creating your first assessment"
+              : "No assessments available yet"
+            }
+            action={canCreateTest ? (
+              <TouchableOpacity
+                style={styles.createButton}
+                onPress={handleCreateNewTest}
+              >
+                <Plus size={20} color={colors.text.inverse} />
+                <Text style={styles.createButtonText}>Create Test</Text>
+              </TouchableOpacity>
+            ) : undefined}
+          />
         )}
 
         {/* Test List */}
@@ -499,27 +502,19 @@ const styles = StyleSheet.create({
     ...shadows.lg,
     elevation: 8,
   },
-  emptyCardContainer: {
+  createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary[600],
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.button,
   },
-  largeEmptyCard: {
-    marginHorizontal: 0,
-    marginTop: 0,
-    marginBottom: 0,
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.xl,
-    minHeight: 280,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+  createButtonText: {
+    color: colors.text.inverse,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
   },
   modalOverlay: {
     flex: 1,

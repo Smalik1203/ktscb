@@ -64,7 +64,7 @@ export default function LoginScreen() {
   if (auth.loading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#FF6B35" />
+        <ActivityIndicator size="large" color="#1E4EB8" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
@@ -133,7 +133,7 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <LinearGradient
-        colors={['#FFFFFF', '#FFFBF9', '#FFF5F0', '#FFE8DC']}
+        colors={['#FFFFFF', '#F8FAFE', '#F0F5FF']}
         style={styles.gradient}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
@@ -166,16 +166,10 @@ export default function LoginScreen() {
                   />
                 </View>
 
-                <Text style={styles.title}>Krishnaveni Talent School</Text>
+                <Text style={styles.title}>ClassBridge</Text>
                 <View style={styles.taglineContainer}>
-                  <LinearGradient
-                    colors={['#FF6B35', '#FF8C42']}
-                    style={styles.taglineBanner}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    <Text style={styles.tagline}>MENTORED FOR LIFE</Text>
-                  </LinearGradient>
+                  <Text style={styles.taglineText}>Bridge The Gap</Text>
+                  <View style={styles.taglineUnderline} />
                 </View>
               </View>
 
@@ -188,7 +182,7 @@ export default function LoginScreen() {
                   <View style={styles.inputContainer}>
                     <View style={styles.inputWrapper}>
                       <View style={styles.inputIcon}>
-                        <Mail size={22} color="#FF6B35" />
+                        <Mail size={22} color="#1E4EB8" />
                       </View>
                       <TextInput
                         label="Email Address"
@@ -203,7 +197,7 @@ export default function LoginScreen() {
                         contentStyle={styles.inputContent}
                         theme={{
                           colors: {
-                            primary: '#FF6B35',
+                            primary: '#1E4EB8',
                             background: '#FFFFFF',
                             surface: '#FFFFFF',
                             outline: '#E0E0E0',
@@ -216,7 +210,7 @@ export default function LoginScreen() {
 
                     <View style={styles.inputWrapper}>
                       <View style={styles.inputIcon}>
-                        <Lock size={22} color="#FF6B35" />
+                        <Lock size={22} color="#1E4EB8" />
                       </View>
                       <TextInput
                         label="Password"
@@ -231,7 +225,7 @@ export default function LoginScreen() {
                         onSubmitEditing={handleLogin}
                         theme={{
                           colors: {
-                            primary: '#FF6B35',
+                            primary: '#1E4EB8',
                             background: '#FFFFFF',
                             surface: '#FFFFFF',
                             outline: '#E0E0E0',
@@ -264,7 +258,7 @@ export default function LoginScreen() {
                     activeOpacity={0.8}
                   >
                     <LinearGradient
-                      colors={loading || !email || !password ? ['#CCCCCC', '#AAAAAA'] : ['#FF6B35', '#FF8C42']}
+                      colors={loading || !email || !password ? ['#CCCCCC', '#AAAAAA'] : ['#1E4EB8', '#4FA3FF']}
                       style={styles.loginButtonGradient}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
@@ -277,8 +271,8 @@ export default function LoginScreen() {
                     </LinearGradient>
                   </TouchableOpacity>
 
-                  <TouchableOpacity 
-                    onPress={handleForgotPassword} 
+                  <TouchableOpacity
+                    onPress={handleForgotPassword}
                     style={styles.forgotPassword}
                     disabled={loading}
                   >
@@ -322,47 +316,49 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logoContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing['6'],
-    ...shadows.lg,
-    borderWidth: 3,
-    borderColor: '#FFE8DC',
+    marginBottom: spacing['8'],
+    ...shadows.xl,
+    borderWidth: 0,
   },
   logoImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 75,
+    borderRadius: 66,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1A237E',
-    marginBottom: spacing['3'],
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#1E4EB8',
+    marginBottom: spacing['4'],
     textAlign: 'center',
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
   taglineContainer: {
     marginTop: spacing['2'],
     width: '100%',
     alignItems: 'center',
+    position: 'relative',
   },
-  taglineBanner: {
-    paddingVertical: spacing['2'],
-    paddingHorizontal: spacing['6'],
-    borderRadius: borderRadius.full,
-    ...shadows.sm,
-  },
-  tagline: {
-    color: '#FFFFFF',
-    fontSize: typography.fontSize.sm,
-    fontWeight: 'bold',
-    letterSpacing: 2,
+  taglineText: {
+    color: '#2A2A2A',
+    fontSize: typography.fontSize.xl,
+    fontWeight: '600',
+    letterSpacing: 0.3,
     textAlign: 'center',
+    marginBottom: spacing['2'],
+  },
+  taglineUnderline: {
+    width: 80,
+    height: 4,
+    borderRadius: borderRadius.full,
+    backgroundColor: '#1E4EB8',
+    marginTop: spacing['1'],
   },
   formSection: {
     width: '100%',
@@ -371,23 +367,24 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: borderRadius['2xl'],
-    padding: spacing['6'],
-    ...shadows.lg,
-    borderWidth: 1,
-    borderColor: '#FFE8DC',
+    padding: spacing['8'],
+    ...shadows.xl,
+    borderWidth: 0,
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: spacing['1'],
+    marginBottom: spacing['2'],
     textAlign: 'center',
+    letterSpacing: -0.3,
   },
   subtitleText: {
     fontSize: typography.fontSize.base,
-    color: '#666666',
-    marginBottom: spacing['6'],
+    color: '#6b7280',
+    marginBottom: spacing['8'],
     textAlign: 'center',
+    lineHeight: 22,
   },
   inputContainer: {
     marginBottom: spacing['6'],
@@ -446,7 +443,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing['2'],
   },
   forgotPasswordText: {
-    color: '#FF6B35',
+    color: '#1E4EB8',
     fontSize: typography.fontSize.base,
     fontWeight: '600',
   },

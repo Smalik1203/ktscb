@@ -16,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestQuestions, useCreateAttempt, useUpdateAttempt, useSubmitTest, useStudentAttempts } from '../../hooks/tests';
 import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
+import { SuccessAnimation } from '../ui/SuccessAnimation';
 
 interface Answer {
   questionId: string;
@@ -48,6 +49,8 @@ export function TestTakingScreen() {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showQuestionPalette, setShowQuestionPalette] = useState(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [submissionScore, setSubmissionScore] = useState<{ earned: number; total: number } | null>(null);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -297,16 +300,9 @@ export function TestTakingScreen() {
         totalPoints,
       });
 
-      Alert.alert(
-        'Time Up!',
-        `Your test has been automatically submitted!\n\nScore: ${earnedPoints}/${totalPoints} points`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      // Show success animation
+      setSubmissionScore({ earned: earnedPoints, total: totalPoints });
+      setShowSuccessAnimation(true);
     } catch (error: any) {
       console.error('Auto-submit failed:', error);
       Alert.alert('Error', 'Failed to submit test automatically. Please try again.');
@@ -365,6 +361,25 @@ export function TestTakingScreen() {
     }
   };
 
+  const handleAnimationEnd = () => {
+    setShowSuccessAnimation(false);
+
+    if (submissionScore) {
+      Alert.alert(
+        'Test Submitted',
+        `Your test has been submitted successfully!\n\nScore: ${submissionScore.earned}/${submissionScore.total} points`,
+        [
+          {
+            text: 'OK',
+            onPress: () => router.back(),
+          },
+        ]
+      );
+    } else {
+      router.back();
+    }
+  };
+
   const handleSubmit = async (autoSubmit = false) => {
     // Prevent double submission
     if (isSubmittedRef.current) {
@@ -416,16 +431,9 @@ export function TestTakingScreen() {
                   totalPoints,
                 });
 
-                Alert.alert(
-                  'Test Submitted',
-                  `Your test has been submitted successfully!\n\nScore: ${earnedPoints}/${totalPoints} points`,
-                  [
-                    {
-                      text: 'OK',
-                      onPress: () => router.back(),
-                    },
-                  ]
-                );
+                // Show success animation
+                setSubmissionScore({ earned: earnedPoints, total: totalPoints });
+                setShowSuccessAnimation(true);
               } catch (error: any) {
                 Alert.alert('Error', error.message || 'Failed to submit test');
                 isSubmittedRef.current = false;
@@ -738,6 +746,12 @@ export function TestTakingScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Success Animation */}
+      <SuccessAnimation
+        visible={showSuccessAnimation}
+        onAnimationEnd={handleAnimationEnd}
+      />
     </SafeAreaView>
   );
 }

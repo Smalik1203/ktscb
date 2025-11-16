@@ -73,17 +73,17 @@ export function Button({
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: colors.primary[600],
+          backgroundColor: colors.primary[600], // Sapphire Blue
           borderColor: colors.primary[600],
           textColor: colors.text.inverse,
-          shadow: shadows.sm,
+          shadow: shadows.none, // No shadow (ClassBridge)
         };
       case 'secondary':
         return {
-          backgroundColor: colors.secondary[600],
-          borderColor: colors.secondary[600],
-          textColor: colors.text.inverse,
-          shadow: shadows.sm,
+          backgroundColor: '#FFFFFF', // White (ClassBridge)
+          borderColor: colors.primary[600], // Sapphire border
+          textColor: colors.primary[600], // Sapphire text
+          shadow: shadows.none, // No shadow (ClassBridge)
         };
       case 'outline':
         return {
@@ -104,14 +104,14 @@ export function Button({
           backgroundColor: colors.primary[600],
           borderColor: colors.primary[600],
           textColor: colors.text.inverse,
-          shadow: shadows.lg,
+          shadow: shadows.md, // Keep some shadow for floating
         };
       default:
         return {
           backgroundColor: colors.primary[600],
           borderColor: colors.primary[600],
           textColor: colors.text.inverse,
-          shadow: shadows.sm,
+          shadow: shadows.none,
         };
     }
   };
@@ -123,35 +123,35 @@ export function Button({
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
           fontSize: typography.fontSize.sm,
-          borderRadius: borderRadius.md,
+          borderRadius: borderRadius.button, // 6px ClassBridge
         };
       case 'md':
         return {
           paddingVertical: spacing.md,
           paddingHorizontal: spacing.lg,
           fontSize: typography.fontSize.base,
-          borderRadius: borderRadius.lg,
+          borderRadius: borderRadius.button, // 6px ClassBridge
         };
       case 'lg':
         return {
           paddingVertical: spacing.lg,
           paddingHorizontal: spacing.xl,
           fontSize: typography.fontSize.lg,
-          borderRadius: borderRadius.lg,
+          borderRadius: borderRadius.button, // 6px ClassBridge
         };
       case 'xl':
         return {
           paddingVertical: spacing.xl,
           paddingHorizontal: spacing['2xl'],
           fontSize: typography.fontSize.xl,
-          borderRadius: borderRadius.xl,
+          borderRadius: borderRadius.button, // 6px ClassBridge
         };
       default:
         return {
           paddingVertical: spacing.md,
           paddingHorizontal: spacing.lg,
           fontSize: typography.fontSize.base,
-          borderRadius: borderRadius.lg,
+          borderRadius: borderRadius.button, // 6px ClassBridge
         };
     }
   };
@@ -164,7 +164,7 @@ export function Button({
     {
       backgroundColor: variantStyles.backgroundColor,
       borderColor: variantStyles.borderColor,
-      borderWidth: variant === 'outline' ? 2 : 0,
+      borderWidth: variant === 'outline' || variant === 'secondary' ? 1 : 0, // 1px border for outline and secondary (ClassBridge)
       paddingVertical: sizeStyles.paddingVertical,
       paddingHorizontal: sizeStyles.paddingHorizontal,
       borderRadius: sizeStyles.borderRadius,

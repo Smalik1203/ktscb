@@ -7,6 +7,7 @@ import { X, Upload, FileText, Paperclip, Image as ImageIcon } from 'lucide-react
 import { Task } from '../../hooks/useTasks';
 import { supabase } from '../../data/supabaseClient';
 import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { SuccessAnimation } from '../ui/SuccessAnimation';
 
 const STORAGE_BUCKET = 'task-submissions';
 
@@ -37,6 +38,7 @@ export function TaskSubmissionModal({
   const [attachments, setAttachments] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
 
   useEffect(() => {
     if (visible && existingSubmission) {
@@ -256,11 +258,8 @@ export function TaskSubmissionModal({
                 attachments: uploadedAttachments,
               });
 
-              Alert.alert('Success', 'Task submitted successfully!');
-              onDismiss();
-              setSubmissionText('');
-              setImages([]);
-              setAttachments([]);
+              // Show success animation
+              setShowSuccessAnimation(true);
             } catch (error: any) {
               console.error('Error submitting task:', error);
               Alert.alert('Error', error.message || 'Failed to submit task');
@@ -278,6 +277,15 @@ export function TaskSubmissionModal({
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const handleAnimationEnd = () => {
+    setShowSuccessAnimation(false);
+    setSubmitting(false);
+    setSubmissionText('');
+    setImages([]);
+    setAttachments([]);
+    onDismiss();
   };
 
   return (
@@ -434,6 +442,12 @@ export function TaskSubmissionModal({
             </Button>
           </View>
         </View>
+
+        {/* Success Animation */}
+        <SuccessAnimation
+          visible={showSuccessAnimation}
+          onAnimationEnd={handleAnimationEnd}
+        />
       </Modal>
     </Portal>
   );

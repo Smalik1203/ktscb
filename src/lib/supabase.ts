@@ -64,6 +64,20 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     storage: AsyncStorage,
     storageKey: 'cb-session-v1'
   },
+  db: {
+    schema: 'public',
+  },
+  global: {
+    headers: {
+      'x-client-info': 'classbridge-mobile',
+    },
+  },
+  // Realtime performance optimizations
+  realtime: {
+    params: {
+      eventsPerSecond: 10, // Throttle realtime events
+    },
+  },
 });
 
 log.info('Supabase client created successfully with AsyncStorage');

@@ -25,6 +25,7 @@ import {
 import { MonthPickerModal } from '../../components/common';
 import { supabase } from '../../lib/supabase';
 import { DB } from '../../types/db.constants';
+import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
 
 export default function CalendarScreen() {
   const { profile } = useAuth();
@@ -353,20 +354,18 @@ export default function CalendarScreen() {
             })}
           </View>
         ) : (
-          <View style={styles.centerContainer}>
-            <CalendarDays size={64} color={colors.text.tertiary} />
-            <Text variant="titleLarge" style={styles.emptyTitle}>
-              No Events
-            </Text>
-            <Text variant="bodyMedium" style={styles.emptyMessage}>
-              No events scheduled for this month.
-            </Text>
-            {canManageEvents && (
-              <Button mode="contained" onPress={handleAddEvent} style={styles.addEventButton}>
-                Add First Event
-              </Button>
-            )}
-          </View>
+          <EmptyStateIllustration
+            type="calendar"
+            title="No Events"
+            description="No events scheduled for this month."
+            action={
+              canManageEvents ? (
+                <Button mode="contained" onPress={handleAddEvent} style={styles.addEventButton}>
+                  Add First Event
+                </Button>
+              ) : undefined
+            }
+          />
         )}
       </ScrollView>
     );
@@ -729,17 +728,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.text.secondary,
     lineHeight: 18,
-  },
-  emptyTitle: {
-    color: colors.text.primary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-    fontWeight: typography.fontWeight.bold,
-  },
-  emptyMessage: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
   },
   addEventButton: {
     marginTop: spacing.md,

@@ -13,6 +13,7 @@ import { useSubjects } from '../../hooks/useSubjects';
 import { TaskFormModal } from '../../components/tasks/TaskFormModal';
 import { TaskSubmissionModal } from '../../components/tasks/TaskSubmissionModal';
 import { StudentTaskCard } from '../../components/tasks/StudentTaskCard';
+import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
 
 // Task Detail Modal Component
 interface TaskDetailModalProps {
@@ -773,9 +774,9 @@ export default function TasksScreen() {
             </View>
           </View>
           
-          {/* Stats Cards */}
-          {!isLoading && stats && (
-            <View style={styles.statsSection}>
+          {/* Stats Cards - keep visible during refresh */}
+          {stats && (
+            <View style={[styles.statsSection, isLoading && styles.statsLoading]}>
               <View style={styles.statsGrid}>
                 <Card style={styles.statCard}>
                   <View style={styles.statContent}>
@@ -810,8 +811,8 @@ export default function TasksScreen() {
             </View>
           )}
 
-          {/* Loading State */}
-        {isLoading && (
+          {/* Loading State - only show if no data loaded yet */}
+        {isLoading && !stats && !tasks?.length && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary[600]} />
             <Text style={styles.loadingText}>Loading tasks...</Text>
@@ -820,29 +821,29 @@ export default function TasksScreen() {
 
         {/* Empty State */}
         {!isLoading && filteredTasks.length === 0 && (
-          <View style={styles.emptyStateContainer}>
-            <View style={styles.emptyIconCircle}>
-              <ClipboardList size={48} color={colors.primary[600]} />
-            </View>
-            <Text style={styles.emptyTitle}>No Tasks Found</Text>
-            <Text style={styles.emptyText}>
-              {searchQuery 
+          <EmptyStateIllustration
+            type="tasks"
+            title="No Tasks Found"
+            description={
+              searchQuery
                 ? 'Try adjusting your search or filters to find what you\'re looking for'
-                : isStudent 
+                : isStudent
                   ? 'You\'re all caught up! No tasks have been assigned yet.'
-                  : 'Get started by creating your first task for your class'}
-            </Text>
-            {!isStudent && !searchQuery && (
-              <Button
-                mode="contained"
-                onPress={handleCreateTask}
-                style={styles.emptyButton}
-                icon={() => <Plus size={20} color="white" />}
-              >
-                Create First Task
-              </Button>
-            )}
-          </View>
+                  : 'Get started by creating your first task for your class'
+            }
+            action={
+              !isStudent && !searchQuery ? (
+                <Button
+                  mode="contained"
+                  onPress={handleCreateTask}
+                  style={styles.emptyButton}
+                  icon={() => <Plus size={20} color="white" />}
+                >
+                  Create First Task
+                </Button>
+              ) : undefined
+            }
+          />
         )}
 
         {/* Task List */}
@@ -1453,6 +1454,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,
   },
+  statsLoading: {
+    opacity: 0.6,
+  },
   statsGrid: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -1560,35 +1564,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
-  },
-  emptyStateContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing['2xl'],
-    alignItems: 'center',
-  },
-  emptyIconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold as any,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.md,
   },
   emptyButton: {
     backgroundColor: colors.primary[600],

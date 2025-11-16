@@ -9,6 +9,7 @@ import { useAllResources } from '../../hooks/useResources';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
 import { Card, LoadingView, ErrorView, EmptyState } from '../../components/ui';
+import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
 import { VideoPlayer } from '../../components/resources/VideoPlayer';
 import { PDFViewer } from '../../components/resources/PDFViewer';
 import { AddResourceModal } from '../../components/resources/AddResourceModal';
@@ -432,18 +433,20 @@ export default function ResourcesScreen() {
 
         {/* Empty State or Resources List */}
         {filteredResources.length === 0 ? (
-          <View style={styles.emptyCardContainer}>
-            <View style={styles.largeEmptyCard}>
-              <EmptyState
-                title="No Resources"
-                message="Get started by adding your first learning resource"
-                icon={<BookOpen size={64} color={colors.neutral[300]} />}
-                actionLabel="Create Resource"
-                onAction={handleAddResource}
-                variant="card"
-              />
-            </View>
-          </View>
+          <EmptyStateIllustration
+            type="resources"
+            title="No Resources"
+            description="Get started by adding your first learning resource"
+            action={
+              <TouchableOpacity
+                style={styles.createResourceButton}
+                onPress={handleAddResource}
+              >
+                <Plus size={20} color={colors.text.inverse} />
+                <Text style={styles.createResourceButtonText}>Create Resource</Text>
+              </TouchableOpacity>
+            }
+          />
         ) : (
           <View style={styles.resourcesContent}>
         {filteredResources.map((resource) => {
@@ -1061,26 +1064,18 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#F8F9FB' 
   },
-  emptyCardContainer: {
+  createResourceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary[600],
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.button,
   },
-  largeEmptyCard: {
-    marginHorizontal: 0,
-    marginTop: 0,
-    marginBottom: 0,
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    paddingVertical: spacing.xl,
-    paddingHorizontal: spacing.xl,
-    minHeight: 280,
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+  createResourceButtonText: {
+    color: colors.text.inverse,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
   },
 });

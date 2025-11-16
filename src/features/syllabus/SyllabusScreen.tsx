@@ -246,12 +246,12 @@ function TeacherSyllabusScreen() {
                 </View>
             </View>
 
-            {(metaLoading) && (
+            {(metaLoading || refreshing) && (
                 <View style={styles.center}><ActivityIndicator /></View>
             )}
 
             {/* Empty meta data states */}
-            {!metaLoading && (!classes?.length || !subjects?.length) && (
+            {!metaLoading && !refreshing && (!classes?.length || !subjects?.length) && (
                 <View style={styles.emptyFill}>
                 <View style={[styles.largeEmptyCard, styles.largeEmptyCardFill]}>
                     <EmptyState
@@ -265,7 +265,7 @@ function TeacherSyllabusScreen() {
             )}
 
             {/* Prompt to choose filters */}
-            {!metaLoading && (classes?.length ?? 0) > 0 && (subjects?.length ?? 0) > 0 && (!selectedClassId || !selectedSubjectId) && (
+            {!metaLoading && !refreshing && (classes?.length ?? 0) > 0 && (subjects?.length ?? 0) > 0 && (!selectedClassId || !selectedSubjectId) && (
                 <View style={styles.emptyFill}>
                 <View style={[styles.largeEmptyCard, styles.largeEmptyCardFill]}>
                     <EmptyState
@@ -278,7 +278,7 @@ function TeacherSyllabusScreen() {
                 </View>
             )}
 
-            {!!selectedClassId && !!selectedSubjectId && tree.chapters.length === 0 && (
+            {!!selectedClassId && !!selectedSubjectId && !refreshing && tree.chapters.length === 0 && (
                 <View style={styles.emptyFill}>
                 <View style={[styles.largeEmptyCard, styles.largeEmptyCardFill]}>
                     <EmptyState
@@ -293,7 +293,7 @@ function TeacherSyllabusScreen() {
                 </View>
             )}
 
-            {!!selectedClassId && !!selectedSubjectId && tree.chapters.length > 0 && (
+            {!!selectedClassId && !!selectedSubjectId && !refreshing && tree.chapters.length > 0 && (
                 <ScrollView 
                     contentContainerStyle={styles.contentContainer}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadDetails} />}

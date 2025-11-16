@@ -48,20 +48,20 @@ export function Input({
       case 'filled':
         return {
           backgroundColor: colors.neutral[50],
-          borderColor: isFocused ? colors.primary[500] : colors.neutral[200],
-          borderWidth: 0,
+          borderColor: isFocused ? colors.primary[600] : colors.neutral[200], // Sapphire Blue focus
+          borderWidth: isFocused ? 2 : 0, // 2px on focus (ClassBridge)
         };
       case 'outlined':
         return {
           backgroundColor: 'transparent',
-          borderColor: isFocused ? colors.primary[500] : colors.border.DEFAULT,
-          borderWidth: 2,
+          borderColor: isFocused ? colors.primary[600] : colors.border.DEFAULT, // Sapphire Blue focus
+          borderWidth: isFocused ? 2 : 1, // 2px on focus (ClassBridge)
         };
       default:
         return {
           backgroundColor: colors.surface.primary,
-          borderColor: isFocused ? colors.primary[500] : colors.border.light,
-          borderWidth: 1,
+          borderColor: isFocused ? colors.primary[600] : colors.border.DEFAULT, // Sapphire Blue focus, Border Gray default
+          borderWidth: isFocused ? 2 : 1, // 2px on focus (ClassBridge)
         };
     }
   };
@@ -73,28 +73,28 @@ export function Input({
           paddingVertical: spacing.sm,
           paddingHorizontal: spacing.md,
           fontSize: typography.fontSize.sm,
-          borderRadius: borderRadius.md,
+          borderRadius: borderRadius.input, // 8px ClassBridge
         };
       case 'md':
         return {
           paddingVertical: spacing.md,
           paddingHorizontal: spacing.lg,
-          fontSize: typography.fontSize.base,
-          borderRadius: borderRadius.lg,
+          fontSize: typography.fontSize.base, // 16px
+          borderRadius: borderRadius.input, // 8px ClassBridge
         };
       case 'lg':
         return {
           paddingVertical: spacing.lg,
           paddingHorizontal: spacing.xl,
           fontSize: typography.fontSize.lg,
-          borderRadius: borderRadius.lg,
+          borderRadius: borderRadius.input, // 8px ClassBridge
         };
       default:
         return {
           paddingVertical: spacing.md,
           paddingHorizontal: spacing.lg,
           fontSize: typography.fontSize.base,
-          borderRadius: borderRadius.lg,
+          borderRadius: borderRadius.input, // 8px ClassBridge
         };
     }
   };
@@ -112,11 +112,11 @@ export function Input({
     {
       backgroundColor: variantStyles.backgroundColor,
       borderColor: error ? colors.error[500] : variantStyles.borderColor,
-      borderWidth: variantStyles.borderWidth,
+      borderWidth: error ? 2 : variantStyles.borderWidth, // 2px on error
       paddingVertical: sizeStyles.paddingVertical,
       paddingHorizontal: sizeStyles.paddingHorizontal,
       borderRadius: sizeStyles.borderRadius,
-      ...(isFocused && !error ? shadows.sm : shadows.xs),
+      ...shadows.none, // No shadow on inputs (ClassBridge)
     },
   ];
 

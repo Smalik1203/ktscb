@@ -63,29 +63,27 @@ export function Card({
       case 'elevated':
         return {
           backgroundColor: colors.surface.elevated,
-          ...shadows.lg,
+          ...shadows.md, // Softer shadow (ClassBridge)
           borderWidth: 0,
         };
       case 'glass':
         return {
           backgroundColor: colors.surface.glass,
-          ...shadows.md,
-          borderWidth: 1,
-          borderColor: colors.border.light,
+          ...shadows.sm,
+          borderWidth: 0, // No border for clean look
         };
       case 'outlined':
         return {
           backgroundColor: colors.surface.primary,
           ...shadows.none,
-          borderWidth: 2,
+          borderWidth: 1, // 1px border (ClassBridge)
           borderColor: colors.border.DEFAULT,
         };
       default:
         return {
           backgroundColor: colors.surface.primary,
           ...shadows.md,
-          borderWidth: 1,
-          borderColor: colors.border.light,
+          borderWidth: 0, // No border for clean look (ClassBridge)
         };
     }
   };
@@ -157,7 +155,7 @@ export function Card({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.card, // 12px ClassBridge
     overflow: 'hidden',
   },
   disabled: {

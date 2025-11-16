@@ -1,53 +1,114 @@
-import { ViewStyle, TextStyle } from 'react-native';
+/**
+ * ClassBridge Design System
+ * Production-grade responsive design system inspired by Duolingo
+ *
+ * Features:
+ * - Responsive typography that scales across devices (phone, tablet, desktop)
+ * - 8px spacing grid system with responsive scaling
+ * - Consistent font sizes optimized for readability
+ * - Sapphire Blue primary color (#1E4EB8)
+ * - Lime Green accent color (#9DFF7A)
+ *
+ * Screen Sizes:
+ * - Small phones: 320-374px (scale: 0.9)
+ * - Standard phones: 375-413px (scale: 0.95)
+ * - Large phones: 414-767px (scale: 1.0)
+ * - Tablets: 768-1023px (scale: 1.1)
+ * - Desktop: 1024px+ (scale: 1.2)
+ */
 
-// Krishnaveni Talent School Color Palette - Orange Theme
+import { ViewStyle, TextStyle, Dimensions } from 'react-native';
+
+// Responsive breakpoints
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+export const breakpoints = {
+  small: 320,   // Small phones
+  medium: 375,  // Standard phones (iPhone SE, iPhone 8)
+  large: 414,   // Large phones (iPhone 11, 12, 13)
+  tablet: 768,  // Tablets
+  desktop: 1024 // Desktop/Large tablets
+};
+
+// Get responsive scale based on screen width
+const getScale = () => {
+  if (SCREEN_WIDTH >= breakpoints.desktop) return 1.2;
+  if (SCREEN_WIDTH >= breakpoints.tablet) return 1.1;
+  if (SCREEN_WIDTH >= breakpoints.large) return 1.0;
+  if (SCREEN_WIDTH >= breakpoints.medium) return 0.95;
+  return 0.9; // Small phones
+};
+
+const SCALE = getScale();
+
+// Responsive font scaling
+const scaleFont = (size: number) => Math.round(size * SCALE);
+const scaleSpacing = (size: number) => Math.round(size * SCALE);
+
+// ClassBridge Color Palette - Sapphire Blue Theme
 export const colors = {
-  // Primary Brand Colors - Orange (KTS Logo Colors)
+  // Primary Brand Colors - Sapphire Blue
   primary: {
-    50: '#fff5f0',
-    100: '#ffe8dc',
-    200: '#ffd4c0',
-    300: '#ffb89d',
-    400: '#ff9a7a',
-    500: '#FF8C42', // Light orange
-    600: '#FF6B35', // Main orange from logo
-    700: '#E55A2B',
-    800: '#CC4A21',
-    900: '#B33A17',
-    950: '#8A2B0F',
-    main: '#FF6B35', // Main primary color (from logo)
+    50: '#eff6ff',
+    100: '#dbeafe',
+    200: '#bfdbfe',
+    300: '#93c5fd',
+    400: '#60a5fa',
+    500: '#4FA3FF', // Sky Blue
+    600: '#1E4EB8', // Sapphire Blue (Main brand color)
+    700: '#1e40af',
+    800: '#1e3a8a',
+    900: '#1e3a8a',
+    950: '#172554',
+    main: '#1E4EB8', // Main primary color
   },
 
-  // Secondary - Modern Teal
+  // Secondary - Sky Blue (lighter variant for secondary actions)
   secondary: {
-    50: '#f0fdfa',
-    100: '#ccfbf1',
-    200: '#99f6e4',
-    300: '#5eead4',
-    400: '#2dd4bf',
-    500: '#14b8a6',
-    600: '#0d9488',
-    700: '#0f766e',
-    800: '#115e59',
-    900: '#134e4a',
-    950: '#042f2e',
-    main: '#14b8a6', // Main secondary color
+    50: '#eff6ff',
+    100: '#dbeafe',
+    200: '#bfdbfe',
+    300: '#93c5fd',
+    400: '#60a5fa',
+    500: '#4FA3FF', // Sky Blue
+    600: '#3b82f6',
+    700: '#2563eb',
+    800: '#1d4ed8',
+    900: '#1e3a8a',
+    950: '#172554',
+    main: '#4FA3FF', // Sky Blue for secondary
   },
 
-  // Success - Vibrant Green
+  // Accent - Lime Green (use sparingly for success states, highlights)
+  accent: {
+    50: '#f7fee7',
+    100: '#ecfccb',
+    200: '#d9f99d',
+    300: '#bef264',
+    400: '#a3e635',
+    500: '#9DFF7A', // Lime Green (Main accent)
+    600: '#65a30d',
+    700: '#4d7c0f',
+    800: '#3f6212',
+    900: '#365314',
+    950: '#1a2e05',
+    main: '#9DFF7A', // Lime Green accent
+  },
+
+  // Success - Lime Green (same as accent for consistency)
   success: {
-    50: '#f0fdf4',
-    100: '#dcfce7',
-    200: '#bbf7d0',
-    300: '#86efac',
-    400: '#4ade80',
-    500: '#22c55e',
-    600: '#16a34a',
-    700: '#15803d',
-    800: '#166534',
-    900: '#14532d',
-    950: '#052e16',
-    main: '#22c55e', // Main success color
+    50: '#f7fee7',
+    100: '#ecfccb',
+    200: '#d9f99d',
+    300: '#bef264',
+    400: '#a3e635',
+    500: '#9DFF7A', // Lime Green
+    600: '#65a30d',
+    700: '#4d7c0f',
+    800: '#3f6212',
+    900: '#365314',
+    950: '#1a2e05',
+    main: '#9DFF7A', // Lime Green for success
   },
 
   // Warning - Modern Amber
@@ -82,138 +143,143 @@ export const colors = {
     main: '#ef4444', // Main error color
   },
 
-  // Info - Dark Blue (from KTS logo)
+  // Info - Sapphire Blue (same as primary for consistency)
   info: {
-    50: '#e8eaf6',
-    100: '#c5cae9',
-    200: '#9fa8da',
-    300: '#7986cb',
-    400: '#5c6bc0',
-    500: '#3f51b5',
-    600: '#3949ab',
-    700: '#303f9f',
-    800: '#283593',
-    900: '#1A237E', // Dark blue from KTS logo
-    950: '#0d1338',
+    50: '#eff6ff',
+    100: '#dbeafe',
+    200: '#bfdbfe',
+    300: '#93c5fd',
+    400: '#60a5fa',
+    500: '#4FA3FF', // Sky Blue
+    600: '#1E4EB8', // Sapphire Blue
+    700: '#1e40af',
+    800: '#1e3a8a',
+    900: '#1e3a8a',
+    950: '#172554',
   },
 
-  // Neutral - Modern Grays
+  // Neutral - ClassBridge Grays (Light, clean)
   neutral: {
     50: '#fafafa',
-    100: '#f5f5f5',
-    200: '#e5e5e5',
-    300: '#d4d4d4',
-    400: '#a3a3a3',
-    500: '#737373',
-    600: '#525252',
-    700: '#404040',
-    800: '#262626',
-    900: '#171717',
-    950: '#0a0a0a',
+    100: '#F5F7FA', // Light Gray (ClassBridge)
+    200: '#e5e7eb',
+    300: '#D9DCE1', // Border Gray (ClassBridge)
+    400: '#9ca3af',
+    500: '#6b7280',
+    600: '#4b5563',
+    700: '#374151',
+    800: '#2A2A2A', // Text Dark (ClassBridge)
+    900: '#1f2937',
+    950: '#030712',
   },
 
-  // Background System - Warm Orange Tones
+  // Background System - Light, Clean (ClassBridge)
   background: {
-    primary: '#ffffff',
-    secondary: '#fff8f5', // Very light orange tint
-    tertiary: '#fff5f0', // Light orange tint
-    quaternary: '#ffe8dc', // Warm orange background
-    dark: '#1A237E', // Dark blue from logo
-    app: '#fffbf9', // Warm off-white
-    elevated: '#ffffff',
+    primary: '#FFFFFF', // White
+    secondary: '#F5F7FA', // Light Gray
+    tertiary: '#F3F4F6', // Very light gray
+    quaternary: '#eff6ff', // Very light blue tint
+    dark: '#0B1A3C', // Dark Navy (Operium)
+    app: '#F5F7FA', // Light Gray app background
+    elevated: '#FFFFFF',
     glass: 'rgba(255, 255, 255, 0.9)',
-    default: '#fffbf9', // Default background - warm white
-    light: '#fff5f0', // Light background - orange tint
-    paper: '#ffffff', // Paper background
-    card: '#ffffff', // Card background
+    default: '#F5F7FA', // Light Gray default
+    light: '#FFFFFF', // White for light backgrounds
+    paper: '#FFFFFF', // Paper background
+    card: '#FFFFFF', // Card background
   },
 
-  // Surface System - Warm Orange Tones
+  // Surface System - Light, Clean (ClassBridge)
   surface: {
-    primary: '#ffffff',
-    secondary: '#fff8f5', // Very light orange tint
-    tertiary: '#fff5f0', // Light orange tint
-    elevated: '#ffffff',
-    overlay: 'rgba(26, 35, 126, 0.6)', // Dark blue overlay
+    primary: '#FFFFFF', // White
+    secondary: '#F5F7FA', // Light Gray
+    tertiary: '#F3F4F6', // Very light gray
+    elevated: '#FFFFFF',
+    overlay: 'rgba(11, 26, 60, 0.6)', // Dark Navy overlay
     glass: 'rgba(255, 255, 255, 0.95)',
-    dark: '#1A237E', // Dark blue from logo
-    light: '#fff5f0', // Light surface - orange tint
-    paper: '#ffffff', // Paper surface
+    dark: '#0B1A3C', // Dark Navy
+    light: '#F5F7FA', // Light Gray surface
+    paper: '#FFFFFF', // Paper surface
   },
 
-  // Border System - Orange Accents
+  // Border System - Clean Gray (ClassBridge)
   border: {
-    light: '#ffe8dc', // Light orange border
-    DEFAULT: '#ffd4c0', // Medium orange border
-    dark: '#FF8C42', // Orange border
-    accent: '#FF6B35', // Main orange accent
+    light: '#e5e7eb', // Very light gray border
+    DEFAULT: '#D9DCE1', // Border Gray (ClassBridge)
+    dark: '#9ca3af', // Darker gray border
+    accent: '#1E4EB8', // Sapphire Blue accent
   },
 
-  // Text System - Senior-level accessibility standards
+  // Text System - ClassBridge Typography (accessibility standards)
   text: {
-    primary: '#1A1A1A',        // Near black for maximum readability
+    primary: '#2A2A2A',        // Text Dark (ClassBridge) for maximum readability
     secondary: '#374151',      // Dark gray for secondary text
     tertiary: '#6b7280',       // Medium gray for tertiary text
     quaternary: '#9ca3af',     // Light gray for disabled text
-    inverse: '#ffffff',        // White for dark backgrounds
+    inverse: '#FFFFFF',        // White for dark backgrounds
     disabled: '#d1d5db',       // Light gray for disabled states
-    accent: '#FF6B35',         // Orange brand color for links/accents
+    accent: '#1E4EB8',         // Sapphire Blue for links/accents
   },
 
-  // Modern Gradients - Orange Theme
+  // Modern Gradients - Sapphire Blue Theme
   gradient: {
-    primary: ['#FF6B35', '#FF8C42', '#FFA85C'], // Main orange gradient
-    secondary: ['#FF8C42', '#FFB89D', '#FFD4C0'], // Light orange gradient
-    success: ['#22c55e', '#16a34a', '#15803d'],
-    warning: ['#FF6B35', '#f97316', '#ef4444'], // Orange to red
-    sunset: ['#FF6B35', '#ef4444', '#ec4899'], // Orange sunset
-    ocean: ['#1A237E', '#3949ab', '#5c6bc0'], // Dark blue gradient
-    forest: ['#22c55e', '#16a34a', '#15803d'],
-    cosmic: ['#FF6B35', '#FF8C42', '#FFB89D'], // Orange cosmic
+    primary: ['#3A57F5', '#537BFF', '#4FA3FF'], // Sapphire to Sky Blue (Operium style)
+    secondary: ['#4FA3FF', '#60a5fa', '#93c5fd'], // Sky Blue gradient
+    success: ['#9DFF7A', '#a3e635', '#65a30d'], // Lime Green gradient
+    warning: ['#f59e0b', '#f97316', '#ef4444'], // Amber to red
+    sunset: ['#1E4EB8', '#2563eb', '#4FA3FF'], // Sapphire sunset
+    ocean: ['#1E4EB8', '#2563eb', '#4FA3FF'], // Sapphire Blue gradient
+    forest: ['#9DFF7A', '#a3e635', '#65a30d'], // Lime Green gradient
+    cosmic: ['#1E4EB8', '#4FA3FF', '#93c5fd'], // Blue cosmic
   },
 
-  // Special Educational Colors - Orange Accented
+  // Special Educational Colors - ClassBridge Theme
   education: {
-    math: '#FF6B35', // Orange
-    science: '#10b981',
-    english: '#FF8C42', // Light orange
-    history: '#ef4444',
-    art: '#1A237E', // Dark blue from logo
-    music: '#ec4899',
-    sports: '#FF6B35', // Orange
-    library: '#FF8C42', // Light orange
+    math: '#1E4EB8', // Sapphire Blue
+    science: '#9DFF7A', // Lime Green
+    english: '#4FA3FF', // Sky Blue
+    history: '#ef4444', // Red
+    art: '#ec4899', // Pink
+    music: '#a855f7', // Purple
+    sports: '#1E4EB8', // Sapphire Blue
+    library: '#4FA3FF', // Sky Blue
   },
 };
 
+// Responsive spacing (8px grid system with scaling)
 export const spacing = {
   0: 0,
-  1: 4,
-  2: 8,
-  3: 12,
-  4: 16,
-  5: 20,
-  6: 24,
-  8: 32,
-  10: 40,
-  12: 48,
-  16: 64,
-  20: 80,
-  24: 96,
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
-  '2xl': 48,
-  '3xl': 64,
-  xxl: 80, // Extra extra large spacing
+  1: scaleSpacing(4),   // 4px
+  2: scaleSpacing(8),   // 8px
+  3: scaleSpacing(12),  // 12px
+  4: scaleSpacing(16),  // 16px
+  5: scaleSpacing(20),  // 20px
+  6: scaleSpacing(24),  // 24px
+  8: scaleSpacing(32),  // 32px
+  10: scaleSpacing(40), // 40px
+  12: scaleSpacing(48), // 48px
+  16: scaleSpacing(64), // 64px
+  20: scaleSpacing(80), // 80px
+  24: scaleSpacing(96), // 96px
+  // Named spacing (production-grade)
+  xs: scaleSpacing(4),   // Extra small - 4px
+  sm: scaleSpacing(8),   // Small - 8px
+  md: scaleSpacing(16),  // Medium - 16px (base unit)
+  lg: scaleSpacing(24),  // Large - 24px
+  xl: scaleSpacing(32),  // Extra large - 32px
+  '2xl': scaleSpacing(48), // 2x extra large - 48px
+  '3xl': scaleSpacing(64), // 3x extra large - 64px
+  xxl: scaleSpacing(80),   // XXL - 80px
 };
 
 export const borderRadius = {
   none: 0,
   sm: 4,
+  button: 6, // ClassBridge button radius
   DEFAULT: 8,
+  input: 8, // ClassBridge input radius
   md: 12,
+  card: 12, // ClassBridge card radius
   lg: 16,
   xl: 24,
   '2xl': 32,
@@ -229,65 +295,65 @@ export const shadows = {
     elevation: 0,
   },
   xs: {
-    shadowColor: colors.neutral[900],
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
+    shadowOpacity: 0.04, // Softer shadow (ClassBridge)
+    shadowRadius: 2,
     elevation: 1,
   },
   sm: {
-    shadowColor: colors.neutral[900],
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06, // Softer shadow (ClassBridge)
     shadowRadius: 3,
     elevation: 2,
   },
   DEFAULT: {
-    shadowColor: colors.neutral[900],
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowOpacity: 0.08, // Softer shadow (ClassBridge)
+    shadowRadius: 4,
     elevation: 3,
   },
   md: {
-    shadowColor: colors.neutral[900],
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOpacity: 0.08, // Softer shadow (ClassBridge)
+    shadowRadius: 8,
     elevation: 4,
   },
   lg: {
-    shadowColor: colors.neutral[900],
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
+    shadowOpacity: 0.08, // Softer shadow (ClassBridge)
+    shadowRadius: 16,
     elevation: 6,
   },
   xl: {
-    shadowColor: colors.neutral[900],
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.18,
-    shadowRadius: 28,
+    shadowOpacity: 0.08, // Softer shadow (ClassBridge)
+    shadowRadius: 24,
     elevation: 8,
   },
   '2xl': {
-    shadowColor: colors.neutral[900],
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.2,
-    shadowRadius: 36,
+    shadowOpacity: 0.08, // Softer shadow (ClassBridge)
+    shadowRadius: 32,
     elevation: 10,
   },
   inner: {
-    shadowColor: colors.neutral[900],
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    shadowOpacity: 0.04, // Softer shadow (ClassBridge)
+    shadowRadius: 2,
     elevation: 0,
   },
   glow: {
-    shadowColor: colors.primary[600], // Orange glow
+    shadowColor: colors.primary[600], // Sapphire Blue glow
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 0,
   },
@@ -303,18 +369,20 @@ export const typography = {
     display: 'Inter-Bold', // For large headings
     mono: 'SFMono-Regular', // For code/numbers
   },
+  // Production-grade font sizes (Duolingo-style, responsive)
   fontSize: {
-    xs: 12,
-    sm: 14,
-    base: 16,
-    lg: 18,
-    xl: 20,
-    '2xl': 24,
-    '3xl': 30,
-    '4xl': 36,
-    '5xl': 48,
-    '6xl': 60,
-    '7xl': 72,
+    xs: scaleFont(11),      // 11px - tiny labels, captions
+    sm: scaleFont(13),      // 13px - small text, secondary info
+    base: scaleFont(15),    // 15px - body text (optimal readability)
+    md: scaleFont(16),      // 16px - comfortable reading
+    lg: scaleFont(17),      // 17px - emphasized body
+    xl: scaleFont(19),      // 19px - large text, section headers
+    '2xl': scaleFont(22),   // 22px - page headers
+    '3xl': scaleFont(26),   // 26px - large headers
+    '4xl': scaleFont(32),   // 32px - hero text
+    '5xl': scaleFont(40),   // 40px - display
+    '6xl': scaleFont(48),   // 48px - large display
+    '7xl': scaleFont(60),   // 60px - hero display
   },
   fontWeight: {
     light: '300' as TextStyle['fontWeight'],
@@ -340,54 +408,54 @@ export const typography = {
     wider: 0.5,
     widest: 1,
   },
-  // Typography variants for easy use
+  // Typography variants for easy use (Production-grade, responsive)
   h1: {
-    fontSize: 48,
-    fontWeight: '700' as TextStyle['fontWeight'],
-    lineHeight: 1.1,
+    fontSize: scaleFont(26), // Hero headers
+    fontWeight: '600' as TextStyle['fontWeight'],
+    lineHeight: 1.25,
   },
   h2: {
-    fontSize: 36,
-    fontWeight: '700' as TextStyle['fontWeight'],
-    lineHeight: 1.2,
-  },
-  h3: {
-    fontSize: 30,
-    fontWeight: '600' as TextStyle['fontWeight'],
-    lineHeight: 1.2,
-  },
-  h4: {
-    fontSize: 24,
+    fontSize: scaleFont(22), // Page headers
     fontWeight: '600' as TextStyle['fontWeight'],
     lineHeight: 1.3,
   },
+  h3: {
+    fontSize: scaleFont(19), // Section headers
+    fontWeight: '600' as TextStyle['fontWeight'],
+    lineHeight: 1.35,
+  },
+  h4: {
+    fontSize: scaleFont(17), // Subsection headers
+    fontWeight: '600' as TextStyle['fontWeight'],
+    lineHeight: 1.4,
+  },
   h5: {
-    fontSize: 20,
+    fontSize: scaleFont(16), // Small headers
     fontWeight: '600' as TextStyle['fontWeight'],
     lineHeight: 1.4,
   },
   h6: {
-    fontSize: 18,
+    fontSize: scaleFont(15), // Tiny headers
     fontWeight: '600' as TextStyle['fontWeight'],
     lineHeight: 1.4,
   },
   body1: {
-    fontSize: 16,
+    fontSize: scaleFont(15), // Primary body text (optimal)
     fontWeight: '400' as TextStyle['fontWeight'],
     lineHeight: 1.5,
   },
   body2: {
-    fontSize: 14,
+    fontSize: scaleFont(13), // Secondary body text
     fontWeight: '400' as TextStyle['fontWeight'],
     lineHeight: 1.5,
   },
   caption: {
-    fontSize: 12,
+    fontSize: scaleFont(11), // Captions, labels
     fontWeight: '400' as TextStyle['fontWeight'],
     lineHeight: 1.4,
   },
   button: {
-    fontSize: 14,
+    fontSize: scaleFont(15), // Button text (readable)
     fontWeight: '600' as TextStyle['fontWeight'],
     lineHeight: 1.4,
   },
@@ -396,21 +464,21 @@ export const typography = {
 export const animation = {
   duration: {
     instant: 0,
-    fast: 150,
-    normal: 300,
-    slow: 500,
-    slower: 700,
-    slowest: 1000,
+    fast: 150, // ClassBridge fast (150-250ms)
+    normal: 200, // ClassBridge normal
+    slow: 250, // ClassBridge slow (max recommended)
+    slower: 300,
+    slowest: 500,
   },
   easing: {
     linear: 'linear',
     ease: 'ease',
     easeIn: 'ease-in',
-    easeOut: 'ease-out',
+    easeOut: 'ease-out', // ClassBridge recommended
     easeInOut: 'ease-in-out',
     // Custom easing curves for modern feel
-    bounce: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-    smooth: 'cubic-bezier(0.4, 0, 0.2, 1)',
+    bounce: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)', // Avoid for ClassBridge
+    smooth: 'cubic-bezier(0.4, 0, 0.2, 1)', // ClassBridge recommended
     snappy: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
   },
   spring: {
@@ -429,115 +497,139 @@ export const animation = {
   },
 };
 
+// Responsive layout system
 export const layout = {
   maxWidth: {
     sm: 640,
     md: 768,
     lg: 1024,
     xl: 1280,
+    full: SCREEN_WIDTH,
   },
   container: {
     padding: spacing.md,
+    maxWidth: SCREEN_WIDTH >= breakpoints.tablet ? 1200 : SCREEN_WIDTH,
   },
+  // Content max width for readability (like Duolingo)
+  contentMaxWidth: SCREEN_WIDTH >= breakpoints.tablet ? 680 : SCREEN_WIDTH - 32,
 };
 
-// Modern Component Design Tokens
+// Utility for responsive values
+export const responsive = {
+  isSmallPhone: SCREEN_WIDTH < breakpoints.medium,
+  isPhone: SCREEN_WIDTH < breakpoints.tablet,
+  isTablet: SCREEN_WIDTH >= breakpoints.tablet && SCREEN_WIDTH < breakpoints.desktop,
+  isDesktop: SCREEN_WIDTH >= breakpoints.desktop,
+  screenWidth: SCREEN_WIDTH,
+  screenHeight: SCREEN_HEIGHT,
+  scale: SCALE,
+};
+
+// Modern Component Design Tokens (ClassBridge)
 export const componentStyles = {
   card: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.card, // 12px ClassBridge
     padding: spacing.lg,
     ...shadows.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
+    borderWidth: 0, // No border for clean look
   } as ViewStyle,
 
   cardElevated: {
     backgroundColor: colors.surface.elevated,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.card, // 12px ClassBridge
     padding: spacing.lg,
-    ...shadows.lg,
-    borderWidth: 1,
-    borderColor: colors.border.light,
+    ...shadows.md,
+    borderWidth: 0, // No border for clean look
   } as ViewStyle,
 
   cardGlass: {
     backgroundColor: colors.surface.glass,
-    borderRadius: borderRadius.xl,
+    borderRadius: borderRadius.card, // 12px ClassBridge
     padding: spacing.lg,
-    ...shadows.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
+    ...shadows.sm,
+    borderWidth: 0,
   } as ViewStyle,
 
   button: {
     primary: {
-      backgroundColor: colors.primary[600],
+      backgroundColor: colors.primary[600], // Sapphire Blue
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.xl,
-      borderRadius: borderRadius.lg,
-      ...shadows.sm,
+      borderRadius: borderRadius.button, // 6px ClassBridge
+      ...shadows.none, // No shadow for buttons (ClassBridge)
       borderWidth: 0,
     } as ViewStyle,
 
     secondary: {
-      backgroundColor: colors.secondary[600],
+      backgroundColor: '#FFFFFF', // White (ClassBridge)
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.xl,
-      borderRadius: borderRadius.lg,
-      ...shadows.sm,
-      borderWidth: 0,
+      borderRadius: borderRadius.button, // 6px ClassBridge
+      borderWidth: 1,
+      borderColor: colors.primary[600], // Sapphire border
     } as ViewStyle,
 
     outline: {
       backgroundColor: 'transparent',
-      borderWidth: 2,
-      borderColor: colors.primary[600],
+      borderWidth: 1, // Thinner border (ClassBridge)
+      borderColor: colors.primary[600], // Sapphire Blue
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.xl,
-      borderRadius: borderRadius.lg,
+      borderRadius: borderRadius.button, // 6px ClassBridge
     } as ViewStyle,
 
     ghost: {
       backgroundColor: 'transparent',
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.xl,
-      borderRadius: borderRadius.lg,
+      borderRadius: borderRadius.button,
       borderWidth: 0,
     } as ViewStyle,
 
-    floating: {
-      backgroundColor: colors.primary[600],
-      paddingVertical: spacing.lg,
+    destructive: {
+      backgroundColor: colors.error[600], // Red (ClassBridge)
+      paddingVertical: spacing.md,
       paddingHorizontal: spacing.xl,
-      borderRadius: borderRadius.full,
-      ...shadows.lg,
+      borderRadius: borderRadius.button, // 6px ClassBridge
+      ...shadows.none,
       borderWidth: 0,
+    } as ViewStyle,
+
+    disabled: {
+      backgroundColor: colors.neutral[200],
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xl,
+      borderRadius: borderRadius.button,
+      borderWidth: 0,
+      opacity: 0.2, // 20% opacity (ClassBridge)
     } as ViewStyle,
   },
 
   input: {
     backgroundColor: colors.surface.primary,
-    borderWidth: 2,
-    borderColor: colors.border.light,
-    borderRadius: borderRadius.lg,
+    borderWidth: 1, // Thinner border (ClassBridge)
+    borderColor: colors.border.DEFAULT, // Border Gray
+    borderRadius: borderRadius.input, // 8px ClassBridge
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    fontSize: typography.fontSize.base,
-    color: '#000000', // Pure black for maximum readability
-    ...shadows.xs,
+    fontSize: typography.fontSize.base, // Responsive 15px
+    color: colors.text.primary, // #2A2A2A
+    ...shadows.none, // No shadow on inputs
+    minHeight: 48, // Minimum touch target
   } as ViewStyle,
 
   inputFocused: {
     backgroundColor: colors.surface.primary,
-    borderWidth: 2,
-    borderColor: colors.primary[500],
-    borderRadius: borderRadius.lg,
+    borderWidth: 2, // 2px blue outline (ClassBridge)
+    borderColor: colors.primary[600], // Sapphire Blue
+    borderRadius: borderRadius.input, // 8px ClassBridge
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
-    fontSize: typography.fontSize.base,
-    color: '#000000', // Pure black for maximum readability
-    ...shadows.sm,
+    fontSize: typography.fontSize.base, // Responsive
+    color: colors.text.primary,
+    ...shadows.none, // No shadow on inputs
+    minHeight: 48, // Minimum touch target
   } as ViewStyle,
 
   badge: {

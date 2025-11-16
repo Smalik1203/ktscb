@@ -5,6 +5,7 @@ import { Calendar, Coffee, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import { DatePickerModal } from '../common/DatePickerModal';
+import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
 import dayjs from 'dayjs';
 import { supabase } from '../../data/supabaseClient';
 
@@ -247,13 +248,11 @@ export function StudentTimetableScreen() {
   if (!profile?.class_instance_id) {
     return (
       <View style={styles.container}>
-        <View style={styles.centerContainer}>
-          <AlertCircle size={48} color={colors.text.tertiary} />
-          <Text style={styles.emptyTitle}>No class assigned</Text>
-          <Text style={styles.emptyText}>
-            Please contact your administrator to assign you to a class.
-          </Text>
-        </View>
+        <EmptyStateIllustration
+          type="general"
+          title="No Class Assigned"
+          description="Please contact your administrator to assign you to a class."
+        />
       </View>
     );
   }
@@ -291,13 +290,11 @@ export function StudentTimetableScreen() {
         }
       >
         {slots.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <AlertCircle size={48} color={colors.text.tertiary} />
-            <Text style={styles.emptyTitle}>No classes scheduled</Text>
-            <Text style={styles.emptyText}>
-              No classes scheduled for {dayjs(selectedDate).format('MMMM D, YYYY')}
-            </Text>
-          </View>
+          <EmptyStateIllustration
+            type="calendar"
+            title="No Classes Scheduled"
+            description={`No classes scheduled for ${dayjs(selectedDate).format('MMMM D, YYYY')}`}
+          />
         ) : (
           <View style={styles.slotsContainer}>
             {slots.map(slot => (
@@ -368,18 +365,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
   },
-  emptyTitle: {
-    marginTop: spacing.md,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  emptyText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
 
   // Filter Section
   filterSection: {
@@ -437,10 +422,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingTop: spacing.xl * 2,
   },
   slotsContainer: {
     gap: spacing.sm,

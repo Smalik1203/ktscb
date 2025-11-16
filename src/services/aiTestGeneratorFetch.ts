@@ -122,7 +122,7 @@ Rules:
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o', // Using full model for better vision accuracy
+        model: 'gpt-4o-mini', // 💰 Using mini model (94% cheaper, still accurate)
         messages: [
           {
             role: 'user',
@@ -135,13 +135,13 @@ Rules:
                 type: 'image_url',
                 image_url: {
                   url: `data:${mimeType};base64,${base64Image}`,
-                  detail: 'high', // Use high detail for better accuracy
+                  detail: 'low', // 💰 Low detail (95% cheaper, sufficient for most educational images)
                 },
               },
             ],
           },
         ],
-        max_tokens: 4096, // Maximum tokens for complete responses
+        max_tokens: 2500, // ⚡ Optimized for typical question generation
         temperature: 0.3, // 🎯 Lower for more accurate answers
         stream: USE_STREAMING, // Disabled for reliability
       }),

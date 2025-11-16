@@ -202,8 +202,16 @@ export default function StudentSyllabusTab() {
         </View>
       </View>
 
+      {/* Loading State */}
+      {(loading || refreshing) && tree.chapters.length === 0 && (
+        <View style={styles.centerLoading}>
+          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <Text style={styles.loadingText}>Loading syllabus...</Text>
+        </View>
+      )}
+
       {/* Empty State - No subjects */}
-      {subjects.length === 0 && (
+      {!loading && !refreshing && subjects.length === 0 && (
         <View style={styles.emptyFill}>
           <View style={styles.largeEmptyCard}>
             <EmptyState
@@ -217,7 +225,7 @@ export default function StudentSyllabusTab() {
       )}
 
       {/* Empty State - No syllabus */}
-      {subjects.length > 0 && selectedSubjectId && tree.chapters.length === 0 && (
+      {!loading && !refreshing && subjects.length > 0 && selectedSubjectId && tree.chapters.length === 0 && (
         <View style={styles.emptyFill}>
           <View style={styles.largeEmptyCard}>
             <EmptyState
@@ -385,6 +393,17 @@ export default function StudentSyllabusTab() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background.app },
   center: { padding: 24, alignItems: 'center', justifyContent: 'center' },
+  centerLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: spacing.xl
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary
+  },
   filterSection: { 
     paddingHorizontal: spacing.lg, 
     paddingTop: spacing.md, 
