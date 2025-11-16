@@ -42,7 +42,7 @@
       }
     },
     "android": {
-      "package": "com.classbridge.app",
+      "package": "com.classbridge.mobile",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/Image.png",

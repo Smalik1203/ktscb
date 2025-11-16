@@ -1,4 +1,4 @@
-package com.classbridge.app
+package com.classbridge.mobile
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
