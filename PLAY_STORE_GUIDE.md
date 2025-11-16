@@ -7,6 +7,11 @@ Your app is now configured for Play Store submission. Here's what was set up:
 ### Changes Made:
 1. **eas.json** - Changed build type from `apk` to `aab` (Android App Bundle) for Play Store
 2. **app.json** - Added `versionCode` for Android versioning
+3. **R8/ProGuard** - Enabled code minification and obfuscation for release builds
+   - Reduces app size by removing unused code
+   - Obfuscates code to protect intellectual property
+   - Generates mapping.txt file for crash deobfuscation
+   - Mapping file is automatically included in the AAB for Play Console
 
 ## 📋 Prerequisites
 
@@ -141,12 +146,39 @@ Then:
 - **preview**: APK builds for internal testing
 - **production**: AAB builds for Play Store submission
 
+## 🔍 R8/ProGuard & Deobfuscation Files
+
+Your app is configured with R8/ProGuard minification enabled for release builds. This provides:
+
+### Benefits:
+- **Smaller app size**: Unused code is removed
+- **Code protection**: Code is obfuscated to protect intellectual property
+- **Better performance**: Optimized bytecode
+
+### Mapping File:
+- The `mapping.txt` file is automatically generated during release builds
+- It's automatically included in the AAB file when using EAS Build
+- Google Play Console automatically extracts it for crash deobfuscation
+- **Location** (if building locally): `android/app/build/outputs/mapping/release/mapping.txt`
+
+### Important Notes:
+- **Keep mapping files safe**: Store them securely for each release version
+- **Crash reports**: Play Console will automatically deobfuscate crash reports using the mapping file
+- **Version matching**: Each release needs its own mapping file - don't mix versions!
+
+### If You Need to Download Mapping File from EAS:
+The mapping file is included in the AAB, but if you need it separately:
+1. Download the AAB from EAS
+2. Extract it (AAB is a ZIP file)
+3. Find `BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`
+
 ## 🛠️ Troubleshooting
 
 ### Build Fails
 - Check EAS build logs: `eas build:view`
 - Ensure all dependencies are compatible
 - Check for TypeScript/linting errors: `npm run typecheck && npm run lint`
+- If ProGuard errors occur, check `android/app/proguard-rules.pro` for missing keep rules
 
 ### Submission Fails
 - Verify Google Play Console API is set up correctly
