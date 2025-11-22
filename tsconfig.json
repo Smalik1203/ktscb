@@ -1,9 +1,11 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": false,
-    "strictNullChecks": false,
-    "noImplicitAny": false,
+    "strict": false, // TODO: Enable incrementally
+    "strictNullChecks": true, // ✅ Enabled - catch null/undefined errors
+    "noImplicitAny": false, // TODO: Enable after fixing any types
+    "strictFunctionTypes": true, // ✅ Enabled - stricter function type checking
+    "strictPropertyInitialization": false, // Keep off - React Native patterns
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {

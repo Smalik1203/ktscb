@@ -14,7 +14,7 @@ export interface ProgressRingProps {
   label?: string;
 }
 
-export const ProgressRing: React.FC<ProgressRingProps> = ({
+export const ProgressRing = React.memo<ProgressRingProps>(({
   progress,
   size = 100,
   strokeWidth = 8,
@@ -68,7 +68,7 @@ export const ProgressRing: React.FC<ProgressRingProps> = ({
       </View>
     </View>
   );
-};
+}));
 
 const styles = StyleSheet.create({
   container: {

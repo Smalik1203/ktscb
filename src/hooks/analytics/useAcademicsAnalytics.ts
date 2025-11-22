@@ -1,3 +1,5 @@
+import { log } from '../../lib/logger';
+
 // Typed hook for Academics analytics using direct table queries
 
 import { useQuery } from '@tanstack/react-query';
@@ -64,9 +66,24 @@ export function useAcademicsAnalytics(options: UseAcademicsAnalyticsOptions) {
         };
       }
 
-      // 2. Fetch test marks
+      // 2. Fetch test questions to calculate max marks per test
       const testIds = testsData.map((t: any) => t.id);
 
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('test_questions')
+        .select('test_id, points')
+        .in('test_id', testIds);
+
+      if (questionsError) throw questionsError;
+
+      // Calculate max marks per test
+      const testMaxMarksMap = new Map<string, number>();
+      questionsData?.forEach((q: any) => {
+        const testId = q.test_id;
+        testMaxMarksMap.set(testId, (testMaxMarksMap.get(testId) || 0) + (q.points || 0));
+      });
+
+      // 3. Fetch test marks
       const { data: marksData, error: marksError } = await supabase
         .from('test_marks')
         .select(`
@@ -86,7 +103,7 @@ export function useAcademicsAnalytics(options: UseAcademicsAnalyticsOptions) {
 
       if (marksError) throw marksError;
 
-      // 3. Aggregate by student and subject
+      // 4. Aggregate by student and subject
       const studentSubjectMap = new Map<string, AcademicsRow>();
 
       marksData?.forEach((mark: any) => {
@@ -98,9 +115,12 @@ export function useAcademicsAnalytics(options: UseAcademicsAnalyticsOptions) {
         const className = mark.student.class_instances.class_name;
         const subjectId = test.subject_id;
         const subjectName = test.subjects?.subject_name || 'Unknown';
-        // TODO: Calculate percentage using sum of test_questions.points as max_marks
-        // For now, use marks_obtained directly as the score
-        const scorePercent = mark.marks_obtained;
+
+        // Calculate percentage using actual max marks from test_questions
+        const maxMarks = testMaxMarksMap.get(mark.test_id) || 0;
+        const scorePercent = maxMarks > 0
+          ? analyticsUtils.calculatePercentage(mark.marks_obtained, maxMarks)
+          : mark.marks_obtained; // Fallback to raw score if no questions found
 
         const key = `${studentId}-${subjectId}`;
 

@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
-import dayjs from 'dayjs';
+import { format, subDays, addDays } from 'date-fns';
 import { supabase } from '../../data/supabaseClient';
 
 interface TimetableSlot {
@@ -111,7 +111,7 @@ export function StudentTimetableScreen() {
   const [taughtSlotIds, setTaughtSlotIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
+  const dateStr = format(selectedDate, 'YYYY-MM-DD');
 
   // Fetch timetable and taught status
   const fetchTimetable = async (showLoading = true) => {
@@ -269,7 +269,7 @@ export function StudentTimetableScreen() {
             <View style={styles.filterContent}>
               <Text style={styles.filterLabel}>Date</Text>
               <Text style={styles.filterValue} numberOfLines={1}>
-                {dayjs(selectedDate).format('MMM D, YYYY')}
+                {format(selectedDate, 'MMM D, YYYY')}
               </Text>
             </View>
           </TouchableOpacity>
@@ -293,7 +293,7 @@ export function StudentTimetableScreen() {
           <EmptyStateIllustration
             type="calendar"
             title="No Classes Scheduled"
-            description={`No classes scheduled for ${dayjs(selectedDate).format('MMMM D, YYYY')}`}
+            description={`No classes scheduled for ${format(selectedDate, 'MMMM D, YYYY')}`}
           />
         ) : (
           <View style={styles.slotsContainer}>

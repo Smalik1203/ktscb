@@ -23,7 +23,7 @@ export interface TrendChartProps {
 
 const { width: screenWidth } = Dimensions.get('window');
 
-export const TrendChart: React.FC<TrendChartProps> = ({
+export const TrendChart = React.memo<TrendChartProps>(({
   data,
   height = 200,
   width = screenWidth - 32,
@@ -137,7 +137,7 @@ export const TrendChart: React.FC<TrendChartProps> = ({
       </Svg>
     </View>
   );
-};
+}));
 
 const styles = StyleSheet.create({
   container: {

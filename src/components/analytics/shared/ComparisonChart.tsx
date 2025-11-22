@@ -18,7 +18,7 @@ interface ComparisonChartProps {
   variant?: 'default' | 'syllabus';
 }
 
-export const ComparisonChart: React.FC<ComparisonChartProps> = ({
+export const ComparisonChart = React.memo<ComparisonChartProps>(({
   title,
   subtitle,
   items,
@@ -79,7 +79,7 @@ export const ComparisonChart: React.FC<ComparisonChartProps> = ({
       </View>
     </View>
   );
-};
+}));
 
 const styles = StyleSheet.create({
   container: {

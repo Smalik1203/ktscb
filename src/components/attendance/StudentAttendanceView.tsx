@@ -17,7 +17,7 @@ import { colors, typography, spacing, borderRadius, shadows } from '../../../lib
 import { ThreeStateView } from '../common/ThreeStateView';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { supabase } from '../../data/supabaseClient';
-import dayjs from 'dayjs';
+import { format, subDays, addDays } from 'date-fns';
 
 interface AttendanceRecord {
   id: string;

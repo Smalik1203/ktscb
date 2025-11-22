@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ClassBridge",
-    "slug": "classbridge-mobile",
+    "slug": "classbridge",
     "version": "1.0.0",
     "orientation": "default",
     "scheme": "classbridge",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.classbridge.app",
+      "bundleIdentifier": "com.classbridge.mobile",
       "icon": "./assets/images/Image.png",
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -53,7 +53,7 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE"
       ],
-      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.classbridge.app"
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.classbridge.mobile"
     },
     "web": {
       "bundler": "metro",
@@ -71,6 +71,12 @@
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF"
         }
+      ],
+      [
+        "expo-system-ui",
+        {
+          "userInterfaceStyle": "light"
+        }
       ]
     ],
     "experiments": {
@@ -79,7 +85,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "0ef0da41-8d21-45f7-ade7-fca22e8e5436"
+        "projectId": "b364796a-abfd-4a5c-bf65-0d122433bc2c"
       }
     }
   }

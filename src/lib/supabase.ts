@@ -17,9 +17,13 @@ log.info('Supabase configuration:', {
 });
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  log.error('Missing Supabase configuration. Please check your .env file.');
+  const errorMsg = `Missing Supabase configuration. 
+URL: ${SUPABASE_URL ? 'SET' : 'MISSING'}
+KEY: ${SUPABASE_ANON_KEY ? 'SET' : 'MISSING'}
+Please check your .env file or EAS build configuration.`;
+  log.error(errorMsg);
   log.error('Required variables: EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY');
-  throw new Error('Supabase configuration is missing. Please check your .env file.');
+  throw new Error('API KEY INVALID: Supabase configuration is missing. Please rebuild the app with environment variables configured.');
 }
 
 // One-time migration to clear any existing SecureStore sessions

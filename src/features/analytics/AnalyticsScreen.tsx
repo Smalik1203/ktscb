@@ -1,3 +1,5 @@
+import { log } from '../../lib/logger';
+
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { Text, Card, ActivityIndicator, Surface } from 'react-native-paper';
@@ -6,7 +8,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { getSuperAdminAnalytics, getStudentAnalytics } from '../../lib/analytics-rpc';
+// RPC functions deprecated - using new hook-based architecture
+// import { getSuperAdminAnalytics, getStudentAnalytics } from '../../lib/analytics-rpc';
 import { KPICard, TrendChart, ProgressRing } from '../../components/analytics';
 import type { DataPoint } from '../../components/analytics';
 import {
@@ -559,44 +562,16 @@ export default function AnalyticsScreen() {
   // Calculate date range based on time period
   const { startDate, endDate } = getDateRangeForPeriod(timePeriod);
 
-  // Fetch analytics data based on role
-  const { data: analyticsData, isLoading, isFetching, error, refetch } = useQuery({
-    queryKey: ['analytics', role, profile?.auth_id, timePeriod],
-    queryFn: async () => {
-      if (role === 'superadmin' || role === 'cb_admin') {
-        if (!profile?.school_code) {
-          throw new Error('School code is required');
-        }
-        return await getSuperAdminAnalytics(profile.school_code, startDate, endDate);
-      } else if (role === 'admin') {
-        // Admin analytics disabled - class filtering removed
-        // If needed, fetch admin's class_instance_id from teacher/admin table
-        throw new Error('Admin analytics not available');
-      } else if (role === 'student' && profile?.auth_id) {
-        // First, get the student ID from the student table using auth_user_id
-        const { data: studentData, error: studentError } = await supabase
-          .from('student')
-          .select('id')
-          .eq('auth_user_id', profile.auth_id)
-          .single();
-
-        if (studentError) throw studentError;
-        if (!studentData) throw new Error('Student record not found');
-
-        return await getStudentAnalytics(studentData.id, startDate, endDate);
-      }
-      return null;
-    },
-    enabled: canViewAnalytics && (
-      role === 'student' ||
-      role === 'superadmin' ||
-      role === 'cb_admin'
-    ),
-    retry: false, // Don't retry on error
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
-    throwOnError: false, // Prevent error from propagating and causing navigation
-  });
+  // New hook-based analytics - RPC deprecated
+  // Using direct component-level data fetching via useAttendanceAnalytics, useFeesAnalytics, etc.
+  // Overview data is now aggregated from individual feature hooks in the detail views
+  const analyticsData = null; // Deprecated RPC data removed
+  const isLoading = false;
+  const isFetching = false;
+  const error = null;
+  const refetch = async () => {
+    // Refresh handled by individual feature hooks
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);

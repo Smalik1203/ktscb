@@ -16,7 +16,7 @@ export interface KPICardProps {
   isLoading?: boolean;
 }
 
-export const KPICard: React.FC<KPICardProps> = ({
+export const KPICard = React.memo<KPICardProps>(({
   title,
   value,
   subtitle,
@@ -84,7 +84,7 @@ export const KPICard: React.FC<KPICardProps> = ({
       </View>
     </Card>
   );
-};
+}));
 
 const styles = StyleSheet.create({
   card: {

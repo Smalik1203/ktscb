@@ -14,6 +14,10 @@ import { useFrameworkReady } from '../hooks/useFrameworkReady';
 import ErrorBoundary from '../src/components/ErrorBoundary';
 import { NetworkStatus } from '../src/components/ui/NetworkStatus';
 import { DrawerContent } from '../src/components/layout/DrawerContent';
+import { initSentry } from '../src/lib/sentry';
+
+// Initialize Sentry error tracking
+initSentry();
 
 export default function RootLayout() {
   useFrameworkReady();

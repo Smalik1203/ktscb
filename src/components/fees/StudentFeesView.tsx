@@ -20,7 +20,7 @@ import { ThreeStateView } from '../common/ThreeStateView';
 import { supabase } from '../../data/supabaseClient';
 import { useQuery } from '@tanstack/react-query';
 import { getStudentFees } from '../../data/queries';
-import dayjs from 'dayjs';
+import { format, subDays, addDays } from 'date-fns';
 
 interface FeePlanItem {
   id: string;
@@ -203,7 +203,7 @@ export const StudentFeesView: React.FC = () => {
 
   // Format date
   const formatDate = (dateString: string) => {
-    return dayjs(dateString).format('MMM D, YYYY');
+    return format(dateString, 'MMM D, YYYY');
   };
 
   // Get payment method icon

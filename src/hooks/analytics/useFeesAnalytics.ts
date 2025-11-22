@@ -1,3 +1,5 @@
+import { log } from '../../lib/logger';
+
 // Typed hook for Fees analytics using direct table queries
 
 import { useQuery } from '@tanstack/react-query';
@@ -27,14 +29,16 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
   return useQuery({
     queryKey: ['analytics', 'fees', school_code, academic_year_id, start_date, end_date, classInstanceId, limit],
     queryFn: async () => {
-      // TODO: Update to use actual fee_student_plans schema once plan amounts are stored
-      // Currently using simplified query with fee_payments only
-      //
-      // NOTE: The fee_student_plans table in database doesn't have amount/due_date fields.
-      // Fee amounts are stored in separate tables or calculated via RPC.
-      // For now, we'll use student_fee_summary view via RPC or simplify the query.
+      // 1. Fetch fee data from student_fee_summary view (includes plan amounts and collected amounts)
+      let feeQuery = supabase
+        .from('student_fee_summary')
+        .select('*')
+        .not('student_id', 'is', null);
 
-      // 1. Fetch students in scope
+      // Note: student_fee_summary doesn't have school_code or academic_year_id directly
+      // We need to filter by student_id from a students query first
+
+      // First, get students in scope
       let studentsQuery = supabase
         .from('student')
         .select(`
@@ -73,32 +77,46 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
         };
       }
 
-      // 2. Fetch payments
+      // 2. Fetch fee summary for these students
       const studentIds = studentsData.map((s: any) => s.id);
 
+      const { data: feeSummaryData, error: feeError } = await supabase
+        .from('student_fee_summary')
+        .select('*')
+        .in('student_id', studentIds);
+
+      if (feeError) throw feeError;
+
+      // 3. Fetch payment dates for lastPaymentDate tracking
       const { data: paymentsData } = await supabase
         .from('fee_payments')
-        .select('student_id, amount, created_at')
+        .select('student_id, created_at')
         .in('student_id', studentIds)
         .gte('created_at', start_date)
-        .lte('created_at', end_date);
+        .lte('created_at', end_date)
+        .order('created_at', { ascending: false });
 
-      // 3. Build payment map
-      const paymentMap = new Map<string, { total: number; lastDate: string | null }>();
-
+      // 4. Build last payment date map
+      const lastPaymentMap = new Map<string, string>();
       paymentsData?.forEach((payment: any) => {
-        const studentId = payment.student_id;
-
-        if (!paymentMap.has(studentId)) {
-          paymentMap.set(studentId, { total: 0, lastDate: null });
+        if (!lastPaymentMap.has(payment.student_id)) {
+          lastPaymentMap.set(payment.student_id, payment.created_at);
         }
+      });
 
-        const record = paymentMap.get(studentId)!;
-        record.total += payment.amount;
+      // 5. Group fee summary by student (sum across all components)
+      const studentFeeMap = new Map<string, { totalBilled: number; totalCollected: number; totalOutstanding: number }>();
 
-        if (!record.lastDate || payment.created_at > record.lastDate) {
-          record.lastDate = payment.created_at;
+      feeSummaryData?.forEach((feeSummary: any) => {
+        const studentId = feeSummary.student_id;
+        if (!studentFeeMap.has(studentId)) {
+          studentFeeMap.set(studentId, { totalBilled: 0, totalCollected: 0, totalOutstanding: 0 });
         }
+        const record = studentFeeMap.get(studentId)!;
+        // Amounts are in paise, need to keep as-is for calculations
+        record.totalBilled += feeSummary.plan_amount_inr || 0;
+        record.totalCollected += feeSummary.collected_amount_inr || 0;
+        record.totalOutstanding += feeSummary.outstanding_amount_inr || 0;
       });
 
       // 4. Helper function to calculate aging bucket
@@ -129,58 +147,46 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
         return now > due ? 'overdue' : 'current';
       };
 
-      // 5. Aggregate by student
+      // 6. Build student rows with actual billing data
       const studentMap = new Map<string, FeeRow>();
 
       studentsData.forEach((student: any) => {
         const studentId = student.id;
         const studentName = student.full_name;
         const className = `${student.class_instances.grade}${student.class_instances.section || ''}`;
-        // TODO: Get actual billing amount from fee plans
-        // For now, use payment amount as a proxy
-        const paymentInfo = paymentMap.get(studentId) || { total: 0, lastDate: null };
-        const totalPaid = paymentInfo.total;
-        // TODO: Calculate total billed from fee plans
-        const totalBilled = totalPaid * 1.2; // Temporary: assume 20% outstanding
-        const totalDue = totalBilled - totalPaid;
-        const dueDate = null; // TODO: Get from fee plans
 
-        if (!studentMap.has(studentId)) {
-          const agingBucket = calculateAgingBucket(dueDate);
-          const agingDays = dueDate
-            ? Math.max(0, Math.floor((new Date().getTime() - new Date(dueDate).getTime()) / (1000 * 60 * 60 * 24)))
-            : 0;
+        const feeInfo = studentFeeMap.get(studentId) || { totalBilled: 0, totalCollected: 0, totalOutstanding: 0 };
+        const dueDate = null; // Note: Due dates not available in current schema
 
-          const status = calculateFeeStatus(totalBilled, totalPaid, dueDate);
+        const agingBucket = calculateAgingBucket(dueDate);
+        const agingDays = dueDate
+          ? Math.max(0, Math.floor((new Date().getTime() - new Date(dueDate).getTime()) / (1000 * 60 * 60 * 24)))
+          : 0;
 
-          studentMap.set(studentId, {
-            studentId,
-            studentName,
-            className,
-            totalBilled,
-            totalPaid,
-            totalDue,
-            status,
-            agingDays,
-            agingBucket,
-            lastPaymentDate: paymentInfo.lastDate,
-          });
-        } else {
-          // Accumulate if student has multiple plans
-          const existing = studentMap.get(studentId)!;
-          existing.totalBilled += totalBilled;
-          existing.totalPaid += totalPaid;
-          existing.totalDue += totalDue;
-          existing.status = calculateFeeStatus(existing.totalBilled, existing.totalPaid, dueDate);
-        }
+        const status = calculateFeeStatus(feeInfo.totalBilled, feeInfo.totalCollected, dueDate);
+
+        studentMap.set(studentId, {
+          studentId,
+          studentName,
+          className,
+          totalBilled: feeInfo.totalBilled,
+          totalPaid: feeInfo.totalCollected,
+          totalDue: feeInfo.totalOutstanding,
+          status,
+          agingDays,
+          agingBucket,
+          lastPaymentDate: lastPaymentMap.get(studentId) || null,
+        });
       });
 
-      // 6. Fetch previous period data (for trend)
+      // 7. Fetch previous period data (for trend) - using fee_summary as well
       const { startDate: prevStartDate, endDate: prevEndDate } = analyticsUtils.calculatePreviousPeriod(
         start_date,
         end_date
       );
 
+      // For previous period, we'll use the current fee_summary totals but with previous payment data
+      // This gives us a comparison of collection performance
       const { data: prevPaymentsData } = await supabase
         .from('fee_payments')
         .select('student_id, amount')
@@ -194,19 +200,18 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
         prevPaymentMap.set(studentId, (prevPaymentMap.get(studentId) || 0) + payment.amount);
       });
 
-      // 7. Rank rows with trends (by total due, descending)
+      // 8. Build previous rows for trend comparison
       const currentRows = Array.from(studentMap.values());
       const previousRows = Array.from(prevPaymentMap.entries()).map(([studentId, totalPaid]): FeeRow => {
-        // TODO: Get actual billing amount from fee plans
-        const totalBilled = totalPaid * 1.2; // Temporary: assume 20% outstanding
         const student = studentsData.find((s: any) => s.id === studentId);
+        const feeInfo = studentFeeMap.get(studentId) || { totalBilled: 0, totalCollected: 0, totalOutstanding: 0 };
         return {
           studentId,
           studentName: student?.full_name || '',
           className: student ? `${student.class_instances.grade}${student.class_instances.section || ''}` : '',
-          totalBilled,
+          totalBilled: feeInfo.totalBilled,
           totalPaid,
-          totalDue: totalBilled - totalPaid,
+          totalDue: feeInfo.totalBilled - totalPaid,
           status: 'current',
           agingDays: 0,
           agingBucket: 'current',

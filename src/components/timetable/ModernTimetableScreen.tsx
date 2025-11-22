@@ -12,7 +12,7 @@ import { DatePickerModal } from '../common/DatePickerModal';
 import { ThreeStateView } from '../common/ThreeStateView';
 import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
 import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
-import dayjs from 'dayjs';
+import { format, subDays, addDays } from 'date-fns';
 import { router } from 'expo-router';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -310,7 +310,7 @@ export function ModernTimetableScreen() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const dateStr = dayjs(selectedDate).format('YYYY-MM-DD');
+  const dateStr = format(selectedDate, 'yyyy-MM-dd');
   const { data: classes } = useClasses(profile?.school_code);
   const { data: subjectsResult } = useSubjects(profile?.school_code);
   const subjects = subjectsResult?.data || [];
@@ -495,11 +495,11 @@ export function ModernTimetableScreen() {
 
   // Navigation functions
   const goToPreviousDay = () => {
-    setSelectedDate(prev => dayjs(prev).subtract(1, 'day').toDate());
+    setSelectedDate(prev => subDays(prev, 1));
   };
 
   const goToNextDay = () => {
-    setSelectedDate(prev => dayjs(prev).add(1, 'day').toDate());
+    setSelectedDate(prev => addDays(prev, 1));
   };
 
   const goToToday = () => {
@@ -903,7 +903,7 @@ export function ModernTimetableScreen() {
             </View>
             <View style={styles.filterContent}>
               <Text style={styles.filterLabel}>Date</Text>
-              <Text style={styles.filterValue}>{dayjs(selectedDate).format('MMM YYYY')}</Text>
+              <Text style={styles.filterValue}>{format(selectedDate, 'MMM yyyy')}</Text>
             </View>
           </TouchableOpacity>
         </View>

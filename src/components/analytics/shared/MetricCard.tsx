@@ -13,7 +13,7 @@ interface MetricCardProps {
   progress?: number;
 }
 
-export const MetricCard: React.FC<MetricCardProps> = ({
+export const MetricCard = React.memo<MetricCardProps>(({
   label,
   value,
   subtext,
@@ -56,7 +56,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       )}
     </Surface>
   );
-};
+}));
 
 const styles = StyleSheet.create({
   metricCard: {

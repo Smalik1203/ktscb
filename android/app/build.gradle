@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.classbridge.app'
+    namespace 'com.classbridge.mobile'
     defaultConfig {
-        applicationId 'com.classbridge.app'
+        applicationId 'com.classbridge.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
