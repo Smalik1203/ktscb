@@ -56,7 +56,7 @@ export const MetricCard = React.memo<MetricCardProps>(({
       )}
     </Surface>
   );
-}));
+});
 
 const styles = StyleSheet.create({
   metricCard: {

@@ -270,11 +270,11 @@ export const StudentAttendanceView: React.FC = () => {
                 ) : (
                   <View style={styles.recordsList}>
                     {[...attendanceRecords]
-                      .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                       .slice(0, 10)
                       .map((record) => {
                         const isPresent = record.status === 'present';
-                        const recordDate = dayjs(record.date);
+                        const recordDate = new Date(record.date);
 
                         return (
                           <Card key={record.id} mode="elevated" style={styles.recordCard}>
@@ -391,10 +391,10 @@ export const StudentAttendanceView: React.FC = () => {
                     </Card>
                   ) : (
                     historyStats.records
-                      .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                       .map((record) => {
                         const isPresent = record.status === 'present';
-                        const recordDate = dayjs(record.date);
+                        const recordDate = new Date(record.date);
 
                         return (
                           <Card key={record.id} mode="elevated" style={styles.historyRecordCard}>

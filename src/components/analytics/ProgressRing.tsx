@@ -68,7 +68,7 @@ export const ProgressRing = React.memo<ProgressRingProps>(({
       </View>
     </View>
   );
-}));
+});
 
 const styles = StyleSheet.create({
   container: {

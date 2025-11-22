@@ -79,7 +79,7 @@ export const ComparisonChart = React.memo<ComparisonChartProps>(({
       </View>
     </View>
   );
-}));
+});
 
 const styles = StyleSheet.create({
   container: {

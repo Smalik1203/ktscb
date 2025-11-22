@@ -84,7 +84,7 @@ export const KPICard = React.memo<KPICardProps>(({
       </View>
     </Card>
   );
-}));
+});
 
 const styles = StyleSheet.create({
   card: {

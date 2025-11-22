@@ -137,7 +137,7 @@ export const TrendChart = React.memo<TrendChartProps>(({
       </Svg>
     </View>
   );
-}));
+});
 
 const styles = StyleSheet.create({
   container: {
