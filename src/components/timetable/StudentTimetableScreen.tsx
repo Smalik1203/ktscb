@@ -111,7 +111,7 @@ export function StudentTimetableScreen() {
   const [taughtSlotIds, setTaughtSlotIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
-  const dateStr = format(selectedDate, 'YYYY-MM-DD');
+  const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
   // Fetch timetable and taught status
   const fetchTimetable = async (showLoading = true) => {
