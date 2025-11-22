@@ -297,10 +297,10 @@ export const StudentAttendanceView: React.FC = () => {
                               </View>
                               <View style={styles.recordDetails}>
                                 <Text style={styles.recordDate}>
-                                  {recordDate.format('MMM D, YYYY')}
+                                  {format(recordDate, 'MMM d, yyyy')}
                                 </Text>
                                 <Text style={styles.recordDay}>
-                                  {recordDate.format('dddd')}
+                                  {format(recordDate, 'EEEE')}
                                 </Text>
                               </View>
                               <View
@@ -417,10 +417,10 @@ export const StudentAttendanceView: React.FC = () => {
                               </View>
                               <View style={styles.historyRecordDetails}>
                                 <Text style={styles.historyRecordDate}>
-                                  {recordDate.format('MMM D, YYYY')}
+                                  {format(recordDate, 'MMM d, yyyy')}
                                 </Text>
                                 <Text style={styles.historyRecordDay}>
-                                  {recordDate.format('dddd')}
+                                  {format(recordDate, 'EEEE')}
                                 </Text>
                               </View>
                               <View

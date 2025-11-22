@@ -62,11 +62,11 @@ export const AttendanceScreen: React.FC = () => {
   const isStudent = profile?.role === 'student';
 
   // Fetch data (hooks must be called before any early returns)
-  const { data: classes = [] } = useClasses(!isStudent ? scope.school_code : undefined);
+  const { data: classes = [] } = useClasses(!isStudent ? (scope.school_code ?? undefined) : undefined);
   // Fetch all students without pagination for attendance
   const { data: studentsResponse, isLoading: studentsLoading } = useStudents(
     !isStudent && selectedClass?.id ? selectedClass.id : undefined,
-    !isStudent ? scope.school_code : undefined
+    !isStudent ? (scope.school_code ?? undefined) : undefined
     // No pagination options = fetch all students
   );
   const students = studentsResponse?.data || [];
@@ -151,7 +151,7 @@ export const AttendanceScreen: React.FC = () => {
         status: student.status!,
         marked_by: profile.auth_id,
         marked_by_role_code: profile.role || 'unknown',
-        school_code: scope.school_code,
+        school_code: scope.school_code ?? '',
       }));
 
     if (records.length === 0) {
@@ -254,7 +254,7 @@ export const AttendanceScreen: React.FC = () => {
                 status,
                 markedBy: profile.auth_id,
                 markedByRoleCode: profile.role || 'unknown',
-                schoolCode: scope.school_code,
+                schoolCode: scope.school_code ?? '',
               });
               
               Alert.alert(
