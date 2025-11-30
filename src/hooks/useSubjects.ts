@@ -2,17 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import { log } from '../lib/logger';
 import { DB } from '../types/db.constants';
-
-type Subject = {
-  id: string;
-  subject_name: string;
-  school_code: string;
-  created_by: string;
-  created_at: string;
-};
+import type { DomainSubject } from '../lib/normalize';
 
 export interface SubjectsPaginationResult {
-  data: Subject[];
+  data: DomainSubject[];
   total: number;
   page: number;
   pageSize: number;
@@ -62,21 +55,17 @@ export function useSubjects(
         throw countError;
       }
 
-      // Fetch paginated data
-      const { data, error } = await supabase
-        .from(DB.tables.subjects)
-        .select('id, subject_name, school_code, created_by, created_at')
-        .eq(DB.columns.schoolCode, schoolCode)
-        .order('subject_name')
-        .range(from, to);
+      // Fetch paginated data using queries.ts
+      const { listSubjects } = await import('../data/queries');
+      const result = await listSubjects(schoolCode, { from, to });
 
-      if (error) {
-        log.error('Failed to fetch subjects', error);
-        throw error;
+      if (result.error) {
+        log.error('Failed to fetch subjects', result.error);
+        throw result.error;
       }
 
       return {
-        data: (data as Subject[]) || [],
+        data: result.data || [],
         total: count || 0,
         page,
         pageSize,

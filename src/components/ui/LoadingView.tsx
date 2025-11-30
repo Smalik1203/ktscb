@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ActivityIndicator, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors, spacing, typography } from '../../../lib/design-system';
+import { spacing, typography, colors } from '../../../lib/design-system';
 
 interface LoadingViewProps {
   message?: string;
@@ -9,11 +11,13 @@ interface LoadingViewProps {
   showMessage?: boolean;
 }
 
-export function LoadingView({ 
-  message = 'Loading...', 
+export function LoadingView({
+  message = 'Loading...',
   size = 'large',
-  showMessage = true 
+  showMessage = true
 }: LoadingViewProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -43,7 +47,8 @@ export function LoadingView({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',

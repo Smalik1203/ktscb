@@ -1,11 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking, Dimensions, Modal } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking, Dimensions, Modal, Platform } from 'react-native';
 import { Text, Card, Button, Chip, Checkbox, ActivityIndicator, Searchbar, Menu, IconButton, Portal, Modal as PaperModal } from 'react-native-paper';
 import { File, Paths } from 'expo-file-system';
 import { WebView } from 'react-native-webview';
 import { Stack } from 'expo-router';
 import { ClipboardList, Plus, Calendar, AlertCircle, CheckCircle, Clock, Edit, Trash2, MoreVertical, Users, BookOpen, AlertTriangle, X, BarChart3, FileCheck, FileText, Download } from 'lucide-react-native';
-import { colors, spacing, typography, borderRadius } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTasks, useStudentTasks, useTaskStats, useCreateTask, useUpdateTask, useDeleteTask, Task, useTaskSubmissions, useSubmitTask, useUnsubmitTask } from '../../hooks/useTasks';
 import { useClasses } from '../../hooks/useClasses';
@@ -14,6 +14,8 @@ import { TaskFormModal } from '../../components/tasks/TaskFormModal';
 import { TaskSubmissionModal } from '../../components/tasks/TaskSubmissionModal';
 import { StudentTaskCard } from '../../components/tasks/StudentTaskCard';
 import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
+import { PDFViewer } from '../../components/resources/PDFViewer';
+import type { Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 
 // Task Detail Modal Component
 interface TaskDetailModalProps {
@@ -22,17 +24,12 @@ interface TaskDetailModalProps {
   task: Task | null;
   classes: any[] | undefined;
   subjects: any[] | undefined;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
 }
 
-function TaskDetailModal({ visible, onDismiss, task, classes, subjects }: TaskDetailModalProps) {
+function TaskDetailModal({ visible, onDismiss, task, classes, subjects, colors, styles }: TaskDetailModalProps) {
   if (!task) return null;
-
-  // Debug logging
-  console.log('Task Detail Modal - Attachments:', {
-    hasAttachments: !!task.attachments,
-    attachmentsLength: task.attachments?.length,
-    attachments: task.attachments,
-  });
 
   const taskClass = classes?.find(c => c.id === task.class_instance_id);
   const taskSubject = subjects?.find(s => s.id === task.subject_id);
@@ -50,7 +47,6 @@ function TaskDetailModal({ visible, onDismiss, task, classes, subjects }: TaskDe
   const handleDownloadAttachment = async (attachment: any) => {
     try {
       if (attachment.url) {
-        console.log('Opening file:', attachment.url);
         const supported = await Linking.canOpenURL(attachment.url);
         if (supported) {
           await Linking.openURL(attachment.url);
@@ -185,9 +181,11 @@ interface TaskProgressModalProps {
   visible: boolean;
   onDismiss: () => void;
   task: Task | null;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
 }
 
-function TaskProgressModal({ visible, onDismiss, task }: TaskProgressModalProps) {
+function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskProgressModalProps) {
   const { data: submissions, isLoading } = useTaskSubmissions(task?.id || '');
 
   if (!task) return null;
@@ -197,6 +195,16 @@ function TaskProgressModal({ visible, onDismiss, task }: TaskProgressModalProps)
   const gradedCount = submissions?.filter((s: any) => s.status === 'graded').length || 0;
   const notSubmittedCount = submissions?.filter((s: any) => s.status === 'not_submitted').length || 0;
   const completionRate = totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0;
+
+  const getSubmissionStatusColor = (status: string): string => {
+    switch (status) {
+      case 'graded': return colors.success[100];
+      case 'submitted': return colors.info[100];
+      case 'late': return colors.warning[100];
+      case 'not_submitted': return colors.neutral[100];
+      default: return colors.neutral[100];
+    }
+  };
 
   return (
     <Portal>
@@ -304,17 +312,6 @@ function TaskProgressModal({ visible, onDismiss, task }: TaskProgressModalProps)
   );
 }
 
-// Helper function for submission status colors
-function getSubmissionStatusColor(status: string): string {
-  switch (status) {
-    case 'graded': return colors.success[100];
-    case 'submitted': return colors.info[100];
-    case 'late': return colors.warning[100];
-    case 'not_submitted': return colors.neutral[100];
-    default: return colors.neutral[100];
-  }
-}
-
 // Helper function to format submission status text
 function formatSubmissionStatus(status: string): string {
   switch (status) {
@@ -328,8 +325,12 @@ function formatSubmissionStatus(status: string): string {
 
 export default function TasksScreen() {
   const { profile } = useAuth();
+  const { colors, isDark, typography, spacing, borderRadius } = useTheme();
   const isStudent = profile?.role === 'student';
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, isDark, typography, spacing, borderRadius), [colors, isDark, typography, spacing, borderRadius]);
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(undefined);
@@ -1238,6 +1239,8 @@ export default function TasksScreen() {
           setSelectedTaskForProgress(null);
         }}
         task={selectedTaskForProgress}
+        colors={colors}
+        styles={styles}
       />
 
       {/* Task Detail Modal */}
@@ -1250,6 +1253,8 @@ export default function TasksScreen() {
         task={selectedTaskForDetail}
         classes={classes}
         subjects={subjects}
+        colors={colors}
+        styles={styles}
       />
 
       {/* Task Submission Modal (Students Only) */}
@@ -1379,47 +1384,57 @@ export default function TasksScreen() {
           </View>
           {selectedFile && (
             <View style={styles.fileViewerContent}>
-              <WebView
-                source={{
-                  uri: selectedFile.type === 'application/pdf'
-                    ? `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(selectedFile.url)}`
-                    : selectedFile.url
-                }}
-                style={styles.webView}
-                startInLoadingState={true}
-                renderLoading={() => (
-                  <View style={styles.webViewLoading}>
-                    <ActivityIndicator size="large" color={colors.primary[600]} />
-                    <Text style={styles.webViewLoadingText}>Loading file...</Text>
-                  </View>
-                )}
-                onError={(syntheticEvent) => {
-                  console.error('WebView error:', syntheticEvent.nativeEvent);
-                  Alert.alert(
-                    'Error',
-                    'Failed to load file. Would you like to open it in an external app?',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Open Externally',
-                        onPress: async () => {
-                          try {
-                            const canOpen = await Linking.canOpenURL(selectedFile.url);
-                            if (canOpen) {
-                              await Linking.openURL(selectedFile.url);
-                              setFileViewerVisible(false);
-                            } else {
-                              Alert.alert('Error', 'Cannot open this file type');
+              {selectedFile.type === 'application/pdf' ? (
+                // Use PDFViewer component for consistent PDF handling
+                <PDFViewer
+                  uri={selectedFile.url}
+                  title={selectedFile.name}
+                  onClose={() => {
+                    setFileViewerVisible(false);
+                    setSelectedFile(null);
+                  }}
+                />
+              ) : (
+                <WebView
+                  source={{ uri: selectedFile.url }}
+                  style={styles.webView}
+                  startInLoadingState={true}
+                  cacheEnabled={true}
+                  cacheMode="LOAD_CACHE_ELSE_NETWORK"
+                  renderLoading={() => (
+                    <View style={styles.webViewLoading}>
+                      <ActivityIndicator size="large" color={colors.primary[600]} />
+                      <Text style={styles.webViewLoadingText}>Loading file...</Text>
+                    </View>
+                  )}
+                  onError={(syntheticEvent) => {
+                    console.error('WebView error:', syntheticEvent.nativeEvent);
+                    Alert.alert(
+                      'Error',
+                      'Failed to load file. Would you like to open it in an external app?',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Open Externally',
+                          onPress: async () => {
+                            try {
+                              const canOpen = await Linking.canOpenURL(selectedFile.url);
+                              if (canOpen) {
+                                await Linking.openURL(selectedFile.url);
+                                setFileViewerVisible(false);
+                              } else {
+                                Alert.alert('Error', 'Cannot open this file type');
+                              }
+                            } catch (error) {
+                              Alert.alert('Error', 'Failed to open file');
                             }
-                          } catch (error) {
-                            Alert.alert('Error', 'Failed to open file');
                           }
                         }
-                      }
-                    ]
-                  );
-                }}
-              />
+                      ]
+                    );
+                  }}
+                />
+              )}
             </View>
           )}
         </PaperModal>
@@ -1441,10 +1456,10 @@ export default function TasksScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean, typography: Typography, spacing: Spacing, borderRadius: BorderRadius) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background.app,
   },
   scrollView: {
     flex: 1,
@@ -1463,14 +1478,16 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
     padding: spacing.sm,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 4,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border.DEFAULT,
   },
   statContent: {
     flexDirection: 'column',
@@ -1503,18 +1520,22 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.sm,
     alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 4,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border.DEFAULT,
   },
   filterItem: {
     flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -1549,7 +1570,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   searchBar: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     elevation: 0,
     borderRadius: borderRadius.md,
     borderWidth: 1,
@@ -1616,15 +1637,17 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   taskCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: isDark ? 0.3 : 0.08,
     shadowRadius: 4,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border.DEFAULT,
   },
   taskCardHeader: {
     flexDirection: 'row',
@@ -1782,7 +1805,7 @@ const styles = StyleSheet.create({
   // Bottom Sheet Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'flex-end',
   },
   bottomSheet: {
@@ -1796,7 +1819,7 @@ const styles = StyleSheet.create({
   sheetHandle: {
     width: 36,
     height: 4,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: colors.border.DEFAULT,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: spacing.sm,
@@ -1822,7 +1845,7 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   sheetItemActive: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
   },
   sheetItemText: {
     fontSize: typography.fontSize.base,

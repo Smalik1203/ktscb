@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
 import Svg, { Path, Circle, Line, Text as SvgText } from 'react-native-svg';
-import { colors, spacing } from '../../../lib/design-system';
+import { spacing, colors } from '../../../lib/design-system';
 
 export interface DataPoint {
   label: string;
@@ -29,11 +31,19 @@ export const TrendChart = React.memo<TrendChartProps>(({
   width = screenWidth - 32,
   showLabels = true,
   showDots = true,
-  lineColor = colors.primary[600],
-  dotColor = colors.primary[600],
-  gridColor = colors.border.light,
-  labelColor = colors.text.tertiary,
+  lineColor,
+  dotColor,
+  gridColor,
+  labelColor,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
+  // Use theme colors as defaults
+  const finalLineColor = lineColor || colors.primary[600];
+  const finalDotColor = dotColor || colors.primary[600];
+  const finalGridColor = gridColor || colors.border.light;
+  const finalLabelColor = labelColor || colors.text.tertiary;
   if (!data || data.length === 0) {
     return (
       <View style={[styles.container, { height }]}>
@@ -80,14 +90,14 @@ export const TrendChart = React.memo<TrendChartProps>(({
               y1={line.y}
               x2={width - padding.right}
               y2={line.y}
-              stroke={gridColor}
+              stroke={finalGridColor}
               strokeWidth="1"
               strokeDasharray="4,4"
             />
             <SvgText
               x={padding.left - 8}
               y={line.y + 4}
-              fill={labelColor}
+              fill={finalLabelColor}
               fontSize="10"
               textAnchor="end"
             >
@@ -97,7 +107,7 @@ export const TrendChart = React.memo<TrendChartProps>(({
         ))}
 
         {/* Trend line */}
-        <Path d={pathData} stroke={lineColor} strokeWidth="2" fill="none" />
+        <Path d={pathData} stroke={finalLineColor} strokeWidth="2" fill="none" />
 
         {/* Data points */}
         {showDots &&
@@ -107,7 +117,7 @@ export const TrendChart = React.memo<TrendChartProps>(({
               cx={point.x}
               cy={point.y}
               r="4"
-              fill={dotColor}
+              fill={finalDotColor}
               stroke={colors.surface.primary}
               strokeWidth="2"
             />
@@ -126,7 +136,7 @@ export const TrendChart = React.memo<TrendChartProps>(({
                 key={`label-${index}`}
                 x={point.x}
                 y={height - padding.bottom + 20}
-                fill={labelColor}
+                fill={finalLabelColor}
                 fontSize="10"
                 textAnchor="middle"
               >
@@ -139,7 +149,10 @@ export const TrendChart = React.memo<TrendChartProps>(({
   );
 });
 
-const styles = StyleSheet.create({
+TrendChart.displayName = 'TrendChart';
+
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     backgroundColor: colors.surface.primary,
     borderRadius: 8,

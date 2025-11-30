@@ -19,27 +19,21 @@ export interface AITestGenerationResult {
  */
 async function imageToBase64(imageUri: string): Promise<string> {
   try {
-    console.log('[AI Test Generator] Fetching image...');
-
     // Add timeout to fetch
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     const response = await fetch(imageUri, { signal: controller.signal });
     clearTimeout(timeoutId);
 
     const blob = await response.blob();
-    const sizeInMB = blob.size / (1024 * 1024);
-    console.log('[AI Test Generator] Image size:', sizeInMB.toFixed(2), 'MB');
 
     // Convert blob to base64
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64data = reader.result as string;
-        // Remove the data:image/jpeg;base64, prefix
         const base64 = base64data.split(',')[1];
-        console.log('[AI Test Generator] Base64 conversion complete');
         resolve(base64);
       };
       reader.onerror = reject;
@@ -49,7 +43,6 @@ async function imageToBase64(imageUri: string): Promise<string> {
     if (error.name === 'AbortError') {
       throw new Error('Image loading timeout. Please try a smaller image.');
     }
-    console.error('Error converting image to base64:', error);
     throw new Error('Failed to process image: ' + error.message);
   }
 }
@@ -64,10 +57,6 @@ export async function generateQuestionsFromImage(
   onProgress?: (text: string) => void
 ): Promise<AITestGenerationResult> {
   try {
-    console.log('[AI Test Generator] Starting generation...');
-    console.log('[AI Test Generator] API Key present:', !!OPENAI_API_KEY);
-    console.log('[AI Test Generator] API Key length:', OPENAI_API_KEY?.length || 0);
-
     if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
       throw new Error('OpenAI API key not configured. Please add your key to the .env file.');
     }
@@ -76,7 +65,6 @@ export async function generateQuestionsFromImage(
       onProgress('🔄 Processing image...');
     }
 
-    console.log('[AI Test Generator] Converting image to base64...');
     const base64Image = await imageToBase64(imageUri);
     const mimeType = imageUri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
 
@@ -84,7 +72,6 @@ export async function generateQuestionsFromImage(
       onProgress('📤 Sending to AI...');
     }
 
-    // Optimized prompt - shorter but effective
     const prompt = `Analyze this educational image and create ${questionCount} MCQ questions.
 
 ${context ? `Focus: ${context}` : ''}
@@ -108,13 +95,8 @@ Rules:
 - Brief explanations
 - Valid JSON only`;
 
-    console.log('[AI Test Generator] Sending request to OpenAI...');
-    console.log('[AI Test Generator] Image base64 length:', base64Image.length);
-
-    // Use non-streaming for reliability (can enable streaming later)
     const USE_STREAMING = false;
 
-    // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -122,7 +104,7 @@ Rules:
         'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // 💰 Using mini model (94% cheaper, still accurate)
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'user',
@@ -135,33 +117,26 @@ Rules:
                 type: 'image_url',
                 image_url: {
                   url: `data:${mimeType};base64,${base64Image}`,
-                  detail: 'low', // 💰 Low detail (95% cheaper, sufficient for most educational images)
+                  detail: 'low',
                 },
               },
             ],
           },
         ],
-        max_tokens: 2500, // ⚡ Optimized for typical question generation
-        temperature: 0.3, // 🎯 Lower for more accurate answers
-        stream: USE_STREAMING, // Disabled for reliability
+        max_tokens: 2500,
+        temperature: 0.3,
+        stream: USE_STREAMING,
       }),
     });
 
-    console.log('[AI Test Generator] Response received, status:', response.status);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[AI Test Generator] OpenAI API error status:', response.status);
-      console.error('[AI Test Generator] OpenAI API error response:', errorText);
-
       let errorMessage = `API request failed with status ${response.status}`;
 
       try {
         const errorData = JSON.parse(errorText);
         errorMessage = errorData.error?.message || errorMessage;
-        console.error('[AI Test Generator] Parsed error:', errorData.error);
-      } catch (e) {
-        console.error('[AI Test Generator] Could not parse error response');
+      } catch {
         errorMessage = errorText.substring(0, 200);
       }
 
@@ -171,9 +146,6 @@ Rules:
     let content = '';
 
     if (USE_STREAMING) {
-      // Handle streaming response
-      console.log('[AI Test Generator] Starting to read stream...');
-
       if (onProgress) {
         onProgress('✨ AI is generating questions...\n\n');
       }
@@ -186,18 +158,9 @@ Rules:
         throw new Error('No response stream available');
       }
 
-      let chunkCount = 0;
       while (true) {
         const { done, value } = await reader.read();
-        if (done) {
-          console.log('[AI Test Generator] Stream ended normally');
-          break;
-        }
-
-        chunkCount++;
-        if (chunkCount % 10 === 0) {
-          console.log('[AI Test Generator] Received', chunkCount, 'chunks, content length:', content.length);
-        }
+        if (done) break;
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
@@ -205,10 +168,7 @@ Rules:
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = line.slice(6);
-            if (data === '[DONE]') {
-              console.log('[AI Test Generator] Stream completed with [DONE] signal');
-              break;
-            }
+            if (data === '[DONE]') break;
 
             try {
               const parsed = JSON.parse(data);
@@ -216,22 +176,17 @@ Rules:
               if (delta) {
                 content += delta;
                 displayText += delta;
-
-                // Update progress with animation
                 if (onProgress) {
                   onProgress(displayText);
                 }
               }
-            } catch (e) {
+            } catch {
               // Skip invalid JSON chunks
             }
           }
         }
       }
     } else {
-      // Handle non-streaming response (simpler, more reliable)
-      console.log('[AI Test Generator] Reading non-streaming response...');
-
       if (onProgress) {
         onProgress('✨ AI is generating questions...\n\nPlease wait...');
       }
@@ -239,14 +194,10 @@ Rules:
       const data = await response.json();
       content = data.choices?.[0]?.message?.content || '';
 
-      console.log('[AI Test Generator] Response content length:', content.length);
-
       if (onProgress && content) {
         onProgress(content);
       }
     }
-
-    console.log('[AI Test Generator] Full response received, length:', content.length);
 
     if (!content) {
       throw new Error('No response from OpenAI');
@@ -255,30 +206,20 @@ Rules:
     // Parse the JSON response
     let parsedData;
     try {
-      console.log('[AI Test Generator] Parsing response...');
-      // Remove markdown code blocks if present
       const cleanedContent = content
         .replace(/```json\n?/g, '')
         .replace(/```\n?/g, '')
         .trim();
 
-      console.log('[AI Test Generator] Cleaned content length:', cleanedContent.length);
-      console.log('[AI Test Generator] First 200 chars:', cleanedContent.substring(0, 200));
-
       parsedData = JSON.parse(cleanedContent);
-      console.log('[AI Test Generator] Parsed successfully, questions:', parsedData.questions?.length || 0);
-    } catch (parseError) {
-      console.error('[AI Test Generator] Failed to parse response:', content.substring(0, 500));
-      console.error('[AI Test Generator] Parse error:', parseError);
+    } catch {
       throw new Error('Failed to parse AI response. Please try again.');
     }
 
-    // Validate the structure
     if (!parsedData.questions || !Array.isArray(parsedData.questions)) {
       throw new Error('Invalid response format from AI');
     }
 
-    // Validate each question
     const validQuestions: GeneratedQuestion[] = parsedData.questions
       .filter((q: any) => {
         return (
@@ -303,17 +244,11 @@ Rules:
       throw new Error('No valid questions generated');
     }
 
-    console.log(`[AI Test Generator] Successfully generated ${validQuestions.length} questions`);
-
     return {
       questions: validQuestions,
       totalGenerated: validQuestions.length,
     };
   } catch (error: any) {
-    console.error('[AI Test Generator] Error:', error);
-    console.error('[AI Test Generator] Error stack:', error.stack);
-
-    // More detailed error message
     let errorMessage = error.message || 'Failed to generate questions';
 
     if (error.message?.includes('timeout')) {
@@ -347,7 +282,6 @@ export async function generateQuestionsFromMultipleImages(
       const result = await generateQuestionsFromImage(imageUri, questionCountPerImage, context);
 
       if (result.error) {
-        console.warn(`Failed to generate questions for image: ${result.error}`);
         continue;
       }
 
@@ -359,8 +293,6 @@ export async function generateQuestionsFromMultipleImages(
       totalGenerated: allQuestions.length,
     };
   } catch (error: any) {
-    console.error('[AI Test Generator] Error processing multiple images:', error);
-
     return {
       questions: [],
       totalGenerated: 0,

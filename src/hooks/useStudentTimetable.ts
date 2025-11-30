@@ -44,8 +44,8 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
       if (!slotsData || slotsData.length === 0) return { slots: [], taughtSlotIds: new Set<string>() };
 
       // Get unique subject and teacher IDs
-      const subjectIds = [...new Set(slotsData.map(slot => slot.subject_id).filter(Boolean))];
-      const teacherIds = [...new Set(slotsData.map(slot => slot.teacher_id).filter(Boolean))];
+      const subjectIds = [...new Set(slotsData.map(slot => slot.subject_id).filter((id): id is string => Boolean(id)))];
+      const teacherIds = [...new Set(slotsData.map(slot => slot.teacher_id).filter((id): id is string => Boolean(id)))];
 
       // Batch fetch subjects and teachers
       const [subjectsResult, teachersResult] = await Promise.all([
@@ -79,11 +79,6 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
 
       const taughtSlotIds = new Set((progressData || []).map(p => p.timetable_slot_id).filter(Boolean));
 
-      // Debug logging
-      console.log('[useStudentTimetable] Date:', dateStr, 'Class:', classInstanceId);
-      console.log('[useStudentTimetable] Progress records:', progressData?.length || 0);
-      console.log('[useStudentTimetable] Taught slot IDs:', Array.from(taughtSlotIds));
-
       // Combine slots with subject and teacher data
       const enrichedSlots = slotsData.map(slot => ({
         ...slot,
@@ -91,7 +86,7 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
         teacher: slot.teacher_id ? teachersMap.get(slot.teacher_id) : null,
       }));
 
-      return { slots: enrichedSlots as TimetableSlot[], taughtSlotIds };
+      return { slots: enrichedSlots as unknown as TimetableSlot[], taughtSlotIds };
     },
     enabled: !!classInstanceId && !!dateStr,
     staleTime: 30 * 1000, // ✅ 30 seconds (was 5 minutes - too long!)
@@ -109,11 +104,6 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
     if (!data?.slots) return 0;
     return data.slots.filter(slot => slot.slot_type === 'period').length;
   }, [data?.slots]);
-
-  // Debug logging to check taughtSlotIds
-  if (data?.taughtSlotIds && data.taughtSlotIds.size > 0) {
-    console.log('[useStudentTimetable] Taught slot IDs:', Array.from(data.taughtSlotIds));
-  }
 
   return {
     slots: data?.slots || [],

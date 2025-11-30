@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { RefreshCw, AlertCircle, Inbox } from 'lucide-react-native';
-import { colors, spacing, typography } from '../../../lib/design-system';
+import { spacing, typography, colors } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export interface ThreeStateViewProps {
   state: 'loading' | 'error' | 'empty' | 'success';
@@ -30,8 +31,55 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
   children,
   timeout = 6,
 }) => {
+  const { colors, isDark } = useTheme();
+  
+  // Create dynamic styles based on theme
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.lg,
+      backgroundColor: colors.background.app,
+    },
+    loadingText: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.medium,
+      color: colors.text.primary,
+      marginTop: spacing.md,
+      textAlign: 'center',
+    },
+    timeoutText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      marginTop: spacing.sm,
+      textAlign: 'center',
+    },
+    errorTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.error[500],
+      marginTop: spacing.md,
+      textAlign: 'center',
+    },
+    errorDetails: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      marginTop: spacing.sm,
+      textAlign: 'center',
+      fontFamily: 'monospace',
+    },
+    emptyTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.secondary,
+      marginTop: spacing.md,
+      textAlign: 'center',
+    },
+  }), [colors]);
+
   if (state === 'success' && children) {
-    return <>{children}</>;
+    return <View style={{ flex: 1, backgroundColor: colors.background.app }}>{children}</View>;
   }
 
   const renderContent = () => {
@@ -40,9 +88,9 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
         return (
           <View style={styles.centerContent}>
             <ActivityIndicator size="large" color={colors.primary[500]} />
-            <Text style={styles.loadingText}>{loadingMessage}</Text>
+            <Text style={dynamicStyles.loadingText}>{loadingMessage}</Text>
             {timeout > 0 && (
-              <Text style={styles.timeoutText}>
+              <Text style={dynamicStyles.timeoutText}>
                 Taking longer than expected? Check your connection.
               </Text>
             )}
@@ -53,16 +101,16 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
         return (
           <View style={styles.centerContent}>
             <AlertCircle size={48} color={colors.error[500]} />
-            <Text style={styles.errorTitle}>{errorMessage}</Text>
+            <Text style={dynamicStyles.errorTitle}>{errorMessage}</Text>
             {errorDetails && (
-              <Text style={styles.errorDetails}>{errorDetails}</Text>
+              <Text style={dynamicStyles.errorDetails}>{errorDetails}</Text>
             )}
             {onRetry && (
               <Button
                 mode="contained"
                 onPress={onRetry}
                 style={styles.retryButton}
-                icon={() => <RefreshCw size={16} color="white" />}
+                icon={() => <RefreshCw size={16} color={isDark ? colors.text.inverse : colors.surface.primary} />}
               >
                 Retry
               </Button>
@@ -74,7 +122,7 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
         return (
           <View style={styles.centerContent}>
             <Inbox size={48} color={colors.text.secondary} />
-            <Text style={styles.emptyTitle}>{emptyMessage}</Text>
+            <Text style={dynamicStyles.emptyTitle}>{emptyMessage}</Text>
             {emptyAction && (
               <Button
                 mode="outlined"
@@ -93,59 +141,20 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {renderContent()}
     </View>
   );
 };
 
+// Static styles that don't depend on theme
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
   centerContent: {
     alignItems: 'center',
     maxWidth: 300,
   },
-  loadingText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
-  timeoutText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.sm,
-    textAlign: 'center',
-  },
-  errorTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.error[500],
-    marginTop: spacing.md,
-    textAlign: 'center',
-  },
-  errorDetails: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.sm,
-    textAlign: 'center',
-    fontFamily: 'monospace',
-  },
   retryButton: {
     marginTop: spacing.lg,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    marginTop: spacing.md,
-    textAlign: 'center',
   },
   emptyButton: {
     marginTop: spacing.lg,

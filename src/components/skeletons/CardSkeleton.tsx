@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
 import { View, StyleSheet, Animated, Easing } from 'react-native';
-import { colors, spacing, borderRadius } from '../../../lib/design-system';
+import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 
 interface CardSkeletonProps {
   height?: number;
@@ -9,6 +10,12 @@ interface CardSkeletonProps {
 }
 
 export function CardSkeleton({ height = 120, width = '100%', style }: CardSkeletonProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+
   const animatedValue = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
@@ -43,25 +50,44 @@ export function CardSkeleton({ height = 120, width = '100%', style }: CardSkelet
 }
 
 export function ListCardSkeleton() {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+
   return (
     <View style={styles.listCard}>
-      <CardSkeleton height={20} width="40%" style={{ marginBottom: spacing['2'] }} />
-      <CardSkeleton height={16} width="60%" style={{ marginBottom: spacing['2'] }} />
+      <CardSkeleton height={20} width="40%" style={{ marginBottom: spacing[2] }} />
+      <CardSkeleton height={16} width="60%" style={{ marginBottom: spacing[2] }} />
       <CardSkeleton height={14} width="80%" />
     </View>
   );
 }
 
 export function StatCardSkeleton() {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+
   return (
     <View style={styles.statCard}>
-      <CardSkeleton height={40} width={60} style={{ marginBottom: spacing['2'], borderRadius: borderRadius.full }} />
+      <CardSkeleton height={40} width={60} style={{ marginBottom: spacing[2], borderRadius: borderRadius.full }} />
       <CardSkeleton height={16} width="70%" />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (
+  colors: ThemeColors,
+  typography: Typography,
+  spacing: Spacing,
+  borderRadius: BorderRadius,
+  shadows: Shadows
+) =>
+  StyleSheet.create({
   container: {
     borderRadius: borderRadius.lg,
     overflow: 'hidden',
@@ -72,17 +98,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.neutral[300],
   },
   listCard: {
-    padding: spacing['4'],
+      padding: spacing[4],
     backgroundColor: colors.background.secondary,
     borderRadius: borderRadius.lg,
-    marginBottom: spacing['3'],
+      marginBottom: spacing[3],
   },
   statCard: {
-    padding: spacing['4'],
+      padding: spacing[4],
     backgroundColor: colors.background.secondary,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
 });
-

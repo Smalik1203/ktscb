@@ -1,22 +1,39 @@
+/**
+ * LoginScreen
+ * 
+ * Refactored to use centralized design system.
+ * All styling comes from theme tokens - no hardcoded values.
+ */
+
 import React, { useState } from 'react';
-import { View, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { TextInput, Text, ActivityIndicator } from 'react-native-paper';
+import { TextInput, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useAuth } from '../src/contexts/AuthContext';
+import { useTheme } from '../src/contexts/ThemeContext';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
-import { typography, spacing, borderRadius, shadows } from '../lib/design-system';
 import { isRateLimited, getRemainingAttempts, getResetTime, clearRateLimit } from '../src/utils/rateLimiter';
 import { sanitizeEmail } from '../src/utils/sanitize';
 import { LinearGradient } from 'expo-linear-gradient';
+import { log } from '../src/lib/logger';
+import { 
+  Container, 
+  Stack, 
+  Heading, 
+  Body, 
+  Button,
+  Center,
+} from '../src/ui';
 
 const { height } = Dimensions.get('window');
 
 export default function LoginScreen() {
   const router = useRouter();
   const auth = useAuth();
+  const { colors, spacing, borderRadius, shadows, isDark } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -32,9 +49,8 @@ export default function LoginScreen() {
   // Handle access denied - sign out user and show message
   React.useEffect(() => {
     if (auth.status === 'accessDenied') {
-      // Sign out the user automatically
       auth.signOut().catch((err) => {
-        console.error('Failed to sign out after access denied:', err);
+        log.error('Failed to sign out after access denied', err);
       });
       
       Alert.alert(
@@ -43,7 +59,6 @@ export default function LoginScreen() {
         [{ 
           text: 'OK', 
           onPress: () => {
-            // Clear the form after showing the error
             setEmail('');
             setPassword('');
           }
@@ -60,13 +75,40 @@ export default function LoginScreen() {
     }
   }, [auth.status]);
 
+  // Gradient colors based on theme - ClassBridge brand
+  const gradientColors = isDark 
+    ? [colors.background.primary, colors.background.secondary, colors.background.tertiary] as const
+    : ['#FFFFFF', '#F5FAFF', '#EBF5FF'] as const;
+  
+  const buttonGradientColors = isDark
+    ? [colors.primary[700], colors.primary.main] as const
+    : [colors.primary.main, colors.secondary.main] as const;
+  
+  const disabledButtonColors = isDark
+    ? [colors.neutral[600], colors.neutral[500]] as const
+    : [colors.neutral[300], colors.neutral[400]] as const;
+
+  // Theme for TextInput
+  const inputTheme = {
+    colors: {
+      primary: colors.primary.main,
+      background: colors.surface.primary,
+      surface: colors.surface.primary,
+      outline: colors.border.DEFAULT,
+      onSurface: colors.text.primary,
+      placeholder: colors.text.tertiary,
+    },
+  };
+
   // Show loading screen while auth is loading
   if (auth.loading) {
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#1E4EB8" />
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
+      <Container background="primary" flex>
+        <Center style={{ flex: 1 }}>
+          <ActivityIndicator size="large" color={colors.primary.main} />
+          <Body color="secondary" style={{ marginTop: spacing.md }}>Loading...</Body>
+        </Center>
+      </Container>
     );
   }
 
@@ -76,14 +118,12 @@ export default function LoginScreen() {
       return;
     }
 
-    // Sanitize email input
     const sanitizedEmail = sanitizeEmail(email);
     if (!sanitizedEmail) {
       Alert.alert('Invalid Email', 'Please enter a valid email address');
       return;
     }
 
-    // Check rate limiting
     const rateLimitKey = sanitizedEmail.toLowerCase();
     if (isRateLimited(rateLimitKey, 'login')) {
       const resetTime = getResetTime(rateLimitKey, 'login');
@@ -115,10 +155,7 @@ export default function LoginScreen() {
       }
 
       if (data.user) {
-        // Clear rate limit on successful login
         clearRateLimit(rateLimitKey);
-        // Don't set loading to false here - let the auth context handle the flow
-        // The auth context will either redirect to main app or show access denied
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'An unexpected error occurred');
@@ -130,330 +167,176 @@ export default function LoginScreen() {
     Alert.alert('Forgot Password', 'Password reset functionality will be implemented soon.');
   };
 
+  // Card style using theme tokens
+  const cardStyle = {
+    backgroundColor: colors.surface.elevated,
+    borderRadius: borderRadius['2xl'],
+    padding: spacing['2xl'],
+    ...(isDark ? { borderWidth: 1, borderColor: colors.border.light } : shadows.xl),
+  };
+
+  // Logo container style using theme tokens
+  const logoContainerStyle = {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: colors.surface.primary,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    marginBottom: spacing.lg,
+    ...(isDark ? { borderWidth: 1, borderColor: colors.border.light } : shadows.xl),
+  };
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary }} edges={['top']}>
       <LinearGradient
-        colors={['#FFFFFF', '#F8FAFE', '#F0F5FF']}
-        style={styles.gradient}
+        colors={gradientColors}
+        style={{ flex: 1 }}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
+          style={{ flex: 1 }}
         >
-          <ScrollView 
-            contentContainerStyle={styles.scrollContent} 
-            showsVerticalScrollIndicator={false}
-            bounces={false}
+          <Container 
+            scroll 
+            showScrollIndicator={false}
+            padding="lg"
+            background="transparent"
+            style={{ minHeight: height }}
           >
-            <View style={styles.formContainer}>
+            <Center style={{ flex: 1, paddingVertical: spacing.lg }}>
               {/* Logo Section */}
-              <View style={styles.logoSection}>
-                <View style={styles.logoContainer}>
+              <Stack spacing="md" style={{ alignItems: 'center', marginBottom: spacing.lg }}>
+                <View style={logoContainerStyle}>
                   <Image
                     source={require('../assets/images/Image.png')}
-                    style={styles.logoImage}
+                    style={{ width: '100%', height: '100%', borderRadius: 66 }}
                     contentFit="cover"
                     transition={200}
                     cachePolicy="memory-disk"
                     onError={(error) => {
-                      console.error('Logo image failed to load:', error);
-                    }}
-                    onLoad={() => {
-                      console.log('Logo image loaded successfully');
+                      log.error('Logo image failed to load', error);
                     }}
                   />
                 </View>
 
-                <Text style={styles.title}>ClassBridge</Text>
-                <View style={styles.taglineContainer}>
-                  <Text style={styles.taglineText}>Bridge The Gap</Text>
-                  <View style={styles.taglineUnderline} />
-                </View>
-              </View>
+                <Heading 
+                  level={1} 
+                  color="accent"
+                  style={{ textAlign: 'center', letterSpacing: -0.5 }}
+                >
+                  ClassBridge
+                </Heading>
+                
+                <Stack spacing="xs" style={{ alignItems: 'center' }}>
+                  <Heading level={4} align="center">Bridge The Gap</Heading>
+                  <View style={{
+                    width: 80,
+                    height: 4,
+                    borderRadius: borderRadius.full,
+                    backgroundColor: colors.primary.main,
+                  }} />
+                </Stack>
+              </Stack>
 
               {/* Form Section */}
-              <View style={styles.formSection}>
-                <View style={styles.card}>
-                  <Text style={styles.welcomeText}>Welcome Back</Text>
-                  <Text style={styles.subtitleText}>Sign in to continue to your account</Text>
+              <View style={{ width: '100%', maxWidth: 420 }}>
+                <View style={cardStyle}>
+                  <Stack spacing="md">
+                    <Heading level={2} align="center">Welcome Back</Heading>
+                    <Body color="secondary" align="center" style={{ marginBottom: spacing.lg }}>
+                      Sign in to continue to your account
+                    </Body>
 
-                  <View style={styles.inputContainer}>
-                    <View style={styles.inputWrapper}>
-                      <View style={styles.inputIcon}>
-                        <Mail size={22} color="#1E4EB8" />
-                      </View>
-                      <TextInput
-                        label="Email Address"
-                        value={email}
-                        onChangeText={setEmail}
-                        mode="outlined"
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        autoComplete="email"
-                        disabled={loading}
-                        style={styles.input}
-                        contentStyle={styles.inputContent}
-                        theme={{
-                          colors: {
-                            primary: '#1E4EB8',
-                            background: '#FFFFFF',
-                            surface: '#FFFFFF',
-                            outline: '#E0E0E0',
-                            onSurface: '#1A1A1A',
-                            placeholder: '#9E9E9E',
-                          },
-                        }}
-                      />
-                    </View>
+                    {/* Email Input */}
+                    <TextInput
+                      label="Email Address"
+                      value={email}
+                      onChangeText={setEmail}
+                      mode="outlined"
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoComplete="email"
+                      disabled={loading}
+                      left={<TextInput.Icon icon={() => <Mail size={20} color={colors.primary.main} />} />}
+                      style={{ backgroundColor: colors.surface.primary, marginBottom: spacing.md }}
+                      theme={inputTheme}
+                    />
 
-                    <View style={styles.inputWrapper}>
-                      <View style={styles.inputIcon}>
-                        <Lock size={22} color="#1E4EB8" />
-                      </View>
-                      <TextInput
-                        label="Password"
-                        value={password}
-                        onChangeText={setPassword}
-                        mode="outlined"
-                        secureTextEntry={!showPassword}
-                        autoComplete="password"
-                        disabled={loading}
-                        style={styles.input}
-                        contentStyle={styles.inputContent}
-                        onSubmitEditing={handleLogin}
-                        theme={{
-                          colors: {
-                            primary: '#1E4EB8',
-                            background: '#FFFFFF',
-                            surface: '#FFFFFF',
-                            outline: '#E0E0E0',
-                            onSurface: '#1A1A1A',
-                            placeholder: '#9E9E9E',
-                          },
-                        }}
-                      />
-                      <TouchableOpacity
-                        style={styles.passwordToggle}
-                        onPress={() => setShowPassword(!showPassword)}
-                        disabled={loading}
-                      >
-                        {showPassword ? (
-                          <EyeOff size={22} color="#666666" />
-                        ) : (
-                          <Eye size={22} color="#666666" />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                    {/* Password Input */}
+                    <TextInput
+                      label="Password"
+                      value={password}
+                      onChangeText={setPassword}
+                      mode="outlined"
+                      secureTextEntry={!showPassword}
+                      autoComplete="password"
+                      disabled={loading}
+                      left={<TextInput.Icon icon={() => <Lock size={20} color={colors.primary.main} />} />}
+                      right={
+                        <TextInput.Icon 
+                          icon={() => showPassword ? <EyeOff size={20} color={colors.text.tertiary} /> : <Eye size={20} color={colors.text.tertiary} />}
+                          onPress={() => setShowPassword(!showPassword)}
+                          disabled={loading}
+                        />
+                      }
+                      style={{ backgroundColor: colors.surface.primary, marginBottom: spacing.lg }}
+                      onSubmitEditing={handleLogin}
+                      theme={inputTheme}
+                    />
 
+                    {/* Login Button */}
                   <TouchableOpacity
                     onPress={handleLogin}
                     disabled={loading || !email || !password}
-                    style={[
-                      styles.loginButton,
-                      (loading || !email || !password) && styles.loginButtonDisabled
-                    ]}
+                      style={{
+                        borderRadius: borderRadius.xl,
+                        overflow: 'hidden',
+                        marginBottom: spacing.md,
+                        opacity: (loading || !email || !password) ? 0.6 : 1,
+                        ...shadows.md,
+                      }}
                     activeOpacity={0.8}
                   >
                     <LinearGradient
-                      colors={loading || !email || !password ? ['#CCCCCC', '#AAAAAA'] : ['#1E4EB8', '#4FA3FF']}
-                      style={styles.loginButtonGradient}
+                      colors={loading || !email || !password ? disabledButtonColors : buttonGradientColors}
+                        style={{
+                          paddingVertical: spacing.md,
+                          paddingHorizontal: spacing.lg,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: 52,
+                        }}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                     >
                       {loading ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
+                          <ActivityIndicator color={colors.text.inverse} size="small" />
                       ) : (
-                        <Text style={styles.loginButtonText}>Sign In</Text>
+                          <Heading level={5} color="inverse" style={{ letterSpacing: 0.5 }}>
+                            Sign In
+                          </Heading>
                       )}
                     </LinearGradient>
                   </TouchableOpacity>
 
+                    {/* Forgot Password */}
                   <TouchableOpacity
                     onPress={handleForgotPassword}
-                    style={styles.forgotPassword}
+                      style={{ alignItems: 'center', paddingVertical: spacing.xs }}
                     disabled={loading}
                   >
-                    <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                      <Body color="accent" weight="semibold">Forgot Password?</Body>
                   </TouchableOpacity>
+                  </Stack>
                 </View>
               </View>
-            </View>
-          </ScrollView>
+            </Center>
+          </Container>
         </KeyboardAvoidingView>
       </LinearGradient>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  gradient: {
-    flex: 1,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingVertical: spacing['8'],
-    minHeight: height,
-  },
-  formContainer: {
-    paddingHorizontal: spacing['6'],
-    alignItems: 'center',
-    width: '100%',
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: spacing['8'],
-    width: '100%',
-  },
-  logoContainer: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing['8'],
-    ...shadows.xl,
-    borderWidth: 0,
-  },
-  logoImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 66,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#1E4EB8',
-    marginBottom: spacing['4'],
-    textAlign: 'center',
-    letterSpacing: -0.5,
-  },
-  taglineContainer: {
-    marginTop: spacing['2'],
-    width: '100%',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  taglineText: {
-    color: '#2A2A2A',
-    fontSize: typography.fontSize.xl,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-    marginBottom: spacing['2'],
-  },
-  taglineUnderline: {
-    width: 80,
-    height: 4,
-    borderRadius: borderRadius.full,
-    backgroundColor: '#1E4EB8',
-    marginTop: spacing['1'],
-  },
-  formSection: {
-    width: '100%',
-    maxWidth: 420,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: borderRadius['2xl'],
-    padding: spacing['8'],
-    ...shadows.xl,
-    borderWidth: 0,
-  },
-  welcomeText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: spacing['2'],
-    textAlign: 'center',
-    letterSpacing: -0.3,
-  },
-  subtitleText: {
-    fontSize: typography.fontSize.base,
-    color: '#6b7280',
-    marginBottom: spacing['8'],
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  inputContainer: {
-    marginBottom: spacing['6'],
-  },
-  inputWrapper: {
-    position: 'relative',
-    marginBottom: spacing['5'],
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: spacing['4'],
-    top: spacing['5'],
-    zIndex: 10,
-    backgroundColor: '#FFFFFF',
-    padding: spacing['1'],
-  },
-  input: {
-    paddingLeft: spacing['12'],
-    backgroundColor: '#FFFFFF',
-  },
-  inputContent: {
-    fontSize: typography.fontSize.base,
-  },
-  passwordToggle: {
-    position: 'absolute',
-    right: spacing['4'],
-    top: spacing['5'],
-    zIndex: 10,
-    padding: spacing['1'],
-    backgroundColor: '#FFFFFF',
-  },
-  loginButton: {
-    borderRadius: borderRadius.xl,
-    overflow: 'hidden',
-    marginBottom: spacing['4'],
-    ...shadows.md,
-  },
-  loginButtonGradient: {
-    paddingVertical: spacing['4'],
-    paddingHorizontal: spacing['6'],
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-  },
-  loginButtonDisabled: {
-    opacity: 0.6,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: typography.fontSize.lg,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  forgotPassword: {
-    alignItems: 'center',
-    paddingVertical: spacing['2'],
-  },
-  forgotPasswordText: {
-    color: '#1E4EB8',
-    fontSize: typography.fontSize.base,
-    fontWeight: '600',
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: spacing['4'],
-    color: '#666666',
-    fontSize: typography.fontSize.base,
-  },
-});

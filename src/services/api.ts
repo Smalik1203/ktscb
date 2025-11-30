@@ -1,5 +1,28 @@
 import { supabase } from '../lib/supabase';
 import { Database } from '../types/database.types';
+import type { 
+  DomainStudent, 
+  DomainAdmin, 
+  DomainClassInstance, 
+  DomainUser,
+  DomainAttendance,
+  DomainTimetableSlot,
+  DomainTask,
+  DomainLearningResource,
+  DomainSubject,
+  DomainCalendarEvent
+} from '../lib/normalize';
+import { 
+  getCurrentUserContext,
+  getStudentDetails, 
+  getClassDetails,
+  listClasses,
+  getTimetable,
+  listTasks,
+  listResources,
+  listSubjects,
+  getActiveAcademicYear
+} from '../data/queries';
 
 type Tables = Database['public']['Tables'];
 
@@ -8,34 +31,34 @@ export interface UserProfile {
   role: string;
   school_code: string | null;
   class_instance_id: string | null;
-  full_name: string;
-  email: string;
-  phone?: string;
-  student?: Tables['student']['Row'];
-  admin?: Tables['admin']['Row'];
-  class_instance?: ClassInstance;
+  full_name: string | null;
+  email: string | null;
+  phone?: string | null;
+  student?: DomainStudent;
+  admin?: DomainAdmin;
+  class_instance?: DomainClassInstance;
 }
 
 export interface ClassInstance {
   id: string;
-  grade: number;
-  section: string;
+  grade: number | null;
+  section: string | null;
   school_code: string;
-  academic_year_id: string;
-  class_teacher_id?: string;
+  academic_year_id: string | null;
+  class_teacher_id?: string | null;
 }
 
 export interface AttendanceRecord {
   id: string;
   student_id: string;
-  class_instance_id: string;
+  class_instance_id: string | null;
   date: string;
   status: 'present' | 'absent';
   marked_by: string;
   marked_by_role_code: string;
-  school_code: string;
-  created_at: string;
-  updated_at?: string;
+  school_code: string | null;
+  created_at: string | null;
+  updated_at?: string | null;
 }
 
 export interface AttendanceInput {
@@ -65,24 +88,14 @@ export interface FeePayment {
   updated_at: string | null;
 }
 
-export interface TimetableSlot {
-  id: string;
-  school_code: string;
-  class_instance_id: string;
-  class_date: string; // YYYY-MM-DD
-  period_number: number;
-  slot_type: 'period' | 'break' | string;
-  name: string | null;
-  start_time: string; // HH:MM:SS
-  end_time: string;   // HH:MM:SS
-  subject_id: string | null;
-  teacher_id: string | null;
-  syllabus_item_id?: string | null;
+// Re-export domain types for backward compatibility
+export type TimetableSlot = DomainTimetableSlot & {
+  // Additional properties from database that aren't in domain schema yet
+  slot_type?: string;
+  name?: string | null;
   plan_text?: string | null;
-  status: 'planned' | 'done' | 'cancelled' | string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
+  status?: string;
+  created_by?: string;
   syllabus_chapter_id?: string | null;
   syllabus_topic_id?: string | null;
   // Enriched properties added by useUnifiedTimetable hook
@@ -101,66 +114,11 @@ export interface TimetableSlot {
   };
   // Legacy properties for backward compatibility
   day_of_week?: number;
-}
+};
 
-export interface LearningResource {
-  id: string;
-  title: string;
-  description: string | null;
-  resource_type: string;
-  content_url: string | null;
-  file_size: number | null;
-  school_code: string;
-  class_instance_id: string | null;
-  subject_id: string | null;
-  uploaded_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  description: string | null;
-  event_type: string;
-  start_date: string;
-  end_date: string | null;
-  start_time: string | null;
-  end_time: string | null;
-  is_all_day: boolean | null;
-  is_recurring: boolean | null;
-  recurrence_pattern: string | null;
-  recurrence_interval: number | null;
-  recurrence_end_date: string | null;
-  color: string | null;
-  is_active: boolean | null;
-  school_code: string;
-  class_instance_id: string | null;
-  academic_year_id: string | null;
-  created_by: string;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description: string | null;
-  instructions: string | null;
-  assigned_date: string;
-  due_date: string;
-  priority: string | null;
-  max_marks: number | null;
-  attachments: any | null;
-  is_active: boolean | null;
-  academic_year_id: string | null;
-  class_instance_id: string | null;
-  subject_id: string | null;
-  school_code: string;
-  created_by: string;
-  created_at: string | null;
-  updated_at: string | null;
-}
+export type LearningResource = DomainLearningResource;
+export type CalendarEvent = DomainCalendarEvent;
+export type Task = DomainTask;
 
 export const api = {
   users: {
@@ -181,46 +139,58 @@ export const api = {
         role: userData.role,
         school_code: userData.school_code,
         class_instance_id: userData.class_instance_id,
-        full_name: user.email?.split('@')[0] || 'User',
-        email: user.email || '',
+        full_name: user.email?.split('@')[0] || null,
+        email: user.email || null,
       };
 
       if (userData.role === 'student') {
-        const { data: studentData } = await supabase
+        // Find student by auth_user_id
+        const { data: studentRows } = await supabase
           .from('student')
-          .select('*')
+          .select('id')
           .eq('auth_user_id', user.id)
-          .maybeSingle();
-
-        if (studentData) {
-          profile.student = studentData;
-          profile.full_name = studentData.full_name;
-          profile.class_instance_id = studentData.class_instance_id;
+          .limit(1);
+        
+        if (studentRows && studentRows.length > 0) {
+          const studentResult = await getStudentDetails(studentRows[0].id);
+          if (studentResult.data) {
+            profile.student = studentResult.data;
+            profile.full_name = studentResult.data.full_name;
+            profile.class_instance_id = studentResult.data.class_instance_id;
+          }
         }
       } else if (userData.role === 'admin' || userData.role === 'superadmin') {
-        const { data: adminData } = await supabase
+        // Find admin by auth_user_id
+        const { data: adminRows } = await supabase
           .from('admin')
-          .select('*')
+          .select('id')
           .eq('auth_user_id', user.id)
-          .maybeSingle();
+          .limit(1);
+        
+        if (adminRows && adminRows.length > 0) {
+          const { data: adminData } = await supabase
+            .from('admin')
+            .select('*')
+            .eq('id', adminRows[0].id)
+            .maybeSingle();
 
-        if (adminData) {
-          profile.admin = adminData;
-          profile.full_name = adminData.full_name;
-          profile.email = adminData.email;
-          profile.phone = adminData.phone?.toString();
+          if (adminData) {
+            const { normalizeAdmin } = await import('../lib/normalize');
+            const normalized = normalizeAdmin(adminData);
+            if (normalized.data) {
+              profile.admin = normalized.data;
+              profile.full_name = normalized.data.full_name;
+              profile.email = normalized.data.email;
+              profile.phone = normalized.data.phone?.toString() || null;
+            }
+          }
         }
       }
 
       if (userData.class_instance_id) {
-        const { data: classData } = await supabase
-          .from('class_instances')
-          .select('id, grade, section, school_code, academic_year_id, class_teacher_id')
-          .eq('id', userData.class_instance_id)
-          .maybeSingle();
-
-        if (classData) {
-          profile.class_instance = classData;
+        const classResult = await getClassDetails(userData.class_instance_id);
+        if (classResult.data) {
+          profile.class_instance = classResult.data;
         }
       }
 
@@ -254,69 +224,95 @@ export const api = {
   },
 
   attendance: {
-    async getByClass(classId: string, date?: string): Promise<AttendanceRecord[]> {
-      let query = supabase
-        .from('attendance')
-        .select('*')
-        .eq('class_instance_id', classId);
-
+    async getByClass(classId: string, date?: string): Promise<DomainAttendance[]> {
+      const { getAttendanceForDate, getAttendanceOverview } = await import('../data/queries');
+      
       if (date) {
-        query = query.eq('date', date);
+        // Get class instance to find school_code
+        const classResult = await getClassDetails(classId);
+        if (classResult.error || !classResult.data) {
+          throw new Error(classResult.error?.userMessage || 'Class not found');
+        }
+        
+        const result = await getAttendanceForDate(classId, date, classResult.data.school_code);
+        if (result.error) throw new Error(result.error.userMessage || 'Operation failed');
+        return result.data || [];
+      } else {
+        // Get overview - need school_code and date range
+        const classResult = await getClassDetails(classId);
+        if (classResult.error || !classResult.data) {
+          throw new Error(classResult.error?.userMessage || 'Class not found');
+        }
+        
+        // Default to last 30 days
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        
+        const result = await getAttendanceOverview(classId, [startDate, endDate], classResult.data.school_code);
+        if (result.error) throw new Error(result.error.userMessage || 'Operation failed');
+        return result.data || [];
       }
-
-      const { data, error } = await query.order('date', { ascending: false });
-
-      if (error) throw error;
-      return (data || []).map(record => ({
-        ...record,
-        status: record.status as 'present' | 'absent',
-        updated_at: (record as any).updated_at || record.created_at
-      }));
     },
 
-    async getBySchool(schoolCode: string, date?: string): Promise<AttendanceRecord[]> {
-      const { data: classes } = await supabase
-        .from('class_instances')
-        .select('id')
-        .eq('school_code', schoolCode);
-
-      if (!classes || classes.length === 0) return [];
-
-      const classIds = classes.map(c => c.id);
-
-      let query = supabase
-        .from('attendance')
-        .select('*')
-        .in('class_instance_id', classIds);
-
-      if (date) {
-        query = query.eq('date', date);
+    async getBySchool(schoolCode: string, date?: string): Promise<DomainAttendance[]> {
+      const { listClasses, getAttendanceForDate, getAttendanceOverview } = await import('../data/queries');
+      
+      const classesResult = await listClasses(schoolCode);
+      if (classesResult.error || !classesResult.data) {
+        throw new Error(classesResult.error?.userMessage || 'Failed to fetch classes');
       }
 
-      const { data, error } = await query.order('date', { ascending: false });
+      if (classesResult.data.length === 0) return [];
 
-      if (error) throw error;
-      return (data || []).map(record => ({
-        ...record,
-        status: record.status as 'present' | 'absent',
-        updated_at: (record as any).updated_at || record.created_at
-      }));
+      // Aggregate attendance from all classes
+      const allAttendance: DomainAttendance[] = [];
+      
+      for (const classInstance of classesResult.data) {
+        if (date) {
+          const result = await getAttendanceForDate(classInstance.id, date, schoolCode);
+          if (result.data) {
+            allAttendance.push(...result.data);
+          }
+        } else {
+          const endDate = new Date().toISOString().split('T')[0];
+          const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+          const result = await getAttendanceOverview(classInstance.id, [startDate, endDate], schoolCode);
+          if (result.data) {
+            allAttendance.push(...result.data);
+          }
+        }
+      }
+      
+      return allAttendance;
     },
 
-    async getByStudent(studentId: string): Promise<AttendanceRecord[]> {
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('date', { ascending: false })
-        .limit(30);
-
-      if (error) throw error;
-      return (data || []).map(record => ({
-        ...record,
-        status: record.status as 'present' | 'absent',
-        updated_at: (record as any).updated_at || record.created_at
-      }));
+    async getByStudent(studentId: string): Promise<DomainAttendance[]> {
+      // Get student to find class_instance_id and school_code
+      const studentResult = await getStudentDetails(studentId);
+      if (studentResult.error || !studentResult.data) {
+        throw new Error(studentResult.error?.userMessage || 'Student not found');
+      }
+      
+      const student = studentResult.data;
+      if (!student.class_instance_id || !student.school_code) {
+        throw new Error('Student missing class_instance_id or school_code');
+      }
+      
+      // Get last 30 days
+      const endDate = new Date().toISOString().split('T')[0];
+      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      const { getAttendanceOverview } = await import('../data/queries');
+      const result = await getAttendanceOverview(
+        student.class_instance_id,
+        [startDate, endDate],
+        student.school_code
+      );
+      
+      if (result.error) throw new Error(result.error.userMessage || 'Operation failed');
+      
+      // Filter to this student only
+      return (result.data || []).filter(a => a.student_id === studentId);
     },
 
     async markAttendance(records: AttendanceInput[]): Promise<void> {
@@ -338,7 +334,9 @@ export const api = {
 
         if (existing) {
           existing.forEach(record => {
-            existingRecords[record.student_id] = record.id;
+            if (record.student_id) {
+              existingRecords[record.student_id] = record.id;
+            }
           });
         }
       }
@@ -552,98 +550,138 @@ export const api = {
   },
 
   timetable: {
-    async getByClass(classId: string): Promise<TimetableSlot[]> {
-      const { data, error } = await supabase
-        .from('timetable_slots')
-        .select('*')
-        .eq('class_instance_id', classId)
-        .order('day_of_week', { ascending: true })
-        .order('start_time', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
+    async getByClass(classId: string, date?: string): Promise<DomainTimetableSlot[]> {
+      const classResult = await getClassDetails(classId);
+      if (classResult.error || !classResult.data) {
+        throw new Error(classResult.error?.userMessage || 'Class not found');
+      }
+      
+      const targetDate = date || new Date().toISOString().split('T')[0];
+      const result = await getTimetable(classId, targetDate, classResult.data.school_code);
+      if (result.error) throw new Error(result.error.userMessage || 'Operation failed');
+      return result.data || [];
     },
 
-    async getBySchool(schoolCode: string): Promise<TimetableSlot[]> {
-      const { data: classes } = await supabase
-        .from('class_instances')
-        .select('id')
-        .eq('school_code', schoolCode);
+    async getBySchool(schoolCode: string): Promise<DomainTimetableSlot[]> {
+      const classesResult = await listClasses(schoolCode);
+      if (classesResult.error || !classesResult.data || classesResult.data.length === 0) {
+        return [];
+      }
 
-      if (!classes || classes.length === 0) return [];
-
-      const classIds = classes.map(c => c.id);
-
-      const { data, error } = await supabase
-        .from('timetable_slots')
-        .select('*')
-        .in('class_instance_id', classIds)
-        .order('day_of_week', { ascending: true })
-        .order('start_time', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
+      const allSlots: DomainTimetableSlot[] = [];
+      const today = new Date().toISOString().split('T')[0];
+      
+      for (const classInstance of classesResult.data) {
+        const result = await getTimetable(classInstance.id, today, schoolCode);
+        if (result.data) {
+          allSlots.push(...result.data);
+        }
+      }
+      
+      return allSlots;
     },
   },
 
   students: {
-    async getByClass(classId: string) {
-      const { data, error } = await supabase
-        .from('student')
-        .select('id, full_name, student_code, class_instance_id, school_code')
-        .eq('class_instance_id', classId)
-        .order('full_name', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
+    async getByClass(classId: string): Promise<Pick<DomainStudent, 'id' | 'full_name' | 'student_code' | 'class_instance_id' | 'school_code'>[]> {
+      const { listStudents } = await import('../data/queries');
+      const classResult = await getClassDetails(classId);
+      if (classResult.error || !classResult.data) {
+        throw new Error(classResult.error?.userMessage || 'Class not found');
+      }
+      
+      const result = await listStudents(classId, classResult.data.school_code);
+      if (result.error) throw new Error(result.error.userMessage || 'Operation failed');
+      return (result.data || []).map(s => ({
+        id: s.id,
+        full_name: s.full_name,
+        student_code: s.student_code,
+        class_instance_id: s.class_instance_id,
+        school_code: s.school_code,
+      }));
     },
 
-    async getBySchool(schoolCode: string) {
-      const { data, error } = await supabase
-        .from('student')
-        .select('id, full_name, student_code, class_instance_id, school_code')
-        .eq('school_code', schoolCode)
-        .order('full_name', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
+    async getBySchool(schoolCode: string): Promise<Pick<DomainStudent, 'id' | 'full_name' | 'student_code' | 'class_instance_id' | 'school_code'>[]> {
+      // Get all classes for school, then get students from each
+      const classesResult = await listClasses(schoolCode);
+      if (classesResult.error || !classesResult.data) {
+        throw new Error(classesResult.error?.userMessage || 'Failed to fetch classes');
+      }
+      
+      const allStudents: Pick<DomainStudent, 'id' | 'full_name' | 'student_code' | 'class_instance_id' | 'school_code'>[] = [];
+      const { listStudents } = await import('../data/queries');
+      
+      for (const classInstance of classesResult.data) {
+        const result = await listStudents(classInstance.id, schoolCode);
+        if (result.data) {
+          allStudents.push(...result.data.map(s => ({
+            id: s.id,
+            full_name: s.full_name,
+            student_code: s.student_code,
+            class_instance_id: s.class_instance_id,
+            school_code: s.school_code,
+          })));
+        }
+      }
+      
+      return allStudents;
     },
   },
 
   resources: {
-    async getByClass(classId?: string, schoolCode?: string): Promise<LearningResource[]> {
-      let query = supabase
-        .from('learning_resources')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (classId) {
-        query = query.eq('class_instance_id', classId);
-      } else if (schoolCode) {
-        query = query.eq('school_code', schoolCode);
+    async getByClass(classId?: string, schoolCode?: string): Promise<DomainLearningResource[]> {
+      if (!classId || !schoolCode) {
+        throw new Error('classId and schoolCode are required');
       }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data || [];
+      
+      const result = await listResources(classId, schoolCode);
+      if (result.error) throw new Error(result.error.userMessage || 'Operation failed');
+      return result.data || [];
     },
 
-    async getAll(schoolCode: string): Promise<LearningResource[]> {
+    async getAll(schoolCode: string, limit?: number): Promise<DomainLearningResource[]> {
+      // Get all classes, then get resources from each
+      const classesResult = await listClasses(schoolCode);
+      if (classesResult.error || !classesResult.data) {
+        throw new Error(classesResult.error?.userMessage || 'Failed to fetch classes');
+      }
+      
+      const allResources: DomainLearningResource[] = [];
+      
+      for (const classInstance of classesResult.data) {
+        const result = await listResources(classInstance.id, schoolCode, undefined, { to: limit ? limit - allResources.length : 99 });
+        if (result.data) {
+          allResources.push(...result.data);
+          if (limit && allResources.length >= limit) break;
+        }
+      }
+      
+      return allResources.slice(0, limit);
+    },
+
+    async getPaginated(schoolCode: string, offset: number, limit: number): Promise<LearningResource[]> {
       const { data, error } = await supabase
         .from('learning_resources')
         .select('*')
         .eq('school_code', schoolCode)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (error) throw error;
       return data || [];
     },
 
     async create(resourceData: Omit<LearningResource, 'id' | 'created_at' | 'updated_at'>): Promise<LearningResource> {
+      // Ensure content_url is provided (required by database)
+      if (!resourceData.content_url) {
+        throw new Error('content_url is required');
+      }
       const { data, error } = await supabase
         .from('learning_resources')
-        .insert([resourceData])
+        .insert([{
+          ...resourceData,
+          content_url: resourceData.content_url, // TypeScript now knows this is not null
+        }])
         .select()
         .single();
 
@@ -652,9 +690,14 @@ export const api = {
     },
 
     async update(id: string, updates: Partial<LearningResource>): Promise<LearningResource> {
+      // Filter out null content_url if provided (database doesn't accept null)
+      const updateData: Partial<DomainLearningResource> = { ...updates };
+      if ('content_url' in updateData && updateData.content_url === null) {
+        delete updateData.content_url;
+      }
       const { data, error } = await supabase
         .from('learning_resources')
-        .update(updates)
+        .update(updateData)
         .eq('id', id)
         .select()
         .single();
@@ -698,26 +741,54 @@ export const api = {
   },
 
   tasks: {
-    async getByUser(userId: string): Promise<Task[]> {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('created_by', userId)
-        .order('due_date', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
+    async getByUser(userId: string): Promise<DomainTask[]> {
+      // Get user's class_instance_id and academic_year_id
+      const userResult = await getCurrentUserContext();
+      if (userResult.error || !userResult.data) {
+        throw new Error(userResult.error?.userMessage || 'User not found');
+      }
+      
+      const user = userResult.data;
+      if (!user.class_instance_id || !user.school_code) {
+        throw new Error('User missing class_instance_id or school_code');
+      }
+      
+      // Get active academic year
+      const ayResult = await getActiveAcademicYear(user.school_code);
+      if (ayResult.error || !ayResult.data) {
+        throw new Error(ayResult.error?.userMessage || 'Active academic year not found');
+      }
+      
+      const result = await listTasks(user.class_instance_id, ayResult.data.id, user.school_code);
+      if (result.error) throw new Error(result.error.userMessage || 'Operation failed');
+      
+      // Filter to tasks created by this user
+      return (result.data || []).filter(t => t.created_by === userId);
     },
 
-    async getBySchool(schoolCode: string): Promise<Task[]> {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('school_code', schoolCode)
-        .order('due_date', { ascending: true });
-
-      if (error) throw error;
-      return data || [];
+    async getBySchool(schoolCode: string): Promise<DomainTask[]> {
+      // Get active academic year
+      const ayResult = await getActiveAcademicYear(schoolCode);
+      if (ayResult.error || !ayResult.data) {
+        throw new Error(ayResult.error?.userMessage || 'Active academic year not found');
+      }
+      
+      // Get all classes, then get tasks from each
+      const classesResult = await listClasses(schoolCode);
+      if (classesResult.error || !classesResult.data) {
+        throw new Error(classesResult.error?.userMessage || 'Failed to fetch classes');
+      }
+      
+      const allTasks: DomainTask[] = [];
+      
+      for (const classInstance of classesResult.data) {
+        const result = await listTasks(classInstance.id, ayResult.data.id, schoolCode);
+        if (result.data) {
+          allTasks.push(...result.data);
+        }
+      }
+      
+      return allTasks;
     },
   },
 

@@ -6,7 +6,7 @@
 
 export interface AnalyticsQueryFilters {
   school_code: string;
-  academic_year_id: string;
+  academic_year_id: string | undefined; // Can be undefined when academic year is not yet loaded
   start_date: string; // ISO date string (YYYY-MM-DD)
   end_date: string; // ISO date string (YYYY-MM-DD)
 }

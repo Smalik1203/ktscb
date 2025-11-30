@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Text, Portal, Modal } from 'react-native-paper';
 import { Calendar, BookOpen, Edit, Trash2, X, Plus, Sparkles } from 'lucide-react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 import { Card, Button, Input, EmptyState } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAcademicYears, useCreateAcademicYear, useUpdateAcademicYear, useDeleteAcademicYear } from '../../hooks/useAcademicYears';
@@ -14,6 +16,12 @@ import * as Haptics from 'expo-haptics';
 
 export default function AddClassesScreen() {
   const { profile } = useAuth();
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+  
   const schoolCode = profile?.school_code;
   const schoolName = profile?.school_name;
 
@@ -814,7 +822,8 @@ export default function AddClassesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,

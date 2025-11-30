@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors, borderRadius, spacing, typography, shadows } from '../../../lib/design-system';
+import { borderRadius, spacing, typography, shadows } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -18,54 +19,56 @@ export function Badge({
   style,
   textStyle,
 }: BadgeProps) {
-  const getVariantStyles = () => {
+  const { colors, isDark } = useTheme();
+
+  const getVariantStyles = useMemo(() => {
     switch (variant) {
       case 'primary':
         return {
-          backgroundColor: colors.primary[100],
-          textColor: colors.primary[700],
-          borderColor: colors.primary[200],
+          backgroundColor: colors.primary[isDark ? 100 : 100],
+          textColor: colors.primary[isDark ? 600 : 700],
+          borderColor: colors.primary[isDark ? 200 : 200],
         };
       case 'secondary':
         return {
-          backgroundColor: colors.secondary[100],
-          textColor: colors.secondary[700],
-          borderColor: colors.secondary[200],
+          backgroundColor: colors.secondary[isDark ? 100 : 100],
+          textColor: colors.secondary[isDark ? 600 : 700],
+          borderColor: colors.secondary[isDark ? 200 : 200],
         };
       case 'success':
         return {
-          backgroundColor: colors.success[100],
-          textColor: colors.success[700],
-          borderColor: colors.success[200],
+          backgroundColor: colors.success[isDark ? 100 : 100],
+          textColor: colors.success[isDark ? 600 : 700],
+          borderColor: colors.success[isDark ? 200 : 200],
         };
       case 'warning':
         return {
-          backgroundColor: colors.warning[100],
-          textColor: colors.warning[700],
-          borderColor: colors.warning[200],
+          backgroundColor: colors.warning[isDark ? 100 : 100],
+          textColor: colors.warning[isDark ? 600 : 700],
+          borderColor: colors.warning[isDark ? 200 : 200],
         };
       case 'error':
         return {
-          backgroundColor: colors.error[100],
-          textColor: colors.error[700],
-          borderColor: colors.error[200],
+          backgroundColor: colors.error[isDark ? 100 : 100],
+          textColor: colors.error[isDark ? 600 : 700],
+          borderColor: colors.error[isDark ? 200 : 200],
         };
       case 'info':
         return {
-          backgroundColor: colors.info[100],
-          textColor: colors.info[700],
-          borderColor: colors.info[200],
+          backgroundColor: colors.info[isDark ? 100 : 100],
+          textColor: colors.info[isDark ? 600 : 700],
+          borderColor: colors.info[isDark ? 200 : 200],
         };
       default:
         return {
-          backgroundColor: colors.neutral[100],
-          textColor: colors.neutral[700],
-          borderColor: colors.neutral[200],
+          backgroundColor: colors.neutral[isDark ? 100 : 100],
+          textColor: colors.neutral[isDark ? 600 : 700],
+          borderColor: colors.neutral[isDark ? 200 : 200],
         };
     }
-  };
+  }, [variant, colors, isDark]);
 
-  const getSizeStyles = () => {
+  const sizeStyles = useMemo(() => {
     switch (size) {
       case 'sm':
         return {
@@ -96,10 +99,9 @@ export function Badge({
           borderRadius: borderRadius.md,
         };
     }
-  };
+  }, [size]);
 
-  const variantStyles = getVariantStyles();
-  const sizeStyles = getSizeStyles();
+  const variantStyles = getVariantStyles;
 
   const badgeStyles = [
     styles.badge,

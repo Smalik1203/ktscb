@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import {
   View,
   Text,
@@ -16,7 +18,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { parseCSV, parseExcel, parseTXT, parseJSON, ParsedQuestion, ParseResult } from '../../utils/questionParsers';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 
 interface ImportQuestionsModalProps {
   visible: boolean;
@@ -27,6 +29,9 @@ interface ImportQuestionsModalProps {
 type FileFormat = 'csv' | 'xlsx' | 'txt' | 'json';
 
 export function ImportQuestionsModal({ visible, onClose, onImport }: ImportQuestionsModalProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const [selectedFormat, setSelectedFormat] = useState<FileFormat>('csv');
   const [parsing, setParsing] = useState(false);
   const [parseResult, setParseResult] = useState<ParseResult | null>(null);
@@ -439,7 +444,8 @@ Answer: H2O
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   modal: {
     backgroundColor: colors.surface.primary,
     margin: spacing.lg,

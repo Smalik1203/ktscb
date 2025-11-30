@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, RefreshControl, RefreshControlProps } from 'react-native';
 import { Text, Chip } from 'react-native-paper';
-import { colors, spacing, borderRadius, typography } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { spacing, borderRadius, typography } from '../../../lib/design-system';
 import { CalendarEvent } from '../../hooks/useCalendarEvents';
 
 interface CalendarMonthViewProps {
@@ -24,6 +25,10 @@ export default function CalendarMonthView({
   onEventClick,
   refreshControl,
 }: CalendarMonthViewProps) {
+  const { colors, isDark } = useTheme();
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   // Get events for a specific date
   const getEventsForDate = (date: Date): CalendarEvent[] => {
     const dateStr = date.toISOString().split('T')[0];
@@ -73,15 +78,15 @@ export default function CalendarMonthView({
   };
 
   const getEventTypeColor = (type: string): string => {
-    const colors: { [key: string]: string } = {
-      holiday: '#0369a1',
-      assembly: '#1890ff',
-      exam: '#faad14',
-      ptm: '#52c41a',
-      'sports day': '#722ed1',
-      'cultural event': '#eb2f96',
+    const eventColors: { [key: string]: string } = {
+      holiday: colors.info[600],
+      assembly: colors.primary[500],
+      exam: colors.warning[500],
+      ptm: colors.success[500],
+      'sports day': colors.secondary[600],
+      'cultural event': colors.accent[500],
     };
-    return colors[type.toLowerCase()] || '#8c8c8c';
+    return eventColors[type.toLowerCase()] || colors.neutral[500];
   };
 
   const calendarDays = generateCalendarDays();
@@ -205,18 +210,18 @@ export default function CalendarMonthView({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FAFBFC',
+    backgroundColor: colors.background.app,
   },
   weekHeader: {
     flexDirection: 'row',
     paddingTop: spacing.sm,
     paddingBottom: spacing.xs,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     borderBottomWidth: 1,
-    borderBottomColor: '#E1E4E8',
+    borderBottomColor: colors.border.DEFAULT,
   },
   weekHeaderCell: {
     width: cellWidth,
@@ -228,13 +233,13 @@ const styles = StyleSheet.create({
   },
   weekHeaderText: {
     fontWeight: typography.fontWeight.semibold,
-    color: '#586069',
+    color: colors.text.secondary,
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   sundayHeaderText: {
-    color: '#6366F1',
+    color: colors.primary[600],
   },
   gridContainer: {
     flex: 1,
@@ -245,7 +250,7 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     minHeight: '100%',
   },
   cell: {
@@ -253,20 +258,20 @@ const styles = StyleSheet.create({
     height: cellHeight,
     borderRightWidth: 0.5,
     borderBottomWidth: 0.5,
-    borderColor: '#E1E4E8',
+    borderColor: colors.border.light,
     padding: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
   },
   todayCell: {
-    backgroundColor: '#F0F7FF',
+    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
     borderLeftWidth: 3,
-    borderLeftColor: '#4F46E5',
+    borderLeftColor: colors.primary[600],
   },
   weekendCell: {
-    backgroundColor: '#FAFBFC',
+    backgroundColor: colors.background.secondary,
   },
   holidayCell: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? colors.warning[100] : colors.warning[50],
   },
   dateHeader: {
     flexDirection: 'row',
@@ -276,19 +281,19 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 14,
-    color: '#24292E',
+    color: colors.text.primary,
     fontWeight: typography.fontWeight.semibold,
   },
   dateTextMuted: {
-    color: '#959DA5',
+    color: colors.text.tertiary,
   },
   dateTextToday: {
-    color: '#4F46E5',
+    color: colors.primary[600],
     fontWeight: typography.fontWeight.bold,
     fontSize: 15,
   },
   dateTextSpecial: {
-    color: '#6366F1',
+    color: colors.primary[600],
   },
   holidayEmoji: {
     fontSize: 10,
@@ -306,16 +311,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginBottom: 2,
     borderLeftWidth: 3,
-    borderLeftColor: 'rgba(0,0,0,0.2)',
+    borderLeftColor: colors.border.light,
   },
   eventBadgeText: {
     fontSize: 10,
-    color: '#FFFFFF',
+    color: colors.text.inverse,
     fontWeight: typography.fontWeight.semibold,
   },
   moreEventsText: {
     fontSize: 9,
-    color: '#6366F1',
+    color: colors.primary[600],
     textAlign: 'left',
     marginTop: 2,
     fontWeight: typography.fontWeight.medium,

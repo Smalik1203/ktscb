@@ -6,3 +6,4 @@ export { useAcademicsAnalytics } from './useAcademicsAnalytics';
 export { useTasksAnalytics } from './useTasksAnalytics';
 export { useSyllabusAnalytics } from './useSyllabusAnalytics';
 export { useOperationsAnalytics } from './useOperationsAnalytics';
+export { useSuperAdminAnalytics, useStudentAggregatedAnalytics } from './useAggregatedAnalytics';

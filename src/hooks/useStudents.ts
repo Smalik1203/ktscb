@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase';
 import { log } from '../lib/logger';
 import { DB } from '../types/db.constants';
 
+import type { DomainStudent } from '../lib/normalize';
+
 export interface StudentsPaginationResult {
-  data: any[];
+  data: Pick<DomainStudent, 'id' | 'student_code' | 'full_name' | 'email' | 'phone' | 'class_instance_id' | 'school_code' | 'created_at'>[];
   total: number;
   page: number;
   pageSize: number;
@@ -86,8 +88,6 @@ export function useCreateStudent(schoolCode: string | null | undefined) {
 
   return useMutation({
     mutationFn: async (input: CreateStudentInput) => {
-      console.log('Creating student:', { ...input, password: '[REDACTED]' });
-      
       if (!schoolCode) {
         throw new Error('School code is required');
       }

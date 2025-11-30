@@ -72,13 +72,13 @@ export default function IntegratedCalendarView({
   }
 
   const getEventTypeColor = (type: string): string => {
-    const colors: { [key: string]: string } = {
-      holiday: '#0369a1',
-      assembly: '#1890ff',
-      exam: '#faad14',
-      ptm: '#52c41a',
+    const colorMap: { [key: string]: string } = {
+      holiday: colors.info[600],
+      assembly: colors.primary[500],
+      exam: colors.warning[500],
+      ptm: colors.success[500],
     };
-    return colors[type.toLowerCase()] || '#8c8c8c';
+    return colorMap[type.toLowerCase()] || colors.neutral[500];
   };
 
   const formatTime = (time: string): string => {
@@ -145,7 +145,7 @@ export default function IntegratedCalendarView({
   const renderTestItem = (test: any) => (
     <Card key={test.id} style={styles.itemCard}>
       <View style={styles.itemHeader}>
-        <View style={[styles.itemIcon, { backgroundColor: '#faad14' }]}>
+        <View style={[styles.itemIcon, { backgroundColor: colors.warning[500] }]}>
           <Trophy size={20} color={colors.text.inverse} />
         </View>
         <View style={styles.itemContent}>
@@ -167,7 +167,7 @@ export default function IntegratedCalendarView({
               styles.chip,
               { backgroundColor: test.test_mode === 'online' ? '#f6ffed' : '#e6f7ff' },
             ]}
-            textStyle={{ color: test.test_mode === 'online' ? '#52c41a' : '#1890ff' }}
+            textStyle={{ color: test.test_mode === 'online' ? colors.success[500] : colors.primary[500] }}
           >
             {test.test_mode === 'online' ? 'Online' : 'Offline'}
           </Chip>

@@ -37,14 +37,15 @@ export function useAttendanceAnalytics(options: UseAttendanceAnalyticsOptions) {
           created_at,
           class_instances!inner(
             id,
-            class_name,
+            grade,
+            section,
             school_code,
             academic_year_id,
             class_id
           )
         `)
-        .eq('class_instances.school_code', school_code)
-        .eq('class_instances.academic_year_id', academic_year_id)
+        .filter('class_instances.school_code', 'eq', school_code)
+        .filter('class_instances.academic_year_id', 'eq', academic_year_id)
         .gte('date', start_date)
         .lte('date', end_date);
 
@@ -86,8 +87,8 @@ export function useAttendanceAnalytics(options: UseAttendanceAnalyticsOptions) {
             academic_year_id
           )
         `)
-        .eq('class_instances.school_code', school_code)
-        .eq('class_instances.academic_year_id', academic_year_id)
+        .filter('class_instances.school_code', 'eq', school_code)
+        .filter('class_instances.academic_year_id', 'eq', academic_year_id)
         .gte('date', prevStartDate)
         .lte('date', prevEndDate);
 
@@ -102,7 +103,10 @@ export function useAttendanceAnalytics(options: UseAttendanceAnalyticsOptions) {
 
       currentData.forEach((record: any) => {
         const classId = record.class_instance_id;
-        const className = record.class_instances.class_name;
+        const classInfo = record.class_instances;
+        const className = classInfo?.grade !== null && classInfo?.grade !== undefined
+          ? `Grade ${classInfo.grade}${classInfo.section ? ` - ${classInfo.section}` : ''}`
+          : 'Unknown Class';
 
         if (!classMap.has(classId)) {
           classMap.set(classId, {
@@ -182,7 +186,7 @@ export function useAttendanceAnalytics(options: UseAttendanceAnalyticsOptions) {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!school_code && !!academic_year_id && !!start_date && !!end_date,
+    enabled: !!(school_code && school_code !== '') && typeof academic_year_id === 'string' && !!(start_date && start_date !== '') && !!(end_date && end_date !== ''),
   });
 }
 
@@ -209,14 +213,15 @@ export function useStudentAttendanceAnalytics(options: UseStudentAttendanceAnaly
           status,
           created_at,
           class_instances!inner(
-            class_name,
+            grade,
+            section,
             school_code,
             academic_year_id
           )
         `)
         .eq('student_id', studentId)
-        .eq('class_instances.school_code', school_code)
-        .eq('class_instances.academic_year_id', academic_year_id)
+        .filter('class_instances.school_code', 'eq', school_code)
+        .filter('class_instances.academic_year_id', 'eq', academic_year_id)
         .gte('date', start_date)
         .lte('date', end_date)
         .order('date', { ascending: true });
@@ -272,6 +277,6 @@ export function useStudentAttendanceAnalytics(options: UseStudentAttendanceAnaly
       };
     },
     staleTime: 5 * 60 * 1000,
-    enabled: !!studentId && !!school_code && !!academic_year_id && !!start_date && !!end_date,
+    enabled: !!(studentId && studentId !== '') && !!(school_code && school_code !== '') && typeof academic_year_id === 'string' && !!(start_date && start_date !== '') && !!(end_date && end_date !== ''),
   });
 }

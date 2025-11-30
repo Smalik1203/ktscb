@@ -1,4 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
@@ -6,7 +8,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { X } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { colors, spacing } from '../../../lib/design-system';
+import { spacing, colors } from '../../../lib/design-system';
 import { removeYouTubeBranding } from '../../utils/youtubeBrandingRemoval';
 
 interface VideoPlayerProps {
@@ -34,6 +36,9 @@ function isYouTubeUrl(url: string): boolean {
 }
 
 export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const isYouTube = isYouTubeUrl(uri);
   const youtubeVideoId = isYouTube ? getYouTubeVideoId(uri) : null;
   const insets = useSafeAreaInsets();
@@ -47,14 +52,6 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
   const [wantsFullscreenOnPlay, setWantsFullscreenOnPlay] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const webviewRef = useRef<any>(null);
-
-  // Debug logging
-  console.log('VideoPlayer Debug:', {
-    uri,
-    isYouTube,
-    youtubeVideoId,
-    playerMethod
-  });
 
   // No need for YouTube extraction with enhanced WebView approach
 
@@ -177,7 +174,7 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
                 />
               )}
             </View>
-          ) : (
+          ) : youtubeEmbedUrl ? (
             <WebView
               source={{ uri: youtubeEmbedUrl }}
               style={[styles.video, { width, height: height - 100 }]}
@@ -210,7 +207,7 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
                 console.log('YouTube WebView loaded successfully');
               }}
             />
-          )
+          ) : null
         ) : (
           <VideoView
             player={player}
@@ -225,7 +222,8 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.neutral[900],

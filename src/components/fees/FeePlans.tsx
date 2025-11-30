@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import {
   View,
   Text,
@@ -36,7 +38,7 @@ import { useStudents } from '../../hooks/useStudents';
 import { ClassSelector } from '../ClassSelector';
 import { supabase } from '../../data/supabaseClient';
 import { getClassStudentsFees, getFeeComponentTypes } from '../../data/queries';
-import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 // Helper function for formatting amounts
 const formatAmount = (amount: number): string => {
   return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -90,10 +92,10 @@ export default function FeePlans() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const { selectedClass, scope, setSelectedClass } = useClassSelection();
-  const { data: classes = [] } = useClasses(scope.school_code);
+  const { data: classes = [] } = useClasses(scope.school_code ?? undefined);
   const { data: studentsResponse, isLoading: studentsLoading } = useStudents(
     selectedClass?.id,
-    scope.school_code
+    scope.school_code ?? undefined
   );
   const students = studentsResponse?.data || [];
 
@@ -125,8 +127,6 @@ export default function FeePlans() {
         }
       });
       const uniqueComponents = Array.from(componentMap.values());
-      console.log('Original components:', components.length, 'Unique components:', uniqueComponents.length);
-      console.log('Component names:', components.map((c: any) => c.name));
       return uniqueComponents;
     }),
     enabled: !!schoolCode,
@@ -200,6 +200,11 @@ export default function FeePlans() {
   // Handle edit plan
   const handleEditPlan = async (student: any) => {
     try {
+      if (!schoolCode) {
+        Alert.alert('Error', 'School code is required');
+        return;
+      }
+
       let planId = student.feeDetails?.plan?.id;
 
       // Create plan if missing
@@ -227,11 +232,11 @@ export default function FeePlans() {
           const { data: ins, error: iErr } = await supabase
         .from('fee_student_plans')
             .insert({
-              school_code: schoolCode,
+              school_code: schoolCode!,
               student_id: student.id,
-              class_instance_id: selectedClassId,
+              class_instance_id: selectedClassId!,
               academic_year_id: academicYearId,
-              created_by: profile?.auth_id
+              created_by: profile?.auth_id || undefined
             })
             .select('id')
             .single();
@@ -256,9 +261,6 @@ export default function FeePlans() {
         component_type_id: it.component_type_id,
         amount_inr: Number(it.amount_inr || 0)
       }));
-      
-      console.log('Plan items loaded:', mappedItems);
-      console.log('Fee components available:', feeComponents?.length || 0);
       
       // If no items exist, add one empty item to start
       setPlanItems(mappedItems.length > 0 ? mappedItems : [{ component_type_id: null, amount_inr: 0 }]);
@@ -312,11 +314,9 @@ export default function FeePlans() {
           component_type_id: it.component_type_id,
           amount_inr: Number(it.amount_inr || 0)
         }));
-        console.log('Loaded existing plan items:', mappedItems);
       } else {
         // If no items exist, add one empty item to start
         mappedItems = [{ component_type_id: null, amount_inr: 0 }];
-        console.log('No existing plan items, starting with empty item');
       }
       
       setPlanItems(mappedItems);
@@ -598,6 +598,11 @@ export default function FeePlans() {
           onPress: async () => {
             setSavingClassPlan(true);
     try {
+      if (!schoolCode) {
+        Alert.alert('Error', 'School code is required');
+        return;
+      }
+
               // 1) Ensure plans exist for all students
               const studentsWithPlans = studentsWithFeeData || [];
               const missing = students.filter(s => 
@@ -607,7 +612,7 @@ export default function FeePlans() {
               let newPlans: any[] = [];
               if (missing.length > 0) {
                 const toInsert = missing.map(s => ({
-                  school_code: schoolCode,
+                  school_code: schoolCode!,
                   student_id: s.id,
                   class_instance_id: selectedClassId,
                   academic_year_id: academicYearId,
@@ -625,7 +630,7 @@ export default function FeePlans() {
               // Build final plan_id list
               const existingPlans = studentsWithPlans
                 .filter(s => s.feeDetails?.plan)
-                .map(s => ({ id: s.feeDetails.plan.id, student_id: s.id }));
+                .map(s => ({ id: s.feeDetails.plan!.id, student_id: s.id }));
               const allPlans = [...existingPlans, ...newPlans];
               const planIds = allPlans.map(p => p.id);
       
@@ -746,21 +751,29 @@ export default function FeePlans() {
       {selectedClass && filteredStudents.length > 0 && (
         <View style={styles.summaryCardsContainer}>
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryCardLabel}>Total Fees</Text>
+            <View style={styles.summaryCardHeader}>
+              <Text style={styles.summaryCardLabel}>TOTAL FEES</Text>
+            </View>
             <Text style={styles.summaryCardValue}>
-              ₹{summaryTotalAssigned.toLocaleString('en-IN')}
+              ₹{(summaryTotalAssigned / 100000).toFixed(2)}L
             </Text>
           </View>
+
           <View style={[styles.summaryCard, styles.summaryCardSuccess]}>
-            <Text style={styles.summaryCardLabel}>Collected</Text>
+            <View style={styles.summaryCardHeader}>
+              <Text style={styles.summaryCardLabel}>COLLECTED</Text>
+            </View>
             <Text style={[styles.summaryCardValue, styles.summaryCardValueSuccess]}>
-              ₹{(summaryTotalAssigned - summaryTotalPending).toLocaleString('en-IN')}
+              ₹{((summaryTotalAssigned - summaryTotalPending) / 100000).toFixed(2)}L
             </Text>
           </View>
+
           <View style={[styles.summaryCard, styles.summaryCardPending]}>
-            <Text style={styles.summaryCardLabel}>Outstanding</Text>
+            <View style={styles.summaryCardHeader}>
+              <Text style={styles.summaryCardLabel}>OUTSTANDING</Text>
+            </View>
             <Text style={[styles.summaryCardValue, styles.summaryCardValuePending]}>
-              ₹{summaryTotalPending.toLocaleString('en-IN')}
+              ₹{(summaryTotalPending / 100000).toFixed(2)}L
             </Text>
           </View>
         </View>
@@ -2542,6 +2555,9 @@ const styles = {
     borderLeftColor: colors.error[500],
     backgroundColor: colors.error[50],
   },
+  summaryCardHeader: {
+    marginBottom: spacing.xs,
+  },
   summaryCardLabel: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.medium as any,
@@ -2551,7 +2567,7 @@ const styles = {
     letterSpacing: 0.5,
   },
   summaryCardValue: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.bold as any,
     color: colors.text.primary,
   },

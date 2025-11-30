@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, TouchableOpacity, Platform, Modal, Animated, ScrollView, TextInput, Alert } from 'react-native';
 import { Portal, Modal as PaperModal, Button , Searchbar } from 'react-native-paper';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+import { spacing, borderRadius, typography, colors } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors, Shadows } from '../../theme/types';
 import { supabase } from '../../lib/supabase';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -48,8 +50,12 @@ function formatDateDisplay(isoOrYmd: string): string {
 export default function PaymentHistory() {
   const { scope, selectedClass, setSelectedClass, classes } = useClassSelection();
   const { profile } = useAuth();
+  const { colors, isDark, shadows } = useTheme();
   const queryClient = useQueryClient();
   const schoolCode = scope.school_code;
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, isDark, shadows), [colors, isDark, shadows]);
 
   const [startDate, setStartDate] = useState<Date | null>(() => {
     const d = new Date();
@@ -176,6 +182,7 @@ export default function PaymentHistory() {
     queryKey: ['fee_student_plans', schoolCode, selectedClass?.id || 'all', studentIds.join(',')],
     enabled: activeTab === 'record' && !!schoolCode && studentIds.length > 0,
     queryFn: async () => {
+      if (!schoolCode) throw new Error('School code is required');
       const { data, error } = await supabase
         .from('fee_student_plans')
         .select('id, student_id')
@@ -199,7 +206,7 @@ export default function PaymentHistory() {
     queryKey: ['componentBalances', selectedStudentId, selectedPlanIdForBalance, schoolCode],
     enabled: !!selectedStudentId && !!schoolCode && activeTab === 'record',
     queryFn: async () => {
-      if (!selectedPlanIdForBalance) {
+      if (!selectedPlanIdForBalance || !schoolCode) {
         return new Map<string, { due: number; paid: number; remaining: number }>();
       }
 
@@ -215,8 +222,8 @@ export default function PaymentHistory() {
       const { data: existingPayments, error: paymentsError } = await supabase
         .from('fee_payments')
         .select('amount_inr, component_type_id')
-        .eq('student_id', selectedStudentId)
-        .eq('school_code', schoolCode);
+        .eq('student_id', selectedStudentId!)
+        .eq('school_code', schoolCode!);
       
       if (paymentsError) throw paymentsError;
 
@@ -289,8 +296,8 @@ export default function PaymentHistory() {
       const { data: existingPayments, error: paymentsError } = await supabase
         .from('fee_payments')
         .select('amount_inr, component_type_id')
-        .eq('student_id', selectedStudentId)
-        .eq('school_code', schoolCode);
+        .eq('student_id', selectedStudentId!)
+        .eq('school_code', schoolCode!);
       
       if (paymentsError) throw paymentsError;
       
@@ -340,6 +347,7 @@ export default function PaymentHistory() {
       studentIds.join(',')
     ],
     queryFn: async () => {
+      if (!schoolCode) throw new Error('School code is required');
       let query = supabase
         .from('fee_payments')
         .select(
@@ -350,7 +358,7 @@ export default function PaymentHistory() {
           component:component_type_id ( id, name )
         `
         )
-        .eq('school_code', schoolCode);
+        .eq('school_code', schoolCode!);
 
       if (selectedClass?.id && studentIds.length > 0) {
         // filter by students of the selected class
@@ -599,12 +607,18 @@ export default function PaymentHistory() {
         }
       }
       
+      if (!schoolCode) {
+        Alert.alert('Error', 'School code is required');
+        setIsSubmitting(false);
+        return;
+      }
+
       // Calculate total and component-specific already paid
       const { data: existingPayments, error: paymentsError } = await supabase
         .from('fee_payments')
         .select('amount_inr, component_type_id')
         .eq('student_id', selectedStudentId)
-        .eq('school_code', schoolCode);
+        .eq('school_code', schoolCode!);
       
       if (paymentsError) {
         console.error('Error fetching existing payments:', paymentsError);
@@ -674,22 +688,27 @@ export default function PaymentHistory() {
         return;
       }
       
+      if (!schoolCode) {
+        Alert.alert('Error', 'School code is required');
+        setIsSubmitting(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('fee_payments')
         .insert({
-          school_code: schoolCode,
-          student_id: selectedStudentId,
+          student_id: selectedStudentId!,
           plan_id: planId,
-          component_type_id: selectedComponentId,
+          component_type_id: selectedComponentId || null,
           amount_inr: amount,
           payment_method: paymentMethod,
           payment_date: paymentDate.toISOString().split('T')[0],
           transaction_id: receiptNumber || null,
           receipt_number: receiptNumber || null,
           remarks: remarks || null,
-          created_by: profile?.auth_id,
+          created_by: profile?.auth_id || undefined,
           recorded_by_name: profile?.full_name || null,
-        });
+        } as any);
       
       if (error) {
         console.error('Payment error:', error);
@@ -1733,7 +1752,7 @@ export default function PaymentHistory() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.secondary,
@@ -1818,14 +1837,14 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     alignItems: 'center',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: isDark ? colors.neutral[900] : colors.text.primary,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 4,
   },
   filterItem: {
@@ -1890,7 +1909,7 @@ const styles = StyleSheet.create({
   },
   searchBar: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     elevation: 0,
     borderRadius: borderRadius.md,
     borderWidth: 1,
@@ -1900,7 +1919,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.md,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface.primary,
     borderWidth: 1,
     borderColor: colors.border.light,
     alignItems: 'center',
@@ -1970,7 +1989,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2017,7 +2036,7 @@ const styles = StyleSheet.create({
   // Bottom Sheet (Task Management style)
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'flex-end',
   },
   bottomSheet: {
@@ -2033,7 +2052,7 @@ const styles = StyleSheet.create({
   sheetHandle: {
     width: 36,
     height: 4,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: colors.border.DEFAULT,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: spacing.sm,
@@ -2092,10 +2111,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     marginVertical: 2,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.surface.secondary,
   },
   sheetItemActive: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: isDark ? colors.primary[900] : colors.primary[50],
   },
   sheetItemPaid: {
     backgroundColor: colors.neutral[50],
@@ -2193,7 +2212,7 @@ const styles = StyleSheet.create({
   },
   detailsModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -2755,7 +2774,7 @@ const styles = StyleSheet.create({
   },
   editPaymentModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'center' as const,
     alignItems: 'center' as const,
   },

@@ -1,121 +1,41 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { Text, Card, Button, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
-import { Users, UserPlus, Shield, BookOpen, Calendar, Activity, AlertCircle } from 'lucide-react-native';
+import React, { useState, useMemo } from 'react';
+import { View, StyleSheet, ScrollView, RefreshControl, Platform, Dimensions } from 'react-native';
+import { Text, Card, ActivityIndicator, Avatar } from 'react-native-paper';
+import { Users, Shield, Activity, AlertCircle, UserCheck, UserX, Clock, TrendingUp, Zap, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, typography, spacing, borderRadius } from '../../../lib/design-system';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../lib/supabase';
-import { DB } from '../../types/db.constants';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { typography, spacing, borderRadius } from '../../../lib/design-system';
+import { useUserActivityStats } from '../../hooks/useUserActivityStats';
+import { LinearGradient } from 'expo-linear-gradient';
 
-interface UserStats {
-  totalUsers: number;
-  students: number;
-  teachers: number;
-  admins: number;
-}
-
-interface ClassStats {
-  totalClasses: number;
-  activeClasses: number;
-  totalStudents: number;
-}
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ManageScreen() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'users' | 'classes' | 'settings'>('users');
+  const { colors, isDark } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
+  
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const role = profile?.role;
   const canManage = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
 
-  // Fetch user statistics
-  const { data: userStats, isLoading: userStatsLoading, error: userStatsError, refetch: refetchUserStats } = useQuery({
-    queryKey: ['user-stats', profile?.school_code],
-    queryFn: async (): Promise<UserStats> => {
-      if (!profile?.school_code) throw new Error('No school selected');
+  const { 
+    data: activityStats, 
+    isLoading: activityLoading, 
+    error: activityError, 
+    refetch: refetchActivity 
+  } = useUserActivityStats(profile?.school_code);
 
-      const { data: studentsData, error: studentsError } = await supabase
-        .from(DB.tables.student)
-        .select('id')
-        .eq('school_code', profile.school_code);
-      
-      if (studentsError) throw studentsError;
-
-      const { data: adminsData, error: adminsError } = await supabase
-        .from(DB.tables.admin)
-        .select('id, role')
-        .eq('school_code', profile.school_code);
-      
-      if (adminsError) throw adminsError;
-
-      const teachers = adminsData?.filter(admin => admin.role === 'teacher').length || 0;
-      const admins = adminsData?.filter(admin => admin.role === 'admin').length || 0;
-
-      return {
-        totalUsers: (studentsData?.length || 0) + (adminsData?.length || 0),
-        students: studentsData?.length || 0,
-        teachers,
-        admins,
-      };
-    },
-    enabled: !!profile?.school_code,
-  });
-
-  // Fetch class statistics
-  const { data: classStats, isLoading: classStatsLoading, error: classStatsError, refetch: refetchClassStats } = useQuery({
-    queryKey: ['class-stats', profile?.school_code],
-    queryFn: async (): Promise<ClassStats> => {
-      if (!profile?.school_code) throw new Error('No school selected');
-
-      const { data: classesData, error: classesError } = await supabase
-        .from(DB.tables.classInstances)
-        .select('id')
-        .eq('school_code', profile.school_code);
-      
-      if (classesError) throw classesError;
-
-      const { data: studentsData, error: studentsError } = await supabase
-        .from(DB.tables.student)
-        .select('id')
-        .eq('school_code', profile.school_code);
-      
-      if (studentsError) throw studentsError;
-
-      return {
-        totalClasses: classesData?.length || 0,
-        activeClasses: classesData?.length || 0, // Assuming all classes are active for now
-        totalStudents: studentsData?.length || 0,
-      };
-    },
-    enabled: !!profile?.school_code && canManage,
-  });
-
-  // Early return after all hooks
   if (!canManage) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerLeft}>
-              <View style={styles.iconContainer}>
-                <Users size={32} color={colors.text.inverse} />
-              </View>
-              <View>
-                <Text variant="headlineSmall" style={styles.headerTitle}>
-                  Management
-                </Text>
-                <Text variant="bodyLarge" style={styles.headerSubtitle}>
-                  Access restricted to administrators
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
         <View style={styles.restrictedContainer}>
-          <Shield size={64} color={colors.text.tertiary} />
-          <Text variant="titleLarge" style={styles.restrictedTitle}>Access Restricted</Text>
-          <Text variant="bodyMedium" style={styles.restrictedMessage}>
+          <View style={styles.restrictedIcon}>
+            <Shield size={48} color={colors.error[400]} />
+          </View>
+          <Text style={styles.restrictedTitle}>Access Restricted</Text>
+          <Text style={styles.restrictedMessage}>
             Management features are only available to administrators.
           </Text>
         </View>
@@ -126,486 +46,693 @@ export default function ManageScreen() {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        refetchUserStats(),
-        refetchClassStats(),
-      ]);
+      await refetchActivity();
     } finally {
       setRefreshing(false);
     }
   };
 
-  const getRoleIcon = (role: string) => {
-    switch (role.toLowerCase()) {
-      case 'student':
-        return <Users size={16} color="#667eea" />;
-      case 'teacher':
-        return <BookOpen size={16} color="#10b981" />;
-      case 'admin':
-        return <Shield size={16} color="#f59e0b" />;
-      default:
-        return <Users size={16} color="#6b7280" />;
-    }
-  };
-
-  const getRoleColor = (role: string) => {
-    switch (role.toLowerCase()) {
-      case 'student':
-        return '#667eea';
-      case 'teacher':
-        return '#10b981';
-      case 'admin':
-        return '#f59e0b';
-      default:
-        return '#6b7280';
-    }
-  };
-
-  const renderUsersTab = () => {
-    if (userStatsLoading) {
-      return (
+  if (activityLoading) {
+    return (
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading user statistics...</Text>
+          <ActivityIndicator size="large" color={colors.primary[500]} />
+          <Text style={styles.loadingText}>Loading activity data...</Text>
         </View>
-      );
-    }
-
-    if (userStatsError) {
-      return (
-        <View style={styles.errorContainer}>
-          <AlertCircle size={64} color={colors.error[500]} />
-          <Text variant="titleLarge" style={styles.errorTitle}>Unable to load user data</Text>
-          <Text variant="bodyMedium" style={styles.errorMessage}>
-            {userStatsError instanceof Error ? userStatsError.message : 'Something went wrong'}
-          </Text>
-          <Button mode="contained" onPress={() => refetchUserStats()} style={styles.retryButton}>
-            Try Again
-          </Button>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.tabContent}>
-        {/* User Statistics */}
-        <View style={styles.statsGrid}>
-          <Card style={styles.statCard}>
-            <View style={styles.statContent}>
-              <View style={[styles.statIcon, { backgroundColor: colors.primary[50] }]}>
-                <Users size={24} color={colors.primary[600]} />
-              </View>
-              <View style={styles.statText}>
-                <Text variant="headlineSmall" style={styles.statValue}>
-                  {userStats?.totalUsers || 0}
-                </Text>
-                <Text variant="bodyMedium" style={styles.statLabel}>
-                  Total Users
-                </Text>
-              </View>
-            </View>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <View style={styles.statContent}>
-              <View style={[styles.statIcon, { backgroundColor: colors.success[50] }]}>
-                <Users size={24} color={colors.success[600]} />
-              </View>
-              <View style={styles.statText}>
-                <Text variant="headlineSmall" style={styles.statValue}>
-                  {userStats?.students || 0}
-                </Text>
-                <Text variant="bodyMedium" style={styles.statLabel}>
-                  Students
-                </Text>
-              </View>
-            </View>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <View style={styles.statContent}>
-              <View style={[styles.statIcon, { backgroundColor: colors.warning[50] }]}>
-                <BookOpen size={24} color={colors.warning[600]} />
-              </View>
-              <View style={styles.statText}>
-                <Text variant="headlineSmall" style={styles.statValue}>
-                  {userStats?.teachers || 0}
-                </Text>
-                <Text variant="bodyMedium" style={styles.statLabel}>
-                  Teachers
-                </Text>
-              </View>
-            </View>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <View style={styles.statContent}>
-              <View style={[styles.statIcon, { backgroundColor: colors.error[50] }]}>
-                <Shield size={24} color={colors.error[600]} />
-              </View>
-              <View style={styles.statText}>
-                <Text variant="headlineSmall" style={styles.statValue}>
-                  {userStats?.admins || 0}
-                </Text>
-                <Text variant="bodyMedium" style={styles.statLabel}>
-                  Admins
-                </Text>
-              </View>
-            </View>
-          </Card>
-        </View>
-
-        {/* User Management Actions */}
-        <Card style={styles.actionCard}>
-          <Text variant="titleMedium" style={styles.actionTitle}>User Management</Text>
-          <View style={styles.actionButtons}>
-            <Button 
-              mode="contained" 
-              icon={() => <UserPlus size={20} color={colors.text.inverse} />}
-              style={styles.actionButton}
-              onPress={() => {/* TODO: Implement add user */}}
-            >
-              Add User
-            </Button>
-            <Button 
-              mode="outlined" 
-              icon={() => <Users size={20} color={colors.primary[600]} />}
-              style={styles.actionButton}
-              onPress={() => {/* TODO: Implement view users */}}
-            >
-              View Users
-            </Button>
-          </View>
-        </Card>
       </View>
     );
+  }
+
+  if (activityError) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <View style={styles.errorIcon}>
+            <AlertCircle size={48} color={colors.error[500]} />
+          </View>
+          <Text style={styles.errorTitle}>Unable to load data</Text>
+          <Text style={styles.errorMessage}>
+            {activityError instanceof Error ? activityError.message : 'Something went wrong'}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const studentTotal = activityStats?.students.total || 0;
+  const studentWithAccount = activityStats?.students.withAccount || 0;
+  const studentActive = activityStats?.students.active || 0;
+  const studentInactive = activityStats?.students.inactive || 0;
+  const studentDormant = activityStats?.students.dormant || 0;
+  const studentNeverLoggedIn = activityStats?.students.neverLoggedIn || 0;
+
+  const adminTotal = activityStats?.admins.total || 0;
+  const adminWithAccount = activityStats?.admins.withAccount || 0;
+  const adminNoAccount = activityStats?.admins.noAccount || 0;
+  const adminActive = activityStats?.admins.active || 0;
+  const adminInactive = activityStats?.admins.inactive || 0;
+  const adminDormant = activityStats?.admins.dormant || 0;
+  const adminNeverLoggedIn = activityStats?.admins.neverLoggedIn || 0;
+
+  const studentLoginRate = studentWithAccount > 0 
+    ? (studentWithAccount - studentNeverLoggedIn) / studentWithAccount 
+    : 0;
+  const adminLoginRate = adminWithAccount > 0 
+    ? (adminWithAccount - adminNeverLoggedIn) / adminWithAccount 
+    : 0;
+  
+  const totalActive = studentActive + adminActive;
+  const totalUsers = studentTotal + adminTotal;
+  const adoptionRate = Math.round((studentLoginRate + adminLoginRate) / 2 * 100);
+  const recentLogins = activityStats?.recentLogins || [];
+
+  const formatRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const renderClassesTab = () => {
-    if (classStatsLoading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading class statistics...</Text>
-        </View>
-      );
-    }
-
-    if (classStatsError) {
-      return (
-        <View style={styles.errorContainer}>
-          <AlertCircle size={64} color={colors.error[500]} />
-          <Text variant="titleLarge" style={styles.errorTitle}>Unable to load class data</Text>
-          <Text variant="bodyMedium" style={styles.errorMessage}>
-            {classStatsError instanceof Error ? classStatsError.message : 'Something went wrong'}
-          </Text>
-          <Button mode="contained" onPress={() => refetchClassStats()} style={styles.retryButton}>
-            Try Again
-          </Button>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.tabContent}>
-        {/* Class Statistics */}
-        <View style={styles.statsGrid}>
-          <Card style={styles.statCard}>
-            <View style={styles.statContent}>
-              <View style={[styles.statIcon, { backgroundColor: colors.primary[50] }]}>
-                <BookOpen size={24} color={colors.primary[600]} />
-              </View>
-              <View style={styles.statText}>
-                <Text variant="headlineSmall" style={styles.statValue}>
-                  {classStats?.totalClasses || 0}
-                </Text>
-                <Text variant="bodyMedium" style={styles.statLabel}>
-                  Total Classes
-                </Text>
-              </View>
-            </View>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <View style={styles.statContent}>
-              <View style={[styles.statIcon, { backgroundColor: colors.success[50] }]}>
-                <Activity size={24} color={colors.success[600]} />
-              </View>
-              <View style={styles.statText}>
-                <Text variant="headlineSmall" style={styles.statValue}>
-                  {classStats?.activeClasses || 0}
-                </Text>
-                <Text variant="bodyMedium" style={styles.statLabel}>
-                  Active Classes
-                </Text>
-              </View>
-            </View>
-          </Card>
-
-          <Card style={styles.statCard}>
-            <View style={styles.statContent}>
-              <View style={[styles.statIcon, { backgroundColor: colors.warning[50] }]}>
-                <Users size={24} color={colors.warning[600]} />
-              </View>
-              <View style={styles.statText}>
-                <Text variant="headlineSmall" style={styles.statValue}>
-                  {classStats?.totalStudents || 0}
-                </Text>
-                <Text variant="bodyMedium" style={styles.statLabel}>
-                  Total Students
-                </Text>
-              </View>
-            </View>
-          </Card>
-        </View>
-
-        {/* Class Management Actions */}
-        <Card style={styles.actionCard}>
-          <Text variant="titleMedium" style={styles.actionTitle}>Class Management</Text>
-          <View style={styles.actionButtons}>
-            <Button 
-              mode="contained" 
-              icon={() => <BookOpen size={20} color={colors.text.inverse} />}
-              style={styles.actionButton}
-              onPress={() => {/* TODO: Implement add class */}}
-            >
-              Add Class
-            </Button>
-            <Button 
-              mode="outlined" 
-              icon={() => <Calendar size={20} color={colors.primary[600]} />}
-              style={styles.actionButton}
-              onPress={() => {/* TODO: Implement manage classes */}}
-            >
-              Manage Classes
-            </Button>
-          </View>
-        </Card>
-      </View>
-    );
-  };
-
-  const renderSettingsTab = () => {
-    return (
-      <View style={styles.tabContent}>
-        <Card style={styles.actionCard}>
-          <Text variant="titleMedium" style={styles.actionTitle}>School Settings</Text>
-          <Text variant="bodyMedium" style={styles.comingSoonText}>
-            School settings and configuration options will be available in the next update.
-          </Text>
-        </Card>
-
-        <Card style={styles.actionCard}>
-          <Text variant="titleMedium" style={styles.actionTitle}>Academic Settings</Text>
-          <Text variant="bodyMedium" style={styles.comingSoonText}>
-            Academic year, curriculum, and fee structure settings will be available in the next update.
-          </Text>
-        </Card>
-
-        <Card style={styles.actionCard}>
-          <Text variant="titleMedium" style={styles.actionTitle}>System Settings</Text>
-          <Text variant="bodyMedium" style={styles.comingSoonText}>
-            Notification preferences and system configuration will be available in the next update.
-          </Text>
-        </Card>
-      </View>
-    );
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <View style={styles.iconContainer}>
-              <Users size={32} color={colors.text.inverse} />
+      <ScrollView 
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={handleRefresh}
+            tintColor={colors.primary[500]}
+          />
+        }
+      >
+        {/* Hero Stats */}
+        <View style={styles.heroSection}>
+          <LinearGradient
+            colors={isDark ? [colors.primary[800], colors.primary[900]] : [colors.primary[500], colors.primary[700]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroGradient}
+          >
+            <View style={styles.heroContent}>
+              <View style={styles.heroMain}>
+                <Text style={styles.heroValue}>{totalUsers}</Text>
+                <Text style={styles.heroLabel}>Total Users</Text>
+              </View>
+              <View style={styles.heroDivider} />
+              <View style={styles.heroStats}>
+                <View style={styles.heroStatItem}>
+                  <View style={styles.heroStatDot} />
+                  <Text style={styles.heroStatValue}>{totalActive}</Text>
+                  <Text style={styles.heroStatLabel}>Active</Text>
+                </View>
+                <View style={styles.heroStatItem}>
+                  <View style={[styles.heroStatDot, { backgroundColor: colors.warning[400] }]} />
+                  <Text style={styles.heroStatValue}>{adoptionRate}%</Text>
+                  <Text style={styles.heroStatLabel}>Adoption</Text>
+                </View>
+              </View>
             </View>
-            <View>
-              <Text variant="headlineSmall" style={styles.headerTitle}>
-                Management
+          </LinearGradient>
+        </View>
+
+        {/* Student Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.cardIcon, { backgroundColor: colors.success[100] }]}>
+              <Users size={20} color={colors.success[600]} />
+            </View>
+            <View style={styles.cardHeaderText}>
+              <Text style={styles.cardTitle}>Students</Text>
+              <Text style={styles.cardSubtitle}>{studentTotal} registered</Text>
+            </View>
+            <View style={[styles.onlineBadge, { backgroundColor: colors.success[50] }]}>
+              <View style={[styles.onlineDot, { backgroundColor: colors.success[500] }]} />
+              <Text style={[styles.onlineText, { color: colors.success[700] }]}>{studentActive}</Text>
+            </View>
+          </View>
+
+          {/* Login Rate Display */}
+          <View style={styles.loginRateSection}>
+            <View style={[styles.loginRateCircle, { borderColor: colors.success[500] }]}>
+              <Text style={[styles.loginRateValue, { color: colors.success[600] }]}>
+                {Math.round(studentLoginRate * 100)}%
               </Text>
-              <Text variant="bodyLarge" style={styles.headerSubtitle}>
-                User and class management
-              </Text>
+            </View>
+            <Text style={styles.loginRateLabel}>Login Rate</Text>
+            <View style={styles.loginRateBar}>
+              <View style={[styles.loginRateBarTrack, { backgroundColor: colors.neutral[200] }]}>
+                <View style={[
+                  styles.loginRateBarFill, 
+                  { 
+                    backgroundColor: colors.success[500],
+                    width: `${Math.round(studentLoginRate * 100)}%`
+                  }
+                ]} />
+              </View>
+            </View>
+          </View>
+
+          {/* Status Grid */}
+          <View style={styles.statusGrid}>
+            <View style={[styles.statusCard, { backgroundColor: colors.success[50] }]}>
+              <UserCheck size={16} color={colors.success[600]} />
+              <Text style={[styles.statusValue, { color: colors.success[700] }]}>{studentActive}</Text>
+              <Text style={styles.statusLabel}>Active</Text>
+            </View>
+            <View style={[styles.statusCard, { backgroundColor: colors.warning[50] }]}>
+              <Clock size={16} color={colors.warning[600]} />
+              <Text style={[styles.statusValue, { color: colors.warning[700] }]}>{studentInactive}</Text>
+              <Text style={styles.statusLabel}>Idle</Text>
+            </View>
+            <View style={[styles.statusCard, { backgroundColor: colors.error[50] }]}>
+              <UserX size={16} color={colors.error[600]} />
+              <Text style={[styles.statusValue, { color: colors.error[700] }]}>{studentDormant}</Text>
+              <Text style={styles.statusLabel}>Dormant</Text>
+            </View>
+            <View style={[styles.statusCard, { backgroundColor: colors.neutral[100] }]}>
+              <AlertCircle size={16} color={colors.neutral[500]} />
+              <Text style={[styles.statusValue, { color: colors.neutral[700] }]}>{studentNeverLoggedIn}</Text>
+              <Text style={styles.statusLabel}>Never</Text>
             </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.tabContainer}>
-        <SegmentedButtons
-          value={activeTab}
-          onValueChange={(value) => setActiveTab(value as 'users' | 'classes' | 'settings')}
-          buttons={[
-            { value: 'users', label: 'Users' },
-            { value: 'classes', label: 'Classes' },
-            { value: 'settings', label: 'Settings' },
-          ]}
-          style={styles.segmentedButtons}
-        />
-      </View>
+        {/* Staff Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.cardIcon, { backgroundColor: colors.primary[100] }]}>
+              <Shield size={20} color={colors.primary[600]} />
+            </View>
+            <View style={styles.cardHeaderText}>
+              <Text style={styles.cardTitle}>Staff & Teachers</Text>
+              <Text style={styles.cardSubtitle}>{adminTotal} members</Text>
+            </View>
+            <View style={[styles.onlineBadge, { backgroundColor: colors.primary[50] }]}>
+              <View style={[styles.onlineDot, { backgroundColor: colors.primary[500] }]} />
+              <Text style={[styles.onlineText, { color: colors.primary[700] }]}>{adminActive}</Text>
+            </View>
+          </View>
 
-      <ScrollView 
-        style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-      >
-        {activeTab === 'users' && renderUsersTab()}
-        {activeTab === 'classes' && renderClassesTab()}
-        {activeTab === 'settings' && renderSettingsTab()}
+          {/* Login Rate Display */}
+          <View style={styles.loginRateSection}>
+            <View style={[styles.loginRateCircle, { borderColor: colors.primary[500] }]}>
+              <Text style={[styles.loginRateValue, { color: colors.primary[600] }]}>
+                {Math.round(adminLoginRate * 100)}%
+              </Text>
+            </View>
+            <Text style={styles.loginRateLabel}>Login Rate</Text>
+            <View style={styles.loginRateBar}>
+              <View style={[styles.loginRateBarTrack, { backgroundColor: colors.neutral[200] }]}>
+                <View style={[
+                  styles.loginRateBarFill, 
+                  { 
+                    backgroundColor: colors.primary[500],
+                    width: `${Math.round(adminLoginRate * 100)}%`
+                  }
+                ]} />
+              </View>
+            </View>
+          </View>
+
+          {/* Status Grid */}
+          <View style={styles.statusGrid}>
+            <View style={[styles.statusCard, { backgroundColor: colors.success[50] }]}>
+              <UserCheck size={16} color={colors.success[600]} />
+              <Text style={[styles.statusValue, { color: colors.success[700] }]}>{adminActive}</Text>
+              <Text style={styles.statusLabel}>Active</Text>
+            </View>
+            <View style={[styles.statusCard, { backgroundColor: colors.warning[50] }]}>
+              <Clock size={16} color={colors.warning[600]} />
+              <Text style={[styles.statusValue, { color: colors.warning[700] }]}>{adminInactive}</Text>
+              <Text style={styles.statusLabel}>Idle</Text>
+            </View>
+            <View style={[styles.statusCard, { backgroundColor: colors.error[50] }]}>
+              <UserX size={16} color={colors.error[600]} />
+              <Text style={[styles.statusValue, { color: colors.error[700] }]}>{adminDormant}</Text>
+              <Text style={styles.statusLabel}>Dormant</Text>
+            </View>
+            <View style={[styles.statusCard, { backgroundColor: colors.neutral[100] }]}>
+              <AlertCircle size={16} color={colors.neutral[500]} />
+              <Text style={[styles.statusValue, { color: colors.neutral[700] }]}>{adminNeverLoggedIn + adminNoAccount}</Text>
+              <Text style={styles.statusLabel}>Never</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Recent Activity */}
+        {recentLogins.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.recentHeader}>
+              <View style={styles.recentTitleRow}>
+                <Activity size={18} color={colors.primary[500]} />
+                <Text style={styles.recentTitle}>Recent Activity</Text>
+              </View>
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>Live</Text>
+              </View>
+            </View>
+            
+            {recentLogins.slice(0, 5).map((login, index) => (
+              <View key={login.id} style={[
+                styles.activityItem,
+                index < Math.min(recentLogins.length, 5) - 1 && styles.activityItemBorder
+              ]}>
+                <Avatar.Text 
+                  size={36} 
+                  label={getInitials(login.name)}
+                  style={{ backgroundColor: login.user_type === 'student' ? colors.success[500] : colors.primary[500] }}
+                  labelStyle={{ fontSize: 14, fontWeight: '600' }}
+                />
+                <View style={styles.activityInfo}>
+                  <Text style={styles.activityName} numberOfLines={1}>{login.name}</Text>
+                  <View style={[
+                    styles.typeBadge,
+                    { backgroundColor: login.user_type === 'student' ? colors.success[100] : colors.primary[100] }
+                  ]}>
+                    <Text style={[
+                      styles.typeText,
+                      { color: login.user_type === 'student' ? colors.success[700] : colors.primary[700] }
+                    ]}>
+                      {login.user_type === 'student' ? 'Student' : 'Staff'}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.activityTime}>{formatRelativeTime(login.last_sign_in)}</Text>
+              </View>
+            ))}
+
+            {recentLogins.length > 5 && (
+              <View style={styles.viewAllRow}>
+                <Text style={styles.viewAllText}>View all activity</Text>
+                <ChevronRight size={16} color={colors.primary[500]} />
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Legend */}
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.success[500] }]} />
+            <Text style={styles.legendText}>Active (7d)</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.warning[500] }]} />
+            <Text style={styles.legendText}>Idle (7-30d)</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.error[500] }]} />
+            <Text style={styles.legendText}>Dormant (30d+)</Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.app,
-  },
-  header: {
-    backgroundColor: colors.primary[600],
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  headerTitle: {
-    color: colors.text.inverse,
-    fontWeight: typography.fontWeight.bold,
-  },
-  headerSubtitle: {
-    color: colors.text.inverse,
-    opacity: 0.9,
-  },
-  restrictedContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  restrictedTitle: {
-    color: colors.text.primary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  restrictedMessage: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  tabContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  segmentedButtons: {
-    backgroundColor: colors.surface.secondary,
+    backgroundColor: colors.background.secondary,
   },
   content: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
   },
-  tabContent: {
-    paddingBottom: spacing.xl,
-  },
+  
+  // Loading & Error States
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    gap: spacing.md,
   },
   loadingText: {
-    marginTop: spacing.md,
+    fontSize: 14,
     color: colors.text.secondary,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.xl,
-  },
-  errorTitle: {
-    color: colors.text.primary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  errorMessage: {
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  retryButton: {
-    marginTop: spacing.md,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    padding: spacing.xl,
     gap: spacing.md,
-    marginBottom: spacing.xl,
   },
-  statCard: {
-    width: '48%',
-    padding: spacing.lg,
-  },
-  statContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
+  errorIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.error[50],
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
   },
-  statText: {
-    flex: 1,
-  },
-  statValue: {
-    fontWeight: typography.fontWeight.bold,
+  errorTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.text.primary,
   },
-  statLabel: {
+  errorMessage: {
+    fontSize: 14,
     color: colors.text.secondary,
+    textAlign: 'center',
   },
-  actionCard: {
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-  },
-  actionTitle: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.lg,
-  },
-  actionButtons: {
-    flexDirection: 'row',
+  restrictedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
     gap: spacing.md,
   },
-  actionButton: {
+  restrictedIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.error[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  restrictedTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  restrictedMessage: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+
+  // Hero Section
+  heroSection: {
+    padding: spacing.md,
+    paddingBottom: 0,
+  },
+  heroGradient: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.primary[900],
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+      },
+      android: { elevation: 8 },
+    }),
+  },
+  heroContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heroMain: {
     flex: 1,
   },
-  comingSoonText: {
-    color: colors.text.secondary,
-    lineHeight: 24,
+  heroValue: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -1,
+  },
+  heroLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  heroDivider: {
+    width: 1,
+    height: 60,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginHorizontal: spacing.lg,
+  },
+  heroStats: {
+    gap: spacing.md,
+  },
+  heroStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  heroStatDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#4ADE80',
+  },
+  heroStatValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  heroStatLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+  },
+
+  // Cards
+  card: {
+    margin: spacing.md,
+    marginTop: spacing.md,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.text.primary,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: isDark ? 0.3 : 0.08,
+        shadowRadius: 12,
+      },
+      android: { elevation: 3 },
+    }),
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border.light,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  cardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardHeaderText: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: colors.text.tertiary,
+    marginTop: 1,
+  },
+  onlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  onlineText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Login Rate Display
+  loginRateSection: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    gap: spacing.xs,
+  },
+  loginRateCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surface.primary,
+  },
+  loginRateValue: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  loginRateLabel: {
+    fontSize: 11,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: '500',
+  },
+  loginRateBar: {
+    width: '60%',
+    marginTop: spacing.xs,
+  },
+  loginRateBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  loginRateBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+
+  // Status Grid
+  statusGrid: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  statusCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    gap: 4,
+  },
+  statusValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statusLabel: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    fontWeight: '500',
+  },
+
+  // Recent Activity
+  recentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  recentTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  recentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.success[50],
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.success[500],
+  },
+  liveText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.success[700],
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  activityItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  activityInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  activityName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text.primary,
+  },
+  typeBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  typeText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  activityTime: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+  },
+  viewAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingTop: spacing.md,
+    marginTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.primary[500],
+  },
+
+  // Legend
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
   },
 });

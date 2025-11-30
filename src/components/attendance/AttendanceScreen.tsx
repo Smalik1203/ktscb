@@ -1,5 +1,12 @@
+/**
+ * AttendanceScreen
+ * 
+ * Refactored to use centralized design system with dynamic theming.
+ * All styling now uses theme tokens via useTheme hook.
+ */
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Dimensions } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Dimensions } from 'react-native';
 import { Text, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { 
@@ -12,12 +19,12 @@ import {
   Circle
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { useStudents } from '../../hooks/useStudents';
 import { useClasses } from '../../hooks/useClasses';
 import { useClassAttendance, useMarkAttendance, useMarkBulkAttendance, useClassAttendanceSummary } from '../../hooks/useAttendance';
-import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
 import { AttendanceInput } from '../../services/api';
 import { StudentAttendanceView } from './StudentAttendanceView';
 
@@ -32,6 +39,7 @@ interface StudentAttendanceData {
 
 export const AttendanceScreen: React.FC = () => {
   const { profile } = useAuth();
+  const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
   const { selectedClass, scope, setSelectedClass } = useClassSelection();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState<StudentAttendanceData[]>([]);
@@ -42,18 +50,19 @@ export const AttendanceScreen: React.FC = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [historyStartDate, setHistoryStartDate] = useState<Date>(() => {
     const date = new Date();
-    date.setDate(date.getDate() - 30); // Default to last 30 days
+    date.setDate(date.getDate() - 30);
     return date;
   });
   const [historyEndDate, setHistoryEndDate] = useState<Date>(new Date());
   const [showHistoryStartDatePicker, setShowHistoryStartDatePicker] = useState(false);
   const [showHistoryEndDatePicker, setShowHistoryEndDatePicker] = useState(false);
   
-  // Bottom sheet ref for class selector
   const bottomSheetRef = useRef<BottomSheetModal>(null);
-  
-  // Snapshot index for bottom sheet
   const snapPoints = useMemo(() => ['75%'], []);
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark), 
+    [colors, spacing, borderRadius, typography, shadows, isDark]);
 
   const dateString = selectedDate.toISOString().split('T')[0];
   const historyStartDateString = historyStartDate.toISOString().split('T')[0];
@@ -61,47 +70,52 @@ export const AttendanceScreen: React.FC = () => {
   const canMark = profile?.role === 'admin' || profile?.role === 'superadmin';
   const isStudent = profile?.role === 'student';
 
-  // Fetch data (hooks must be called before any early returns)
   const { data: classes = [] } = useClasses(!isStudent ? (scope.school_code ?? undefined) : undefined);
-  // Fetch all students without pagination for attendance
-  const { data: studentsResponse, isLoading: studentsLoading } = useStudents(
-    !isStudent && selectedClass?.id ? selectedClass.id : undefined,
-    !isStudent ? (scope.school_code ?? undefined) : undefined
-    // No pagination options = fetch all students
-  );
-  const students = studentsResponse?.data || [];
+  const effectiveSchoolCode = scope.school_code ?? profile?.school_code ?? selectedClass?.school_code ?? null;
 
-  const { data: existingAttendance = [], isLoading: attendanceLoading } = useClassAttendance(
+  const { data: studentsResponse, isLoading: studentsLoading, error: studentsError } = useStudents(
+    !isStudent && selectedClass?.id ? selectedClass.id : undefined,
+    !isStudent && effectiveSchoolCode ? effectiveSchoolCode : undefined
+  );
+  const students = useMemo(() => studentsResponse?.data || [], [studentsResponse?.data]);
+
+  const { data: existingAttendanceRaw, isLoading: attendanceLoading, error: attendanceError } = useClassAttendance(
     !isStudent && selectedClass?.id ? selectedClass.id : undefined,
     !isStudent ? dateString : undefined
   );
+  const existingAttendance = useMemo(() => existingAttendanceRaw || [], [existingAttendanceRaw]);
 
-  const { data: attendanceSummary = [], isLoading: summaryLoading } = useClassAttendanceSummary(
+  const { data: attendanceSummaryRaw, isLoading: summaryLoading } = useClassAttendanceSummary(
     !isStudent && activeTab === 'history' && selectedClass?.id ? selectedClass.id : undefined,
     !isStudent && activeTab === 'history' ? historyStartDateString : undefined,
     !isStudent && activeTab === 'history' ? historyEndDateString : undefined
   );
+  const attendanceSummary = useMemo(() => attendanceSummaryRaw || [], [attendanceSummaryRaw]);
 
   const markAttendanceMutation = useMarkAttendance();
   const markBulkAttendanceMutation = useMarkBulkAttendance();
 
-  // Initialize attendance data (must be before early return)
   useEffect(() => {
-    if (!isStudent && students.length > 0) {
-      const studentAttendanceData: StudentAttendanceData[] = students.map(student => {
-        const existing = existingAttendance.find(a => a.student_id === student.id);
-        return {
-          studentId: student.id,
-          studentName: student.full_name,
-          studentCode: student.student_code,
-          status: existing?.status || null,
-        };
-      });
+    if (!isStudent && students && students.length > 0) {
+      const studentAttendanceData: StudentAttendanceData[] = students
+        .filter(student => student && student.id && student.full_name && student.student_code)
+        .map(student => {
+          const existing = existingAttendance?.find(a => a && a.student_id === student.id);
+          const normalizedStatus: AttendanceStatus = existing?.status === 'present' || existing?.status === 'absent'
+            ? existing.status
+            : null;
+          return {
+            studentId: student.id,
+            studentName: student.full_name,
+            studentCode: student.student_code,
+            status: normalizedStatus,
+          };
+        });
       setAttendanceData(studentAttendanceData);
     } else {
       setAttendanceData([]);
     }
-  }, [students.length, existingAttendance.length, dateString, isStudent]);
+  }, [students, existingAttendance, dateString, isStudent]);
 
   const handleDateConfirm = useCallback((date: Date) => {
     if (isStudent) return;
@@ -117,11 +131,9 @@ export const AttendanceScreen: React.FC = () => {
 
   const handleStatusChange = useCallback((studentId: string, status: AttendanceStatus) => {
     if (isStudent) return;
-    // Immediate update for better UX
     setAttendanceData(prev => {
       const updated = prev.map(s => {
         if (s.studentId === studentId) {
-          // If clicking the same status, unmark it
           const newStatus = s.status === status ? null : status;
           return { ...s, status: newStatus };
         }
@@ -130,36 +142,28 @@ export const AttendanceScreen: React.FC = () => {
       return updated;
     });
     setHasChanges(true);
-  }, []);
+  }, [isStudent]);
 
   const handleSave = async () => {
-    if (!selectedClass?.id || !scope.school_code || !profile?.auth_id) {
-      Alert.alert(
-        'Error',
-        'Please select a class and ensure you are logged in',
-        [{ text: 'OK', style: 'default' }]
-      );
+    if (!selectedClass?.id || !effectiveSchoolCode || !profile?.auth_id) {
+      Alert.alert('Error', 'Please select a class and ensure you are logged in');
       return;
     }
 
     const records: AttendanceInput[] = attendanceData
-      .filter(student => student.status !== null)
+      .filter(student => student.status !== null && (student.status === 'present' || student.status === 'absent'))
       .map(student => ({
         student_id: student.studentId,
         class_instance_id: selectedClass.id,
         date: dateString,
-        status: student.status!,
+        status: student.status as 'present' | 'absent',
         marked_by: profile.auth_id,
         marked_by_role_code: profile.role || 'unknown',
-        school_code: scope.school_code ?? '',
+        school_code: effectiveSchoolCode,
       }));
 
     if (records.length === 0) {
-      Alert.alert(
-        'No Changes',
-        'Please mark attendance for at least one student before saving.',
-        [{ text: 'OK', style: 'default' }]
-      );
+      Alert.alert('No Changes', 'Please mark attendance for at least one student before saving.');
       return;
     }
 
@@ -172,16 +176,9 @@ export const AttendanceScreen: React.FC = () => {
         weekday: 'short', 
         month: 'short', 
         day: 'numeric' 
-      })}?\n\n` +
-      `📊 ${records.length} students marked\n` +
-      `✅ ${presentCount} Present\n` +
-      `❌ ${absentCount} Absent`,
+      })}?\n\n📊 ${records.length} students marked\n✅ ${presentCount} Present\n❌ ${absentCount} Absent`,
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => {}
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Save Attendance',
           style: 'default',
@@ -189,63 +186,36 @@ export const AttendanceScreen: React.FC = () => {
             try {
               await markAttendanceMutation.mutateAsync(records);
               setHasChanges(false);
-              Alert.alert(
-                '✅ Success',
-                `Attendance saved successfully for ${records.length} students.`,
-                [{ text: 'OK', style: 'default' }]
-              );
+              Alert.alert('✅ Success', `Attendance saved successfully for ${records.length} students.`);
             } catch (error) {
-              console.error('Attendance save error:', error);
-              Alert.alert(
-                'Error',
-                'Failed to save attendance. Please check your connection and try again.',
-                [{ text: 'OK', style: 'default' }]
-              );
+              Alert.alert('Error', 'Failed to save attendance. Please check your connection and try again.');
             }
           }
         }
-      ],
-      { cancelable: true }
+      ]
     );
   };
 
   const handleBulkMark = async (status: 'present' | 'absent') => {
-    if (!selectedClass?.id || !scope.school_code || !profile?.auth_id) {
-      Alert.alert(
-        'Error',
-        'Please select a class and ensure you are logged in',
-        [{ text: 'OK', style: 'default' }]
-      );
+    if (!selectedClass?.id || !effectiveSchoolCode || !profile?.auth_id) {
+      Alert.alert('Error', 'Please select a class and ensure you are logged in');
       return;
     }
 
     const statusText = status === 'present' ? 'Present' : 'Absent';
     const studentCount = students.length;
-    const dateDisplay = selectedDate.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    });
 
     Alert.alert(
       `Mark All ${statusText}?`,
-      `Are you sure you want to mark all ${studentCount} students as ${statusText.toLowerCase()} for ${dateDisplay}?\n\n` +
-      `⚠️ This action will update all student attendance records.`,
+      `Are you sure you want to mark all ${studentCount} students as ${statusText.toLowerCase()}?`,
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => {}
-        },
+        { text: 'Cancel', style: 'cancel' },
         {
           text: `Yes, Mark All ${statusText}`,
           style: status === 'present' ? 'default' : 'destructive',
           onPress: async () => {
             try {
-              // Update UI immediately for better UX
-              setAttendanceData(prev => 
-                prev.map(student => ({ ...student, status }))
-              );
+              setAttendanceData(prev => prev.map(student => ({ ...student, status })));
               setHasChanges(true);
 
               await markBulkAttendanceMutation.mutateAsync({
@@ -254,35 +224,26 @@ export const AttendanceScreen: React.FC = () => {
                 status,
                 markedBy: profile.auth_id,
                 markedByRoleCode: profile.role || 'unknown',
-                schoolCode: scope.school_code ?? '',
+                schoolCode: effectiveSchoolCode,
               });
               
-              Alert.alert(
-                '✅ Success',
-                `All ${studentCount} students have been marked as ${statusText.toLowerCase()}.`,
-                [{ text: 'OK', style: 'default' }]
-              );
+              Alert.alert('✅ Success', `All ${studentCount} students have been marked as ${statusText.toLowerCase()}.`);
             } catch (error) {
-              console.error('Bulk attendance error:', error);
-              // Revert UI changes on error
               setAttendanceData(prev => {
-                const reverted = prev.map(student => {
+                return prev.map(student => {
                   const existing = existingAttendance.find(a => a.student_id === student.studentId);
-                  return { ...student, status: existing?.status || null };
+                  const normalizedStatus: AttendanceStatus = existing?.status === 'present' || existing?.status === 'absent' 
+                    ? existing.status 
+                    : null;
+                  return { ...student, status: normalizedStatus };
                 });
-                return reverted;
               });
               setHasChanges(false);
-              Alert.alert(
-                'Error',
-                'Failed to mark bulk attendance. Please try again.',
-                [{ text: 'OK', style: 'default' }]
-              );
+              Alert.alert('Error', 'Failed to mark bulk attendance. Please try again.');
             }
           }
         }
-      ],
-      { cancelable: true }
+      ]
     );
   };
 
@@ -295,7 +256,6 @@ export const AttendanceScreen: React.FC = () => {
     );
   }
 
-  // Calculate history stats
   const totalPresentDays = attendanceSummary.reduce((sum, s) => sum + s.presentDays, 0);
   const totalAbsentDays = attendanceSummary.reduce((sum, s) => sum + s.absentDays, 0);
   const totalDays = attendanceSummary.reduce((sum, s) => sum + s.totalDays, 0);
@@ -308,7 +268,6 @@ export const AttendanceScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Tab Switcher */}
       {!isStudent && (
         <View style={styles.tabContainer}>
           <SegmentedButtons
@@ -323,14 +282,10 @@ export const AttendanceScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Quick Filters Section - Only shown for non-students */}
       {!isStudent && (
         <View style={styles.filterSection}>
           {activeTab === 'mark' ? (
-            <>
-            {/* Mark Attendance Filters */}
             <View style={styles.filterRow}>
-            {/* Class Filter */}
             <TouchableOpacity
               style={styles.filterItem}
               onPress={() => bottomSheetRef.current?.present()}
@@ -347,15 +302,11 @@ export const AttendanceScreen: React.FC = () => {
               <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
             </TouchableOpacity>
 
-            {/* Divider */}
             <View style={styles.filterDivider} />
 
-            {/* Date Filter */}
             <TouchableOpacity 
               style={styles.filterItem}
-              onPress={() => {
-                setShowDatePicker(true);
-              }}
+                onPress={() => setShowDatePicker(true)}
             >
               <View style={styles.filterIcon}>
                 <Calendar size={16} color={colors.text.inverse} />
@@ -363,20 +314,13 @@ export const AttendanceScreen: React.FC = () => {
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Date</Text>
                 <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                  {selectedDate.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric'
-                  })}
+                    {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </Text>
               </View>
             </TouchableOpacity>
           </View>
-          </>
         ) : (
-          <>
-          {/* History Filters */}
           <View style={styles.filterRow}>
-            {/* Class Filter */}
             <TouchableOpacity
               style={styles.filterItem}
               onPress={() => bottomSheetRef.current?.present()}
@@ -393,10 +337,8 @@ export const AttendanceScreen: React.FC = () => {
               <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
             </TouchableOpacity>
 
-            {/* Divider */}
             <View style={styles.filterDivider} />
 
-            {/* Start Date Filter */}
             <TouchableOpacity 
               style={styles.filterItem}
               onPress={() => setShowHistoryStartDatePicker(true)}
@@ -407,18 +349,13 @@ export const AttendanceScreen: React.FC = () => {
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Start</Text>
                 <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                  {historyStartDate.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric'
-                  })}
+                    {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </Text>
               </View>
             </TouchableOpacity>
 
-            {/* Divider */}
             <View style={styles.filterDivider} />
 
-            {/* End Date Filter */}
             <TouchableOpacity 
               style={styles.filterItem}
               onPress={() => setShowHistoryEndDatePicker(true)}
@@ -429,29 +366,22 @@ export const AttendanceScreen: React.FC = () => {
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>End</Text>
                 <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                  {historyEndDate.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric'
-                  })}
+                    {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </Text>
               </View>
             </TouchableOpacity>
           </View>
-          </>
           )}
         </View>
       )}
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {activeTab === 'mark' ? (
-          <>
-        {/* Students Section */}
+      {activeTab === 'mark' ? (
         <View style={styles.studentsSection}>
           <View style={styles.studentsHeader}>
             <View>
               <Text style={styles.sectionTitle}>Students</Text>
               <Text style={styles.studentsSubtitle}>
-                {attendanceData.length} total • {attendanceData.filter(s => s.status === null).length} unmarked
+                {attendanceData?.length || 0} total • {attendanceData?.filter(s => s.status === null).length || 0} unmarked
               </Text>
             </View>
             {hasChanges && (
@@ -464,117 +394,128 @@ export const AttendanceScreen: React.FC = () => {
           <View style={styles.studentsList}>
             {studentsLoading || attendanceLoading ? (
               <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary[600]} />
+                <ActivityIndicator size="large" color={colors.primary.main} />
                 <Text style={styles.loadingText}>Loading students...</Text>
               </View>
+            ) : studentsError || attendanceError ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>Error loading data. Please try again.</Text>
+              </View>
+            ) : attendanceData.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Users size={48} color={colors.text.tertiary} />
+                <Text style={styles.emptyText}>No students found in this class</Text>
+              </View>
             ) : (
-              attendanceData.map((student) => {
-                const status = student.status;
-                const isPresent = status === 'present';
-                const isAbsent = status === 'absent';
-                const isMarked = status !== null;
-                
-                // Optimize styles computation
-                const cardStyle = isPresent 
-                  ? styles.studentCardPresent 
-                  : isAbsent 
-                  ? styles.studentCardAbsent 
-                  : styles.studentCardUnmarked;
-                
-                const presentButtonStyle = isPresent 
-                  ? styles.statusButtonActivePresent 
-                  : !isMarked 
-                  ? styles.statusButtonUnmarked 
-                  : null;
-                
-                const absentButtonStyle = isAbsent 
-                  ? styles.statusButtonActiveAbsent 
-                  : !isMarked 
-                  ? styles.statusButtonUnmarked 
-                  : null;
-                
-                return (
-                  <View 
-                    key={student.studentId} 
-                    style={[styles.studentCard, cardStyle]}
-                  >
-                    <View style={styles.studentInfo}>
-                      <View style={styles.studentNameRow}>
-                        <Text style={styles.studentName}>{student.studentName}</Text>
-                        {/* Status Indicator Badge */}
-                        {isMarked ? (
-                          <View style={[
-                            styles.statusBadge,
-                            isPresent ? styles.statusBadgePresent : styles.statusBadgeAbsent
-                          ]}>
-                            {isPresent ? (
-                              <CheckCircle size={12} color={colors.text.inverse} />
-                            ) : (
-                              <XCircle size={12} color={colors.text.inverse} />
-                            )}
-                            <Text style={styles.statusBadgeText}>
-                              {isPresent ? 'Present' : 'Absent'}
+              <FlatList
+                data={attendanceData}
+                renderItem={({ item: student }) => {
+                  const status = student.status;
+                  const isPresent = status === 'present';
+                  const isAbsent = status === 'absent';
+                  const isMarked = status !== null;
+                  
+                  const cardStyle = isPresent 
+                    ? styles.studentCardPresent 
+                    : isAbsent 
+                    ? styles.studentCardAbsent 
+                    : styles.studentCardUnmarked;
+                  
+                  const presentButtonStyle = isPresent 
+                    ? styles.statusButtonActivePresent 
+                    : !isMarked 
+                    ? styles.statusButtonUnmarked 
+                    : null;
+                  
+                  const absentButtonStyle = isAbsent 
+                    ? styles.statusButtonActiveAbsent 
+                    : !isMarked 
+                    ? styles.statusButtonUnmarked 
+                    : null;
+                  
+                  return (
+                    <View style={[styles.studentCard, cardStyle]}>
+                      <View style={styles.studentInfo}>
+                        <View style={styles.studentNameRow}>
+                          <Text style={styles.studentName}>{student.studentName}</Text>
+                          {isMarked ? (
+                            <View style={[
+                              styles.statusBadge,
+                              isPresent ? styles.statusBadgePresent : styles.statusBadgeAbsent
+                            ]}>
+                              {isPresent ? (
+                                <CheckCircle size={12} color={colors.text.inverse} />
+                              ) : (
+                                <XCircle size={12} color={colors.text.inverse} />
+                              )}
+                              <Text style={styles.statusBadgeText}>
+                                {isPresent ? 'Present' : 'Absent'}
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={styles.statusBadgeUnmarked}>
+                              <Circle size={12} color={colors.text.tertiary} fill={colors.text.tertiary} />
+                              <Text style={styles.statusBadgeTextUnmarked}>Unmarked</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.studentCode}>{student.studentCode}</Text>
+                      </View>
+                      
+                      {canMark && (
+                        <View style={styles.statusButtons}>
+                          <TouchableOpacity
+                            style={[styles.statusButton, presentButtonStyle]}
+                            onPress={() => handleStatusChange(student.studentId, 'present')}
+                            activeOpacity={0.7}
+                          >
+                            <CheckCircle 
+                              size={16} 
+                              color={isPresent ? colors.text.inverse : colors.success.main} 
+                            />
+                            <Text style={[
+                              styles.statusButtonText,
+                              isPresent && styles.statusButtonTextActive,
+                              !isMarked && styles.statusButtonTextUnmarked
+                            ]}>
+                              Present
                             </Text>
-                          </View>
-                        ) : (
-                          <View style={styles.statusBadgeUnmarked}>
-                            <Circle size={12} color={colors.text.tertiary} fill={colors.text.tertiary} />
-                            <Text style={styles.statusBadgeTextUnmarked}>Unmarked</Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={styles.studentCode}>{student.studentCode}</Text>
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity
+                            style={[styles.statusButton, absentButtonStyle]}
+                            onPress={() => handleStatusChange(student.studentId, 'absent')}
+                            activeOpacity={0.7}
+                          >
+                            <XCircle 
+                              size={16} 
+                              color={isAbsent ? colors.text.inverse : colors.error.main} 
+                            />
+                            <Text style={[
+                              styles.statusButtonText,
+                              isAbsent && styles.statusButtonTextActive,
+                              !isMarked && styles.statusButtonTextUnmarked
+                            ]}>
+                              Absent
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
-                    
-                    {canMark && (
-                      <View style={styles.statusButtons}>
-                        <TouchableOpacity
-                          style={[styles.statusButton, presentButtonStyle]}
-                          onPress={() => handleStatusChange(student.studentId, 'present')}
-                          activeOpacity={0.7}
-                        >
-                          <CheckCircle 
-                            size={16} 
-                            color={isPresent ? colors.text.inverse : colors.success[600]} 
-                          />
-                          <Text style={[
-                            styles.statusButtonText,
-                            isPresent && styles.statusButtonTextActive,
-                            !isMarked && styles.statusButtonTextUnmarked
-                          ]}>
-                            Present
-                          </Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                          style={[styles.statusButton, absentButtonStyle]}
-                          onPress={() => handleStatusChange(student.studentId, 'absent')}
-                          activeOpacity={0.7}
-                        >
-                          <XCircle 
-                            size={16} 
-                            color={isAbsent ? colors.text.inverse : colors.error[600]} 
-                          />
-                          <Text style={[
-                            styles.statusButtonText,
-                            isAbsent && styles.statusButtonTextActive,
-                            !isMarked && styles.statusButtonTextUnmarked
-                          ]}>
-                            Absent
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-                );
-              })
+                  );
+                }}
+                keyExtractor={(item) => item.studentId}
+                removeClippedSubviews={true}
+                initialNumToRender={15}
+                maxToRenderPerBatch={10}
+                windowSize={10}
+                contentContainerStyle={styles.flatListContent}
+                showsVerticalScrollIndicator={false}
+              />
             )}
           </View>
         </View>
-
-          </>
-        ) : (
-          /* History Tab */
+      ) : (
           <View style={styles.historyContainer}>
             {isStudent ? (
               <StudentAttendanceView />
@@ -586,35 +527,32 @@ export const AttendanceScreen: React.FC = () => {
                 </View>
               ) : (
                 <>
-                  {/* Summary Stats */}
                   <View style={styles.historyStats}>
                     <View style={styles.statCard}>
                       <Text style={styles.statNumber}>{historyStats.total}</Text>
-                      <Text style={styles.statLabel}>Total Students</Text>
+                      <Text style={styles.statLabel} numberOfLines={1}>Students</Text>
                     </View>
                     <View style={styles.statCard}>
-                      <Text style={[styles.statNumber, { color: colors.success[600] }]}>{historyStats.averageAttendance}%</Text>
-                      <Text style={styles.statLabel}>Avg Attendance</Text>
+                      <Text style={[styles.statNumber, { color: colors.success.main }]}>{historyStats.averageAttendance}%</Text>
+                      <Text style={styles.statLabel} numberOfLines={1}>Present</Text>
                     </View>
                     <View style={styles.statCard}>
-                      <Text style={[styles.statNumber, { color: colors.error[600] }]}>{historyStats.averageAbsent}%</Text>
-                      <Text style={styles.statLabel}>Avg Absent</Text>
+                      <Text style={[styles.statNumber, { color: colors.error.main }]}>{historyStats.averageAbsent}%</Text>
+                      <Text style={styles.statLabel} numberOfLines={1}>Absent</Text>
                     </View>
                   </View>
 
-                  {/* Date Range Display */}
                   <View style={styles.dateRangeContainer}>
                     <Text style={styles.dateRangeText}>
                       {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </Text>
                   </View>
 
-                  {/* Attendance Summary List */}
                   <View style={styles.summaryContainer}>
                     <Text style={styles.summaryTitle}>Student Summary</Text>
                     {summaryLoading ? (
                       <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={colors.primary[600]} />
+                      <ActivityIndicator size="large" color={colors.primary.main} />
                         <Text style={styles.loadingText}>Loading history...</Text>
                       </View>
                     ) : attendanceSummary.length === 0 ? (
@@ -622,9 +560,10 @@ export const AttendanceScreen: React.FC = () => {
                         <Text style={styles.emptyStateText}>No attendance records found for this period</Text>
                       </View>
                     ) : (
-                      <View style={styles.summaryList}>
-                        {attendanceSummary.map((student) => (
-                          <View key={student.studentId} style={styles.summaryItem}>
+                      <FlatList
+                        data={attendanceSummary}
+                        renderItem={({ item: student }) => (
+                          <View style={styles.summaryItem}>
                             <View style={styles.summaryStudentInfo}>
                               <Text style={styles.summaryStudentName}>{student.studentName}</Text>
                               <Text style={styles.studentCode}>{student.studentCode}</Text>
@@ -650,8 +589,15 @@ export const AttendanceScreen: React.FC = () => {
                               </View>
                             </View>
                           </View>
-                        ))}
-                      </View>
+                        )}
+                        keyExtractor={(item) => item.studentId}
+                        removeClippedSubviews={true}
+                        initialNumToRender={15}
+                        maxToRenderPerBatch={10}
+                        windowSize={10}
+                        contentContainerStyle={styles.summaryList}
+                        showsVerticalScrollIndicator={false}
+                      />
                     )}
                   </View>
                 </>
@@ -659,9 +605,7 @@ export const AttendanceScreen: React.FC = () => {
             )}
           </View>
         )}
-      </ScrollView>
 
-      {/* Class Dropdown Bottom Sheet */}
       <BottomSheetModal
         ref={bottomSheetRef}
         index={0}
@@ -679,7 +623,7 @@ export const AttendanceScreen: React.FC = () => {
             <TouchableOpacity
               key={cls.id}
               onPress={() => {
-                setSelectedClass(cls);
+                setSelectedClass(cls as any);
                 setHasChanges(true);
                 bottomSheetRef.current?.dismiss();
               }}
@@ -707,7 +651,6 @@ export const AttendanceScreen: React.FC = () => {
         </BottomSheetScrollView>
       </BottomSheetModal>
 
-      {/* Date Picker Modal */}
       <DatePickerModal
         visible={showDatePicker}
         onDismiss={handleDateCancel}
@@ -717,7 +660,6 @@ export const AttendanceScreen: React.FC = () => {
         maximumDate={new Date(2030, 11, 31)}
       />
 
-      {/* History Start Date Picker */}
       <DatePickerModal
         visible={showHistoryStartDatePicker}
         onDismiss={() => setShowHistoryStartDatePicker(false)}
@@ -731,7 +673,6 @@ export const AttendanceScreen: React.FC = () => {
         title="Select Start Date"
       />
 
-      {/* History End Date Picker */}
       <DatePickerModal
         visible={showHistoryEndDatePicker}
         onDismiss={() => setShowHistoryEndDatePicker(false)}
@@ -745,7 +686,6 @@ export const AttendanceScreen: React.FC = () => {
         title="Select End Date"
       />
 
-      {/* Save Button - Fixed at Bottom */}
       {hasChanges && canMark && (
         <View style={styles.saveButtonContainer}>
           <TouchableOpacity
@@ -777,7 +717,14 @@ export const AttendanceScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (
+  colors: ThemeColors, 
+  spacing: any, 
+  borderRadius: any, 
+  typography: any, 
+  shadows: any, 
+  isDark: boolean
+) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.secondary,
@@ -790,10 +737,6 @@ const styles = StyleSheet.create({
   },
   tabSwitcher: {
     backgroundColor: colors.background.secondary,
-  },
-  scrollView: {
-    flex: 1,
-    paddingBottom: 100, // Space for save button
   },
   filterSection: {
     paddingHorizontal: spacing.lg,
@@ -808,27 +751,26 @@ const styles = StyleSheet.create({
   filterRow: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.sm,
     paddingHorizontal: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...shadows.sm,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border.DEFAULT,
   },
   filterItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 0, // Allow flex items to shrink below content size
+    minWidth: 0,
+    overflow: 'hidden',
   },
   filterIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.primary.main,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
@@ -836,7 +778,7 @@ const styles = StyleSheet.create({
   },
   filterContent: {
     flex: 1,
-    minWidth: 0, // Allow text to truncate properly
+    minWidth: 0,
     alignItems: 'flex-start',
   },
   filterLabel: {
@@ -850,35 +792,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
   },
-  inlineDatePicker: {
-    height: 40,
-    width: 120,
-  },
-  datePickerModal: {
-    backgroundColor: colors.surface.primary,
-    padding: spacing.lg,
-    margin: spacing.xl,
-    borderRadius: borderRadius.lg,
-    maxHeight: '60%',
-    minHeight: 300,
-  },
-  datePickerContainer: {
-    alignItems: 'center',
-  },
-  datePickerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.lg,
-  },
-  datePickerActions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  datePickerButton: {
-    flex: 1,
-  },
   filterDivider: {
     width: 1,
     height: 40,
@@ -886,70 +799,10 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
     flexShrink: 0,
   },
-  customDatePickerModal: {
-    justifyContent: 'flex-end',
-    margin: 0,
-  },
-  customDatePickerContainer: {
-    backgroundColor: colors.surface.primary,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.lg,
-    maxHeight: Dimensions.get('window').height * 0.6,
-  },
-  handleBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: colors.border.DEFAULT,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-  },
-  customDatePicker: {
-    height: 200,
-    marginVertical: spacing.lg,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: colors.surface.primary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: colors.text.secondary,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-  },
-  continueButton: {
-    flex: 1,
-    backgroundColor: colors.primary[600],
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    color: colors.text.inverse,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  datePickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  datePicker: {
-    alignSelf: 'center',
-    marginVertical: spacing.lg,
-  },
   studentsSection: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
+    flex: 1,
   },
   studentsHeader: {
     flexDirection: 'row',
@@ -957,13 +810,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.md,
   },
-  studentsCount: {
+  studentsSubtitle: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
-    fontWeight: typography.fontWeight.medium,
+    marginTop: spacing.xs,
+  },
+  changesBadge: {
+    backgroundColor: colors.warning[50],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.warning.main,
+  },
+  changesBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.warning[700],
+  },
+  flatListContent: {
+    paddingBottom: spacing.xl,
   },
   studentsList: {
-    gap: spacing.xs,
+    flex: 1,
   },
   studentCard: {
     backgroundColor: colors.surface.primary,
@@ -972,11 +841,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...shadows.sm,
     minHeight: 56,
     borderWidth: 2,
     borderColor: colors.border.light,
@@ -988,19 +853,19 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   studentCardPresent: {
-    borderColor: colors.success[500],
+    borderColor: colors.success.main,
     backgroundColor: colors.success[50],
     borderStyle: 'solid',
   },
   studentCardAbsent: {
-    borderColor: colors.error[500],
+    borderColor: colors.error.main,
     backgroundColor: colors.error[50],
     borderStyle: 'solid',
   },
   studentInfo: {
     flex: 1,
     marginRight: spacing.md,
-    minWidth: 0, // Allow text to truncate properly
+    minWidth: 0,
   },
   studentNameRow: {
     flexDirection: 'row',
@@ -1026,10 +891,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   statusBadgePresent: {
-    backgroundColor: colors.success[600],
+    backgroundColor: colors.success.main,
   },
   statusBadgeAbsent: {
-    backgroundColor: colors.error[600],
+    backgroundColor: colors.error.main,
   },
   statusBadgeUnmarked: {
     flexDirection: 'row',
@@ -1079,14 +944,14 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   statusButtonActivePresent: {
-    backgroundColor: colors.success[600],
-    borderColor: colors.success[600],
+    backgroundColor: colors.success.main,
+    borderColor: colors.success.main,
     borderStyle: 'solid',
     opacity: 1,
   },
   statusButtonActiveAbsent: {
-    backgroundColor: colors.error[600],
-    borderColor: colors.error[600],
+    backgroundColor: colors.error.main,
+    borderColor: colors.error.main,
     borderStyle: 'solid',
     opacity: 1,
   },
@@ -1101,25 +966,6 @@ const styles = StyleSheet.create({
   statusButtonTextActive: {
     color: colors.text.inverse,
   },
-  studentsSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-  },
-  changesBadge: {
-    backgroundColor: colors.warning[100],
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.warning[300],
-  },
-  changesBadgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.warning[700],
-  },
-  // Save Button Container
   saveButtonContainer: {
     position: 'absolute',
     bottom: 0,
@@ -1132,13 +978,12 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
     ...shadows.lg,
-    elevation: 8,
   },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.primary.main,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
     borderRadius: borderRadius.xl,
@@ -1154,7 +999,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     color: colors.text.inverse,
   },
-  // Bottom Sheet Styles
   bottomSheetBackground: {
     backgroundColor: colors.surface.primary,
     borderTopLeftRadius: borderRadius.xl,
@@ -1187,7 +1031,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border.DEFAULT,
   },
   bottomSheetItemSelected: {
-    backgroundColor: colors.primary[50],
+    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
     borderRadius: borderRadius.md,
     marginVertical: spacing.xs,
   },
@@ -1197,12 +1041,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   bottomSheetItemTextSelected: {
-    color: colors.primary[600],
+    color: colors.primary.main,
     fontWeight: typography.fontWeight.semibold,
   },
   bottomSheetItemCheck: {
     fontSize: typography.fontSize.lg,
-    color: colors.primary[600],
+    color: colors.primary.main,
     fontWeight: typography.fontWeight.bold,
   },
   emptyState: {
@@ -1214,119 +1058,56 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
   },
-  studentsHeaderContainer: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  studentsHeaderTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  studentsHeaderSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  bulkActionsContainer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  bulkButtonPresent: {
-    flex: 1,
-    backgroundColor: colors.primary[600],
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-  },
-  bulkButtonAbsent: {
-    flex: 1,
-    backgroundColor: colors.surface.primary,
-    borderWidth: 1,
-    borderColor: colors.error[600],
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-  },
-  bulkButtonReset: {
-    flex: 1,
-    backgroundColor: colors.surface.primary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-  },
   historyContainer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-  },
-  historyTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  historySubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginBottom: spacing.lg,
-  },
-  dateRangeSelector: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  dateRangeButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surface.primary,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  dateRangeButtonText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.medium,
   },
   historyStats: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.xs,
     marginBottom: spacing.lg,
   },
   statCard: {
     flex: 1,
     backgroundColor: colors.surface.primary,
-    padding: spacing.md,
-    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
+    minWidth: 0,
+    ...shadows.sm,
   },
   statNumber: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.primary[600],
-    marginBottom: spacing.xs,
+    color: colors.primary.main,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     color: colors.text.secondary,
     textAlign: 'center',
   },
+  dateRangeContainer: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  dateRangeText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    fontWeight: typography.fontWeight.medium,
+  },
   summaryContainer: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.sm,
+    borderRadius: borderRadius.md,
     padding: spacing.md,
+    flex: 1,
+    ...shadows.sm,
   },
   summaryTitle: {
     fontSize: typography.fontSize.lg,
@@ -1369,10 +1150,10 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   summaryStatusPresent: {
-    backgroundColor: colors.success[100],
+    backgroundColor: colors.success[50],
   },
   summaryStatusAbsent: {
-    backgroundColor: colors.error[100],
+    backgroundColor: colors.error[50],
   },
   summaryStatusUnmarked: {
     backgroundColor: colors.background.secondary,
@@ -1412,17 +1193,5 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
     marginTop: spacing.md,
-  },
-  dateRangeContainer: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.sm,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    alignItems: 'center',
-  },
-  dateRangeText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.medium,
   },
 });

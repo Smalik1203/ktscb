@@ -8,6 +8,7 @@ import type {
   Attendance,
   AttendanceInsert,
   FeeStudentPlan,
+  FeeStudentPlanItem,
   FeePayment,
   FeePaymentInsert,
   FeeComponentType,
@@ -21,13 +22,57 @@ import type {
   AcademicYear,
   Subject,
 } from '../types/database.types';
+import {
+  normalizeUser,
+  normalizeStudent,
+  normalizeStudents,
+  normalizeAdmin,
+  normalizeClassInstance,
+  normalizeClassInstances,
+  normalizeSubject,
+  normalizeSubjects,
+  normalizeTimetableSlot,
+  normalizeTimetableSlots,
+  normalizeAttendance,
+  normalizeAttendances,
+  normalizeTask,
+  normalizeTasks,
+  normalizeTest,
+  normalizeTestQuestion,
+  normalizeFeePayment,
+  normalizeFeePayments,
+  normalizeFeeStudentPlanWithItems,
+  normalizeAcademicYear,
+  normalizeCalendarEvent,
+  normalizeLearningResource,
+  normalizeLearningResources,
+  type DomainUser,
+  type DomainStudent,
+  type DomainAdmin,
+  type DomainClassInstance,
+  type DomainSubject,
+  type DomainTimetableSlot,
+  type DomainAttendance,
+  type DomainTask,
+  type DomainTest,
+  type DomainTestQuestion,
+  type DomainFeePayment,
+  type DomainFeeStudentPlan,
+  type DomainFeeStudentPlanItem,
+  type DomainAcademicYear,
+  type DomainCalendarEvent,
+  type DomainLearningResource,
+  type DomainFeeComponentType,
+} from '../lib/normalize';
+import { FeeComponentTypeSchema, safeParse } from '../lib/domain-schemas';
 
 export interface QueryResult<T> {
   data: T | null;
   error: ReturnType<typeof mapError> | null;
+  warnings?: string[];
 }
 
-type StudentLite = Pick<Student,
+type StudentLite = Pick<DomainStudent,
   'id' | 'student_code' | 'full_name' | 'email' | 'phone' | 'class_instance_id' | 'school_code' | 'created_at'
 >;
 
@@ -54,10 +99,10 @@ export async function getCurrentUserContext(options?: { signal?: AbortSignal }):
       .from(DB.tables.users)
       .select('id, role, school_code, class_instance_id')
       .eq('id', user.id)
-      .abortSignal(options?.signal as any)
       .maybeSingle();
     
-    if (error && (error as any).code !== 'PGRST116') {
+    if (error) {
+      // PGRST116 is "not found" - treat as error for user context
       return {
         data: null,
         error: mapError(error, { queryName: 'getCurrentUserContext', table: 'users' }),
@@ -87,23 +132,31 @@ export async function getCurrentUserContext(options?: { signal?: AbortSignal }):
   }
 }
 
-export async function getUserProfile(userId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<User>> {
+export async function getUserProfile(userId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<DomainUser>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.users)
       .select('*')
       .eq('id', userId)
-      .abortSignal(options?.signal as any)
       .maybeSingle();
     
-    if (error && (error as any).code !== 'PGRST116') {
+    if (error) {
       return {
         data: null,
         error: mapError(error, { queryName: 'getUserProfile', table: 'users' }),
       };
     }
     
-    return { data, error: null };
+    const normalized = normalizeUser(data);
+    if (normalized.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalized.error), { queryName: 'getUserProfile' }),
+        warnings: normalized.warnings,
+      };
+    }
+    
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getUserProfile' });
     return { data: null, error: mappedError };
@@ -112,39 +165,46 @@ export async function getUserProfile(userId: string, options?: { signal?: AbortS
 
 // ==================== ACADEMIC YEARS ====================
 
-export async function getActiveAcademicYear(schoolCode: string, options?: { signal?: AbortSignal }): Promise<QueryResult<AcademicYear>> {
+export async function getActiveAcademicYear(schoolCode: string, options?: { signal?: AbortSignal }): Promise<QueryResult<DomainAcademicYear>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.academicYears)
       .select('*')
       .eq(DB.columns.schoolCode, schoolCode)
       .eq('is_active', true)
-      .abortSignal(options?.signal as any)
       .maybeSingle();
     
-    if (error && (error as any).code !== 'PGRST116') {
+    if (error) {
       return {
         data: null,
         error: mapError(error, { queryName: 'getActiveAcademicYear', table: 'academic_years' }),
       };
     }
     
-    return { data, error: null };
+    const normalized = normalizeAcademicYear(data);
+    if (normalized.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalized.error), { queryName: 'getActiveAcademicYear' }),
+        warnings: normalized.warnings,
+      };
+    }
+    
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getActiveAcademicYear' });
     return { data: null, error: mappedError };
   }
 }
 
-export async function listAcademicYears(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<AcademicYear[]>> {
+export async function listAcademicYears(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<DomainAcademicYear[]>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.academicYears)
       .select('*')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('year_start', { ascending: false })
-      .range(options?.from ?? 0, options?.to ?? 99)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 99);
     
     if (error) {
       return {
@@ -153,7 +213,22 @@ export async function listAcademicYears(schoolCode: string, options?: { signal?:
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized: DomainAcademicYear[] = [];
+    const warnings: string[] = [];
+    
+    if (data) {
+      for (const item of data) {
+        const result = normalizeAcademicYear(item);
+        if (result.data) {
+          normalized.push(result.data);
+          warnings.push(...result.warnings);
+        } else if (result.error) {
+          warnings.push(`Skipped invalid academic year: ${result.error}`);
+        }
+      }
+    }
+    
+    return { data: normalized, error: null, warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listAcademicYears' });
     return { data: null, error: mappedError };
@@ -166,7 +241,7 @@ export async function listClasses(
   schoolCode: string,
   academicYearId?: string,
   options?: { signal?: AbortSignal; from?: number; to?: number }
-): Promise<QueryResult<ClassInstance[]>> {
+): Promise<QueryResult<DomainClassInstance[]>> {
   try {
     let query = supabase
       .from(DB.tables.classInstances)
@@ -180,8 +255,7 @@ export async function listClasses(
     }
     
     const { data, error } = await query
-      .range(options?.from ?? 0, options?.to ?? 199)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 199);
     
     if (error) {
       return {
@@ -190,30 +264,39 @@ export async function listClasses(
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized = normalizeClassInstances(data);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listClasses' });
     return { data: null, error: mappedError };
   }
 }
 
-export async function getClassDetails(classInstanceId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<ClassInstance>> {
+export async function getClassDetails(classInstanceId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<DomainClassInstance>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.classInstances)
       .select('*')
       .eq('id', classInstanceId)
-      .abortSignal(options?.signal as any)
       .maybeSingle();
     
-    if (error && (error as any).code !== 'PGRST116') {
+    if (error) {
       return {
         data: null,
         error: mapError(error, { queryName: 'getClassDetails', table: 'class_instances' }),
       };
     }
     
-    return { data, error: null };
+    const normalized = normalizeClassInstance(data);
+    if (normalized.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalized.error), { queryName: 'getClassDetails' }),
+        warnings: normalized.warnings,
+      };
+    }
+    
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getClassDetails' });
     return { data: null, error: mappedError };
@@ -224,7 +307,7 @@ export async function getClassDetails(classInstanceId: string, options?: { signa
 
 export async function listAdmins(
   schoolCode: string
-): Promise<QueryResult<Admin[]>> {
+): Promise<QueryResult<DomainAdmin[]>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.admin)
@@ -236,7 +319,22 @@ export async function listAdmins(
       return { data: null, error: mapError(error, { queryName: 'listAdmins', table: 'admin' }) };
     }
 
-    return { data: data || [], error: null };
+    const normalized: DomainAdmin[] = [];
+    const warnings: string[] = [];
+    
+    if (data) {
+      for (const item of data) {
+        const result = normalizeAdmin(item);
+        if (result.data) {
+          normalized.push(result.data);
+          warnings.push(...result.warnings);
+        } else if (result.error) {
+          warnings.push(`Skipped invalid admin: ${result.error}`);
+        }
+      }
+    }
+
+    return { data: normalized, error: null, warnings };
   } catch (error) {
     return { data: null, error: mapError(error, { queryName: 'listAdmins', table: 'admin' }) };
   }
@@ -254,8 +352,7 @@ export async function listStudents(
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.schoolCode, schoolCode)
       .order('full_name', { ascending: true })
-      .range(options?.from ?? 0, options?.to ?? 499)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 499);
     
     if (error) {
       return {
@@ -264,30 +361,74 @@ export async function listStudents(
       };
     }
     
-    return { data: (data as unknown as StudentLite[]) || [], error: null };
+    // Normalize students and extract lite fields
+    // Note: We're only selecting a subset of fields, so we need to handle partial data
+    const normalized: StudentLite[] = [];
+    const warnings: string[] = [];
+    
+    if (data) {
+      for (const item of data) {
+        // Create a minimal student object with required fields for normalization
+        const fullStudent = {
+          ...item,
+          auth_user_id: null,
+          created_by: item.created_at ? 'system' : '',
+          parent_phone: null,
+          role: 'student' as const,
+          school_name: item.school_code || '',
+        };
+        
+        const result = normalizeStudent(fullStudent);
+        if (result.data) {
+          normalized.push({
+            id: result.data.id,
+            student_code: result.data.student_code,
+            full_name: result.data.full_name,
+            email: result.data.email,
+            phone: result.data.phone,
+            class_instance_id: result.data.class_instance_id,
+            school_code: result.data.school_code,
+            created_at: result.data.created_at,
+          });
+          warnings.push(...result.warnings);
+        } else if (result.error) {
+          warnings.push(`Skipped invalid student: ${result.error}`);
+        }
+      }
+    }
+    
+    return { data: normalized, error: null, warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listStudents' });
     return { data: null, error: mappedError };
   }
 }
 
-export async function getStudentDetails(studentId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<Student>> {
+export async function getStudentDetails(studentId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<DomainStudent>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.student)
       .select('*')
       .eq('id', studentId)
-      .abortSignal(options?.signal as any)
       .maybeSingle();
     
-    if (error && (error as any).code !== 'PGRST116') {
+    if (error) {
       return {
         data: null,
         error: mapError(error, { queryName: 'getStudentDetails', table: 'student' }),
       };
     }
     
-    return { data, error: null };
+    const normalized = normalizeStudent(data);
+    if (normalized.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalized.error), { queryName: 'getStudentDetails' }),
+        warnings: normalized.warnings,
+      };
+    }
+    
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getStudentDetails' });
     return { data: null, error: mappedError };
@@ -301,7 +442,7 @@ export async function getAttendanceForDate(
   date: string,
   schoolCode: string,
   options?: { signal?: AbortSignal; from?: number; to?: number }
-): Promise<QueryResult<Attendance[]>> {
+): Promise<QueryResult<DomainAttendance[]>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.attendance)
@@ -309,8 +450,7 @@ export async function getAttendanceForDate(
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq('date', date)
       .eq(DB.columns.schoolCode, schoolCode)
-      .range(options?.from ?? 0, options?.to ?? 499)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 499);
     
     if (error) {
       return {
@@ -319,7 +459,8 @@ export async function getAttendanceForDate(
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized = normalizeAttendances(data);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getAttendanceForDate' });
     return { data: null, error: mappedError };
@@ -331,7 +472,7 @@ export async function getAttendanceOverview(
   dateRange: [string, string],
   schoolCode: string,
   options?: { signal?: AbortSignal; from?: number; to?: number }
-): Promise<QueryResult<Attendance[]>> {
+): Promise<QueryResult<DomainAttendance[]>> {
   try {
     const [startDate, endDate] = dateRange;
     const { data, error } = await supabase
@@ -342,8 +483,7 @@ export async function getAttendanceOverview(
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: false })
-      .range(options?.from ?? 0, options?.to ?? 999)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 999);
     
     if (error) {
       return {
@@ -352,7 +492,8 @@ export async function getAttendanceOverview(
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized = normalizeAttendances(data);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getAttendanceOverview' });
     return { data: null, error: mappedError };
@@ -368,18 +509,27 @@ export async function saveAttendance(
     }
     
     // Delete existing attendance for this class and date
-    const { class_instance_id, date, school_code } = records[0];
+    const firstRecord = records[0];
+    if (!firstRecord.class_instance_id || !firstRecord.school_code) {
+      throw new Error('class_instance_id and school_code are required');
+    }
+    const class_instance_id = firstRecord.class_instance_id;
+    const school_code = firstRecord.school_code;
+    const date = firstRecord.date;
+    if (!date) {
+      throw new Error('date is required');
+    }
     await supabase
       .from(DB.tables.attendance)
       .delete()
-      .eq(DB.columns.classInstanceId, class_instance_id!)
+      .eq(DB.columns.classInstanceId, class_instance_id)
       .eq('date', date)
-      .eq(DB.columns.schoolCode, school_code!);
+      .eq(DB.columns.schoolCode, school_code);
     
     // Insert new records
     const { data, error } = await supabase
       .from(DB.tables.attendance)
-      .insert(records as any)
+      .insert(records)
       .select();
     
     if (error) {
@@ -401,7 +551,7 @@ export async function checkHoliday(
   date: string,
   classInstanceId?: string,
   options?: { signal?: AbortSignal }
-): Promise<QueryResult<CalendarEvent | null>> {
+): Promise<QueryResult<DomainCalendarEvent | null>> {
   try {
     let query = supabase
       .from(DB.tables.schoolCalendarEvents)
@@ -416,16 +566,29 @@ export async function checkHoliday(
       query = query.is('class_instance_id', null);
     }
     
-    const { data, error } = await query.abortSignal(options?.signal as any).maybeSingle();
+    const { data, error } = await query.maybeSingle();
     
-    if (error && (error as any).code !== 'PGRST116') {
+    if (error) {
       return {
         data: null,
         error: mapError(error, { queryName: 'checkHoliday', table: 'school_calendar_events' }),
       };
     }
     
-    return { data, error: null };
+    if (!data) {
+      return { data: null, error: null };
+    }
+    
+    const normalized = normalizeCalendarEvent(data);
+    if (normalized.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalized.error), { queryName: 'checkHoliday' }),
+        warnings: normalized.warnings,
+      };
+    }
+    
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'checkHoliday' });
     return { data: null, error: mappedError };
@@ -439,8 +602,8 @@ export async function getStudentFees(
   academicYearId: string,
   schoolCode: string
 ): Promise<QueryResult<{
-  plan: FeeStudentPlan | null;
-  payments: FeePayment[];
+  plan: (DomainFeeStudentPlan & { items: DomainFeeStudentPlanItem[] }) | null;
+  payments: DomainFeePayment[];
   totalDue: number;
   totalPaid: number;
   balance: number;
@@ -480,29 +643,49 @@ export async function getStudentFees(
       };
     }
     
+    // Normalize plan with items
+    const normalizedPlan = planData ? normalizeFeeStudentPlanWithItems(planData as FeeStudentPlan & { items?: FeeStudentPlanItem[] }) : null;
+    
+    // Normalize payments
+    const normalizedPayments = normalizeFeePayments(paymentsData);
+    
+    if (normalizedPayments.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalizedPayments.error), { queryName: 'getStudentFees' }),
+        warnings: normalizedPayments.warnings,
+      };
+    }
+    
     // Calculate totals
     let totalDue = 0;
-    if (planData && !planError && (planData as any)?.items) {
-      totalDue = (planData as any).items.reduce((sum: number, item: any) => {
+    if (normalizedPlan?.data?.items) {
+      totalDue = normalizedPlan.data.items.reduce((sum, item) => {
         return sum + (item.amount_inr * item.quantity);
       }, 0);
     }
     
-    const totalPaid = (paymentsData || []).reduce((sum: number, payment: any) => {
+    const totalPaid = (normalizedPayments.data || []).reduce((sum, payment) => {
       return sum + payment.amount_inr;
     }, 0);
     
     const balance = totalDue - totalPaid;
     
+    const warnings = [
+      ...(normalizedPlan?.warnings || []),
+      ...normalizedPayments.warnings,
+    ];
+    
     return {
       data: {
-        plan: planData as any,
-        payments: paymentsData as any[] || [],
+        plan: normalizedPlan?.data || null,
+        payments: normalizedPayments.data || [],
         totalDue,
         totalPaid,
         balance,
       },
       error: null,
+      warnings,
     };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getStudentFees' });
@@ -514,7 +697,19 @@ export async function getClassStudentsFees(
   classInstanceId: string,
   academicYearId: string,
   schoolCode: string
-): Promise<QueryResult<any[]>> {
+): Promise<QueryResult<Array<{
+  id: string;
+  student_code: string;
+  full_name: string;
+  class_instance_id: string;
+  feeDetails: {
+    plan: (DomainFeeStudentPlan & { items: DomainFeeStudentPlanItem[] }) | null;
+    payments: DomainFeePayment[];
+    totalDue: number;
+    totalPaid: number;
+    balance: number;
+  };
+}>>> {
   try {
     // Get all students in this class
     const { data: students, error: studentsError } = await supabase
@@ -535,7 +730,7 @@ export async function getClassStudentsFees(
       return { data: [], error: null };
     }
     
-    const studentIds = students.map((s: any) => s.id);
+    const studentIds = students.map((s) => s.id);
     
     // Get all fee plans for these students
     const { data: plans } = await supabase
@@ -556,52 +751,94 @@ export async function getClassStudentsFees(
       .in('student_id', studentIds)
       .eq(DB.columns.schoolCode, schoolCode);
     
+    // Normalize payments
+    const normalizedPayments = normalizeFeePayments(payments);
+    if (normalizedPayments.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalizedPayments.error), { queryName: 'getClassStudentsFees' }),
+        warnings: normalizedPayments.warnings,
+      };
+    }
+    const allPayments = normalizedPayments.data || [];
+    
     // Combine student data with fee information
-    const studentsWithFees = (students as any[]).map((student: any) => {
-      const studentPlan = plans?.find((p: any) => p.student_id === student.id);
-      const studentPayments = payments?.filter((p: any) => p.student_id === student.id) || [];
+    const studentsWithFees: Array<{
+      id: string;
+      student_code: string;
+      full_name: string;
+      class_instance_id: string;
+      feeDetails: {
+        plan: (DomainFeeStudentPlan & { items: DomainFeeStudentPlanItem[] }) | null;
+        payments: DomainFeePayment[];
+        totalDue: number;
+        totalPaid: number;
+        balance: number;
+      };
+    }> = [];
+    const warnings: string[] = [...normalizedPayments.warnings];
+    
+    for (const student of students) {
+      if (!student.id || !student.student_code || !student.full_name) {
+        warnings.push(`Skipped invalid student record`);
+        continue;
+      }
+      
+      const studentPlan = plans?.find((p) => p.student_id === student.id);
+      const studentPayments = allPayments.filter((p) => p.student_id === student.id);
+      
+      let normalizedPlan: (DomainFeeStudentPlan & { items: DomainFeeStudentPlanItem[] }) | null = null;
+      if (studentPlan) {
+        const planResult = normalizeFeeStudentPlanWithItems(studentPlan as FeeStudentPlan & { items?: FeeStudentPlanItem[] });
+        if (planResult.data) {
+          normalizedPlan = planResult.data;
+          warnings.push(...planResult.warnings);
+        }
+      }
       
       let totalDue = 0;
-      if (studentPlan && (studentPlan as any)?.items) {
-        totalDue = (studentPlan as any).items.reduce((sum: number, item: any) => {
+      if (normalizedPlan?.items) {
+        totalDue = normalizedPlan.items.reduce((sum, item) => {
           return sum + (item.amount_inr * item.quantity);
         }, 0);
       }
       
-      const totalPaid = studentPayments.reduce((sum: number, payment: any) => {
+      const totalPaid = studentPayments.reduce((sum, payment) => {
         return sum + payment.amount_inr;
       }, 0);
       
       const balance = totalDue - totalPaid;
       
-      return {
-        ...student,
+      studentsWithFees.push({
+        id: student.id,
+        student_code: student.student_code,
+        full_name: student.full_name,
+        class_instance_id: student.class_instance_id || '',
         feeDetails: {
-          plan: studentPlan || null,
+          plan: normalizedPlan,
           payments: studentPayments,
           totalDue,
           totalPaid,
           balance,
         }
-      };
-    });
+      });
+    }
     
-    return { data: studentsWithFees, error: null };
+    return { data: studentsWithFees, error: null, warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getClassStudentsFees' });
     return { data: null, error: mappedError };
   }
 }
 
-export async function getFeeComponentTypes(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<FeeComponentType[]>> {
+export async function getFeeComponentTypes(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<DomainFeeComponentType[]>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.feeComponentTypes)
       .select('*')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('name', { ascending: true })
-      .range(options?.from ?? 0, options?.to ?? 99)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 99);
     
     if (error) {
       return {
@@ -610,18 +847,32 @@ export async function getFeeComponentTypes(schoolCode: string, options?: { signa
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized: DomainFeeComponentType[] = [];
+    const warnings: string[] = [];
+    
+    if (data) {
+      for (const item of data) {
+        const result = safeParse(FeeComponentTypeSchema, item, 'normalizeFeeComponentType');
+        if (result.success) {
+          normalized.push(result.data);
+        } else {
+          warnings.push(`Skipped invalid fee component type: ${result.error.message}`);
+        }
+      }
+    }
+    
+    return { data: normalized, error: null, warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getFeeComponentTypes' });
     return { data: null, error: mappedError };
   }
 }
 
-export async function recordPayment(payment: FeePaymentInsert): Promise<QueryResult<FeePayment>> {
+export async function recordPayment(payment: FeePaymentInsert): Promise<QueryResult<DomainFeePayment>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.feePayments)
-      .insert(payment as any)
+      .insert(payment)
       .select()
       .maybeSingle();
     
@@ -632,7 +883,16 @@ export async function recordPayment(payment: FeePaymentInsert): Promise<QueryRes
       };
     }
     
-    return { data, error: null };
+    const normalized = normalizeFeePayment(data);
+    if (normalized.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalized.error), { queryName: 'recordPayment' }),
+        warnings: normalized.warnings,
+      };
+    }
+    
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'recordPayment' });
     return { data: null, error: mappedError };
@@ -646,7 +906,7 @@ export async function listResources(
   schoolCode: string,
   subjectId?: string,
   options?: { signal?: AbortSignal; from?: number; to?: number }
-): Promise<QueryResult<LearningResource[]>> {
+): Promise<QueryResult<DomainLearningResource[]>> {
   try {
     let query = supabase
       .from(DB.tables.learningResources)
@@ -654,8 +914,7 @@ export async function listResources(
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.schoolCode, schoolCode)
       .order('created_at', { ascending: false })
-      .range(options?.from ?? 0, options?.to ?? 99)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 99);
     
     if (subjectId) {
       query = query.eq('subject_id', subjectId);
@@ -670,7 +929,8 @@ export async function listResources(
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized = normalizeLearningResources(data);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listResources' });
     return { data: null, error: mappedError };
@@ -682,7 +942,7 @@ export async function listQuizzes(
   schoolCode: string,
   subjectId?: string,
   options?: { signal?: AbortSignal; from?: number; to?: number }
-): Promise<QueryResult<Test[]>> {
+): Promise<QueryResult<DomainTest[]>> {
   try {
     let query = supabase
       .from(DB.tables.tests)
@@ -690,8 +950,7 @@ export async function listQuizzes(
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.schoolCode, schoolCode)
       .order('created_at', { ascending: false })
-      .range(options?.from ?? 0, options?.to ?? 49)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 49);
     
     if (subjectId) {
       query = query.eq('subject_id', subjectId);
@@ -706,7 +965,22 @@ export async function listQuizzes(
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized: DomainTest[] = [];
+    const warnings: string[] = [];
+    
+    if (data) {
+      for (const item of data) {
+        const result = normalizeTest(item);
+        if (result.data) {
+          normalized.push(result.data);
+          warnings.push(...result.warnings);
+        } else if (result.error) {
+          warnings.push(`Skipped invalid test: ${result.error}`);
+        }
+      }
+    }
+    
+    return { data: normalized, error: null, warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listQuizzes' });
     return { data: null, error: mappedError };
@@ -714,21 +988,27 @@ export async function listQuizzes(
 }
 
 export async function getQuizDetails(testId: string, options?: { signal?: AbortSignal }): Promise<QueryResult<{
-  test: Test;
-  questions: TestQuestion[];
+  test: DomainTest;
+  questions: DomainTestQuestion[];
 }>> {
   try {
     const { data: test, error: testError } = await supabase
       .from(DB.tables.tests)
       .select('*')
       .eq('id', testId)
-      .abortSignal(options?.signal as any)
       .maybeSingle();
     
-    if (testError && (testError as any).code !== 'PGRST116') {
+    if (testError) {
       return {
         data: null,
         error: mapError(testError, { queryName: 'getQuizDetails', table: 'tests' }),
+      };
+    }
+    
+    if (!test) {
+      return {
+        data: null,
+        error: mapError(new Error('Test not found'), { queryName: 'getQuizDetails', table: 'tests' }),
       };
     }
     
@@ -745,12 +1025,37 @@ export async function getQuizDetails(testId: string, options?: { signal?: AbortS
       };
     }
     
+    const normalizedTest = normalizeTest(test);
+    if (normalizedTest.error) {
+      return {
+        data: null,
+        error: mapError(new Error(normalizedTest.error), { queryName: 'getQuizDetails' }),
+        warnings: normalizedTest.warnings,
+      };
+    }
+    
+    const normalizedQuestions: DomainTestQuestion[] = [];
+    const warnings: string[] = [...normalizedTest.warnings];
+    
+    if (questions) {
+      for (const question of questions) {
+        const result = normalizeTestQuestion(question);
+        if (result.data) {
+          normalizedQuestions.push(result.data);
+          warnings.push(...result.warnings);
+        } else if (result.error) {
+          warnings.push(`Skipped invalid question: ${result.error}`);
+        }
+      }
+    }
+    
     return {
       data: {
-        test,
-        questions: questions || [],
+        test: normalizedTest.data!,
+        questions: normalizedQuestions,
       },
       error: null,
+      warnings,
     };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getQuizDetails' });
@@ -765,7 +1070,7 @@ export async function getTimetable(
   date: string,
   schoolCode: string,
   options?: { signal?: AbortSignal; from?: number; to?: number }
-): Promise<QueryResult<TimetableSlot[]>> {
+): Promise<QueryResult<DomainTimetableSlot[]>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.timetableSlots)
@@ -779,8 +1084,7 @@ export async function getTimetable(
       .eq(DB.columns.schoolCode, schoolCode)
       .order('period_number', { ascending: true })
       .order('start_time', { ascending: true })
-      .range(options?.from ?? 0, options?.to ?? 49)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 49);
     
     if (error) {
       return {
@@ -789,7 +1093,14 @@ export async function getTimetable(
       };
     }
     
-    return { data: data as any[] || [], error: null };
+    // Extract base timetable slot data (without joins) for normalization
+    const slots: TimetableSlot[] = (data || []).map((slot: TimetableSlot & { subject?: { id: string; subject_name: string } | null; teacher?: { id: string; full_name: string } | null }) => {
+      const { subject, teacher, ...baseSlot } = slot;
+      return baseSlot as TimetableSlot;
+    });
+    
+    const normalized = normalizeTimetableSlots(slots);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getTimetable' });
     return { data: null, error: mappedError };
@@ -801,7 +1112,7 @@ export async function getTimetableWeek(
   startDate: string,
   schoolCode: string,
   options?: { signal?: AbortSignal; from?: number; to?: number }
-): Promise<QueryResult<TimetableSlot[]>> {
+): Promise<QueryResult<DomainTimetableSlot[]>> {
   try {
     // Calculate end date (7 days from start)
     const start = new Date(startDate);
@@ -822,8 +1133,7 @@ export async function getTimetableWeek(
       .lte('class_date', endDate)
       .order('class_date', { ascending: true })
       .order('period_number', { ascending: true })
-      .range(options?.from ?? 0, options?.to ?? 299)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 299);
     
     if (error) {
       return {
@@ -832,7 +1142,14 @@ export async function getTimetableWeek(
       };
     }
     
-    return { data: data as any[] || [], error: null };
+    // Extract base timetable slot data (without joins) for normalization
+    const slots: TimetableSlot[] = (data || []).map((slot: TimetableSlot & { subject?: { id: string; subject_name: string } | null; teacher?: { id: string; full_name: string } | null }) => {
+      const { subject, teacher, ...baseSlot } = slot;
+      return baseSlot as TimetableSlot;
+    });
+    
+    const normalized = normalizeTimetableSlots(slots);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'getTimetableWeek' });
     return { data: null, error: mappedError };
@@ -846,7 +1163,7 @@ export async function listCalendarEvents(
   month: string,
   classInstanceId?: string,
   options?: { signal?: AbortSignal; from?: number; to?: number }
-): Promise<QueryResult<CalendarEvent[]>> {
+): Promise<QueryResult<DomainCalendarEvent[]>> {
   try {
     const [year, monthNum] = month.split('-');
     const startDate = `${year}-${monthNum}-01`;
@@ -860,8 +1177,7 @@ export async function listCalendarEvents(
       .eq('is_active', true)
       .gte('start_date', startDate)
       .lte('start_date', endDate)
-      .range(options?.from ?? 0, options?.to ?? 199)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 199);
     
     if (classInstanceId) {
       query = query.or(`class_instance_id.is.null,class_instance_id.eq.${classInstanceId}`);
@@ -878,7 +1194,22 @@ export async function listCalendarEvents(
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized: DomainCalendarEvent[] = [];
+    const warnings: string[] = [];
+    
+    if (data) {
+      for (const item of data) {
+        const result = normalizeCalendarEvent(item);
+        if (result.data) {
+          normalized.push(result.data);
+          warnings.push(...result.warnings);
+        } else if (result.error) {
+          warnings.push(`Skipped invalid calendar event: ${result.error}`);
+        }
+      }
+    }
+    
+    return { data: normalized, error: null, warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listCalendarEvents' });
     return { data: null, error: mappedError };
@@ -891,7 +1222,7 @@ export async function listTasks(
   classInstanceId: string,
   academicYearId: string,
   schoolCode: string
-): Promise<QueryResult<Task[]>> {
+): Promise<QueryResult<DomainTask[]>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.tasks)
@@ -910,7 +1241,8 @@ export async function listTasks(
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized = normalizeTasks(data);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listTasks' });
     return { data: null, error: mappedError };
@@ -919,15 +1251,14 @@ export async function listTasks(
 
 // ==================== SUBJECTS ====================
 
-export async function listSubjects(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<Subject[]>> {
+export async function listSubjects(schoolCode: string, options?: { signal?: AbortSignal; from?: number; to?: number }): Promise<QueryResult<DomainSubject[]>> {
   try {
     const { data, error } = await supabase
       .from(DB.tables.subjects)
       .select('*')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('subject_name', { ascending: true })
-      .range(options?.from ?? 0, options?.to ?? 199)
-      .abortSignal(options?.signal as any);
+      .range(options?.from ?? 0, options?.to ?? 199);
     
     if (error) {
       return {
@@ -936,7 +1267,8 @@ export async function listSubjects(schoolCode: string, options?: { signal?: Abor
       };
     }
     
-    return { data: data || [], error: null };
+    const normalized = normalizeSubjects(data);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
   } catch (err) {
     const mappedError = mapError(err, { queryName: 'listSubjects' });
     return { data: null, error: mappedError };

@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, Text, StyleSheet, Alert } from 'react-native';
 import { Card, Menu, IconButton } from 'react-native-paper';
 import { 
@@ -14,7 +16,7 @@ import {
 } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { Task } from '../../hooks/useTasks';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 
 interface StudentTaskCardProps {
   task: Task & { submission?: any; subjects?: any; class_instances?: any };
@@ -25,14 +27,16 @@ interface StudentTaskCardProps {
   isSubmitted?: boolean;
 }
 
-export function StudentTaskCard({ 
-  task, 
-  onViewDetail, 
-  onViewAttachments, 
+export function StudentTaskCard({
+  task,
+  onViewDetail,
+  onViewAttachments,
   onSubmit,
   onUnsubmit,
   isSubmitted = false
 }: StudentTaskCardProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   const [menuVisible, setMenuVisible] = useState(false);
 
   const isCompleted = task.submission?.status === 'submitted' || task.submission?.status === 'graded';
@@ -211,7 +215,8 @@ export function StudentTaskCard({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   card: {
     marginBottom: spacing.md,
     backgroundColor: colors.surface.primary,

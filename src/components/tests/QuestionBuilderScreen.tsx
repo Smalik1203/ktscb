@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import {
   View,
   Text,
@@ -8,18 +10,24 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Trash2, ArrowLeft, Save, Image as ImageIcon } from 'lucide-react-native';
+import { Plus, Trash2, ArrowLeft, Save, Image as ImageIcon, Edit2, CheckCircle2, X } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestQuestions, useCreateQuestion, useUpdateQuestion, useDeleteQuestion } from '../../hooks/tests';
 import { TestQuestion, QuestionType } from '../../types/test.types';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { ParsedQuestion } from '../../utils/questionParsers';
 
 export function QuestionBuilderScreen() {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const router = useRouter();
   const params = useLocalSearchParams();
   const testId = params.testId as string;
@@ -34,21 +42,35 @@ export function QuestionBuilderScreen() {
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [questionText, setQuestionText] = useState('');
   const [questionType, setQuestionType] = useState<QuestionType>('mcq');
-  const [options, setOptions] = useState(['', '', '', '']);
+  const [options, setOptions] = useState(['', '']);
   const [correctIndex, setCorrectIndex] = useState(0);
   const [correctText, setCorrectText] = useState('');
   const [points, setPoints] = useState('10');
   const [importingAI, setImportingAI] = useState(false);
-  
+  const [showQuestionModal, setShowQuestionModal] = useState(false);
 
   const resetForm = () => {
     setEditingQuestionId(null);
     setQuestionText('');
     setQuestionType('mcq');
-    setOptions(['', '', '', '']);
+    setOptions(['', '']);
     setCorrectIndex(0);
     setCorrectText('');
     setPoints('10');
+    setShowQuestionModal(false);
+  };
+
+  const addOption = () => {
+    setOptions([...options, '']);
+  };
+
+  const removeOption = (index: number) => {
+    if (options.length <= 2) return; // Keep at least 2 options
+    const newOptions = options.filter((_, i) => i !== index);
+    setOptions(newOptions);
+    if (correctIndex >= newOptions.length) {
+      setCorrectIndex(newOptions.length - 1);
+    }
   };
 
   // Handle AI-generated questions import
@@ -63,8 +85,6 @@ export function QuestionBuilderScreen() {
       setImportingAI(true);
       const aiQuestions = JSON.parse(aiGeneratedQuestionsParam!);
 
-      console.log('[QuestionBuilder] Importing', aiQuestions.length, 'AI-generated questions');
-
       for (let i = 0; i < aiQuestions.length; i++) {
         const aiQ = aiQuestions[i];
 
@@ -74,7 +94,7 @@ export function QuestionBuilderScreen() {
           question_type: 'mcq',
           options: aiQ.options,
           correct_index: aiQ.correct_index,
-          correct_answer: null,
+          correct_answer: undefined,
           points: 1,
           order_index: i,
         });
@@ -97,7 +117,6 @@ export function QuestionBuilderScreen() {
     });
 
     if (!result.canceled) {
-      // TODO: Upload image and get URL
       Alert.alert('Image Selected', 'Image upload functionality to be implemented');
     }
   };
@@ -108,7 +127,6 @@ export function QuestionBuilderScreen() {
     });
 
     if (!result.canceled) {
-      // TODO: Upload document and get URL
       Alert.alert('Document Selected', 'Document upload functionality to be implemented');
     }
   };
@@ -154,10 +172,10 @@ export function QuestionBuilderScreen() {
       question_type: questionType,
       points: parseInt(points),
       order_index: editingQuestionId ? 0 : questions.length,
-      options: questionType === 'mcq' ? options.filter((opt) => opt.trim()) : null,
-      correct_index: questionType === 'mcq' ? correctIndex : null,
-      correct_text: questionType === 'one_word' ? correctText.trim() : null,
-      correct_answer: null,
+      options: questionType === 'mcq' ? options.filter((opt) => opt.trim()) : undefined,
+      correct_index: questionType === 'mcq' ? correctIndex : undefined,
+      correct_text: questionType === 'one_word' ? correctText.trim() : undefined,
+      correct_answer: undefined,
     };
 
     try {
@@ -174,6 +192,16 @@ export function QuestionBuilderScreen() {
     }
   };
 
+  const handleAddQuestion = () => {
+    resetForm();
+    setShowQuestionModal(true);
+  };
+
+  const handleEditQuestionClick = (question: TestQuestion) => {
+    handleEditQuestion(question);
+    setShowQuestionModal(true);
+  };
+
   const handleEditQuestion = (question: TestQuestion) => {
     setEditingQuestionId(question.id);
     setQuestionText(question.question_text);
@@ -181,7 +209,9 @@ export function QuestionBuilderScreen() {
     setPoints(String(question.points));
 
     if (question.question_type === 'mcq') {
-      setOptions(question.options || ['', '', '', '']);
+      const questionOptions = question.options || [];
+      // Ensure at least 2 options
+      setOptions(questionOptions.length >= 2 ? questionOptions : ['', '']);
       setCorrectIndex(question.correct_index || 0);
     } else if (question.question_type === 'one_word') {
       setCorrectText(question.correct_text || '');
@@ -212,8 +242,6 @@ export function QuestionBuilderScreen() {
     setOptions(newOptions);
   };
 
-  
-
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -233,184 +261,52 @@ export function QuestionBuilderScreen() {
           <ArrowLeft size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Questions</Text>
-          <Text style={styles.headerSubtitle}>{testTitle}</Text>
+          <Text style={styles.headerTitle}>{testTitle}</Text>
+          <Text style={styles.headerSubtitle}>{questions.length} Questions</Text>
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        
-
-        {/* Question Form */}
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>
-            {editingQuestionId ? 'Edit Question' : 'Add New Question'}
-          </Text>
-
-          {/* Question Type Selector */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Question Type *</Text>
-            <View style={styles.typeSelector}>
-              {[
-                { value: 'mcq', label: 'Multiple Choice' },
-                { value: 'one_word', label: 'One Word' },
-                { value: 'long_answer', label: 'Long Answer' },
-              ].map((type) => (
-                <TouchableOpacity
-                  key={type.value}
-                  style={[
-                    styles.typeButton,
-                    questionType === type.value && styles.typeButtonActive,
-                  ]}
-                  onPress={() => setQuestionType(type.value as QuestionType)}
-                >
-                  <Text
-                    style={[
-                      styles.typeButtonText,
-                      questionType === type.value && styles.typeButtonTextActive,
-                    ]}
-                  >
-                    {type.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Question Text */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Question *</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Enter question text..."
-              value={questionText}
-              onChangeText={setQuestionText}
-              multiline
-              numberOfLines={3}
-              placeholderTextColor={colors.text.secondary}
-            />
-            <View style={styles.attachmentButtons}>
-              <TouchableOpacity style={styles.attachmentButton} onPress={handlePickImage}>
-                <ImageIcon size={16} color={colors.primary[600]} />
-                <Text style={styles.attachmentButtonText}>Add Image</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.attachmentButton} onPress={handlePickDocument}>
-                <ImageIcon size={16} color={colors.primary[600]} />
-                <Text style={styles.attachmentButtonText}>Add PDF</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* MCQ Options */}
-          {questionType === 'mcq' && (
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Options * (Select correct answer)</Text>
-              {options.map((option, index) => (
-                <View key={index} style={styles.optionRow}>
-                  <TouchableOpacity
-                    style={[
-                      styles.radioButton,
-                      correctIndex === index && styles.radioButtonActive,
-                    ]}
-                    onPress={() => setCorrectIndex(index)}
-                  >
-                    {correctIndex === index && <View style={styles.radioButtonInner} />}
-                  </TouchableOpacity>
-                  <TextInput
-                    style={[styles.input, styles.optionInput]}
-                    placeholder={`Option ${index + 1}`}
-                    value={option}
-                    onChangeText={(text) => updateOption(index, text)}
-                    placeholderTextColor={colors.text.secondary}
-                  />
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* One Word Answer */}
-          {questionType === 'one_word' && (
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Correct Answer *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter correct answer..."
-                value={correctText}
-                onChangeText={setCorrectText}
-                placeholderTextColor={colors.text.secondary}
-              />
-            </View>
-          )}
-
-          {/* Long Answer Info */}
-          {questionType === 'long_answer' && (
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
-                Long answer questions will be graded manually by the teacher.
-              </Text>
-            </View>
-          )}
-
-          {/* Points */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Points *</Text>
-            <TextInput
-              style={[styles.input, styles.pointsInput]}
-              placeholder="10"
-              value={points}
-              onChangeText={setPoints}
-              keyboardType="numeric"
-              placeholderTextColor={colors.text.secondary}
-            />
-          </View>
-
-          {/* Action Buttons */}
-          <View style={styles.formActions}>
-            {editingQuestionId && (
-              <TouchableOpacity style={styles.cancelButton} onPress={resetForm}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.saveButton, { flex: editingQuestionId ? 1 : undefined }]}
-              onPress={handleSaveQuestion}
-            >
-              <Save size={20} color={colors.text.inverse} />
-              <Text style={styles.saveButtonText}>
-                {editingQuestionId ? 'Update Question' : 'Add Question'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Add Question Button */}
+        <TouchableOpacity
+          style={styles.addQuestionButton}
+          onPress={handleAddQuestion}
+          activeOpacity={0.8}
+        >
+          <Plus size={20} color={colors.text.inverse} />
+          <Text style={styles.addQuestionButtonText}>Add Question</Text>
+        </TouchableOpacity>
 
         {/* Questions List */}
         <View style={styles.questionsSection}>
-          <View style={styles.questionsSectionHeader}>
-            <Text style={styles.sectionTitle}>
-              Questions ({questions.length})
-            </Text>
-          </View>
+          <Text style={styles.sectionTitle}>
+            All Questions ({questions.length})
+          </Text>
 
           {questions.length === 0 ? (
             <View style={styles.emptyState}>
-              <Plus size={48} color={colors.text.secondary} />
+              <View style={styles.emptyIcon}>
+                <Plus size={32} color={colors.text.tertiary} />
+              </View>
               <Text style={styles.emptyStateText}>
-                No questions added yet. Add your first question above.
+                No questions yet. Add your first question above.
               </Text>
             </View>
           ) : (
             questions.map((question, index) => (
               <View key={question.id} style={styles.questionCard}>
                 <View style={styles.questionHeader}>
-                  <Text style={styles.questionNumber}>Q{index + 1}</Text>
-                  <View style={styles.questionBadges}>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>
+                  <View style={styles.questionNumberBadge}>
+                    <Text style={styles.questionNumber}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.questionMeta}>
+                    <View style={[styles.typeBadge, { backgroundColor: getTypeColor(question.question_type).bg }]}>
+                      <Text style={[styles.typeBadgeText, { color: getTypeColor(question.question_type).text }]}>
                         {question.question_type.toUpperCase()}
                       </Text>
                     </View>
-                    <View style={[styles.badge, styles.badgePoints]}>
-                      <Text style={styles.badgeText}>{question.points} pts</Text>
+                    <View style={styles.pointsBadge}>
+                      <Text style={styles.pointsText}>{question.points} pts</Text>
                     </View>
                   </View>
                 </View>
@@ -420,19 +316,27 @@ export function QuestionBuilderScreen() {
                 {question.question_type === 'mcq' && question.options && (
                   <View style={styles.optionsList}>
                     {question.options.map((option, optIndex) => (
-                      <View key={optIndex} style={styles.optionItem}>
+                      <View
+                        key={optIndex}
+                        style={[
+                          styles.optionDisplay,
+                          optIndex === question.correct_index && styles.optionDisplayCorrect,
+                        ]}
+                      >
                         <View
                           style={[
-                            styles.optionBullet,
-                            optIndex === question.correct_index &&
-                              styles.optionBulletCorrect,
+                            styles.optionIndicator,
+                            optIndex === question.correct_index && styles.optionIndicatorCorrect,
                           ]}
-                        />
+                        >
+                          {optIndex === question.correct_index && (
+                            <CheckCircle2 size={16} color={colors.text.inverse} />
+                          )}
+                        </View>
                         <Text
                           style={[
-                            styles.optionText,
-                            optIndex === question.correct_index &&
-                              styles.optionTextCorrect,
+                            styles.optionDisplayText,
+                            optIndex === question.correct_index && styles.optionDisplayTextCorrect,
                           ]}
                         >
                           {option}
@@ -443,25 +347,26 @@ export function QuestionBuilderScreen() {
                 )}
 
                 {question.question_type === 'one_word' && (
-                  <View style={styles.answerBox}>
-                    <Text style={styles.answerLabel}>Answer:</Text>
-                    <Text style={styles.answerText}>{question.correct_text}</Text>
+                  <View style={styles.answerDisplay}>
+                    <Text style={styles.answerLabel}>Correct Answer:</Text>
+                    <Text style={styles.answerValue}>{question.correct_text}</Text>
                   </View>
                 )}
 
                 <View style={styles.questionActions}>
                   <TouchableOpacity
-                    style={styles.questionActionButton}
-                    onPress={() => handleEditQuestion(question as TestQuestion)}
+                    style={styles.actionButton}
+                    onPress={() => handleEditQuestionClick(question as TestQuestion)}
                   >
-                    <Text style={styles.questionActionText}>Edit</Text>
+                    <Edit2 size={16} color={colors.primary[600]} />
+                    <Text style={styles.actionButtonText}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.questionActionButton, styles.questionActionButtonDanger]}
+                    style={[styles.actionButton, styles.actionButtonDanger]}
                     onPress={() => handleDeleteQuestion(question.id)}
                   >
                     <Trash2 size={16} color={colors.error[600]} />
-                    <Text style={[styles.questionActionText, styles.questionActionTextDanger]}>
+                    <Text style={[styles.actionButtonText, styles.actionButtonTextDanger]}>
                       Delete
                     </Text>
                   </TouchableOpacity>
@@ -472,15 +377,207 @@ export function QuestionBuilderScreen() {
         </View>
       </ScrollView>
 
-      
+      {/* Question Form Modal */}
+      <Modal
+        visible={showQuestionModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={resetForm}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalOverlay} />
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingQuestionId ? 'Edit Question' : 'Add Question'}
+              </Text>
+              <TouchableOpacity onPress={resetForm} style={styles.modalCloseButton}>
+                <X size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScrollView} showsVerticalScrollIndicator={false}>
+              {/* Question Type Selector */}
+              <View style={styles.modalFormGroup}>
+                <Text style={styles.modalLabel}>Question Type</Text>
+                <View style={styles.typeSelector}>
+                  {[
+                    { value: 'mcq', label: 'MCQ' },
+                    { value: 'one_word', label: 'One Word' },
+                    { value: 'long_answer', label: 'Long Answer' },
+                  ].map((type) => (
+                    <TouchableOpacity
+                      key={type.value}
+                      style={[
+                        styles.typeButton,
+                        questionType === type.value && styles.typeButtonActive,
+                      ]}
+                      onPress={() => setQuestionType(type.value as QuestionType)}
+                    >
+                      <Text
+                        style={[
+                          styles.typeButtonText,
+                          questionType === type.value && styles.typeButtonTextActive,
+                        ]}
+                      >
+                        {type.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Question Text */}
+              <View style={styles.modalFormGroup}>
+                <Text style={styles.modalLabel}>Question</Text>
+                <TextInput
+                  style={styles.modalTextArea}
+                  placeholder="Enter question text..."
+                  value={questionText}
+                  onChangeText={setQuestionText}
+                  multiline
+                  numberOfLines={4}
+                  placeholderTextColor={colors.text.tertiary}
+                />
+              </View>
+
+              {/* MCQ Options */}
+              {questionType === 'mcq' && (
+                <View style={styles.modalFormGroup}>
+                  <Text style={styles.modalLabel}>Options (Select correct answer)</Text>
+                  {options.map((option, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.optionRow,
+                        correctIndex === index && styles.optionRowActive,
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={styles.optionRadio}
+                        onPress={() => setCorrectIndex(index)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[
+                          styles.radioButton,
+                          correctIndex === index && styles.radioButtonActive,
+                        ]}>
+                          {correctIndex === index && <View style={styles.radioButtonInner} />}
+                        </View>
+                      </TouchableOpacity>
+                      <TextInput
+                        style={styles.optionInput}
+                        placeholder="Type here..."
+                        value={option}
+                        onChangeText={(text) => updateOption(index, text)}
+                        placeholderTextColor={colors.text.tertiary}
+                      />
+                      {options.length > 2 && (
+                        <TouchableOpacity
+                          style={styles.removeOptionButton}
+                          onPress={() => removeOption(index)}
+                        >
+                          <Text style={styles.removeOptionText}>×</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    style={styles.addOptionButton}
+                    onPress={addOption}
+                    activeOpacity={0.7}
+                  >
+                    <Plus size={16} color={colors.primary[600]} />
+                    <Text style={styles.addOptionText}>Add Option</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* One Word Answer */}
+              {questionType === 'one_word' && (
+                <View style={styles.modalFormGroup}>
+                  <Text style={styles.modalLabel}>Correct Answer</Text>
+                  <TextInput
+                    style={styles.modalInput}
+                    placeholder="Enter correct answer..."
+                    value={correctText}
+                    onChangeText={setCorrectText}
+                    placeholderTextColor={colors.text.tertiary}
+                  />
+                </View>
+              )}
+
+              {/* Long Answer Info */}
+              {questionType === 'long_answer' && (
+                <View style={styles.infoBox}>
+                  <Text style={styles.infoText}>
+                    Long answer questions will be graded manually by the teacher.
+                  </Text>
+                </View>
+              )}
+
+              {/* Points */}
+              <View style={styles.modalFormGroup}>
+                <Text style={styles.modalLabel}>Points</Text>
+                <TextInput
+                  style={[styles.modalInput, styles.pointsInput]}
+                  placeholder="10"
+                  value={points}
+                  onChangeText={setPoints}
+                  keyboardType="numeric"
+                  placeholderTextColor={colors.text.tertiary}
+                />
+              </View>
+            </ScrollView>
+
+            {/* Modal Footer */}
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={resetForm}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={handleSaveQuestion}
+                activeOpacity={0.8}
+              >
+                <Save size={20} color={colors.text.inverse} />
+                <Text style={styles.modalSaveText}>
+                  {editingQuestionId ? 'Update' : 'Add'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getTypeColor = (type: string) => {
+  switch (type) {
+    case 'mcq':
+      return { bg: colors.primary[50], text: colors.primary[700] };
+    case 'one_word':
+      return { bg: colors.secondary[50], text: colors.secondary[700] };
+    case 'long_answer':
+      return { bg: colors.warning[50], text: colors.warning[700] };
+    default:
+      return { bg: colors.neutral[100], text: colors.neutral[700] };
+  }
+};
+
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.primary,
+    backgroundColor: colors.background.app,
   },
   loadingContainer: {
     flex: 1,
@@ -498,16 +595,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.surface.primary,
-    ...shadows.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   backButton: {
     marginRight: spacing.md,
+    padding: spacing.xs,
   },
   headerContent: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
   },
@@ -518,54 +617,137 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: spacing.lg,
+    padding: spacing.md,
   },
-  
-  formCard: {
+  addQuestionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary[600],
+    marginBottom: spacing.md,
+  },
+  addQuestionButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.inverse,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.surface.overlay,
+  },
+  modalContent: {
+    flex: 1,
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    ...shadows.sm,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    marginTop: '20%',
+    ...shadows.lg,
   },
-  formTitle: {
-    fontSize: typography.fontSize.lg,
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    marginBottom: spacing.md,
   },
-  formGroup: {
-    marginBottom: spacing.md,
+  modalCloseButton: {
+    padding: spacing.xs,
   },
-  label: {
-    fontSize: typography.fontSize.sm,
+  modalScrollView: {
+    flex: 1,
+    padding: spacing.lg,
+  },
+  modalFormGroup: {
+    marginBottom: spacing.lg,
+  },
+  modalLabel: {
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
     marginBottom: spacing.sm,
   },
-  input: {
+  modalTextArea: {
     backgroundColor: colors.surface.secondary,
     borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    minHeight: 120,
+    textAlignVertical: 'top',
+  },
+  modalInput: {
+    backgroundColor: colors.surface.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
+  modalFooter: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+    backgroundColor: colors.surface.primary,
+  },
+  modalCancelButton: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    backgroundColor: colors.surface.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+  },
+  modalSaveButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary[600],
+  },
+  modalSaveText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.inverse,
   },
   typeSelector: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
   typeButton: {
     flex: 1,
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1.5,
+    borderColor: colors.border.light,
     backgroundColor: colors.surface.secondary,
     alignItems: 'center',
   },
@@ -575,126 +757,197 @@ const styles = StyleSheet.create({
   },
   typeButtonText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.secondary,
   },
   typeButtonTextActive: {
     color: colors.text.inverse,
   },
-  attachmentButtons: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  attachmentButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
+  textArea: {
+    backgroundColor: colors.surface.secondary,
     borderWidth: 1,
-    borderColor: colors.primary[300],
-    backgroundColor: colors.primary[50],
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    marginBottom: spacing.sm,
   },
-  attachmentButtonText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.primary[600],
+  optionsContainer: {
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    backgroundColor: colors.surface.secondary,
+  },
+  optionRowActive: {
+    borderColor: colors.success[500],
+    backgroundColor: colors.success[50],
+  },
+  optionRadio: {
+    padding: spacing.xs / 2,
   },
   radioButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     borderWidth: 2,
     borderColor: colors.border.DEFAULT,
     justifyContent: 'center',
     alignItems: 'center',
   },
   radioButtonActive: {
-    borderColor: colors.primary[600],
+    borderColor: colors.success[600],
   },
   radioButtonInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.primary[600],
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.success[600],
   },
   optionInput: {
     flex: 1,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    padding: 0,
+    paddingVertical: spacing.xs,
   },
-  pointsInput: {
-    width: 100,
+  removeOptionButton: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.error[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeOptionText: {
+    fontSize: typography.fontSize.lg,
+    color: colors.error[600],
+    lineHeight: 20,
+  },
+  addOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.primary[300],
+    borderStyle: 'dashed',
+    backgroundColor: colors.primary[50],
+    marginTop: spacing.xs,
+  },
+  addOptionText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.primary[600],
+  },
+  input: {
+    backgroundColor: colors.surface.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   infoBox: {
     backgroundColor: colors.warning[50],
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.warning[200],
   },
   infoText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     color: colors.warning[700],
   },
-  formActions: {
+  formFooter: {
     flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  cancelButton: {
-    flex: 1,
-    padding: spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    backgroundColor: colors.surface.secondary,
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
-  cancelButtonText: {
+  pointsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.surface.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  pointsLabel: {
     fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+  },
+  pointsInput: {
+    width: 60,
+    fontSize: typography.fontSize.base,
     color: colors.text.primary,
+    padding: 0,
+    textAlign: 'center',
+    fontWeight: typography.fontWeight.semibold,
   },
   saveButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     backgroundColor: colors.primary[600],
   },
   saveButtonText: {
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
   },
   questionsSection: {
     marginBottom: spacing.xl,
   },
-  questionsSectionHeader: {
-    marginBottom: spacing.md,
-  },
   sectionTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
+    marginBottom: spacing.md,
   },
   emptyState: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
     padding: spacing.xl * 2,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderStyle: 'dashed',
+  },
+  emptyIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.surface.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
   emptyStateText: {
-    marginTop: spacing.md,
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
     textAlign: 'center',
@@ -702,95 +955,128 @@ const styles = StyleSheet.create({
   questionCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.lg,
     marginBottom: spacing.md,
-    ...shadows.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
   questionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  questionNumberBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary[600],
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   questionNumber: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.bold,
-    color: colors.primary[600],
+    color: colors.text.inverse,
   },
-  questionBadges: {
+  questionMeta: {
     flexDirection: 'row',
-    gap: spacing.xs,
+    gap: spacing.sm,
+    alignItems: 'center',
   },
-  badge: {
+  typeBadge: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs / 2,
     borderRadius: borderRadius.sm,
-    backgroundColor: colors.primary[100],
   },
-  badgePoints: {
-    backgroundColor: colors.success[100],
+  typeBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    letterSpacing: 0.5,
   },
-  badgeText: {
+  pointsBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.neutral[100],
+  },
+  pointsText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[700],
+    color: colors.text.secondary,
   },
   questionText: {
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
+    lineHeight: 24,
     marginBottom: spacing.md,
   },
   optionsList: {
     gap: spacing.sm,
     marginBottom: spacing.md,
   },
-  optionItem: {
+  optionDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface.secondary,
   },
-  optionBullet: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.neutral[400],
+  optionDisplayCorrect: {
+    backgroundColor: colors.success[50],
+    borderWidth: 1,
+    borderColor: colors.success[200],
   },
-  optionBulletCorrect: {
+  optionIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.neutral[300],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  optionIndicatorCorrect: {
     backgroundColor: colors.success[600],
   },
-  optionText: {
+  optionDisplayText: {
+    flex: 1,
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
   },
-  optionTextCorrect: {
+  optionDisplayTextCorrect: {
     fontWeight: typography.fontWeight.semibold,
-    color: colors.success[600],
+    color: colors.success[700],
   },
-  answerBox: {
+  answerDisplay: {
     flexDirection: 'row',
     gap: spacing.sm,
-    padding: spacing.sm,
+    padding: spacing.md,
     backgroundColor: colors.success[50],
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.success[200],
   },
   answerLabel: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.success[700],
   },
-  answerText: {
+  answerValue: {
     fontSize: typography.fontSize.sm,
     color: colors.success[700],
+    fontWeight: typography.fontWeight.medium,
   },
   questionActions: {
     flexDirection: 'row',
     gap: spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: colors.border.DEFAULT,
+    borderTopColor: colors.border.light,
     paddingTop: spacing.md,
+    marginTop: spacing.sm,
   },
-  questionActionButton: {
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
@@ -798,16 +1084,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.md,
     backgroundColor: colors.surface.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
-  questionActionButtonDanger: {
+  actionButtonDanger: {
     backgroundColor: colors.error[50],
+    borderColor: colors.error[200],
   },
-  questionActionText: {
+  actionButtonText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
+    color: colors.primary[600],
   },
-  questionActionTextDanger: {
+  actionButtonTextDanger: {
     color: colors.error[600],
   },
 });

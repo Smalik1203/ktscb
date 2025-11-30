@@ -163,46 +163,36 @@ export function useCreateAdmin(schoolCode: string | null | undefined) {
     mutationFn: async (input: CreateAdminInput) => {
       const startTime = Date.now();
       
-      // 🔍 Debug: Initial state
-      console.log('═══════════════════════════════════════════════════');
-      console.log('🚀 CREATE ADMIN - Starting request');
-      console.log('═══════════════════════════════════════════════════');
-      console.log('📋 Input data:', {
-        full_name: input.full_name,
+      log.debug('Creating admin - starting request', {
         email: input.email,
-        phone: input.phone,
-        admin_code: input.admin_code,
-        password_length: input.password?.length,
+        schoolCode,
+        adminCode: input.admin_code,
       });
-      console.log('🏫 School code:', schoolCode);
       
       if (!schoolCode) {
-        console.error('❌ School code is missing!');
+        log.error('School code is missing for admin creation');
         throw new Error('School code is required');
       }
 
-      // 🔍 Debug: Get session
-      console.log('🔐 Getting auth session...');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
-        console.error('❌ Session error:', sessionError);
+        log.error('Failed to get session for admin creation', sessionError);
         throw new Error('Failed to get session: ' + sessionError.message);
       }
       
       const token = session?.access_token;
 
       if (!token) {
-        console.error('❌ No auth token found!');
-        console.log('Session data:', session);
+        log.error('No auth token found for admin creation', { hasSession: !!session });
         throw new Error('Not authenticated. Please log in.');
       }
 
-      console.log('✅ Auth token obtained:', token.substring(0, 20) + '...');
-      console.log('👤 User ID:', session.user?.id);
-      console.log('📧 User email:', session.user?.email);
+      log.debug('Auth token obtained for admin creation', {
+        userId: session.user?.id,
+        userEmail: session.user?.email,
+      });
 
-      // 🔍 Debug: Prepare request
       const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-admin`;
       const requestBody = {
         full_name: input.full_name,
@@ -213,16 +203,8 @@ export function useCreateAdmin(schoolCode: string | null | undefined) {
         admin_code: input.admin_code,
       };
 
-      console.log('🌐 Request URL:', url);
-      console.log('📦 Request body:', {
-        ...requestBody,
-        password: '[REDACTED]',
-      });
+      log.info('Creating admin via Edge Function', { email: input.email, url });
 
-      log.info('Creating admin', { email: input.email });
-
-      // 🔍 Debug: Make request
-      console.log('📤 Sending POST request...');
       let response;
       try {
         response = await fetch(url, {
@@ -234,48 +216,39 @@ export function useCreateAdmin(schoolCode: string | null | undefined) {
           body: JSON.stringify(requestBody),
         });
 
-        console.log('📥 Response received:', {
+        log.debug('Admin creation response received', {
           status: response.status,
           statusText: response.statusText,
           ok: response.ok,
-          headers: {
-            'content-type': response.headers.get('content-type'),
-          },
         });
       } catch (fetchError: any) {
-        console.error('❌ Fetch error:', {
+        log.error('Network error during admin creation', {
           name: fetchError.name,
           message: fetchError.message,
-          stack: fetchError.stack,
         });
         throw new Error('Network request failed: ' + fetchError.message);
       }
 
-      // 🔍 Debug: Parse response
-      console.log('📄 Parsing response...');
       let result;
       try {
         const responseText = await response.text();
-        console.log('📝 Raw response:', responseText);
+        log.debug('Parsing admin creation response', { responseLength: responseText.length });
         
         result = JSON.parse(responseText);
-        console.log('✅ Parsed result:', result);
       } catch (parseError: any) {
-        console.error('❌ JSON parse error:', {
+        log.error('Failed to parse admin creation response', {
           name: parseError.name,
           message: parseError.message,
         });
         throw new Error('Invalid response from server');
       }
 
-      // 🔍 Debug: Check response status
       if (!response.ok) {
-        console.error('❌ Request failed:', {
+        log.error('Admin creation request failed', {
           status: response.status,
           statusText: response.statusText,
           error: result.error,
           details: result.details,
-          debug: result.debug,
         });
         
         const errorMessage = result.error || result.details || 'Failed to create admin';
@@ -283,30 +256,22 @@ export function useCreateAdmin(schoolCode: string | null | undefined) {
       }
 
       const duration = Date.now() - startTime;
-      console.log('═══════════════════════════════════════════════════');
-      console.log('✅ CREATE ADMIN - Success!');
-      console.log('⏱️  Duration:', duration + 'ms');
-      console.log('📊 Result:', result);
-      console.log('═══════════════════════════════════════════════════');
+      log.info('Admin created successfully', {
+        email: input.email,
+        duration: `${duration}ms`,
+      });
 
       return result;
     },
     onSuccess: (data) => {
-      console.log('🎉 Mutation success callback:', data);
-      // Invalidate admins query to refetch
+      log.debug('Admin creation mutation succeeded', { hasData: !!data });
       queryClient.invalidateQueries({ queryKey: ['admins', schoolCode] });
-      console.log('🔄 Invalidated admins query cache');
     },
     onError: (error: any) => {
-      console.error('═══════════════════════════════════════════════════');
-      console.error('💥 CREATE ADMIN - Failed!');
-      console.error('═══════════════════════════════════════════════════');
-      console.error('Error details:', {
+      log.error('Admin creation mutation failed', {
         name: error.name,
         message: error.message,
-        stack: error.stack,
       });
-      console.error('═══════════════════════════════════════════════════');
     },
   });
 }

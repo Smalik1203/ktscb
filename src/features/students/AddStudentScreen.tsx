@@ -1,10 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, ScrollView, Alert, TouchableOpacity, StyleSheet, Modal, TextInput as RNTextInput } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCreateStudent, useStudents } from '../../hooks/useStudents';
 import { useClassInstances } from '../../hooks/useClassInstances';
-import { colors, spacing, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { ChevronDown, X, Search, CheckCircle2 } from 'lucide-react-native';
 import { ThreeStateView } from '../../components/common/ThreeStateView';
 import { Pagination } from '../../components/common/Pagination';
@@ -12,6 +14,12 @@ import { sanitizeEmail, sanitizePhone, sanitizeCode, sanitizeName, validatePassw
 
 export default function AddStudentScreen() {
   const { profile } = useAuth();
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+  
   const schoolCode = profile?.school_code;
   
   const [fullName, setFullName] = useState('');
@@ -76,7 +84,7 @@ export default function AddStudentScreen() {
     // Validate password strength
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.isValid) {
-      const missing = [];
+      const missing: string[] = [];
       if (!passwordValidation.requirements.minLength) missing.push('at least 8 characters');
       if (!passwordValidation.requirements.hasLetter) missing.push('at least one letter');
       if (!passwordValidation.requirements.hasNumber) missing.push('at least one number');
@@ -360,7 +368,8 @@ export default function AddStudentScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,
@@ -639,7 +648,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {

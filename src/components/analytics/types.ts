@@ -172,31 +172,53 @@ export interface StudentAnalytics {
   };
 }
 
-export type TimePeriod = 'daily' | 'weekly' | 'monthly';
+export type TimePeriod = 'today' | 'week' | 'month' | 'custom';
 export type AnalyticsFeature = 'attendance' | 'fees' | 'learning' | 'operations' | 'overview';
 
+export interface DateRange {
+  startDate: string;
+  endDate: string;
+}
+
+// Preset date ranges
+export const DATE_PRESETS: { value: TimePeriod; label: string; description: string }[] = [
+  { value: 'today', label: 'Today', description: 'Today only' },
+  { value: 'week', label: 'This Week', description: 'Last 7 days' },
+  { value: 'month', label: 'This Month', description: 'Last 30 days' },
+  { value: 'custom', label: 'Custom', description: 'Select dates' },
+];
+
 // Helper function to calculate date range based on time period
-export function getDateRangeForPeriod(timePeriod: TimePeriod): { startDate: string; endDate: string } {
+export function getDateRangeForPeriod(
+  timePeriod: TimePeriod,
+  customRange?: DateRange
+): DateRange {
+  // If custom period with provided range, use it
+  if (timePeriod === 'custom' && customRange) {
+    return customRange;
+  }
+
   const endDate = new Date();
-  endDate.setHours(23, 59, 59, 999); // End of today
+  endDate.setHours(23, 59, 59, 999);
   
   const startDate = new Date();
+  startDate.setHours(0, 0, 0, 0);
   
   switch (timePeriod) {
-    case 'daily':
+    case 'today':
+      // Just today
+      break;
+    case 'week':
       // Last 7 days
-      startDate.setDate(startDate.getDate() - 6); // Include today (6 days ago + today = 7 days)
-      startDate.setHours(0, 0, 0, 0);
+      startDate.setDate(startDate.getDate() - 6);
       break;
-    case 'weekly':
-      // Last 30 days (4 weeks + buffer)
-      startDate.setDate(startDate.getDate() - 29); // Include today (29 days ago + today = 30 days)
-      startDate.setHours(0, 0, 0, 0);
+    case 'month':
+      // Last 30 days
+      startDate.setDate(startDate.getDate() - 29);
       break;
-    case 'monthly':
-      // Last 90 days (3 months)
-      startDate.setDate(startDate.getDate() - 89); // Include today (89 days ago + today = 90 days)
-      startDate.setHours(0, 0, 0, 0);
+    case 'custom':
+      // Default to last 30 days if no custom range provided
+      startDate.setDate(startDate.getDate() - 29);
       break;
   }
   
@@ -204,5 +226,15 @@ export function getDateRangeForPeriod(timePeriod: TimePeriod): { startDate: stri
     startDate: startDate.toISOString().split('T')[0],
     endDate: endDate.toISOString().split('T')[0],
   };
+}
+
+// Format date for display
+export function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 

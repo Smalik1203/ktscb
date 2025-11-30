@@ -2,7 +2,6 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AlertCircle } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
 
 interface Props {
   children: ReactNode;
@@ -15,6 +14,19 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
+// Static colors for ErrorBoundary (renders outside ThemeProvider)
+const ERROR_COLORS = {
+  background: '#F5F7FA',
+  textPrimary: '#2A2A2A',
+  textSecondary: '#6b7280',
+  textTertiary: '#9ca3af',
+  error: '#ef4444',
+  errorLight: '#fef2f2',
+  primary: '#1E4EB8',
+  white: '#FFFFFF',
+  neutral100: '#F5F7FA',
+};
+
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -26,7 +38,6 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI
     return {
       hasError: true,
       error,
@@ -35,41 +46,21 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console (in production, send to error tracking service)
-    
     this.setState({
       error,
       errorInfo,
     });
 
-    // Enhanced error reporting
     this.logErrorToService(error, errorInfo);
   }
 
   private logErrorToService = (error: Error, errorInfo: ErrorInfo) => {
-    // In development, log to console
     if (__DEV__) {
       console.error('Error Boundary caught error:', {
         message: error.message,
         stack: error.stack,
         componentStack: errorInfo.componentStack,
       });
-    }
-
-    // In production, you would send this to your error tracking service
-    // Example: Sentry, Bugsnag, or your own error tracking endpoint
-    if (!__DEV__) {
-      // Prepare error report for production tracking
-      // const errorReport = {
-      //   message: error.message,
-      //   stack: error.stack,
-      //   componentStack: errorInfo.componentStack,
-      //   timestamp: new Date().toISOString(),
-      //   userAgent: 'React Native App',
-      //   version: '1.0.0',
-      // };
-      // Example: Sentry.captureException(error, { extra: errorInfo });
-      // Example: Bugsnag.notify(error, { metaData: errorInfo });
     }
   };
 
@@ -83,17 +74,15 @@ class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      // Custom fallback UI
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      // Default fallback UI
       return (
         <View style={styles.container}>
           <View style={styles.content}>
             <View style={styles.iconContainer}>
-              <AlertCircle size={80} color={colors.error[500]} />
+              <AlertCircle size={80} color={ERROR_COLORS.error} />
             </View>
             
             <Text variant="headlineMedium" style={styles.title}>
@@ -138,74 +127,78 @@ class ErrorBoundary extends Component<Props, State> {
   }
 }
 
+// Static styles - ErrorBoundary renders outside ThemeProvider
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: ERROR_COLORS.background,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing['8'],
+    padding: 32,
   },
   content: {
     alignItems: 'center',
     maxWidth: 400,
   },
   iconContainer: {
-    marginBottom: spacing['8'],
+    marginBottom: 32,
   },
   title: {
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.bold,
+    color: ERROR_COLORS.textPrimary,
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: spacing['4'],
+    marginBottom: 16,
   },
   message: {
-    color: colors.text.secondary,
+    color: ERROR_COLORS.textSecondary,
     textAlign: 'center',
-    marginBottom: spacing['8'],
+    marginBottom: 32,
     lineHeight: 24,
   },
   errorDetails: {
     width: '100%',
-    backgroundColor: colors.neutral[100],
-    borderRadius: borderRadius.lg,
-    padding: spacing['4'],
-    marginBottom: spacing['8'],
+    backgroundColor: ERROR_COLORS.neutral100,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 32,
     maxHeight: 200,
   },
   errorDetailsTitle: {
-    color: colors.error[500],
-    fontWeight: typography.fontWeight.semibold,
-    marginBottom: spacing['2'],
+    color: ERROR_COLORS.error,
+    fontWeight: '600',
+    marginBottom: 8,
   },
   errorDetailsText: {
-    color: colors.error[500],
-    fontSize: typography.fontSize.xs,
+    color: ERROR_COLORS.error,
+    fontSize: 11,
     fontFamily: 'monospace',
-    marginBottom: spacing['2'],
+    marginBottom: 8,
   },
   errorStack: {
-    color: colors.text.tertiary,
-    fontSize: typography.fontSize.xs,
+    color: ERROR_COLORS.textTertiary,
+    fontSize: 11,
     fontFamily: 'monospace',
   },
   actions: {
     width: '100%',
   },
   button: {
-    backgroundColor: colors.primary[500],
-    paddingVertical: spacing['4'],
-    paddingHorizontal: spacing['8'],
-    borderRadius: borderRadius.xl,
+    backgroundColor: ERROR_COLORS.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 24,
     alignItems: 'center',
-    ...shadows.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   buttonText: {
-    color: colors.text.inverse,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    color: ERROR_COLORS.white,
+    fontSize: 17,
+    fontWeight: '600',
   },
 });
 
 export default ErrorBoundary;
-

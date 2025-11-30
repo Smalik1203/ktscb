@@ -36,14 +36,15 @@ export function useTasksAnalytics(options: UseTasksAnalyticsOptions) {
           subjects(id, name),
           class_instances!inner(
             id,
-            class_name,
+            grade,
+            section,
             school_code,
             academic_year_id,
             students:student(count)
           )
         `)
-        .eq('class_instances.school_code', school_code)
-        .eq('class_instances.academic_year_id', academic_year_id)
+        .filter('class_instances.school_code', 'eq', school_code)
+        .filter('class_instances.academic_year_id', 'eq', academic_year_id)
         .gte('due_date', start_date)
         .lte('due_date', end_date);
 
@@ -83,7 +84,10 @@ export function useTasksAnalytics(options: UseTasksAnalyticsOptions) {
         const taskId = task.id;
         const taskName = task.title;
         const classId = task.class_instance_id;
-        const className = task.class_instances.class_name;
+        const classInfo = task.class_instances;
+        const className = classInfo?.grade !== null && classInfo?.grade !== undefined
+          ? `Grade ${classInfo.grade}${classInfo.section ? ` - ${classInfo.section}` : ''}`
+          : 'Unknown Class';
         const subjectId = task.subject_id;
         const subjectName = task.subjects.name;
         const dueDate = task.due_date;
@@ -133,8 +137,8 @@ export function useTasksAnalytics(options: UseTasksAnalyticsOptions) {
           due_date,
           class_instances!inner(school_code, academic_year_id)
         `)
-        .eq('class_instances.school_code', school_code)
-        .eq('class_instances.academic_year_id', academic_year_id)
+        .filter('class_instances.school_code', 'eq', school_code)
+        .filter('class_instances.academic_year_id', 'eq', academic_year_id)
         .gte('due_date', prevStartDate)
         .lte('due_date', prevEndDate);
 
@@ -215,6 +219,6 @@ export function useTasksAnalytics(options: UseTasksAnalyticsOptions) {
       return { aggregation, rankedRows: limitedRows };
     },
     staleTime: 5 * 60 * 1000,
-    enabled: !!school_code && !!academic_year_id && !!start_date && !!end_date,
+    enabled: !!(school_code && school_code !== '') && typeof academic_year_id === 'string' && !!(start_date && start_date !== '') && !!(end_date && end_date !== ''),
   });
 }

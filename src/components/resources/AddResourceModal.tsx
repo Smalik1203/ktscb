@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal as RNModal, Animated, ActivityIndicator } from 'react-native';
 import { Text, Button, Portal, Modal, TextInput, SegmentedButtons, ProgressBar } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Upload, X, FileText, Video, HelpCircle, Loader2 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
-// no need for expo-file-system here; we fetch the file URI directly to Blob
-import { colors, typography, spacing, borderRadius } from '../../../lib/design-system';
+import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
+import { typography, spacing, borderRadius, colors } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
@@ -38,41 +40,47 @@ const pickFile = async () => {
   }
 };
 
-// Modern file upload using ArrayBuffer (works reliably in React Native)
-const uploadToSupabase = async (file: any, pathPrefix: string): Promise<string> => {
+/**
+ * Memory-efficient file upload using streaming (no base64, no blob, no ArrayBuffer)
+ * Uses uploadAsync with multipart/form-data to avoid loading file into JS memory
+ */
+const uploadToSupabase = async (
+  file: any,
+  pathPrefix: string,
+  onProgress?: (progress: number) => void
+): Promise<string> => {
   const fileExt = file.name.split('.').pop();
   const fileName = `${Date.now()}.${fileExt}`;
   const filePath = `${pathPrefix}/${fileName}`;
 
   try {
-    console.log('Uploading file to Supabase Storage:', file.name, file.mimeType, 'Size:', file.size);
-    
-    // Get file as ArrayBuffer for React Native compatibility
-    console.log('Fetching file from URI:', file.uri);
-    const fileResponse = await fetch(file.uri);
-    
-    if (!fileResponse.ok) {
-      throw new Error(`Failed to read file: ${fileResponse.status} ${fileResponse.statusText}`);
-    }
-    
-    const fileArrayBuffer = await fileResponse.arrayBuffer();
-    console.log('File ArrayBuffer created, size:', fileArrayBuffer.byteLength);
-    
-    if (fileArrayBuffer.byteLength === 0) {
-      throw new Error('File appears to be empty');
+    // Get Supabase session for authorization
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('Not authenticated');
     }
 
-    // Upload using Supabase Storage with ArrayBuffer (React Native compatible)
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(filePath, fileArrayBuffer, {
-        contentType: file.mimeType || 'application/octet-stream',
-        upsert: false, // Do not overwrite existing files
-      });
+    // Get Supabase project URL and construct upload endpoint
+    const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+    const uploadUrl = `${supabaseProjectUrl}/storage/v1/object/${STORAGE_BUCKET}/${filePath}`;
 
-    if (uploadError) {
-      console.error('Upload error details:', uploadError);
-      throw new Error(`Upload failed: ${uploadError.message}`);
+    // Use uploadAsync - streams file directly without loading into memory
+    const uploadResult = await uploadAsync(
+      uploadUrl,
+      file.uri,
+      {
+        httpMethod: 'POST',
+        uploadType: FileSystemUploadType.MULTIPART,
+        fieldName: 'file',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': session.access_token,
+        },
+      }
+    );
+
+    if (uploadResult.status !== 200 && uploadResult.status !== 201) {
+      throw new Error(`Upload failed: HTTP ${uploadResult.status}`);
     }
 
     // Get public URL
@@ -80,10 +88,8 @@ const uploadToSupabase = async (file: any, pathPrefix: string): Promise<string> 
       .from(STORAGE_BUCKET)
       .getPublicUrl(filePath);
 
-    console.log('✅ File uploaded successfully to:', publicUrlData.publicUrl);
     return publicUrlData.publicUrl;
   } catch (error) {
-    console.error('File upload error:', error);
     throw error;
   }
 };
@@ -94,9 +100,11 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
   onSuccess,
   editingResource
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   const { profile } = useAuth();
-  const { data: classes = [] } = useClasses(profile?.school_code);
-  const { data: subjectsResult } = useSubjects(profile?.school_code);
+  const { data: classes = [] } = useClasses(profile?.school_code ?? undefined);
+  const { data: subjectsResult } = useSubjects(profile?.school_code ?? undefined);
   const subjects = subjectsResult?.data || [];
   
   const [formData, setFormData] = useState({
@@ -242,45 +250,40 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
         contentUrl = await uploadFileToStorage(selectedFile);
       }
 
+      if (!profile?.school_code) {
+        Alert.alert('Error', 'School code is required');
+        return;
+      }
+
       const resourceData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
         resource_type: formData.resource_type,
         content_url: contentUrl,
-        school_code: profile?.school_code,
+        school_code: profile.school_code,
         subject_id: formData.subject_id,
         class_instance_id: formData.class_instance_id,
         uploaded_by: profile?.auth_id
       };
 
-      console.log('Saving resource with data:', resourceData);
-
       if (editingResource) {
         // Update existing resource
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('learning_resources')
           .update(resourceData)
           .eq('id', editingResource.id)
           .select();
 
-        if (error) {
-          console.error('Update error:', error);
-          throw error;
-        }
-        console.log('Resource updated:', data);
+        if (error) throw error;
         Alert.alert('Success', 'Resource updated successfully');
       } else {
         // Create new resource
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('learning_resources')
           .insert([resourceData])
           .select();
 
-        if (error) {
-          console.error('Insert error:', error);
-          throw error;
-        }
-        console.log('Resource created:', data);
+        if (error) throw error;
         Alert.alert('Success', 'Resource created successfully');
       }
 
@@ -566,7 +569,8 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   modal: {
     backgroundColor: colors.surface.primary,
     margin: spacing.lg,
@@ -696,7 +700,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },

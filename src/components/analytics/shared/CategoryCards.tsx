@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../../contexts/ThemeContext';
+import type { ThemeColors } from '../../../theme/types';
 import { View, StyleSheet, Pressable } from 'react-native';
 import { Text } from 'react-native-paper';
 import { ChevronRight } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius, shadows } from '../../../../lib/design-system';
+import { typography, spacing, borderRadius, shadows, colors } from '../../../../lib/design-system';
 import { AnalyticsFeature } from '../types';
 
 interface CategoryCard {
@@ -22,6 +24,9 @@ interface CategoryCardsProps {
 }
 
 export const CategoryCards: React.FC<CategoryCardsProps> = ({ cards }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   if (!cards || cards.length === 0) {
     return null;
   }
@@ -58,7 +63,8 @@ export const CategoryCards: React.FC<CategoryCardsProps> = ({ cards }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     // gap handled by marginBottom on categoryCard
   },

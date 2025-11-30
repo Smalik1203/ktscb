@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import {
   View,
   Text,
@@ -14,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, ChevronLeft, ChevronRight, Flag, Check, AlertCircle } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestQuestions, useCreateAttempt, useUpdateAttempt, useSubmitTest, useStudentAttempts } from '../../hooks/tests';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
 import { SuccessAnimation } from '../ui/SuccessAnimation';
 
@@ -25,6 +27,9 @@ interface Answer {
 }
 
 export function TestTakingScreen() {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const router = useRouter();
   const params = useLocalSearchParams();
   const testId = params.testId as string;
@@ -79,7 +84,7 @@ export function TestTakingScreen() {
         // Calculate time remaining if there's a time limit
         if (timeLimit) {
           const elapsed = Math.floor(
-            (new Date().getTime() - new Date(inProgressAttempt.started_at).getTime()) / 1000
+            (new Date().getTime() - new Date(inProgressAttempt.started_at || '').getTime()) / 1000
           );
           const remaining = Math.max(0, timeLimit - elapsed);
           setTimeRemaining(remaining);
@@ -117,12 +122,8 @@ export function TestTakingScreen() {
 
     // Wait a tick to ensure timeRemaining is set
     const startTimer = () => {
-      if (timeRemaining <= 0) {
-        console.log('Timer not started: timeRemaining is 0');
-        return;
-      }
+      if (timeRemaining <= 0) return;
 
-      console.log('Starting timer:', { timeLimit, attemptId, timeRemaining });
       timerStartedRef.current = true;
 
       timerRef.current = setInterval(() => {
@@ -236,7 +237,7 @@ export function TestTakingScreen() {
     let totalPoints = 0;
 
     questions.forEach((question) => {
-      totalPoints += question.points;
+      totalPoints += (question.points || 0);
       const answer = answers[question.id];
 
       if (!answer) return;
@@ -244,14 +245,14 @@ export function TestTakingScreen() {
       // Auto-grade MCQ and one_word questions
       if (question.question_type === 'mcq' && typeof answer.answer === 'number') {
         if (answer.answer === question.correct_index) {
-          earnedPoints += question.points;
+          earnedPoints += (question.points || 0);
         }
       } else if (question.question_type === 'one_word' && typeof answer.answer === 'string') {
         // Case-insensitive comparison, trim whitespace
         const studentAnswer = answer.answer.trim().toLowerCase();
         const correctAnswer = question.correct_text?.trim().toLowerCase() || '';
         if (studentAnswer === correctAnswer) {
-          earnedPoints += question.points;
+          earnedPoints += (question.points || 0);
         }
       }
       // Long answer questions need manual grading, so we don't add points here
@@ -261,13 +262,8 @@ export function TestTakingScreen() {
   };
 
   const handleAutoSubmit = async () => {
-    console.log('Auto-submit triggered - time is up!');
-
     // Prevent double submission
-    if (isSubmittedRef.current) {
-      console.log('Test already submitted, skipping auto-submit');
-      return;
-    }
+    if (isSubmittedRef.current) return;
 
     // Directly submit without confirmation since time is up
     if (!attemptId) {
@@ -382,10 +378,7 @@ export function TestTakingScreen() {
 
   const handleSubmit = async (autoSubmit = false) => {
     // Prevent double submission
-    if (isSubmittedRef.current) {
-      console.log('Test already submitted, skipping manual submit');
-      return;
-    }
+    if (isSubmittedRef.current) return;
 
     if (!attemptId) {
       Alert.alert('Error', 'No active attempt found');
@@ -756,7 +749,8 @@ export function TestTakingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.primary,

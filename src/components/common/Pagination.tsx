@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 
 interface PaginationProps {
   currentPage: number;
@@ -21,6 +23,8 @@ export function Pagination({
   onPageChange,
   onItemsPerPageChange,
 }: PaginationProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
   const [goToPageInput, setGoToPageInput] = useState('');
@@ -163,7 +167,8 @@ export function Pagination({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     padding: spacing.md,
     backgroundColor: colors.surface.primary,

@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import Svg, { Circle } from 'react-native-svg';
-import { colors, typography } from '../../../lib/design-system';
+import { typography, colors } from '../../../lib/design-system';
 
 export interface ProgressRingProps {
   progress: number; // 0-100
@@ -18,11 +20,16 @@ export const ProgressRing = React.memo<ProgressRingProps>(({
   progress,
   size = 100,
   strokeWidth = 8,
-  color = colors.primary[600],
-  backgroundColor = colors.surface.tertiary,
+  color,
+  backgroundColor,
   showPercentage = true,
   label,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
+  const finalColor = color || colors.primary[600];
+  const finalBgColor = backgroundColor || colors.surface.tertiary;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const progressValue = Math.min(Math.max(progress, 0), 100);
@@ -36,7 +43,7 @@ export const ProgressRing = React.memo<ProgressRingProps>(({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={backgroundColor}
+          stroke={finalBgColor}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -45,7 +52,7 @@ export const ProgressRing = React.memo<ProgressRingProps>(({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={color}
+          stroke={finalColor}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={`${circumference} ${circumference}`}
@@ -70,7 +77,10 @@ export const ProgressRing = React.memo<ProgressRingProps>(({
   );
 });
 
-const styles = StyleSheet.create({
+ProgressRing.displayName = 'ProgressRing';
+
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     position: 'relative',
     justifyContent: 'center',

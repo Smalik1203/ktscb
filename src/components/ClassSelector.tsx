@@ -1,23 +1,27 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Text, Card } from 'react-native-paper';
 import { Users, ChevronDown } from 'lucide-react-native';
 import { useClassSelection } from '../contexts/ClassSelectionContext';
-import { colors, typography, spacing, borderRadius, shadows } from '../../lib/design-system';
+import { useTheme } from '../contexts/ThemeContext';
+import type { ThemeColors } from '../theme/types';
 
 interface ClassSelectorProps {
   style?: any;
 }
 
 export const ClassSelector: React.FC<ClassSelectorProps> = ({ style }) => {
-  const { 
-    selectedClass, 
-    setSelectedClass, 
-    classes, 
-    isLoading, 
+  const {
+    selectedClass,
+    setSelectedClass,
+    classes,
+    isLoading,
     shouldShowClassSelector,
     error
   } = useClassSelection();
+
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
 
 
   if (!shouldShowClassSelector) {
@@ -114,7 +118,7 @@ export const ClassSelector: React.FC<ClassSelectorProps> = ({ style }) => {
               ]}>
                 Grade {classItem.grade}-{classItem.section}
               </Text>
-              {classItem.student_count > 0 && (
+              {(classItem.student_count ?? 0) > 0 && (
                 <Text style={[
                   styles.studentCount,
                   selectedClass?.id === classItem.id && styles.studentCountSelected
@@ -148,7 +152,8 @@ export const ClassSelector: React.FC<ClassSelectorProps> = ({ style }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     margin: spacing['4'],
     marginBottom: spacing['2'],

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../../contexts/ThemeContext';
+import type { ThemeColors } from '../../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Text, Surface } from 'react-native-paper';
-import { colors, typography, spacing, borderRadius, shadows } from '../../../../lib/design-system';
+import { typography, spacing, borderRadius, shadows, colors } from '../../../../lib/design-system';
 
 interface SummaryCardProps {
   academicYear: string;
@@ -16,6 +18,8 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
   totalClasses,
   totalTeachers,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   return (
     <Surface style={styles.summaryCard} elevation={3}>
       <View style={styles.summaryCardHeader}>
@@ -52,7 +56,8 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   summaryCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,

@@ -54,7 +54,7 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
           )
         `)
         .eq('school_code', school_code)
-        .eq('class_instances.academic_year_id', academic_year_id);
+        .filter('class_instances.academic_year_id', 'eq', academic_year_id);
 
       if (classInstanceId) {
         studentsQuery = studentsQuery.eq('class_instance_id', classInstanceId);
@@ -92,8 +92,8 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
         .from('fee_payments')
         .select('student_id, created_at')
         .in('student_id', studentIds)
-        .gte('created_at', start_date)
-        .lte('created_at', end_date)
+        .gte('created_at', new Date(start_date).toISOString())
+        .lte('created_at', new Date(end_date).toISOString())
         .order('created_at', { ascending: false });
 
       // 4. Build last payment date map
@@ -153,7 +153,10 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
       studentsData.forEach((student: any) => {
         const studentId = student.id;
         const studentName = student.full_name;
-        const className = `${student.class_instances.grade}${student.class_instances.section || ''}`;
+        const classInfo = student.class_instances;
+        const className = classInfo?.grade !== null && classInfo?.grade !== undefined
+          ? `Grade ${classInfo.grade}${classInfo.section ? ` - ${classInfo.section}` : ''}`
+          : 'Unknown Class';
 
         const feeInfo = studentFeeMap.get(studentId) || { totalBilled: 0, totalCollected: 0, totalOutstanding: 0 };
         const dueDate = null; // Note: Due dates not available in current schema
@@ -189,15 +192,15 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
       // This gives us a comparison of collection performance
       const { data: prevPaymentsData } = await supabase
         .from('fee_payments')
-        .select('student_id, amount')
+        .select('student_id, amount_inr')
         .in('student_id', studentIds)
-        .gte('created_at', prevStartDate)
-        .lte('created_at', prevEndDate);
+        .gte('created_at', new Date(prevStartDate).toISOString())
+        .lte('created_at', new Date(prevEndDate).toISOString());
 
       const prevPaymentMap = new Map<string, number>();
       prevPaymentsData?.forEach((payment: any) => {
         const studentId = payment.student_id;
-        prevPaymentMap.set(studentId, (prevPaymentMap.get(studentId) || 0) + payment.amount);
+        prevPaymentMap.set(studentId, (prevPaymentMap.get(studentId) || 0) + (payment.amount_inr || 0));
       });
 
       // 8. Build previous rows for trend comparison
@@ -205,10 +208,14 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
       const previousRows = Array.from(prevPaymentMap.entries()).map(([studentId, totalPaid]): FeeRow => {
         const student = studentsData.find((s: any) => s.id === studentId);
         const feeInfo = studentFeeMap.get(studentId) || { totalBilled: 0, totalCollected: 0, totalOutstanding: 0 };
+        const classInfo = student?.class_instances;
+        const className = classInfo?.grade !== null && classInfo?.grade !== undefined
+          ? `Grade ${classInfo.grade}${classInfo.section ? ` - ${classInfo.section}` : ''}`
+          : 'Unknown Class';
         return {
           studentId,
           studentName: student?.full_name || '',
-          className: student ? `${student.class_instances.grade}${student.class_instances.section || ''}` : '',
+          className,
           totalBilled: feeInfo.totalBilled,
           totalPaid,
           totalDue: feeInfo.totalBilled - totalPaid,
@@ -259,6 +266,6 @@ export function useFeesAnalytics(options: UseFeesAnalyticsOptions) {
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    enabled: !!school_code && !!academic_year_id && !!start_date && !!end_date,
+    enabled: !!(school_code && school_code !== '') && typeof academic_year_id === 'string' && !!(start_date && start_date !== '') && !!(end_date && end_date !== ''),
   });
 }

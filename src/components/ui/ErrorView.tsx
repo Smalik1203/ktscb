@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
 import { AlertCircle } from 'lucide-react-native';
-import { colors, spacing, typography } from '../../../lib/design-system';
+import { spacing, typography, colors } from '../../../lib/design-system';
 import { Button } from './Button';
 
 interface ErrorViewProps {
@@ -18,6 +20,8 @@ export function ErrorView({
   onRetry,
   retryLabel = 'Try Again',
 }: ErrorViewProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const scaleAnim = React.useRef(new Animated.Value(0.8)).current;
 
@@ -72,7 +76,8 @@ export function ErrorView({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',

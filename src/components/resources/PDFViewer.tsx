@@ -1,10 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions, Platform, ActivityIndicator, Linking } from 'react-native';
+/**
+ * PDF Viewer Component - Opens in external browser/PDF app
+ * No size limits, works everywhere
+ */
+
+import React, { useEffect } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Linking,
+  Alert,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from 'react-native-paper';
 import { X } from 'lucide-react-native';
-import { colors, spacing } from '../../../lib/design-system';
-import { WebView } from 'react-native-webview';
 
 interface PDFViewerProps {
   uri: string;
@@ -13,62 +24,51 @@ interface PDFViewerProps {
 }
 
 export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
-  const [loading, setLoading] = useState(true);
+  const { colors, typography, spacing, borderRadius } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const isWeb = Platform.OS === 'web';
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
-
   useEffect(() => {
-    const timer = setTimeout(() => setLoadTimedOut(true), 6000);
-    return () => clearTimeout(timer);
-  }, [uri]);
+    openInBrowser();
+  }, []);
+
+  const openInBrowser = async () => {
+    try {
+      const supported = await Linking.canOpenURL(uri);
+      if (supported) {
+        await Linking.openURL(uri);
+        // Wait a bit then close
+        setTimeout(() => onClose(), 500);
+      } else {
+        Alert.alert('Error', 'Cannot open this PDF URL');
+        onClose();
+      }
+    } catch (error) {
+      console.error('Error opening PDF:', error);
+      Alert.alert('Error', 'Failed to open PDF');
+      onClose();
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Text style={styles.title} numberOfLines={1}>{title}</Text>
-        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <X size={24} color={colors.text.primary} />
+      <View style={[styles.header, { paddingTop: insets.top, backgroundColor: colors.primary[600] }]}>
+        <Text style={[styles.title, { color: colors.text.inverse, fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.semibold }]}>
+          {title}
+        </Text>
+        <TouchableOpacity onPress={onClose} style={[styles.closeButton, { borderRadius: borderRadius.full, padding: spacing.xs }]}>
+          <X size={24} color={colors.text.inverse} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.pdfContainer}>
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary[500]} />
-            <Text style={styles.loadingText}>Loading PDF...</Text>
-          </View>
-        )}
-        {isWeb ? (
-          // Web: use WebView (react-native-webview has a web shim that renders an iframe)
-          <WebView
-            source={{ uri }}
-            style={styles.webview}
-            onLoadEnd={() => setLoading(false)}
-            onError={() => setLoading(false)}
-            startInLoadingState
-          />
-        ) : (
-          // Native (Expo Go compatible): use Google viewer in a WebView, with fallback to open externally
-          <WebView
-            source={{ uri: `https://docs.google.com/viewer?embedded=true&url=${encodeURIComponent(uri)}` }}
-            style={styles.webview}
-            onLoadEnd={() => setLoading(false)}
-            onError={() => setLoading(false)}
-            startInLoadingState
-          />
-        )}
-
-        {!isWeb && (loadTimedOut || !loading) && (
-          <View style={styles.fallbackBar}>
-            <TouchableOpacity onPress={() => Linking.openURL(uri)}>
-              <Text style={styles.fallbackLink}>Open in browser</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+      <View style={[styles.content, { backgroundColor: colors.background.primary }]}>
+        <ActivityIndicator size="large" color={colors.primary[600]} />
+        <Text style={[styles.text, { color: colors.text.primary, fontSize: typography.fontSize.base, marginTop: spacing.lg }]}>
+          Opening PDF in browser...
+        </Text>
+        <Text style={[styles.subtext, { color: colors.text.secondary, fontSize: typography.fontSize.sm, marginTop: spacing.sm }]}>
+          Your PDF will open in a new window
+        </Text>
       </View>
-      <View style={{ height: insets.bottom, backgroundColor: colors.surface.primary }} />
     </View>
   );
 }
@@ -76,63 +76,31 @@ export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.surface.primary,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.surface.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
   title: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginRight: spacing.sm,
+    marginRight: 8,
   },
   closeButton: {
-    padding: spacing.xs,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  pdfContainer: {
+  content: {
     flex: 1,
-    backgroundColor: colors.neutral[100],
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: colors.neutral[100],
-  },
-  fallbackBar: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: '#ffffffcc',
-    borderRadius: 12,
-  },
-  fallbackLink: {
-    color: colors.primary[700],
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.surface.primary,
-    zIndex: 1,
+    padding: 20,
   },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: 16,
-    color: colors.text.secondary,
+  text: {
+    textAlign: 'center',
+  },
+  subtext: {
+    textAlign: 'center',
   },
 });

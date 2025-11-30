@@ -1,11 +1,11 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Card } from 'react-native-paper';
-import { BookOpen, Calendar, Clock, Play, RotateCcw, CheckCircle, AlertCircle } from 'lucide-react-native';
+import React, { useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
+import { BookOpen, Calendar, Clock, Play, RotateCcw, CheckCircle, AlertCircle, Monitor, FileCheck } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { useRouter } from 'expo-router';
 import { TestWithDetails, TestAttempt } from '../../types/test.types';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 
 interface StudentTestCardProps {
   test: TestWithDetails;
@@ -15,6 +15,10 @@ interface StudentTestCardProps {
 
 export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const getTestStatus = () => {
     if (!attempt) return 'not_started';
@@ -24,6 +28,7 @@ export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
   };
 
   const status = getTestStatus();
+  const isOnline = test.test_mode === 'online';
 
   const getStatusConfig = () => {
     switch (status) {
@@ -47,7 +52,7 @@ export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
         };
       default:
         return {
-          icon: AlertCircle,
+          icon: Play,
           color: colors.primary[600],
           backgroundColor: colors.primary[50],
           label: 'Not Started',
@@ -61,12 +66,8 @@ export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
   const StatusIcon = statusConfig.icon;
 
   const handleStartTest = () => {
-    if (test.test_mode !== 'online') {
-      // For offline tests, students can't take them in the app
-      return;
-    }
+    if (!isOnline) return;
 
-    // Navigate to test taking screen
     router.push({
       pathname: `/test/${test.id}/take` as any,
       params: {
@@ -77,11 +78,8 @@ export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
   };
 
   const handleViewResults = () => {
-    if (test.test_mode !== 'online') {
-      return;
-    }
+    if (!isOnline) return;
 
-    // Navigate to results view
     router.push({
       pathname: `/test/${test.id}/results` as any,
       params: {
@@ -91,302 +89,286 @@ export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
   };
 
   const isTestAvailable = () => {
-    // Test must be active
     if (test.status !== 'active') return false;
-
-    // Test must be online
-    if (test.test_mode !== 'online') return false;
-
-    // If test has a date, check if it's available
+    if (!isOnline) return false;
     if (test.test_date) {
       const testDate = new Date(test.test_date);
       const now = new Date();
-      // Test should be available on or after the test date
       if (now < testDate) return false;
     }
-
-    // If already completed and reattempts not allowed
     if (status === 'completed' && !test.allow_reattempts) {
       return true; // Can view results
     }
-
     return true;
   };
 
   const canTakeTest = isTestAvailable();
 
   const getScoreDisplay = () => {
-    // For online tests, use attempt data
-    if (test.test_mode === 'online' && status === 'completed' && attempt) {
+    if (isOnline && status === 'completed' && attempt) {
       const score = attempt.earned_points || 0;
       const total = attempt.total_points || 0;
       const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
-      return {
-        score,
-        total,
-        percentage,
-      };
+      return { score, total, percentage };
     }
-    // For offline tests, use marks data
-    if (test.test_mode === 'offline' && mark) {
+    if (!isOnline && mark) {
       const score = mark.marks_obtained || 0;
       const total = mark.max_marks || 0;
       const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
-      return {
-        score,
-        total,
-        percentage,
-      };
+      return { score, total, percentage };
     }
     return null;
   };
 
   const scoreDisplay = getScoreDisplay();
+  const modeIcon = isOnline ? Monitor : FileCheck;
+  const modeColor = isOnline ? colors.primary[600] : colors.secondary[600];
+  const modeBg = isOnline ? colors.primary[50] : colors.secondary[50];
 
   return (
-    <Card style={styles.card}>
-      <View style={styles.cardContent}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={2}>
-              {test.title}
-            </Text>
+    <View style={styles.card}>
+      <Pressable
+        android_ripple={{ color: colors.primary[100] }}
+        style={({ pressed }) => [
+          styles.cardPressable,
+          pressed && styles.cardPressed
+        ]}
+      >
+        <View style={styles.cardInner}>
+          {/* Icon */}
+          <View style={[styles.testIcon, { backgroundColor: modeBg }]}>
+            {React.createElement(modeIcon, { size: 20, color: modeColor })}
           </View>
 
-          <View style={styles.badges}>
-            {test.test_mode === 'online' ? (
-              <View style={[styles.badge, styles.badgeOnline]}>
-                <Text style={styles.badgeText}>ONLINE</Text>
-              </View>
-            ) : (
-              <View style={[styles.badge, styles.badgeOffline]}>
-                <Text style={styles.badgeText}>OFFLINE</Text>
-              </View>
-            )}
-
-            <View style={[styles.statusBadge, { backgroundColor: statusConfig.backgroundColor }]}>
-              <StatusIcon size={14} color={statusConfig.color} />
-              <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                {statusConfig.label}
+          {/* Content */}
+          <View style={styles.testDetails}>
+            <View style={styles.titleRow}>
+              <Text style={styles.testTitle} numberOfLines={2}>
+                {test.title}
               </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Test Info */}
-        <View style={styles.infoSection}>
-          <View style={styles.infoRow}>
-            <BookOpen size={16} color={colors.text.secondary} />
-            <Text style={styles.infoText}>{test.subject_name}</Text>
-          </View>
-
-          {test.test_date && (
-            <View style={styles.infoRow}>
-              <Calendar size={16} color={colors.text.secondary} />
-              <Text style={styles.infoText}>
-                {format(new Date(test.test_date), 'MMM dd, yyyy')}
-              </Text>
-            </View>
-          )}
-
-          {test.time_limit_seconds && test.test_mode === 'online' && (
-            <View style={styles.infoRow}>
-              <Clock size={16} color={colors.text.secondary} />
-              <Text style={styles.infoText}>
-                {Math.floor(test.time_limit_seconds / 60)} minutes
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Score Display (if completed) */}
-        {scoreDisplay && (
-          <View style={styles.scoreSection}>
-            <View style={styles.scoreCard}>
-              <Text style={styles.scoreLabel}>Your Score</Text>
-              <View style={styles.scoreDisplay}>
-                <Text style={styles.scoreValue}>
-                  {scoreDisplay.score}/{scoreDisplay.total}
+              <View style={[styles.statusBadge, { backgroundColor: statusConfig.backgroundColor }]}>
+                <StatusIcon size={14} color={statusConfig.color} />
+                <Text style={[styles.statusText, { color: statusConfig.color }]}>
+                  {statusConfig.label}
                 </Text>
-                <View style={styles.percentageBadge}>
-                  <Text style={styles.percentageText}>{scoreDisplay.percentage}%</Text>
+              </View>
+            </View>
+
+            {/* Meta Info */}
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <BookOpen size={14} color={colors.text.secondary} />
+                <Text style={styles.metaText}>{test.subject_name}</Text>
+              </View>
+              {test.test_date && (
+                <>
+                  <View style={styles.metaDot} />
+                  <View style={styles.metaItem}>
+                    <Calendar size={14} color={colors.text.secondary} />
+                    <Text style={styles.metaText}>
+                      {format(new Date(test.test_date), 'MMM dd')}
+                    </Text>
+                  </View>
+                </>
+              )}
+              {test.time_limit_seconds && isOnline && (
+                <>
+                  <View style={styles.metaDot} />
+                  <View style={styles.metaItem}>
+                    <Clock size={14} color={colors.text.secondary} />
+                    <Text style={styles.metaText}>
+                      {Math.floor(test.time_limit_seconds / 60)}m
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            {/* Score Display */}
+            {scoreDisplay && (
+              <View style={styles.scoreSection}>
+                <View style={styles.scoreRow}>
+                  <Text style={styles.scoreLabel}>Score:</Text>
+                  <View style={styles.scoreDisplay}>
+                    <Text style={styles.scoreValue}>
+                      {scoreDisplay.score}/{scoreDisplay.total}
+                    </Text>
+                    <View style={styles.percentageBadge}>
+                      <Text style={styles.percentageText}>{scoreDisplay.percentage}%</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
-            </View>
-          </View>
-        )}
+            )}
 
-        {/* Additional Info */}
-        <View style={styles.additionalInfo}>
-          {test.test_mode === 'online' && (
-            <Text style={styles.additionalText}>
-              {test.question_count || 0} Questions
-            </Text>
-          )}
-          {test.test_mode === 'offline' && (
-            <Text style={styles.additionalText}>
-              Max Marks: {test.max_marks || 100}
-            </Text>
-          )}
-        </View>
-
-        {/* Action Buttons */}
-        {test.test_mode === 'online' ? (
-          canTakeTest ? (
-            status === 'completed' && test.allow_reattempts ? (
-              // Show both View Result and Retake for completed tests with reattempts allowed
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.secondaryButton]}
-                  onPress={handleViewResults}
-                >
-                  <CheckCircle size={20} color={colors.success[600]} />
-                  <Text style={styles.secondaryButtonText}>View Result</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: colors.primary[600] }]}
-                  onPress={handleStartTest}
-                >
-                  <RotateCcw size={20} color={colors.text.inverse} />
-                  <Text style={styles.actionButtonText}>Retake Test</Text>
-                </TouchableOpacity>
+            {/* Action Button */}
+            {isOnline ? (
+              canTakeTest ? (
+                status === 'completed' && test.allow_reattempts ? (
+                  <View style={styles.buttonRow}>
+                    <TouchableOpacity
+                      style={styles.secondaryButton}
+                      onPress={handleViewResults}
+                    >
+                      <CheckCircle size={18} color={colors.success[600]} />
+                      <Text style={styles.secondaryButtonText}>View Result</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.primaryButton, { backgroundColor: colors.primary[600] }]}
+                      onPress={handleStartTest}
+                    >
+                      <RotateCcw size={18} color={colors.text.inverse} />
+                      <Text style={styles.primaryButtonText}>Retake</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : status === 'completed' ? (
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { backgroundColor: colors.success[600] }]}
+                    onPress={handleViewResults}
+                  >
+                    <CheckCircle size={18} color={colors.text.inverse} />
+                    <Text style={styles.primaryButtonText}>View Result</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { backgroundColor: statusConfig.buttonColor }]}
+                    onPress={handleStartTest}
+                  >
+                    <StatusIcon size={18} color={colors.text.inverse} />
+                    <Text style={styles.primaryButtonText}>{statusConfig.buttonText}</Text>
+                  </TouchableOpacity>
+                )
+              ) : (
+                <View style={styles.unavailableBadge}>
+                  <AlertCircle size={14} color={colors.text.secondary} />
+                  <Text style={styles.unavailableText}>
+                    {test.status !== 'active' ? 'Test not active' : 'Not available yet'}
+                  </Text>
+                </View>
+              )
+            ) : (
+              <View style={styles.offlineBadge}>
+                {mark ? (
+                  <>
+                    <CheckCircle size={14} color={colors.success[600]} />
+                    <Text style={styles.offlineText}>
+                      Marks uploaded
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle size={14} color={colors.text.secondary} />
+                    <Text style={styles.offlineText}>
+                      Offline test - marks pending
+                    </Text>
+                  </>
+                )}
               </View>
-            ) : status === 'completed' && !test.allow_reattempts ? (
-              // Show only View Result for completed tests without reattempts
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: colors.success[600] }]}
-                onPress={handleViewResults}
-              >
-                <CheckCircle size={20} color={colors.text.inverse} />
-                <Text style={styles.actionButtonText}>View Result</Text>
-              </TouchableOpacity>
-            ) : (
-              // Show Start/Continue for not started or in progress tests
-              <TouchableOpacity
-                style={[
-                  styles.actionButton,
-                  { backgroundColor: statusConfig.buttonColor },
-                ]}
-                onPress={handleStartTest}
-              >
-                <Play size={20} color={colors.text.inverse} />
-                <Text style={styles.actionButtonText}>{statusConfig.buttonText}</Text>
-              </TouchableOpacity>
-            )
-          ) : (
-            <View style={styles.unavailableButton}>
-              <Text style={styles.unavailableText}>
-                {test.status !== 'active' ? 'Test not active' : 'Not available yet'}
-              </Text>
-            </View>
-          )
-        ) : (
-          <View style={styles.offlineNotice}>
-            {mark ? (
-              <>
-                <CheckCircle size={16} color={colors.success[600]} />
-                <Text style={styles.offlineText}>
-                  Marks have been uploaded. Check your score above.
-                </Text>
-              </>
-            ) : (
-              <>
-                <AlertCircle size={16} color={colors.text.secondary} />
-                <Text style={styles.offlineText}>
-                  This is an offline test. Your teacher will upload marks after evaluation.
-                </Text>
-              </>
             )}
           </View>
-        )}
-      </View>
-    </Card>
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   card: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    ...shadows.sm,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
   },
-  cardContent: {
-    padding: spacing.sm,
+  cardPressable: {
+    backgroundColor: colors.surface.primary,
   },
-  header: {
-    marginBottom: spacing.sm,
+  cardPressed: {
+    opacity: 0.7,
+  },
+  cardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  testIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  testDetails: {
+    flex: 1,
+    gap: spacing.xs,
   },
   titleRow: {
-    marginBottom: spacing.xs,
-  },
-  title: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    lineHeight: typography.fontSize.lg * 1.3,
-  },
-  badges: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
   },
-  badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  badgeOnline: {
-    backgroundColor: colors.primary[600],
-  },
-  badgeOffline: {
-    backgroundColor: colors.secondary[600],
-  },
-  badgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
+  testTitle: {
+    flex: 1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    lineHeight: typography.fontSize.base * 1.4,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.xs / 2,
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs / 2,
     borderRadius: borderRadius.sm,
+    flexShrink: 0,
   },
   statusText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
   },
-  infoSection: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  infoRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing.xs,
   },
-  infoText: {
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs / 2,
+  },
+  metaText: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: colors.text.tertiary,
   },
   scoreSection: {
-    marginBottom: spacing.sm,
+    paddingTop: spacing.xs,
   },
-  scoreCard: {
-    backgroundColor: colors.success[50],
+  scoreRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: isDark ? colors.success[100] : colors.success[50],
     padding: spacing.sm,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.success[200],
   },
   scoreLabel: {
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
     color: colors.success[700],
-    marginBottom: spacing.xs,
     fontWeight: typography.fontWeight.medium,
   },
   scoreDisplay: {
@@ -395,34 +377,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   scoreValue: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
     color: colors.success[700],
   },
   percentageBadge: {
     backgroundColor: colors.success[600],
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs / 2,
+    borderRadius: borderRadius.sm,
   },
   percentageText: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.inverse,
-  },
-  additionalInfo: {
-    marginBottom: spacing.sm,
-  },
-  additionalText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    fontWeight: typography.fontWeight.medium,
   },
   buttonRow: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  actionButton: {
+  primaryButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -433,9 +407,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     ...shadows.sm,
   },
-  actionButtonText: {
+  primaryButtonText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
   },
   secondaryButton: {
@@ -447,32 +421,34 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.success[50],
-    borderWidth: 2,
+    backgroundColor: isDark ? colors.success[100] : colors.success[50],
+    borderWidth: 1.5,
     borderColor: colors.success[600],
   },
   secondaryButtonText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.success[600],
   },
-  unavailableButton: {
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.neutral[100],
+  unavailableBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    backgroundColor: colors.neutral[100],
+    borderRadius: borderRadius.md,
   },
   unavailableText: {
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     fontWeight: typography.fontWeight.medium,
   },
-  offlineNotice: {
+  offlineBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: colors.warning[50],
+    gap: spacing.xs,
+    padding: spacing.sm,
+    backgroundColor: isDark ? colors.warning[100] : colors.warning[50],
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.warning[200],
@@ -481,6 +457,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.fontSize.sm,
     color: colors.warning[700],
-    lineHeight: typography.fontSize.sm * 1.4,
+    fontWeight: typography.fontWeight.medium,
   },
 });

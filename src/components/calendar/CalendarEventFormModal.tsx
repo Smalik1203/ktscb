@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   View,
   ScrollView,
@@ -6,17 +7,17 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Text, Modal, Portal, Button, TextInput, Switch, Chip } from 'react-native-paper';
-import { colors, spacing, borderRadius, typography } from '../../../lib/design-system';
 import { Calendar as CalendarIcon, Clock, X } from 'lucide-react-native';
 import { DatePickerModal } from '../common/DatePickerModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 
 interface CalendarEventFormModalProps {
   visible: boolean;
   event?: any;
   academicYearId?: string;
   schoolCode: string;
-  classes: { id: string; grade: number; section?: string }[];
+  classes: { id: string; grade: number | null; section?: string | null }[];
   isHoliday?: boolean;
   userId: string;
   onCancel: () => void;
@@ -35,12 +36,12 @@ const EVENT_TYPES = [
 
 const EVENT_COLORS = [
   '#ff4d4f', // Red
-  '#1890ff', // Blue
-  '#faad14', // Orange
-  '#52c41a', // Green
-  '#722ed1', // Purple
-  '#eb2f96', // Pink
-  '#8c8c8c', // Gray
+  '#2678BE', // Blue
+  '#f59e0b', // Orange
+  '#10B981', // Green
+  '#8B5CF6', // Purple
+  '#EC4899', // Pink
+  '#6B7280', // Gray
 ];
 
 export default function CalendarEventFormModal({
@@ -54,6 +55,12 @@ export default function CalendarEventFormModal({
   onCancel,
   onSuccess,
 }: CalendarEventFormModalProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [eventType, setEventType] = useState('assembly');
@@ -63,7 +70,7 @@ export default function CalendarEventFormModal({
   const [isAllDay, setIsAllDay] = useState(true);
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date());
-  const [color, setColor] = useState('#1890ff');
+  const [color, setColor] = useState('#2678BE');
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -88,14 +95,14 @@ export default function CalendarEventFormModal({
         setIsAllDay(event.is_all_day ?? true);
         setStartTime(event.start_time ? new Date(`2000-01-01T${event.start_time}`) : new Date());
         setEndTime(event.end_time ? new Date(`2000-01-01T${event.end_time}`) : new Date());
-        setColor(event.color || '#1890ff');
+        setColor(event.color || '#2678BE');
         setIsActive(event.is_active ?? true);
       } else {
         // Create mode
         resetForm();
         if (isHoliday) {
           setEventType('holiday');
-          setColor('#faad14');
+          setColor('#f59e0b');
         }
       }
     }
@@ -111,7 +118,7 @@ export default function CalendarEventFormModal({
     setIsAllDay(true);
     setStartTime(new Date());
     setEndTime(new Date());
-    setColor('#1890ff');
+    setColor('#2678BE');
     setIsActive(true);
   };
 
@@ -230,7 +237,7 @@ export default function CalendarEventFormModal({
                     styles.chip,
                     eventType === type.value && styles.chipSelected,
                   ]}
-                  textStyle={eventType === type.value && styles.chipTextSelected}
+                  textStyle={eventType === type.value ? styles.chipTextSelected : undefined}
                 >
                   {type.label}
                 </Chip>
@@ -503,7 +510,14 @@ export default function CalendarEventFormModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (
+  colors: ThemeColors,
+  typography: Typography,
+  spacing: Spacing,
+  borderRadius: BorderRadius,
+  shadows: Shadows
+) =>
+  StyleSheet.create({
   modalContainer: {
     backgroundColor: colors.background.card,
     marginHorizontal: spacing.md,
@@ -663,4 +677,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-

@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Text as RNText, RefreshControl } from 'react-native';
 import { Text, ActivityIndicator } from 'react-native-paper';
 import { Calendar, Coffee, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
+import { spacing, borderRadius, shadows } from '../../theme/tokens';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
-import { format, subDays, addDays } from 'date-fns';
+import { format, isToday as isTodayFn } from 'date-fns';
 import { supabase } from '../../data/supabaseClient';
+import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 
 interface TimetableSlot {
   id: string;
@@ -27,7 +29,17 @@ interface TimetableSlot {
 }
 
 // Period Card Component
-function PeriodCard({ slot, isTaught }: { slot: TimetableSlot; isTaught: boolean }) {
+function PeriodCard({ 
+  slot, 
+  isTaught, 
+  colors, 
+  styles 
+}: { 
+  slot: TimetableSlot; 
+  isTaught: boolean;
+  colors: ThemeColors;
+  styles: ReturnType<typeof createStyles>;
+}) {
   const formatTime = (time24?: string | null) => {
     if (!time24) return '--:--';
     const parts = time24.split(':');
@@ -43,7 +55,7 @@ function PeriodCard({ slot, isTaught }: { slot: TimetableSlot; isTaught: boolean
   // Determine if period is current, upcoming, or past
   const now = new Date();
   const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-  const isToday = dayjs(slot.class_date).isSame(dayjs(), 'day');
+  const isToday = isTodayFn(new Date(slot.class_date));
   const isCurrent = isToday && currentTime >= slot.start_time && currentTime <= slot.end_time;
   const isUpcoming = isToday && slot.start_time > currentTime;
   const isPast = isToday && slot.end_time < currentTime;
@@ -103,6 +115,7 @@ function PeriodCard({ slot, isTaught }: { slot: TimetableSlot; isTaught: boolean
 
 export function StudentTimetableScreen() {
   const { profile } = useAuth();
+  const { colors, typography, spacing: themeSpacing, borderRadius: themeBorderRadius, shadows: themeShadows, isDark } = useTheme();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -110,6 +123,12 @@ export function StudentTimetableScreen() {
   const [slots, setSlots] = useState<TimetableSlot[]>([]);
   const [taughtSlotIds, setTaughtSlotIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(
+    () => createStyles(colors, typography, themeSpacing, themeBorderRadius, themeShadows, isDark),
+    [colors, typography, themeSpacing, themeBorderRadius, themeShadows, isDark]
+  );
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
@@ -124,8 +143,6 @@ export function StudentTimetableScreen() {
       if (showLoading) setLoading(true);
       setError(null);
 
-      console.log('[StudentTimetable] Fetching for date:', dateStr, 'class:', profile.class_instance_id);
-
       // 1. Fetch timetable slots
       const { data: slotsData, error: slotsError } = await supabase
         .from('timetable_slots')
@@ -136,8 +153,6 @@ export function StudentTimetableScreen() {
 
       if (slotsError) throw slotsError;
 
-      console.log('[StudentTimetable] Found slots:', slotsData?.length || 0);
-
       if (!slotsData || slotsData.length === 0) {
         setSlots([]);
         setTaughtSlotIds(new Set());
@@ -146,9 +161,9 @@ export function StudentTimetableScreen() {
       }
 
       // 2. Get subject IDs and teacher IDs
-      const subjectIds = [...new Set(slotsData.map(s => s.subject_id).filter(Boolean))];
-      const teacherIds = [...new Set(slotsData.map(s => s.teacher_id).filter(Boolean))];
-      const topicIds = [...new Set(slotsData.map(s => s.syllabus_topic_id).filter(Boolean))];
+      const subjectIds = [...new Set(slotsData.map(s => s.subject_id).filter((id): id is string => Boolean(id)))];
+      const teacherIds = [...new Set(slotsData.map(s => s.teacher_id).filter((id): id is string => Boolean(id)))];
+      const topicIds = [...new Set(slotsData.map(s => s.syllabus_topic_id).filter((id): id is string => Boolean(id)))];
 
       // 3. Fetch subjects, teachers, and topics in parallel
       const [subjectsRes, teachersRes, topicsRes] = await Promise.all([
@@ -174,24 +189,17 @@ export function StudentTimetableScreen() {
         .eq('class_instance_id', profile.class_instance_id)
         .eq('date', dateStr);
 
-      if (progressError) {
-        console.warn('[StudentTimetable] Error fetching progress:', progressError);
-      }
-
       const taughtIds = new Set(
         (progressData || []).map(p => p.timetable_slot_id).filter(Boolean)
       );
-
-      console.log('[StudentTimetable] Progress records:', progressData?.length || 0);
-      console.log('[StudentTimetable] Taught slot IDs:', Array.from(taughtIds));
 
       // 5. Enrich slots with subject/teacher/topic names
       const enrichedSlots = slotsData.map(slot => ({
         ...slot,
         slot_type: slot.slot_type as 'period' | 'break',
-        subject_name: slot.subject_id ? subjectsMap.get(slot.subject_id) : null,
-        teacher_name: slot.teacher_id ? teachersMap.get(slot.teacher_id) : null,
-        topic_title: slot.syllabus_topic_id ? topicsMap.get(slot.syllabus_topic_id) : null,
+        subject_name: slot.subject_id ? subjectsMap.get(slot.subject_id) : undefined,
+        teacher_name: slot.teacher_id ? teachersMap.get(slot.teacher_id) : undefined,
+        topic_title: slot.syllabus_topic_id ? topicsMap.get(slot.syllabus_topic_id) : undefined,
       }));
 
       setSlots(enrichedSlots);
@@ -269,7 +277,7 @@ export function StudentTimetableScreen() {
             <View style={styles.filterContent}>
               <Text style={styles.filterLabel}>Date</Text>
               <Text style={styles.filterValue} numberOfLines={1}>
-                {format(selectedDate, 'MMM D, YYYY')}
+                {format(selectedDate, 'MMM d, yyyy')}
               </Text>
             </View>
           </TouchableOpacity>
@@ -293,7 +301,7 @@ export function StudentTimetableScreen() {
           <EmptyStateIllustration
             type="calendar"
             title="No Classes Scheduled"
-            description={`No classes scheduled for ${format(selectedDate, 'MMMM D, YYYY')}`}
+            description={`No classes scheduled for ${format(selectedDate, 'MMMM d, yyyy')}`}
           />
         ) : (
           <View style={styles.slotsContainer}>
@@ -302,6 +310,8 @@ export function StudentTimetableScreen() {
                 key={slot.id}
                 slot={slot}
                 isTaught={taughtSlotIds.has(slot.id)}
+                colors={colors}
+                styles={styles}
               />
             ))}
           </View>
@@ -325,7 +335,14 @@ export function StudentTimetableScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (
+  colors: ThemeColors,
+  typography: Typography,
+  spacing: Spacing,
+  borderRadius: BorderRadius,
+  shadows: Shadows,
+  isDark: boolean
+) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,
@@ -382,8 +399,10 @@ const styles = StyleSheet.create({
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: isDark ? 0.3 : 0.1,
     shadowRadius: 4,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border.DEFAULT,
   },
   filterItem: {
     flex: 1,
@@ -434,6 +453,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderLeftWidth: 4,
     ...shadows.sm,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border.DEFAULT,
   },
   currentCard: {
     borderWidth: 2,
@@ -449,7 +470,7 @@ const styles = StyleSheet.create({
   },
   taughtCard: {
     borderLeftColor: colors.success[600],
-    backgroundColor: colors.success[50],
+    backgroundColor: isDark ? colors.success[100] : colors.success[50],
   },
   pendingCard: {
     borderLeftColor: colors.primary[600],
@@ -493,7 +514,7 @@ const styles = StyleSheet.create({
 
   // Break Card Styles
   breakCard: {
-    backgroundColor: colors.warning[50],
+    backgroundColor: isDark ? colors.warning[100] : colors.warning[50],
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     flexDirection: 'row',

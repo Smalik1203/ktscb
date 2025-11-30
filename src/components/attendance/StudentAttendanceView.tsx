@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Text, Card, ActivityIndicator, SegmentedButtons } from 'react-native-paper';
 import {
@@ -13,7 +15,7 @@ import {
 } from 'lucide-react-native';
 import { useStudentAttendance } from '../../hooks/useAttendance';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
+import { typography, spacing, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { ThreeStateView } from '../common/ThreeStateView';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { supabase } from '../../data/supabaseClient';
@@ -27,6 +29,9 @@ interface AttendanceRecord {
 }
 
 export const StudentAttendanceView: React.FC = () => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const { profile } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
   const [studentId, setStudentId] = useState<string | null>(null);
@@ -489,7 +494,8 @@ export const StudentAttendanceView: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,

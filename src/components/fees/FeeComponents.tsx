@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Platform, ToastAndroid } from 'react-native';
 import { Text, Button, ActivityIndicator, Portal, Modal as PaperModal, IconButton } from 'react-native-paper';
 import { Plus, Edit, Trash2, X, DollarSign, Search, Settings2 } from 'lucide-react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, spacing, borderRadius, shadows, typography } from '../../../lib/design-system';
+import { spacing, borderRadius, shadows, typography, colors } from '../../../lib/design-system';
 
 interface FeeComponent {
   id: string;
@@ -54,6 +56,9 @@ const formatAmount = (amount: number | null) => {
 };
 
 export function FeeComponents({ schoolCode }: FeeComponentsProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const [showModal, setShowModal] = useState(false);
   const [editingComponent, setEditingComponent] = useState<FeeComponent | null>(null);
   const [componentName, setComponentName] = useState('');
@@ -123,7 +128,7 @@ export function FeeComponents({ schoolCode }: FeeComponentsProps) {
     }
     
     // Amount is optional - if provided, validate it
-    let amountInr = null;
+    let amountInr: number | null = null;
     if (componentAmount.trim()) {
       if (isNaN(parseFloat(componentAmount))) {
         Alert.alert('Error', 'Enter valid amount');
@@ -489,7 +494,8 @@ export function FeeComponents({ schoolCode }: FeeComponentsProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.secondary,

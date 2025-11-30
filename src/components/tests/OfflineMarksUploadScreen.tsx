@@ -19,28 +19,16 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestMarks, useCreateBulkMarks } from '../../hooks/tests';
 import { useStudents } from '../../hooks/useStudents';
 import { useAuth } from '../../contexts/AuthContext';
-
-// Mobile-native colors
-const COLORS = {
-  primary: '#6A4DFF',
-  primaryLight: '#E8E3FF',
-  background: '#F9FAFB',
-  surface: '#FFFFFF',
-  text: {
-    primary: '#111827',
-    secondary: '#6B7280',
-    tertiary: '#9CA3AF',
-  },
-  success: '#10B981',
-  successLight: '#D1FAE5',
-  border: '#E5E7EB',
-  shadow: 'rgba(0, 0, 0, 0.08)',
-};
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
+import { spacing, borderRadius, colors } from '../../../lib/design-system';
 
 export function OfflineMarksUploadScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user, profile } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const testId = params.testId as string;
   const testTitle = params.testTitle as string;
@@ -50,7 +38,7 @@ export function OfflineMarksUploadScreen() {
   const { data: existingMarks = [], isLoading: marksLoading } = useTestMarks(testId);
   const { data: studentsResponse, isLoading: studentsLoading } = useStudents(
     classInstanceId,
-    profile?.school_code
+    profile?.school_code || ''
   );
   const students = studentsResponse?.data || [];
   const createBulkMarks = useCreateBulkMarks();
@@ -62,17 +50,6 @@ export function OfflineMarksUploadScreen() {
   const inputRefs = useRef<{ [key: string]: TextInput | null }>({});
   const flatListRef = useRef<FlatList>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
-
-  // Debug logging
-  React.useEffect(() => {
-    console.log('OfflineMarksUploadScreen - Debug Info:', {
-      testId,
-      classInstanceId,
-      schoolCode: profile?.school_code,
-      studentsCount: students.length,
-      studentsLoading,
-    });
-  }, [testId, classInstanceId, profile?.school_code, students, studentsLoading]);
 
   // Initialize marks from existing data
   React.useEffect(() => {
@@ -247,36 +224,40 @@ export function OfflineMarksUploadScreen() {
     if (!validateMarks()) return;
 
     Alert.alert(
-      'Save Marks',
-      `You have entered marks for ${progress.marked} out of ${progress.total} students. Do you want to save?`,
+      'Confirm Save',
+      `Save marks for ${progress.marked} students?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Save',
+          style: 'default',
           onPress: async () => {
+            setSaving(true);
             try {
-              setSaving(true);
-
-              const marksData = students
+              // Prepare marks data for bulk insert
+              const marksToSave = students
                 .filter((student: any) => {
                   const studentMarks = marks[student.id];
                   return studentMarks?.marks && studentMarks.marks.trim() !== '';
                 })
-                .map((student: any) => ({
-                  test_id: testId,
-                  student_id: student.id,
-                  marks_obtained: parseFloat(marks[student.id].marks),
-                  max_marks: maxMarks,
-                  remarks: marks[student.id].remarks || null,
-                  created_by: user?.id,
-                }));
+                .map((student: any) => {
+                  const studentMarks = marks[student.id];
+                  return {
+                    test_id: testId,
+                    student_id: student.id,
+                    marks_obtained: parseFloat(studentMarks.marks),
+                    max_marks: maxMarks,
+                    remarks: studentMarks.remarks || undefined,
+                    created_by: user?.id,
+                  };
+                });
 
-              await createBulkMarks.mutateAsync(marksData);
-
-              Alert.alert('Success', 'Marks saved successfully', [
+              await createBulkMarks.mutateAsync(marksToSave);
+              Alert.alert('Success', 'Marks saved successfully!', [
                 { text: 'OK', onPress: () => router.back() },
               ]);
             } catch (error: any) {
+              console.error('Save error:', error);
               Alert.alert('Error', error.message || 'Failed to save marks');
             } finally {
               setSaving(false);
@@ -291,7 +272,7 @@ export function OfflineMarksUploadScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={colors.primary.main} />
           <Text style={styles.loadingText}>Loading students...</Text>
         </View>
       </SafeAreaView>
@@ -304,7 +285,7 @@ export function OfflineMarksUploadScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft size={24} color={COLORS.text.primary} />
+            <ArrowLeft size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>Upload Marks</Text>
@@ -339,7 +320,7 @@ export function OfflineMarksUploadScreen() {
         {/* Simple Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <ArrowLeft size={22} color={COLORS.text.primary} />
+            <ArrowLeft size={22} color={colors.text.primary} />
           </TouchableOpacity>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>{testTitle}</Text>
@@ -377,11 +358,11 @@ export function OfflineMarksUploadScreen() {
                     onChangeText={(text) => updateMarks(item.id, text)}
                     keyboardType="number-pad"
                     maxLength={3}
-                    placeholderTextColor={COLORS.text.tertiary}
+                    placeholderTextColor={colors.text.tertiary}
                   />
                   {hasMarks && (
                     <View style={styles.checkIcon}>
-                      <Check size={14} color={COLORS.success} strokeWidth={3} />
+                      <Check size={14} color={colors.success[600]} strokeWidth={3} />
                     </View>
                   )}
                 </View>
@@ -399,7 +380,7 @@ export function OfflineMarksUploadScreen() {
             activeOpacity={0.8}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={COLORS.surface} />
+              <ActivityIndicator size="small" color={colors.surface.primary} />
             ) : (
               <Text style={styles.saveButtonText}>Save All Marks</Text>
             )}
@@ -410,10 +391,10 @@ export function OfflineMarksUploadScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.neutral[50],
   },
   loadingContainer: {
     flex: 1,
@@ -423,7 +404,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 15,
-    color: COLORS.text.secondary,
+    color: colors.text.secondary,
     fontWeight: '500',
   },
   backButton: {
@@ -434,9 +415,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface.primary,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: colors.border.DEFAULT,
     gap: 12,
   },
   headerContent: {
@@ -445,18 +426,18 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: COLORS.text.primary,
+    color: colors.text.primary,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: COLORS.text.secondary,
+    color: colors.text.secondary,
     fontWeight: '500',
     marginTop: 2,
   },
   progressText: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: colors.primary.main,
   },
   listContent: {
     padding: 20,
@@ -468,10 +449,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface.primary,
     borderRadius: 12,
     marginBottom: 8,
-    shadowColor: COLORS.shadow,
+    shadowColor: colors.surface.overlay,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 1,
     shadowRadius: 3,
@@ -486,7 +467,7 @@ const styles = StyleSheet.create({
   studentNumber: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.text.tertiary,
+    color: colors.text.tertiary,
     width: 24,
   },
   studentDetails: {
@@ -495,12 +476,12 @@ const styles = StyleSheet.create({
   studentName: {
     fontSize: 15,
     fontWeight: '600',
-    color: COLORS.text.primary,
+    color: colors.text.primary,
     marginBottom: 2,
   },
   studentCode: {
     fontSize: 12,
-    color: COLORS.text.secondary,
+    color: colors.text.secondary,
     fontWeight: '500',
   },
   inputWrapper: {
@@ -509,20 +490,20 @@ const styles = StyleSheet.create({
   marksInput: {
     width: 56,
     height: 48,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.neutral[50],
     borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 17,
     fontWeight: '600',
-    color: COLORS.text.primary,
+    color: colors.text.primary,
     textAlign: 'center',
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: colors.border.DEFAULT,
   },
   marksInputFilled: {
-    borderColor: COLORS.success,
-    backgroundColor: COLORS.successLight,
-    color: COLORS.success,
+    borderColor: colors.success[600],
+    backgroundColor: colors.success[50],
+    color: colors.success[600],
   },
   checkIcon: {
     position: 'absolute',
@@ -531,10 +512,10 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: COLORS.shadow,
+    shadowColor: colors.surface.overlay,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 1,
     shadowRadius: 2,
@@ -548,10 +529,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     paddingBottom: Platform.OS === 'ios' ? 32 : 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface.primary,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    shadowColor: COLORS.shadow,
+    borderTopColor: colors.border.DEFAULT,
+    shadowColor: colors.surface.overlay,
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 1,
     shadowRadius: 8,
@@ -559,7 +540,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     paddingVertical: 16,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary.main,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -570,18 +551,18 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.surface,
+    color: colors.text.inverse,
   },
   errorText: {
     fontSize: 18,
     fontWeight: '600',
-    color: COLORS.text.primary,
+    color: colors.text.primary,
     textAlign: 'center',
     marginBottom: 16,
   },
   errorSubtext: {
     fontSize: 14,
-    color: COLORS.text.secondary,
+    color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: 8,
     fontWeight: '500',
@@ -590,13 +571,13 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingHorizontal: 32,
     paddingVertical: 16,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary.main,
     borderRadius: 12,
   },
   retryButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: COLORS.surface,
+    color: colors.text.inverse,
     textAlign: 'center',
   },
 });

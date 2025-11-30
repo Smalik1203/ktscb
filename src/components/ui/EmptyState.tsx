@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Inbox } from 'lucide-react-native';
-import { colors, spacing, typography } from '../../../lib/design-system';
+import { spacing, typography, colors } from '../../../lib/design-system';
 import { Button } from './Button';
 
 interface EmptyStateProps {
@@ -22,6 +24,8 @@ export function EmptyState({
   onAction,
   variant = 'screen',
 }: EmptyStateProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   return (
     <View style={variant === 'card' ? styles.cardContainer : styles.container}>
       {icon || <Inbox size={64} color={colors.neutral[300]} />}
@@ -39,7 +43,8 @@ export function EmptyState({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',

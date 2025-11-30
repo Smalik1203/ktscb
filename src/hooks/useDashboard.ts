@@ -268,7 +268,7 @@ export function useRecentActivity(userId: string, classInstanceId?: string) {
               type: 'attendance',
               title: `Attendance marked`,
               subtitle: `${new Date(record.date).toLocaleDateString()} - ${record.status === 'present' ? 'Present' : record.status === 'absent' ? 'Absent' : 'Late'}`,
-              timestamp: record.created_at,
+              timestamp: record.created_at || new Date().toISOString(),
               icon: 'CheckSquare',
               color: record.status === 'present' ? 'success' : 'error',
             });
@@ -380,7 +380,7 @@ export function useUpcomingEvents(schoolCode: string, classInstanceId?: string) 
         title: event.title,
         date: event.start_date,
         type: event.event_type,
-        description: event.description,
+        description: event.description || undefined,
         color: event.color || '#6366f1',
       }));
     },

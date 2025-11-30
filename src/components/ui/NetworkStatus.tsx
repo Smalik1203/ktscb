@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, Animated } from 'react-native';
 import { Text } from 'react-native-paper';
 import { Wifi, WifiOff } from 'lucide-react-native';
-import { colors, spacing, typography } from '../../../lib/design-system';
+import { spacing, typography, colors } from '../../../lib/design-system';
 import { useNetworkStatus } from '../../utils/offline';
 
 export function NetworkStatus() {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const { isConnected, isInternetReachable } = useNetworkStatus();
   const slideAnim = React.useRef(new Animated.Value(-100)).current;
 
@@ -43,7 +48,8 @@ export function NetworkStatus() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     position: 'absolute',
     top: 0,

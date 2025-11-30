@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { CardSkeleton, StatCardSkeleton, ListCardSkeleton } from './CardSkeleton';
-import { colors, spacing, borderRadius } from '../../../lib/design-system';
+import { spacing, borderRadius, colors } from '../../../lib/design-system';
 
 export function DashboardSkeleton() {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -41,7 +46,8 @@ export function DashboardSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     padding: spacing['4'],

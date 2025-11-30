@@ -1,6 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, Animated, Text } from 'react-native';
-import { colors, typography, spacing } from '../../../lib/design-system';
+import { typography, spacing, colors } from '../../../lib/design-system';
 import Svg, { Circle } from 'react-native-svg';
 
 interface ProgressRingProps {
@@ -20,12 +22,18 @@ export function ProgressRing({
   progress,
   size = 80,
   strokeWidth = 8,
-  color = colors.primary[600],
-  backgroundColor = colors.neutral[200],
+  color,
+  backgroundColor,
   showPercentage = true,
   label,
   animated = true,
 }: ProgressRingProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+  
+  // Use theme colors as defaults
+  const ringColor = color ?? colors.primary[600];
+  const ringBackgroundColor = backgroundColor ?? colors.neutral[200];
   const animatedValue = useRef(new Animated.Value(0)).current;
 
   const radius = (size - strokeWidth) / 2;
@@ -58,7 +66,7 @@ export function ProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={backgroundColor}
+          stroke={ringBackgroundColor}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -68,7 +76,7 @@ export function ProgressRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={color}
+          stroke={ringColor}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={circumference}
@@ -96,7 +104,8 @@ export function ProgressRing({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     position: 'relative',
     justifyContent: 'center',

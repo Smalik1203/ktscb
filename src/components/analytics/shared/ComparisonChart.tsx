@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../../contexts/ThemeContext';
+import type { ThemeColors } from '../../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors, typography, spacing, borderRadius } from '../../../../lib/design-system';
+import { typography, spacing, borderRadius, colors } from '../../../../lib/design-system';
 
 interface ComparisonItem {
   label: string;
@@ -24,6 +26,9 @@ export const ComparisonChart = React.memo<ComparisonChartProps>(({
   items,
   variant = 'syllabus',
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const isSyllabusStyle = variant === 'syllabus';
 
   return (
@@ -81,7 +86,10 @@ export const ComparisonChart = React.memo<ComparisonChartProps>(({
   );
 });
 
-const styles = StyleSheet.create({
+ComparisonChart.displayName = 'ComparisonChart';
+
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     marginBottom: spacing.md,
   },

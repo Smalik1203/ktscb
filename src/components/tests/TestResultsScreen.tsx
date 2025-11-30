@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import {
   View,
   Text,
@@ -12,9 +14,12 @@ import { ArrowLeft, CheckCircle, XCircle, Clock, Award } from 'lucide-react-nati
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestQuestions, useStudentAttempts } from '../../hooks/tests';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 
 export function TestResultsScreen() {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const router = useRouter();
   const params = useLocalSearchParams();
   const testId = params.testId as string;
@@ -318,7 +323,8 @@ export function TestResultsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.primary,

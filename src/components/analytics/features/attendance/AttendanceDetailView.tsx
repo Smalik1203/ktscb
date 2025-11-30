@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../../../contexts/ThemeContext';
+import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Text, Surface } from 'react-native-paper';
-import { colors, typography, spacing, borderRadius } from '../../../../../lib/design-system';
 import { SuperAdminAnalytics, TimePeriod } from '../../types';
 import { TimePeriodFilter } from '../../shared/TimePeriodFilter';
 import { MetricCard } from '../../shared/MetricCard';
@@ -10,13 +11,19 @@ interface AttendanceDetailViewProps {
   data: SuperAdminAnalytics;
   timePeriod: TimePeriod;
   setTimePeriod: (period: TimePeriod) => void;
+  dateRange: { startDate: string; endDate: string };
+  onDateRangeChange: (range: { startDate: string; endDate: string }) => void;
 }
 
 export const AttendanceDetailView: React.FC<AttendanceDetailViewProps> = ({
   data,
   timePeriod,
   setTimePeriod,
+  dateRange,
+  onDateRangeChange,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   const getAttendanceColor = (rate: number) => {
     if (rate >= 80) return colors.success[600];
     if (rate >= 50) return colors.info[600];
@@ -26,9 +33,9 @@ export const AttendanceDetailView: React.FC<AttendanceDetailViewProps> = ({
   const attendanceRate = data?.attendance?.avgRate || 0;
 
   const subtextByPeriod =
-    timePeriod === 'daily'
+    timePeriod === 'today'
       ? 'Last 7 days average'
-      : timePeriod === 'weekly'
+      : timePeriod === 'week'
       ? 'Last 30 days average'
       : 'Last 90 days average';
 
@@ -41,7 +48,12 @@ export const AttendanceDetailView: React.FC<AttendanceDetailViewProps> = ({
 
   return (
     <>
-      <TimePeriodFilter timePeriod={timePeriod} setTimePeriod={setTimePeriod} />
+      <TimePeriodFilter 
+        timePeriod={timePeriod} 
+        setTimePeriod={setTimePeriod}
+        dateRange={dateRange}
+        onDateRangeChange={onDateRangeChange}
+      />
 
       <MetricCard
         label="Overall Attendance Rate"
@@ -90,7 +102,8 @@ export const AttendanceDetailView: React.FC<AttendanceDetailViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   chartCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../../../contexts/ThemeContext';
+import type { ThemeColors } from '../../../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Text, Surface } from 'react-native-paper';
-import { colors, typography, spacing, borderRadius } from '../../../../../lib/design-system';
+import { typography, spacing, borderRadius, colors } from '../../../../../lib/design-system';
 import { SuperAdminAnalytics, TimePeriod } from '../../types';
 import { TimePeriodFilter } from '../../shared/TimePeriodFilter';
 import { MetricCard } from '../../shared/MetricCard';
@@ -11,13 +13,19 @@ interface FeesDetailViewProps {
   data: SuperAdminAnalytics;
   timePeriod: TimePeriod;
   setTimePeriod: (period: TimePeriod) => void;
+  dateRange: { startDate: string; endDate: string };
+  onDateRangeChange: (range: { startDate: string; endDate: string }) => void;
 }
 
 export const FeesDetailView: React.FC<FeesDetailViewProps> = ({
   data,
   timePeriod,
   setTimePeriod,
+  dateRange,
+  onDateRangeChange,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   const realizationRate = Math.round(data?.fees?.realizationRate || 0);
   const totalCollected = data?.fees?.totalCollected || 0;
   const totalOutstanding = data?.fees?.totalOutstanding || 0;
@@ -44,7 +52,12 @@ export const FeesDetailView: React.FC<FeesDetailViewProps> = ({
 
   return (
     <>
-      <TimePeriodFilter timePeriod={timePeriod} setTimePeriod={setTimePeriod} />
+      <TimePeriodFilter 
+        timePeriod={timePeriod} 
+        setTimePeriod={setTimePeriod}
+        dateRange={dateRange}
+        onDateRangeChange={onDateRangeChange}
+      />
 
       <MetricCard
         label="Fee Realization Rate"
@@ -106,7 +119,8 @@ export const FeesDetailView: React.FC<FeesDetailViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   chartCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,

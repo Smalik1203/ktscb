@@ -128,12 +128,12 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         subjectIds.length > 0 ? supabase
           .from('subjects')
           .select('id, subject_name')
-          .in('id', subjectIds)
+          .in('id', subjectIds.filter((id): id is string => Boolean(id)))
           .abortSignal(abortControllerRef.current.signal) : Promise.resolve({ data: [], error: null }),
         teacherIds.length > 0 ? supabase
           .from('admin')
           .select('id, full_name')
-          .in('id', teacherIds)
+          .in('id', teacherIds.filter((id): id is string => Boolean(id)))
           .abortSignal(abortControllerRef.current.signal) : Promise.resolve({ data: [], error: null })
       ]);
 
@@ -145,8 +145,8 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         throw teachersResult.error;
       }
 
-      const subjectsMap = new Map((subjectsResult.data || []).map(s => [s.id, s]));
-      const teachersMap = new Map((teachersResult.data || []).map(t => [t.id, t]));
+      const subjectsMap = new Map<string, { id: string; subject_name: string }>((subjectsResult.data || []).map(s => [s.id, s] as [string, { id: string; subject_name: string }]));
+      const teachersMap = new Map<string, { id: string; full_name: string }>((teachersResult.data || []).map(t => [t.id, t] as [string, { id: string; full_name: string }]));
 
       // Get taught slot IDs from syllabus_progress table
       const { data: progressData, error: progressError } = await supabase
@@ -178,7 +178,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         };
       });
 
-      return { slots: enrichedSlots as TimetableSlot[], taughtSlotIds };
+      return { slots: enrichedSlots as unknown as TimetableSlot[], taughtSlotIds };
     },
     enabled: !!classId && !!dateStr,
     staleTime: 2 * 60 * 1000, // 2 minutes - data stays fresh for navigation
@@ -292,6 +292,41 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         throw new Error('User not authenticated');
       }
 
+      // Check for duplicate before insert - if exists, UPDATE instead
+      const { data: existingSlot } = await supabase
+        .from('timetable_slots')
+        .select('id')
+        .eq('class_instance_id', payload.class_instance_id)
+        .eq('class_date', payload.class_date)
+        .eq('start_time', payload.start_time)
+        .eq('end_time', payload.end_time)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingSlot) {
+        // UPDATE existing slot instead of inserting
+        const { error: updateError } = await supabase
+          .from('timetable_slots')
+          .update({
+            slot_type: payload.slot_type,
+            name: payload.name,
+            subject_id: payload.subject_id,
+            teacher_id: payload.teacher_id,
+            syllabus_chapter_id: payload.syllabus_chapter_id,
+            syllabus_topic_id: payload.syllabus_topic_id,
+            plan_text: payload.plan_text,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingSlot.id);
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        await renumberSlotsSequentially(payload.class_instance_id, payload.class_date, payload.school_code);
+        return;
+      }
+
       const { error } = await supabase
         .from('timetable_slots')
         .insert({
@@ -302,10 +337,42 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
 
       if (error) {
         if (error.code === '23505') {
-          if (error.message.includes('uq_day_slot')) {
+          if (error.message?.includes('uq_tt_time_per_day') || error.details?.includes('class_instance_id, class_date, start_time, end_time')) {
+            // Constraint violation → try to UPDATE existing slot
+            const { data: existing } = await supabase
+              .from('timetable_slots')
+              .select('id')
+              .eq('class_instance_id', payload.class_instance_id)
+              .eq('class_date', payload.class_date)
+              .eq('start_time', payload.start_time)
+              .eq('end_time', payload.end_time)
+              .limit(1)
+              .maybeSingle();
+
+            if (existing) {
+              const { error: updateError } = await supabase
+                .from('timetable_slots')
+                .update({
+                  slot_type: payload.slot_type,
+                  name: payload.name,
+                  subject_id: payload.subject_id,
+                  teacher_id: payload.teacher_id,
+                  syllabus_chapter_id: payload.syllabus_chapter_id,
+                  syllabus_topic_id: payload.syllabus_topic_id,
+                  plan_text: payload.plan_text,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existing.id);
+
+              if (updateError) {
+                throw updateError;
+              }
+
+              await renumberSlotsSequentially(payload.class_instance_id, payload.class_date, payload.school_code);
+              return;
+            }
+          } else if (error.message?.includes('uq_day_slot')) {
             throw new Error('A slot with this period number already exists for this class and date. Please try again.');
-          } else if (error.message.includes('uq_tt_time_per_day')) {
-            throw new Error('A slot with overlapping time already exists for this class and date. Please choose different times.');
           }
         }
         throw error;
@@ -333,8 +400,10 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         if (error.code === '23505') {
           if (error.message.includes('uq_day_slot')) {
             throw new Error('A slot with this period number already exists for this class and date. Please try again.');
-          } else if (error.message.includes('uq_tt_time_per_day')) {
-            throw new Error('A slot with overlapping time already exists for this class and date. Please choose different times.');
+          } else if (error.message?.includes('uq_tt_time_per_day') || error.details?.includes('class_instance_id, class_date, start_time, end_time')) {
+            const duplicateError: any = new Error('A timetable entry already exists for this class, date, and time period. Please choose a different time.');
+            duplicateError.reason = 'duplicate period';
+            throw duplicateError;
           }
         }
         throw error;
@@ -417,10 +486,32 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
       // Generate new slots
       const newSlots = generateSlots(payload, userId);
 
-      // Insert all new slots
+      // Check for duplicates before insert
+      const slotsToInsert: typeof newSlots = [];
+      for (const slot of newSlots) {
+        const { data: existing } = await supabase
+          .from('timetable_slots')
+          .select('id')
+          .eq('class_instance_id', slot.class_instance_id)
+          .eq('class_date', slot.class_date)
+          .eq('start_time', slot.start_time)
+          .eq('end_time', slot.end_time)
+          .limit(1)
+          .maybeSingle();
+        
+        if (!existing) {
+          slotsToInsert.push(slot);
+        }
+      }
+
+      if (slotsToInsert.length === 0) {
+        throw new Error('All generated slots already exist');
+      }
+
+      // Insert only non-duplicate slots
       const { error: insertError } = await supabase
         .from('timetable_slots')
-        .insert(newSlots);
+        .insert(slotsToInsert);
 
       if (insertError) {
         throw insertError;
@@ -455,21 +546,28 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         throw slotError;
       }
 
-      const { error } = await supabase
-        .from('syllabus_progress')
-        .insert({
-          class_instance_id: slot.class_instance_id,
-          created_by: userId,
-          date: slot.class_date,
-          school_code: slot.school_code,
-          subject_id: slot.subject_id,
-          syllabus_chapter_id: slot.syllabus_chapter_id,
-          syllabus_topic_id: slot.syllabus_topic_id,
-          teacher_id: slot.teacher_id,
-          timetable_slot_id: slotId,
-        });
+      if (!slot) {
+        throw new Error('Slot not found');
+      }
+
+      if (!slot.school_code || !slot.class_instance_id || !slot.subject_id || !slot.teacher_id) {
+        throw new Error('School code, class instance ID, subject ID, and teacher ID are required');
+      }
+
+      // Use RPC function to mark taught
+      const { error } = await supabase.rpc('mark_syllabus_taught', {
+        p_school_code: slot.school_code,
+        p_timetable_slot_id: slotId,
+        p_class_instance_id: slot.class_instance_id,
+        p_date: slot.class_date,
+        p_subject_id: slot.subject_id,
+        p_teacher_id: slot.teacher_id,
+        p_syllabus_chapter_id: slot.syllabus_chapter_id ?? undefined,
+        p_syllabus_topic_id: slot.syllabus_topic_id ?? undefined,
+      });
 
       if (error) {
+        console.error('[markSlotTaught] RPC error:', error);
         throw error;
       }
     },
@@ -488,7 +586,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
     mutationFn: async (slotId: string) => {
       const { data: slot, error: slotError } = await supabase
         .from('timetable_slots')
-        .select('school_code, subject_id, teacher_id, syllabus_chapter_id, syllabus_topic_id')
+        .select('school_code')
         .eq('id', slotId)
         .maybeSingle();
 
@@ -496,16 +594,18 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         throw slotError;
       }
 
-      const { error } = await supabase
-        .from('syllabus_progress')
-        .delete()
-        .eq('school_code', slot.school_code)
-        .eq('subject_id', slot.subject_id)
-        .eq('teacher_id', slot.teacher_id)
-        .eq('syllabus_chapter_id', slot.syllabus_chapter_id)
-        .eq('syllabus_topic_id', slot.syllabus_topic_id);
+      if (!slot || !slot.school_code) {
+        throw new Error('Slot not found or missing school code');
+      }
+
+      // Use RPC function to unmark taught
+      const { error } = await supabase.rpc('unmark_syllabus_taught', {
+        p_school_code: slot.school_code,
+        p_timetable_slot_id: slotId,
+      });
 
       if (error) {
+        console.error('[unmarkSlotTaught] RPC error:', error);
         throw error;
       }
     },
@@ -564,8 +664,8 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
 }
 
 // Helper function to generate slots for quick generate
-function generateSlots(payload: QuickGeneratePayload, userId: string) {
-  const slots = [];
+function generateSlots(payload: QuickGeneratePayload, userId: string): any[] {
+  const slots: any[] = [];
   let currentTime = payload.startTime;
   let order = 1;
 

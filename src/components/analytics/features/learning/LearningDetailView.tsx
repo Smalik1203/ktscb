@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../../../contexts/ThemeContext';
+import type { ThemeColors } from '../../../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Text, Surface } from 'react-native-paper';
-import { colors, typography, spacing, borderRadius } from '../../../../../lib/design-system';
+import { typography, spacing, borderRadius, colors } from '../../../../../lib/design-system';
 import { SuperAdminAnalytics, TimePeriod } from '../../types';
 import { TimePeriodFilter } from '../../shared/TimePeriodFilter';
 import { MetricCard } from '../../shared/MetricCard';
@@ -10,13 +12,19 @@ interface LearningDetailViewProps {
   data: SuperAdminAnalytics;
   timePeriod: TimePeriod;
   setTimePeriod: (period: TimePeriod) => void;
+  dateRange: { startDate: string; endDate: string };
+  onDateRangeChange: (range: { startDate: string; endDate: string }) => void;
 }
 
 export const LearningDetailView: React.FC<LearningDetailViewProps> = ({
   data,
   timePeriod,
   setTimePeriod,
+  dateRange,
+  onDateRangeChange,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
   const participationRate = Math.round(data?.academics?.participationRate || 0);
 
   const getScoreColor = (score: number) => {
@@ -27,7 +35,12 @@ export const LearningDetailView: React.FC<LearningDetailViewProps> = ({
 
   return (
     <>
-      <TimePeriodFilter timePeriod={timePeriod} setTimePeriod={setTimePeriod} />
+      <TimePeriodFilter 
+        timePeriod={timePeriod} 
+        setTimePeriod={setTimePeriod}
+        dateRange={dateRange}
+        onDateRangeChange={onDateRangeChange}
+      />
 
       <MetricCard
         label="Test Participation"
@@ -80,7 +93,8 @@ export const LearningDetailView: React.FC<LearningDetailViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   chartCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,

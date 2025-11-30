@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, Refr
 import { Text, Card, Button, Chip, Portal, Modal, TextInput, SegmentedButtons, Snackbar } from 'react-native-paper';
 import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo, X } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { useUnifiedTimetable } from '../../hooks/useUnifiedTimetable';
+import { useEnhancedTimetable } from '../../hooks/useEnhancedTimetable';
 import { useSyllabusLoader } from '../../hooks/useSyllabusLoader';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
@@ -11,9 +11,15 @@ import { useAdmins } from '../../hooks/useAdmins';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { ThreeStateView } from '../common/ThreeStateView';
 import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
-import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
+import { ConflictResolutionModal } from './ConflictResolutionModal';
+import { TimelinePreviewModal } from './TimelinePreviewModal';
+import { useTheme } from '../../contexts/ThemeContext';
+import { typography, spacing, borderRadius, colors } from '../../../lib/design-system';
+import type { ThemeColors, Shadows } from '../../theme/types';
 import { format, subDays, addDays } from 'date-fns';
+import { formatDateFull } from '../../lib/date-utils';
 import { router } from 'expo-router';
+import { formatTimeForDisplay } from '../../utils/timeParser';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isTablet = screenWidth >= 768;
@@ -36,7 +42,9 @@ function CleanTimetableCard({
   isUpcomingPeriod,
   isPastPeriod,
   setSelectedSlotForMenu,
-  setShowSlotMenu
+  setShowSlotMenu,
+  styles,
+  colors,
 }: any) {
   const isTaught = taughtSlotIds.has(slot.id);
 
@@ -45,7 +53,7 @@ function CleanTimetableCard({
       <View style={styles.cleanBreakCard}>
         <View style={styles.cleanBreakContent}>
           <View style={styles.cleanBreakIcon}>
-            <Coffee size={18} color="#a16207" />
+            <Coffee size={18} color={colors.warning[800]} />
           </View>
           <View style={styles.cleanBreakText}>
             <Text style={styles.cleanBreakTitle}>{slot.name || 'Break'}</Text>
@@ -60,7 +68,7 @@ function CleanTimetableCard({
           activeOpacity={0.6}
         >
           <View style={styles.menuIconContainer}>
-            <Edit size={18} color="#0ea5e9" />
+            <Edit size={18} color={colors.info[600]} />
           </View>
         </TouchableOpacity>
       </View>
@@ -127,23 +135,25 @@ function ModernTimetableSlotCard({
   formatTime12Hour,
   isCurrentPeriod,
   isUpcomingPeriod,
-  isPastPeriod
+  isPastPeriod,
+  styles,
+  colors,
 }: any) {
   const getSubjectColor = (subjectName: string) => {
-    const colors = {
-      'Biology': '#059669', // Vibrant Green
-      'Geography': '#1d4ed8', // Deep Blue
-      'Math': '#dc2626', // Vibrant Red
-      'Chemistry': '#ea580c', // Vibrant Orange
-      'English': '#7c3aed', // Vibrant Purple
-      'Physics': '#be185d', // Vibrant Pink
-      'History': '#0891b2', // Vibrant Cyan
-      'Science': '#16a34a', // Vibrant Green
-      'Art': '#e11d48', // Vibrant Rose
-      'Music': '#9333ea', // Vibrant Violet
-      'default': '#1d4ed8' // Deep Blue
+    const colorMap: Record<string, string> = {
+      'Biology': colors.success[600],
+      'Geography': colors.info[700],
+      'Math': colors.error[700],
+      'Chemistry': colors.warning[700],
+      'English': colors.accent[600],
+      'Physics': colors.accent[700],
+      'History': colors.info[600],
+      'Science': colors.success[700],
+      'Art': colors.error[600],
+      'Music': colors.accent[600],
+      'default': colors.info[700]
     };
-    return colors[subjectName as keyof typeof colors] || colors.default;
+    return colorMap[subjectName] || colorMap.default;
   };
 
   const subjectColor = getSubjectColor(slot.subject_name || 'default');
@@ -208,7 +218,7 @@ function ModernTimetableSlotCard({
         
         <View style={styles.modernTeacherInfo}>
           <View style={styles.modernTeacherAvatar}>
-            <User size={16} color="#6b7280" />
+            <User size={16} color={colors.text.secondary} />
           </View>
           <Text style={styles.modernTeacherName}>
             {slot.teacher_name || 'No Teacher'}
@@ -250,6 +260,11 @@ function ModernTimetableSlotCard({
 
 export function ModernTimetableScreen() {
   const { profile } = useAuth();
+  const { colors, isDark, shadows } = useTheme();
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, isDark, shadows), [colors, isDark, shadows]);
+  
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -290,14 +305,30 @@ export function ModernTimetableScreen() {
   const [slotForm, setSlotForm] = useState({
     slot_type: 'period',
     name: '',
-    start_time: '',
-    end_time: '',
+    start_time_input: '', // Natural language input
+    end_time_input: '', // Natural language input
+    start_time: '', // Parsed HH:MM:SS (for display)
+    end_time: '', // Parsed HH:MM:SS (for display)
     subject_id: '',
     teacher_id: '',
     plan_text: '',
     syllabus_chapter_id: '',
     syllabus_topic_id: '',
   });
+  
+  // Conflict resolution state
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [conflictInfo, setConflictInfo] = useState<{
+    conflicts: any[];
+    affectedSlots: Array<{ slot: any; newStart: string; newEnd: string }>;
+    shiftDelta: number;
+  } | null>(null);
+  const [pendingResolution, setPendingResolution] = useState<{
+    action: 'abort' | 'replace' | 'shift';
+    replaceSlotId?: string;
+    shiftDelta?: number;
+  } | null>(null);
   const [showChapterDropdown, setShowChapterDropdown] = useState(false);
   const [showTopicDropdown, setShowTopicDropdown] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
@@ -311,18 +342,35 @@ export function ModernTimetableScreen() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
-  const { data: classes } = useClasses(profile?.school_code);
-  const { data: subjectsResult } = useSubjects(profile?.school_code);
+  const schoolCode = profile?.school_code || undefined;
+  const { data: classes } = useClasses(schoolCode);
+  const { data: subjectsResult } = useSubjects(schoolCode);
   const subjects = subjectsResult?.data || [];
-  const { data: adminsResult } = useAdmins(profile?.school_code);
+  const { data: adminsResult } = useAdmins(schoolCode);
   const adminsList = adminsResult?.data || [];
-  const { slots, displayPeriodNumber, loading, error, refetch, createSlot, updateSlot, deleteSlot, quickGenerate, markSlotTaught, unmarkSlotTaught, updateSlotStatus, taughtSlotIds } = useUnifiedTimetable(
+  const { 
+    slots, 
+    displayPeriodNumber, 
+    loading, 
+    error, 
+    refetch, 
+    deleteSlot, 
+    quickGenerate, 
+    markSlotTaught, 
+    unmarkSlotTaught, 
+    updateSlotStatus, 
+    taughtSlotIds,
+    parseTimeInput,
+    detectSlotConflicts,
+    createSlotWithResolution,
+    updateSlotWithResolution,
+  } = useEnhancedTimetable(
     selectedClassId,
     dateStr,
-    profile?.school_code
+    schoolCode
   );
 
-  const { chaptersById, syllabusContentMap } = useSyllabusLoader(selectedClassId, profile?.school_code);
+  const { chaptersById, syllabusContentMap } = useSyllabusLoader(selectedClassId, schoolCode);
 
   // Set selectedClassId from user profile if available
   useEffect(() => {
@@ -391,13 +439,13 @@ export function ModernTimetableScreen() {
 
   // Helper function to get teacher avatar color
   const getTeacherAvatarColor = (teacherName: string) => {
-    if (!teacherName) return '#9ca3af';
-    const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4'];
+    if (!teacherName) return colors.text.tertiary;
+    const teacherColors = [colors.primary[600], colors.primary[500], colors.accent[500], colors.error[600], colors.warning[600], colors.success[600], colors.info[500]];
     const hash = teacherName.split('').reduce((a, b) => {
       a = ((a << 5) - a) + b.charCodeAt(0);
       return a & a;
     }, 0);
-    return colors[Math.abs(hash) % colors.length];
+    return teacherColors[Math.abs(hash) % teacherColors.length];
   };
 
   // Haptic feedback functions
@@ -484,12 +532,6 @@ export function ModernTimetableScreen() {
     setSnackbarVisible(true);
   };
 
-  const showSuccess = (message: string) => {
-    setSnackbarMessage(message);
-    setSnackbarVisible(true);
-  };
-
-
   // Get selected class info
   const selectedClass = classes?.find(c => c.id === selectedClassId);
 
@@ -521,16 +563,16 @@ export function ModernTimetableScreen() {
     });
   };
 
-  // Handle add slot
+  // Handle add slot with conflict detection
   const handleAddSlot = async () => {
     if (!selectedClassId || !profile?.school_code) {
-      showError('Please select a class and ensure you have a school code');
+      Alert.alert('Error', 'Please select a class and ensure school code is available');
       return;
     }
 
     // Validate required fields
     if (!slotForm.start_time || !slotForm.end_time) {
-      showError('Please enter start and end times');
+      showError('Please enter valid start and end times');
       return;
     }
 
@@ -546,51 +588,107 @@ export function ModernTimetableScreen() {
       }
     }
 
-    // Show confirmation dialog
-    Alert.alert(
-      'Confirm Add Slot',
-      `Are you sure you want to add this ${slotForm.slot_type}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add',
-          onPress: async () => {
+    // Check for conflicts
+    const conflicts = detectSlotConflicts(
+      slotForm.start_time,
+      slotForm.end_time
+    );
+
+    if (conflicts && (conflicts.conflicts.length > 0 || conflicts.affectedSlots.length > 0)) {
+      // Show conflict resolution modal
+      setConflictInfo(conflicts);
+      setShowConflictModal(true);
+      return;
+    }
+
+    // No conflicts, proceed with create
+    await performAddSlot({ action: 'abort' });
+  };
+  
+  // Perform the actual create with resolution
+  const performAddSlot = async (resolution: { action: 'abort' | 'replace' | 'shift'; replaceSlotId?: string; shiftDelta?: number }) => {
+    if (!selectedClassId || !profile?.school_code) return;
+
             try {
-              const payload = {
+      const result = await createSlotWithResolution({
                 class_instance_id: selectedClassId,
-                school_code: profile.school_code,
+        school_code: profile.school_code,
                 class_date: dateStr,
-                period_number: 999, // Temporary value, will be renumbered by the hook
                 slot_type: slotForm.slot_type as 'period' | 'break',
+        start_time_input: slotForm.start_time_input,
+        end_time_input: slotForm.end_time_input,
                 name: slotForm.slot_type === 'break' ? slotForm.name : null,
-                start_time: slotForm.start_time,
-                end_time: slotForm.end_time,
                 subject_id: slotForm.slot_type === 'period' ? slotForm.subject_id : null,
                 teacher_id: slotForm.slot_type === 'period' ? slotForm.teacher_id : null,
                 plan_text: slotForm.slot_type === 'period' ? slotForm.plan_text : null,
                 syllabus_chapter_id: slotForm.slot_type === 'period' ? slotForm.syllabus_chapter_id : null,
                 syllabus_topic_id: slotForm.slot_type === 'period' ? slotForm.syllabus_topic_id : null,
-              };
+      }, resolution);
 
-              await createSlot(payload);
+      if (result.success) {
+        showSuccess(`Slot created successfully${result.slots_shifted ? ` (${result.slots_shifted} slot(s) shifted)` : ''}`);
               closeModal();
               closeAllDropdowns();
-            } catch (error) {
-              showError('Failed to create slot. Please try again.');
+      } else {
+        showError('Failed to create slot. Please try a different time slot.');
+      }
+    } catch (error: any) {
+      if (error.message?.includes('duplicate period')) {
+        showError('A timetable entry already exists for this class, date, and time period. Please choose a different time.');
+      } else {
+        showError(error.message || 'Failed to create slot. Please try again.');
             }
-          },
-        },
-      ]
-    );
+    }
+  };
+  
+  // Handle conflict resolution
+  const handleConflictResolution = (action: 'abort' | 'replace' | 'shift') => {
+    setShowConflictModal(false);
+    
+    if (action === 'abort') {
+      return; // User cancelled
+    }
+    
+    if (action === 'shift' && conflictInfo) {
+      // Show preview modal before applying shift
+      setPendingResolution({ action, shiftDelta: conflictInfo.shiftDelta });
+      setShowPreviewModal(true);
+    } else {
+      // Replace or immediate action
+      setPendingResolution({ action });
+      if (editingSlot) {
+        performEditSlot({ action });
+      } else {
+        performAddSlot({ action });
+      }
+    }
   };
 
-  // Handle edit slot
+  // Handle preview confirmation
+  const handlePreviewConfirm = () => {
+    setShowPreviewModal(false);
+    if (pendingResolution) {
+      if (editingSlot) {
+        performEditSlot(pendingResolution);
+      } else {
+        performAddSlot(pendingResolution);
+      }
+    }
+  };
+  
+  // Helper to show success message
+  const showSuccess = (message: string) => {
+    setSnackbarMessage(message);
+    setSnackbarVisible(true);
+  };
+
+  // Handle edit slot with conflict detection
   const handleEditSlot = async () => {
     if (!editingSlot) return;
 
     // Validate required fields
     if (!slotForm.start_time || !slotForm.end_time) {
-      showError('Please enter start and end times');
+      showError('Please enter valid start and end times');
       return;
     }
 
@@ -606,37 +704,61 @@ export function ModernTimetableScreen() {
       }
     }
 
-    // Show confirmation dialog
-    Alert.alert(
-      'Confirm Update Slot',
-      `Are you sure you want to update this ${slotForm.slot_type}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Update',
-          onPress: async () => {
-            try {
-              await updateSlot(editingSlot.id, {
+    // Only check for conflicts if the TIME has changed
+    const timeChanged = 
+      slotForm.start_time !== editingSlot.start_time || 
+      slotForm.end_time !== editingSlot.end_time;
+
+    if (timeChanged) {
+      // Check for conflicts (excluding the slot being edited)
+      const conflicts = detectSlotConflicts(
+        slotForm.start_time,
+        slotForm.end_time,
+        editingSlot.id
+      );
+
+      if (conflicts && (conflicts.conflicts.length > 0 || conflicts.affectedSlots.length > 0)) {
+        // Show conflict resolution modal
+        setConflictInfo(conflicts);
+        setShowConflictModal(true);
+        return;
+      }
+    }
+
+    // No conflicts or time unchanged, proceed with update
+    await performEditSlot({ action: 'abort' });
+  };
+  
+  // Perform the actual edit with resolution
+  const performEditSlot = async (resolution: { action: 'abort' | 'replace' | 'shift'; replaceSlotId?: string; shiftDelta?: number }) => {
+    if (!editingSlot) return;
+
+    try {
+      // Only pass time inputs if they've actually changed from the original
+      const timeChanged = 
+        slotForm.start_time !== editingSlot.start_time || 
+        slotForm.end_time !== editingSlot.end_time;
+
+      const result = await updateSlotWithResolution(editingSlot.id, {
                 slot_type: slotForm.slot_type as 'period' | 'break',
+        start_time_input: timeChanged ? slotForm.start_time_input : undefined,
+        end_time_input: timeChanged ? slotForm.end_time_input : undefined,
                 name: slotForm.slot_type === 'break' ? slotForm.name : null,
-                start_time: slotForm.start_time,
-                end_time: slotForm.end_time,
                 subject_id: slotForm.slot_type === 'period' ? slotForm.subject_id : null,
                 teacher_id: slotForm.slot_type === 'period' ? slotForm.teacher_id : null,
                 plan_text: slotForm.slot_type === 'period' ? slotForm.plan_text : null,
                 syllabus_chapter_id: slotForm.slot_type === 'period' ? slotForm.syllabus_chapter_id : null,
                 syllabus_topic_id: slotForm.slot_type === 'period' ? slotForm.syllabus_topic_id : null,
-              });
+      }, resolution);
               
+      if (result.success) {
+        showSuccess(`Slot ${editingSlot ? 'updated' : 'created'} successfully${result.slots_shifted ? ` (${result.slots_shifted} slot(s) shifted)` : ''}`);
               closeModal();
               closeAllDropdowns();
-            } catch (error) {
-              showError('Failed to update slot. Please try again.');
+      }
+    } catch (error: any) {
+      showError(error.message || 'Failed to update slot. Please try again.');
             }
-          },
-        },
-      ]
-    );
   };
 
   // Handle delete slot
@@ -778,6 +900,8 @@ export function ModernTimetableScreen() {
     setSlotForm({
       slot_type: 'period',
       name: '',
+      start_time_input: '',
+      end_time_input: '',
       start_time: '',
       end_time: '',
       subject_id: '',
@@ -786,14 +910,46 @@ export function ModernTimetableScreen() {
       syllabus_chapter_id: '',
       syllabus_topic_id: '',
     });
+    setConflictInfo(null);
+    setPendingResolution(null);
+  };
+  
+  // Handle time input change with parsing
+  const handleTimeInputChange = (field: 'start_time_input' | 'end_time_input', value: string) => {
+    setSlotForm(prev => {
+      const newForm = { ...prev, [field]: value };
+      
+      // Parse the input
+      const startParsed = field === 'end_time_input' && newForm.start_time_input 
+        ? parseTimeInput(newForm.start_time_input) 
+        : null;
+      const referenceHour = startParsed?.isValid ? (startParsed as any).hour : undefined;
+      const parsed = parseTimeInput(value, referenceHour);
+      
+      if (parsed.isValid) {
+        // Update the parsed time field
+        if (field === 'start_time_input') {
+          newForm.start_time = parsed.formatted;
+        } else {
+          newForm.end_time = parsed.formatted;
+        }
+      }
+      
+      return newForm;
+    });
   };
 
   // Open edit modal
   const openEditModal = (slot: any) => {
     setEditingSlot(slot);
+    // Convert HH:MM:SS to natural language format for editing
+    const startDisplay = formatTimeForDisplay(slot.start_time);
+    const endDisplay = formatTimeForDisplay(slot.end_time);
     setSlotForm({
       slot_type: slot.slot_type,
       name: slot.name || '',
+      start_time_input: startDisplay,
+      end_time_input: endDisplay,
       start_time: slot.start_time,
       end_time: slot.end_time,
       subject_id: slot.subject_id || '',
@@ -876,8 +1032,8 @@ export function ModernTimetableScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#8b5cf6']}
-            tintColor="#8b5cf6"
+            colors={[colors.primary[500]]}
+            tintColor={colors.primary[500]}
           />
         }
       >
@@ -885,7 +1041,7 @@ export function ModernTimetableScreen() {
         <View style={styles.filterBar}>
           <TouchableOpacity style={[styles.filterItem, !selectedClassId && styles.filterItemDisabled]} onPress={() => setShowClassSelector(true)}>
             <View style={styles.filterIcon}>
-              <Users size={16} color="#ffffff" />
+              <Users size={16} color={colors.surface.primary} />
             </View>
             <View style={styles.filterContent}>
               <Text style={styles.filterLabel}>Class</Text>
@@ -899,7 +1055,7 @@ export function ModernTimetableScreen() {
 
           <TouchableOpacity style={styles.filterItem} onPress={() => setShowDatePicker(true)}>
             <View style={styles.filterIcon}>
-              <ListTodo size={16} color="#ffffff" />
+              <ListTodo size={16} color={colors.surface.primary} />
             </View>
             <View style={styles.filterContent}>
               <Text style={styles.filterLabel}>Date</Text>
@@ -925,7 +1081,7 @@ export function ModernTimetableScreen() {
             <EmptyStateIllustration
               type="calendar"
               title="No Timetable"
-              description={`No timetable for ${dayjs(selectedDate).format('MMM D, YYYY')}`}
+              description={`No timetable for ${formatDateFull(selectedDate, 'MMM d, yyyy')}`}
               action={
                 <TouchableOpacity
                   style={styles.emptyActionButton}
@@ -961,6 +1117,8 @@ export function ModernTimetableScreen() {
                     isPastPeriod={isCompletedPeriod(slot)}
                     setSelectedSlotForMenu={setSelectedSlotForMenu}
                     setShowSlotMenu={setShowSlotMenu}
+                    styles={styles}
+                    colors={colors}
                   />
                 );
               })}
@@ -1039,10 +1197,17 @@ export function ModernTimetableScreen() {
           onDismiss={closeModal}
           contentContainerStyle={styles.modalContainer}
         >
+          <View style={styles.modalHeaderContainer}>
           <Text style={styles.modalTitle}>
             {editingSlot ? 'Edit Slot' : `Add ${slotForm.slot_type === 'period' ? 'Period' : 'Break'}`}
           </Text>
+          </View>
 
+          <ScrollView 
+            style={styles.modalScrollContent}
+            contentContainerStyle={styles.modalScrollContentContainer}
+            showsVerticalScrollIndicator={true}
+          >
           <SegmentedButtons
             value={slotForm.slot_type}
             onValueChange={(value) => handleSlotFormChange('slot_type', value)}
@@ -1053,31 +1218,63 @@ export function ModernTimetableScreen() {
             style={styles.segmentedButtons}
           />
 
+            <View>
           <TextInput
             label="Start Time"
-            value={slotForm.start_time}
-            onChangeText={(text) => handleSlotFormChange('start_time', text)}
+                value={slotForm.start_time_input}
+                onChangeText={(text) => handleTimeInputChange('start_time_input', text)}
             style={styles.textInput}
             mode="outlined"
-            placeholder="HH:MM:SS"
-            outlineColor="#e2e8f0"
-            activeOutlineColor="#6366f1"
-            textColor="#000000"
-            placeholderTextColor="#9ca3af"
-          />
+                placeholder="e.g., 9am, 530pm, 14:30, noon"
+            outlineColor={colors.border.light}
+                activeOutlineColor={colors.primary[600]}
+                textColor={colors.text.primary}
+                placeholderTextColor={colors.text.tertiary}
+                right={
+                  slotForm.start_time ? (
+                    <TextInput.Icon
+                      icon={() => <Clock size={18} color={colors.success[600]} />}
+                    />
+                  ) : undefined
+                }
+              />
+              {slotForm.start_time && (
+                <View style={styles.timeHelperContainer}>
+                  <Text style={styles.timeHelperText}>
+                    Parsed as: {formatTimeForDisplay(slotForm.start_time)}
+                  </Text>
+                </View>
+              )}
+            </View>
 
+            <View>
           <TextInput
             label="End Time"
-            value={slotForm.end_time}
-            onChangeText={(text) => handleSlotFormChange('end_time', text)}
+                value={slotForm.end_time_input}
+                onChangeText={(text) => handleTimeInputChange('end_time_input', text)}
             style={styles.textInput}
             mode="outlined"
-            placeholder="HH:MM:SS"
-            outlineColor="#e2e8f0"
-            activeOutlineColor="#6366f1"
-            textColor="#000000"
-            placeholderTextColor="#9ca3af"
-          />
+                placeholder="e.g., 10am, 630pm, 15:30"
+            outlineColor={colors.border.light}
+                activeOutlineColor={colors.primary[600]}
+                textColor={colors.text.primary}
+                placeholderTextColor={colors.text.tertiary}
+                right={
+                  slotForm.end_time ? (
+                    <TextInput.Icon
+                      icon={() => <Clock size={18} color={colors.success[600]} />}
+                    />
+                  ) : undefined
+                }
+              />
+              {slotForm.end_time && (
+                <View style={styles.timeHelperContainer}>
+                  <Text style={styles.timeHelperText}>
+                    Parsed as: {formatTimeForDisplay(slotForm.end_time)}
+                  </Text>
+                </View>
+              )}
+            </View>
 
           {slotForm.slot_type === 'break' && (
             <TextInput
@@ -1087,10 +1284,10 @@ export function ModernTimetableScreen() {
               style={styles.textInput}
               mode="outlined"
               placeholder="e.g., Lunch Break"
-              outlineColor="#e2e8f0"
-              activeOutlineColor="#6366f1"
-              textColor="#000000"
-              placeholderTextColor="#9ca3af"
+              outlineColor={colors.border.light}
+                activeOutlineColor={colors.primary[600]}
+                textColor={colors.text.primary}
+                placeholderTextColor={colors.text.tertiary}
             />
           )}
 
@@ -1104,7 +1301,7 @@ export function ModernTimetableScreen() {
                 <Text style={styles.dropdownButtonText}>
                   {subjects?.find(s => s.id === slotForm.subject_id)?.subject_name || 'Select Subject'}
                 </Text>
-                <ChevronRight size={20} color="#6b7280" />
+                  <ChevronRight size={20} color={colors.text.secondary} />
               </TouchableOpacity>
 
               {/* Teacher Selection Button */}
@@ -1115,7 +1312,7 @@ export function ModernTimetableScreen() {
                 <Text style={styles.dropdownButtonText}>
                   {adminsList?.find(t => t.id === slotForm.teacher_id)?.full_name || 'Select Teacher'}
                 </Text>
-                <ChevronRight size={20} color="#6b7280" />
+                  <ChevronRight size={20} color={colors.text.secondary} />
               </TouchableOpacity>
 
               {/* Chapter Selection Button */}
@@ -1126,7 +1323,7 @@ export function ModernTimetableScreen() {
                 <Text style={styles.dropdownButtonText}>
                   {getChapterName(slotForm.syllabus_chapter_id) || 'Select Chapter'}
                 </Text>
-                <ChevronRight size={20} color="#6b7280" />
+                  <ChevronRight size={20} color={colors.text.secondary} />
               </TouchableOpacity>
 
               {/* Topic Selection Button */}
@@ -1137,7 +1334,7 @@ export function ModernTimetableScreen() {
                 <Text style={styles.dropdownButtonText}>
                   {getTopicName(slotForm.syllabus_topic_id) || 'Select Topic'}
                 </Text>
-                <ChevronRight size={20} color="#6b7280" />
+                  <ChevronRight size={20} color={colors.text.secondary} />
               </TouchableOpacity>
 
               <TextInput
@@ -1149,13 +1346,14 @@ export function ModernTimetableScreen() {
                 placeholder="Lesson plan..."
                 multiline
                 numberOfLines={3}
-                outlineColor="#e2e8f0"
-                activeOutlineColor="#6366f1"
-                textColor="#000000"
-                placeholderTextColor="#9ca3af"
+                outlineColor={colors.border.light}
+                  activeOutlineColor={colors.primary[600]}
+                  textColor={colors.text.primary}
+                  placeholderTextColor={colors.text.tertiary}
               />
             </>
           )}
+          </ScrollView>
 
           <View style={styles.modalActions}>
             <Button 
@@ -1219,7 +1417,7 @@ export function ModernTimetableScreen() {
             mode="outlined"
           />
 
-          <Text style={{ marginTop: 8, marginBottom: 4, color: '#374151', fontWeight: '600' }}>Break Configuration</Text>
+          <Text style={{ marginTop: 8, marginBottom: 4, color: colors.text.primary, fontWeight: '600' }}>Break Configuration</Text>
           {quickForm.breaks.map((b, idx) => (
             <View key={idx} style={styles.breakRow}>
               <TextInput
@@ -1437,7 +1635,7 @@ export function ModernTimetableScreen() {
                   styles.modalItemText,
                   slotForm.syllabus_topic_id === topic.topic_id && styles.modalItemTextSelected
                 ]}>
-                  {getTopicName(topic.topic_id)}
+                  {topic.topic_id ? getTopicName(topic.topic_id) : ''}
                 </Text>
                 {slotForm.syllabus_topic_id === topic.topic_id && (
                   <CheckCircle size={20} color={colors.primary[600]} />
@@ -1474,7 +1672,7 @@ export function ModernTimetableScreen() {
               style={styles.slotMenuAction}
               activeOpacity={0.7}
             >
-              <Edit size={20} color="#6366f1" />
+              <Edit size={20} color={colors.primary[600]} />
               <Text style={styles.slotMenuActionText}>Edit Period</Text>
             </TouchableOpacity>
             
@@ -1490,9 +1688,9 @@ export function ModernTimetableScreen() {
               activeOpacity={0.7}
             >
               {taughtSlotIds.has(selectedSlotForMenu?.id) ? (
-                <Circle size={20} color="#6b7280" />
+                <Circle size={20} color={colors.text.secondary} />
               ) : (
-                <CheckCircle size={20} color="#6b7280" />
+                <CheckCircle size={20} color={colors.text.secondary} />
               )}
               <Text style={[
                 styles.slotMenuActionText,
@@ -1510,7 +1708,7 @@ export function ModernTimetableScreen() {
               style={[styles.slotMenuAction, styles.slotMenuDeleteAction]}
               activeOpacity={0.7}
             >
-              <Trash2 size={20} color="#ef4444" />
+              <Trash2 size={20} color={colors.error[600]} />
               <Text style={[styles.slotMenuActionText, styles.slotMenuDeleteText]}>Delete Period</Text>
             </TouchableOpacity>
           </View>
@@ -1548,6 +1746,7 @@ export function ModernTimetableScreen() {
         <Modal
           visible={showActionsModal}
           onDismiss={() => setShowActionsModal(false)}
+          contentContainerStyle={styles.actionsModalContentContainer}
         >
           <View style={styles.actionsModalContainer}>
             <View style={styles.actionsModalHeader}>
@@ -1568,7 +1767,7 @@ export function ModernTimetableScreen() {
                 }}
                 activeOpacity={0.8}
               >
-                <Plus size={18} color="#4F46E5" />
+                <Plus size={18} color={colors.primary[700]} />
                 <Text style={styles.actionText}>Add Period</Text>
               </TouchableOpacity>
 
@@ -1583,7 +1782,7 @@ export function ModernTimetableScreen() {
                 }}
                 activeOpacity={0.8}
               >
-                <Coffee size={18} color="#a16207" />
+                <Coffee size={18} color={colors.warning[800]} />
                 <Text style={styles.actionText}>Add Break</Text>
               </TouchableOpacity>
 
@@ -1612,11 +1811,57 @@ export function ModernTimetableScreen() {
           </View>
         </Modal>
       </Portal>
+
+      {/* Conflict Resolution Modal */}
+      {conflictInfo && (
+        <Portal>
+          <ConflictResolutionModal
+            visible={showConflictModal}
+            onDismiss={() => setShowConflictModal(false)}
+            conflicts={conflictInfo.conflicts}
+            affectedSlots={conflictInfo.affectedSlots}
+            shiftDelta={conflictInfo.shiftDelta}
+            onResolve={handleConflictResolution}
+            newSlotInfo={{
+              start_time: slotForm.start_time,
+              end_time: slotForm.end_time,
+              slot_type: slotForm.slot_type as 'period' | 'break',
+              name: slotForm.name || undefined,
+              subject_name: slotForm.slot_type === 'period' 
+                ? subjects?.find(s => s.id === slotForm.subject_id)?.subject_name 
+                : undefined,
+            }}
+          />
+        </Portal>
+      )}
+
+      {/* Timeline Preview Modal */}
+      {conflictInfo && pendingResolution && (
+        <Portal>
+          <TimelinePreviewModal
+            visible={showPreviewModal}
+            onDismiss={() => setShowPreviewModal(false)}
+            onConfirm={handlePreviewConfirm}
+            currentSlots={slots}
+            newSlot={{
+              start_time: slotForm.start_time,
+              end_time: slotForm.end_time,
+              slot_type: slotForm.slot_type as 'period' | 'break',
+              name: slotForm.name || undefined,
+              subject_name: slotForm.slot_type === 'period' 
+                ? subjects?.find(s => s.id === slotForm.subject_id)?.subject_name 
+                : undefined,
+            }}
+            shifts={conflictInfo.affectedSlots}
+            shiftDelta={conflictInfo.shiftDelta}
+          />
+        </Portal>
+      )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,
@@ -1817,7 +2062,7 @@ const styles = StyleSheet.create({
     display: 'none',
   },
   actionsModal: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     margin: 20,
     borderRadius: 16,
     padding: 16,
@@ -1828,11 +2073,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
     maxWidth: 480,
-    width: '90%',
-    maxHeight: '80%',
-    alignSelf: 'center',
-    marginTop: 'auto',
-    marginBottom: 'auto',
+    width: '100%',
+    overflow: 'hidden',
     ...shadows.lg,
   },
   actionsModalHeader: {
@@ -1870,11 +2112,11 @@ const styles = StyleSheet.create({
   // Bottom sheet styles (task management style)
   bsOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'flex-end',
   },
   bsContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: spacing.sm,
@@ -1884,7 +2126,7 @@ const styles = StyleSheet.create({
   bsHandle: {
     width: 36,
     height: 4,
-    backgroundColor: '#D1D5DB',
+    backgroundColor: colors.border.DEFAULT,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: spacing.sm,
@@ -1892,7 +2134,7 @@ const styles = StyleSheet.create({
   bsTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text.primary,
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
   },
@@ -1908,23 +2150,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     borderRadius: 12,
     marginVertical: 2,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: colors.background.secondary,
   },
   bsItemActive: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: colors.primary[50],
   },
   bsItemText: {
     fontSize: 16,
-    color: '#111827',
+    color: colors.text.primary,
     fontWeight: '600',
     flex: 1,
   },
   bsItemTextActive: {
-    color: '#4F46E5',
+    color: colors.primary[700],
   },
   bsCheck: {
     fontSize: 18,
-    color: '#4F46E5',
+    color: colors.primary[700],
     fontWeight: '700',
   },
   actionRow: {
@@ -1943,7 +2185,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1f2937',
+    color: colors.text.primary,
     marginBottom: 8,
   },
   scheduleHeader: {
@@ -1954,19 +2196,19 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
     marginBottom: 8,
     fontWeight: '500',
   },
   progressBar: {
     height: 6,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: colors.border.DEFAULT,
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#8b5cf6',
+    backgroundColor: colors.primary[500],
     borderRadius: 3,
   },
   quickActionsGrid: {
@@ -1978,29 +2220,29 @@ const styles = StyleSheet.create({
     width: '47%',
     padding: 16,
     borderRadius: 14,
-    shadowColor: '#000',
+    shadowColor: colors.text.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 2,
   },
   purpleCard: {
-    backgroundColor: '#8b5cf6',
+    backgroundColor: colors.primary[500],
   },
   blueCard: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: colors.info[600],
   },
   greenCard: {
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success[600],
   },
   orangeCard: {
-    backgroundColor: '#f59e0b',
+    backgroundColor: colors.warning[600],
   },
   quickActionIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: colors.surface.glass,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -2008,12 +2250,12 @@ const styles = StyleSheet.create({
   quickActionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#ffffff',
+    color: colors.surface.primary,
     marginBottom: 4,
   },
   quickActionSubtitle: {
     fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: colors.text.inverse,
     fontWeight: '500',
   },
   timetableContentContainer: {
@@ -2417,20 +2659,20 @@ const styles = StyleSheet.create({
   slotCard: {
     marginBottom: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.border.DEFAULT,
     ...shadows.xs,
   },
   periodCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderLeftWidth: 3,
-    borderLeftColor: '#6366f1',
+    borderLeftColor: colors.primary[600],
   },
   breakCard: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.background.secondary,
     borderLeftWidth: 3,
-    borderLeftColor: '#d1d5db',
+    borderLeftColor: colors.border.DEFAULT,
     minHeight: 50,
   },
   slotContent: {
@@ -2453,12 +2695,12 @@ const styles = StyleSheet.create({
   },
   slotTime: {
     fontSize: 14,
-    color: '#374151',
+    color: colors.text.primary,
     marginLeft: spacing.xs,
     fontWeight: '600',
   },
   periodBadge: {
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.primary[600],
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
@@ -2466,7 +2708,7 @@ const styles = StyleSheet.create({
   },
   periodBadgeText: {
     fontSize: 12,
-    color: '#ffffff',
+    color: colors.surface.primary,
     fontWeight: '600',
   },
   slotActions: {
@@ -2481,7 +2723,7 @@ const styles = StyleSheet.create({
   actionButton: {
     padding: spacing.sm,
     borderRadius: borderRadius.sm,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     ...shadows.xs,
     elevation: 1,
   },
@@ -2490,18 +2732,18 @@ const styles = StyleSheet.create({
   },
   subjectTitle: {
     fontSize: 20,
-    color: '#000000',
+    color: colors.text.primary,
     fontWeight: '700',
     marginBottom: spacing.xs,
   },
   teacherName: {
     fontSize: 14,
-    color: '#374151',
+    color: colors.text.primary,
     fontWeight: '500',
     marginBottom: spacing.sm,
   },
   unassignedText: {
-    color: '#9ca3af',
+    color: colors.text.tertiary,
     fontStyle: 'italic',
   },
   statusBadge: {
@@ -2511,13 +2753,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   statusBadgePlanned: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background.tertiary,
   },
   statusBadgeDone: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: colors.success[100],
   },
   statusBadgeCancelled: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: colors.error[100],
   },
   statusBadgeText: {
     fontSize: 12,
@@ -2525,13 +2767,13 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   statusBadgeTextPlanned: {
-    color: '#6b7280',
+    color: colors.text.secondary,
   },
   statusBadgeTextDone: {
-    color: '#16a34a',
+    color: colors.success[700],
   },
   statusBadgeTextCancelled: {
-    color: '#dc2626',
+    color: colors.error[700],
   },
   statusButtons: {
     flexDirection: 'row',
@@ -2542,22 +2784,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background.tertiary,
   },
   statusButtonActive: {
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.primary[600],
   },
   statusButtonText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#6b7280',
+    color: colors.text.secondary,
   },
   statusButtonTextActive: {
-    color: '#ffffff',
+    color: colors.surface.primary,
   },
   planText: {
     fontSize: 14,
-    color: '#000000',
+    color: colors.text.primary,
     fontStyle: 'italic',
   },
   syllabusContainer: {
@@ -2566,7 +2808,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   syllabusChip: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background.secondary,
   },
   breakContent: {
     alignItems: 'center',
@@ -2585,41 +2827,62 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.warning[100],
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#f59e0b',
+    borderColor: colors.warning[600],
   },
   breakIconText: {
     fontSize: 16,
   },
   breakTitle: {
     fontSize: 16,
-    color: '#374151',
+    color: colors.text.primary,
     fontWeight: '600',
     fontStyle: 'italic',
     marginBottom: 0,
   },
   breakSubtitle: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.text.secondary,
     fontWeight: '500',
   },
 
   // Modals
   modalContainer: {
-    backgroundColor: '#ffffff',
-    padding: spacing.lg,
+    backgroundColor: colors.surface.primary,
+    padding: 0,
     margin: spacing.lg,
     borderRadius: borderRadius.lg,
+    maxHeight: '90%',
+    overflow: 'hidden',
     ...shadows.lg,
+  },
+  modalScrollContent: {
+    flexGrow: 0,
+    maxHeight: 400,
+  },
+  modalScrollContentContainer: {
+    padding: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  actionsModalContentContainer: {
+    margin: spacing.lg,
+    maxHeight: '90%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalHeaderContainer: {
+    padding: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   modalTitle: {
     fontSize: 24,
-    color: '#000000',
+    color: colors.text.primary,
     fontWeight: '600',
-    marginBottom: spacing.lg,
     textAlign: 'center',
   },
   modalScrollView: {
@@ -2630,21 +2893,21 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    borderBottomColor: colors.border.light,
   },
   modalItemSelected: {
-    backgroundColor: '#f0f4ff',
+    backgroundColor: colors.info[50],
   },
   modalItemText: {
     fontSize: 16,
-    color: '#000000',
+    color: colors.text.primary,
   },
   modalItemTextSelected: {
-    color: '#6366f1',
+    color: colors.primary[600],
     fontWeight: '600',
   },
   modalCloseButton: {
-    borderColor: '#e2e8f0',
+    borderColor: colors.border.light,
   },
 
   // Date Navigation in Modal
@@ -2658,7 +2921,7 @@ const styles = StyleSheet.create({
   dateNavButton: {
     padding: spacing.md,
     borderRadius: borderRadius.md,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background.secondary,
     ...shadows.sm,
     elevation: 2,
   },
@@ -2667,23 +2930,23 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 20,
-    color: '#000000',
+    color: colors.text.primary,
     fontWeight: '600',
   },
   todayButton: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
-    backgroundColor: '#f0f4ff',
+    backgroundColor: colors.info[50],
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: colors.primary[200],
     alignItems: 'center',
     marginBottom: spacing.md,
     ...shadows.xs,
   },
   todayButtonText: {
     fontSize: 14,
-    color: '#6366f1',
+    color: colors.primary[600],
     fontWeight: '600',
   },
 
@@ -2692,8 +2955,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   textInput: {
+    marginBottom: spacing.xs,
+    backgroundColor: colors.surface.primary,
+  },
+  timeHelperContainer: {
+    marginTop: spacing.xs,
     marginBottom: spacing.md,
-    backgroundColor: '#ffffff',
+    marginLeft: spacing.sm,
+  },
+  timeHelperText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
   },
   
   // Dropdown Button Styles
@@ -2701,9 +2973,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border.light,
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -2712,7 +2984,7 @@ const styles = StyleSheet.create({
   },
   dropdownButtonText: {
     fontSize: 16,
-    color: '#374151',
+    color: colors.text.primary,
     fontWeight: '500',
     flex: 1,
   },
@@ -2727,11 +2999,11 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: spacing.sm,
     borderRadius: borderRadius.sm,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.background.secondary,
   },
   closeButtonText: {
     fontSize: 18,
-    color: '#6b7280',
+    color: colors.text.secondary,
     fontWeight: '600',
   },
 
@@ -2739,11 +3011,15 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginTop: spacing.lg,
+    padding: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+    backgroundColor: colors.surface.primary,
   },
   cancelButton: {
     flex: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.border.light,
     borderRadius: borderRadius.lg,
   },
   saveButton: {
@@ -2762,24 +3038,24 @@ const styles = StyleSheet.create({
   // Quick Generate Modal
   modalDescription: {
     fontSize: 16,
-    color: '#374151',
+    color: colors.text.primary,
     marginBottom: spacing.md,
     lineHeight: 22,
   },
   generatePreview: {
-    backgroundColor: '#f0f4ff',
+    backgroundColor: colors.info[50],
     padding: spacing.md,
     borderRadius: borderRadius.md,
     marginBottom: spacing.md,
   },
   generatePreviewText: {
     fontSize: 14,
-    color: '#000000',
+    color: colors.text.primary,
     marginBottom: spacing.xs,
   },
   warningText: {
     fontSize: 14,
-    color: '#f59e0b',
+    color: colors.warning[600],
     fontWeight: '600',
     marginBottom: spacing.lg,
     textAlign: 'center',
@@ -2792,56 +3068,56 @@ const styles = StyleSheet.create({
   addBreakBtn: {
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: '#CBD5E1',
+    borderColor: colors.border.DEFAULT,
     borderRadius: 8,
     alignItems: 'center',
     paddingVertical: spacing.sm,
     marginBottom: spacing.md,
   },
   addBreakText: {
-    color: '#374151',
+    color: colors.text.primary,
     fontWeight: '600',
   },
   removeBreakBtn: {
     marginLeft: 8,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.error[100],
     borderRadius: 8,
   },
   removeBreakText: {
-    color: '#DC2626',
+    color: colors.error[700],
     fontWeight: '600',
   },
   
   // Visual Hierarchy Styles
   currentPeriodCard: {
-    backgroundColor: '#e0f2fe',
-    borderLeftColor: '#0284c7',
+    backgroundColor: colors.info[100],
+    borderLeftColor: colors.info[700],
     borderLeftWidth: 6,
     transform: [{ scale: 1.02 }],
   },
   upcomingPeriodCard: {
-    backgroundColor: '#f0fdf4',
-    borderLeftColor: '#16a34a',
+    backgroundColor: colors.success[50],
+    borderLeftColor: colors.success[700],
     borderLeftWidth: 4,
   },
   currentPeriodTime: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0284c7',
+    color: colors.info[700],
   },
   upcomingPeriodTime: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#16a34a',
+    color: colors.success[700],
   },
   
   // Jump to Current Button
   jumpToCurrentButton: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.info[100],
     borderWidth: 1,
-    borderColor: '#6366f1',
+    borderColor: colors.primary[600],
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -2849,23 +3125,23 @@ const styles = StyleSheet.create({
   jumpToCurrentText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6366f1',
+    color: colors.primary[600],
   },
   
   // Compact View Styles
   compactViewActive: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.info[100],
     borderWidth: 1,
-    borderColor: '#6366f1',
+    borderColor: colors.primary[600],
   },
   compactViewText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#6b7280',
+    color: colors.text.secondary,
     marginLeft: 4,
   },
   compactViewTextActive: {
-    color: '#6366f1',
+    color: colors.primary[600],
   },
   compactSlotCard: {
     marginBottom: spacing.sm,
@@ -2900,7 +3176,7 @@ const styles = StyleSheet.create({
   teacherAvatarText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.surface.primary,
   },
   
   // Mobile Responsive Styles
@@ -2977,7 +3253,7 @@ const styles = StyleSheet.create({
   },
   statusLabel: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
     fontWeight: '500',
     marginRight: spacing.sm,
   },
@@ -2986,47 +3262,47 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#f9fafb',
+    borderColor: colors.border.DEFAULT,
+    backgroundColor: colors.background.secondary,
   },
   statusFieldButtonDone: {
-    backgroundColor: '#dcfce7',
-    borderColor: '#16a34a',
+    backgroundColor: colors.success[100],
+    borderColor: colors.success[700],
   },
   statusFieldButtonCancelled: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#dc2626',
+    backgroundColor: colors.error[50],
+    borderColor: colors.error[700],
   },
   statusFieldButtonPlanned: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#2563eb',
+    backgroundColor: colors.primary[50],
+    borderColor: colors.info[600],
   },
   statusFieldText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.text.primary,
   },
   statusFieldTextDone: {
-    color: '#16a34a',
+    color: colors.success[700],
   },
   statusFieldTextCancelled: {
-    color: '#dc2626',
+    color: colors.error[700],
   },
   statusFieldTextPlanned: {
-    color: '#2563eb',
+    color: colors.info[600],
   },
   
   // Single Line: Date Strip + Filters
   singleLineContainer: {
     flexDirection: 'row',
-    backgroundColor: '#dbeafe',
+    backgroundColor: colors.info[100],
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#93c5fd',
+    borderBottomColor: colors.info[300],
     alignItems: 'center',
     minHeight: 60,
-    shadowColor: '#000',
+    shadowColor: colors.text.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -3036,12 +3312,12 @@ const styles = StyleSheet.create({
     flex: 2,
     marginRight: 16,
     height: 44,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderRadius: 8,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#93c5fd',
-    shadowColor: '#000',
+    borderColor: colors.info[300],
+    shadowColor: colors.text.primary,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
@@ -3056,12 +3332,12 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#93c5fd',
-    shadowColor: '#000',
+    borderColor: colors.info[300],
+    shadowColor: colors.text.primary,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 3,
@@ -3072,7 +3348,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#1d4ed8',
+    backgroundColor: colors.info[700],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 6,
@@ -3082,7 +3358,7 @@ const styles = StyleSheet.create({
   },
   compactFilterLabel: {
     fontSize: 9,
-    color: '#6b7280',
+    color: colors.text.secondary,
     fontWeight: '600',
     marginBottom: 2,
     textTransform: 'uppercase',
@@ -3090,27 +3366,27 @@ const styles = StyleSheet.create({
   },
   compactFilterValue: {
     fontSize: 12,
-    color: '#1f2937',
+    color: colors.text.primary,
     fontWeight: '700',
   },
   
   // Modern Design Styles
   modernHeader: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface.primary,
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.border.DEFAULT,
   },
   modernTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text.primary,
     marginBottom: 4,
   },
   classInfo: {
     fontSize: 16,
-    color: '#6b7280',
+    color: colors.text.secondary,
     fontWeight: '500',
   },
   
@@ -3250,7 +3526,7 @@ const styles = StyleSheet.create({
   modernSubjectName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text.primary,
     flex: 1,
     flexShrink: 1,
     minWidth: 0,
@@ -3273,14 +3549,14 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background.tertiary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
   },
   modernTeacherName: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
     fontWeight: '500',
     flex: 1,
     flexShrink: 1,
@@ -3288,7 +3564,7 @@ const styles = StyleSheet.create({
   },
   modernPlanText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
     lineHeight: 20,
     marginBottom: 8,
     flexShrink: 1,
@@ -3304,13 +3580,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background.tertiary,
   },
   modernTaughtButton: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: colors.success[100],
   },
   modernNotTaughtButton: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: colors.background.tertiary,
   },
   modernStatusText: {
     fontSize: 12,
@@ -3318,23 +3594,23 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   modernTaughtText: {
-    color: '#16a34a',
+    color: colors.success[700],
   },
   modernNotTaughtText: {
-    color: '#6b7280',
+    color: colors.text.secondary,
   },
   
   // Modern Break Cards
   modernBreakCard: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.warning[100],
     borderRadius: 14,
     marginBottom: 10,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#fbbf24',
-    shadowColor: '#000',
+    borderColor: colors.warning[500],
+    shadowColor: colors.text.primary,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 4,
@@ -3347,7 +3623,7 @@ const styles = StyleSheet.create({
   modernBreakTimeText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text.primary,
   },
   modernBreakContent: {
     flex: 0.7,
@@ -3355,6 +3631,6 @@ const styles = StyleSheet.create({
   modernBreakTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: colors.text.primary,
   },
 });

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import { Text, Button } from 'react-native-paper';
-import { colors, spacing, borderRadius, typography } from '../../../lib/design-system';
+import { spacing, borderRadius, typography, colors } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 interface MonthPickerModalProps {
@@ -83,7 +84,7 @@ export const MonthPickerModal: React.FC<MonthPickerModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'center',
     padding: spacing.lg,
   },

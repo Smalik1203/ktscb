@@ -1,19 +1,31 @@
-import React from 'react';
-import { colors } from '../../../../../lib/design-system';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../../../contexts/ThemeContext';
+import { View, StyleSheet } from 'react-native';
 import { SuperAdminAnalytics, TimePeriod } from '../../types';
 import { TimePeriodFilter, MetricCard, ComparisonChart } from '../../shared';
+import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../../../theme/types';
 
 interface SyllabusProgressDetailViewProps {
   data: SuperAdminAnalytics;
   timePeriod: TimePeriod;
   setTimePeriod: (period: TimePeriod) => void;
+  dateRange: { startDate: string; endDate: string };
+  onDateRangeChange: (range: { startDate: string; endDate: string }) => void;
 }
 
 export const SyllabusProgressDetailView: React.FC<SyllabusProgressDetailViewProps> = ({
   data,
   timePeriod,
   setTimePeriod,
+  dateRange,
+  onDateRangeChange,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+
   const overallProgress = data?.syllabus?.overallProgress || 0;
 
   const getProgressColor = (progress: number) => {
@@ -45,8 +57,13 @@ export const SyllabusProgressDetailView: React.FC<SyllabusProgressDetailViewProp
   }) || [];
 
   return (
-    <>
-      <TimePeriodFilter timePeriod={timePeriod} setTimePeriod={setTimePeriod} />
+    <View style={styles.container}>
+      <TimePeriodFilter 
+        timePeriod={timePeriod} 
+        setTimePeriod={setTimePeriod}
+        dateRange={dateRange}
+        onDateRangeChange={onDateRangeChange}
+      />
 
       <MetricCard
         label="Overall Syllabus Progress"
@@ -73,7 +90,19 @@ export const SyllabusProgressDetailView: React.FC<SyllabusProgressDetailViewProp
           variant="syllabus"
         />
       )}
-    </>
+    </View>
   );
 };
 
+const createStyles = (
+  colors: ThemeColors,
+  typography: Typography,
+  spacing: Spacing,
+  borderRadius: BorderRadius,
+  shadows: Shadows
+) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+  });

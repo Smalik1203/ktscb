@@ -1,27 +1,37 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * FeesScreen
+ * 
+ * Refactored to use centralized design system with dynamic theming.
+ * All styling uses theme tokens via useTheme hook.
+ */
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { FeeComponents, FeePlans, StudentFeesView } from '../../components/fees';
 import { Settings, CreditCard } from 'lucide-react-native';
 
 export default function FeesScreen() {
   const { profile } = useAuth();
+  const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
   const { scope } = useClassSelection();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<'components' | 'plans'>('components');
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark), 
+    [colors, spacing, borderRadius, typography, shadows, isDark]);
 
   const isStudent = profile?.role === 'student';
 
-  // Update active tab based on URL parameter (must be called before any early returns)
   useEffect(() => {
     if (!isStudent) {
       if (tab === 'components' || tab === 'plans') {
         setActiveTab(tab);
       } else {
-        // Default to components if no tab specified
         setActiveTab('components');
       }
     }
@@ -32,7 +42,6 @@ export default function FeesScreen() {
     return <StudentFeesView />;
   }
 
-
   return (
       <View style={styles.container}>
         {/* Segmented Control Tab Navigation */}
@@ -41,7 +50,7 @@ export default function FeesScreen() {
             style={[styles.tabButton, activeTab === 'components' && styles.tabButtonActive]}
             onPress={() => setActiveTab('components')}
           >
-            <Settings size={18} color={activeTab === 'components' ? colors.primary[600] : colors.text.secondary} />
+          <Settings size={18} color={activeTab === 'components' ? colors.primary.main : colors.text.secondary} />
             <Text style={[styles.tabText, activeTab === 'components' && styles.tabTextActive]}>
               Components
             </Text>
@@ -51,16 +60,16 @@ export default function FeesScreen() {
             style={[styles.tabButton, activeTab === 'plans' && styles.tabButtonActive]}
             onPress={() => setActiveTab('plans')}
           >
-            <CreditCard size={18} color={activeTab === 'plans' ? colors.primary[600] : colors.text.secondary} />
+          <CreditCard size={18} color={activeTab === 'plans' ? colors.primary.main : colors.text.secondary} />
             <Text style={[styles.tabText, activeTab === 'plans' && styles.tabTextActive]}>
               Fee Plans
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Content - Each component handles its own ScrollView */}
+      {/* Content */}
         {activeTab === 'components' && (
-          <FeeComponents schoolCode={scope.school_code} />
+          <FeeComponents schoolCode={scope.school_code || ''} />
         )}
         {activeTab === 'plans' && (
         <FeePlans />
@@ -69,10 +78,17 @@ export default function FeesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (
+  colors: ThemeColors,
+  spacing: any,
+  borderRadius: any,
+  typography: any,
+  shadows: any,
+  isDark: boolean
+) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.secondary,
+    backgroundColor: colors.background.app,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -83,6 +99,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.xs,
     ...shadows.sm,
+    borderWidth: isDark ? 1 : 0,
+    borderColor: colors.border.DEFAULT,
   },
   tabButton: {
     flex: 1,
@@ -95,15 +113,15 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   tabButtonActive: {
-    backgroundColor: colors.primary[50],
+    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
   },
   tabText: {
     fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium as any,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.secondary,
   },
   tabTextActive: {
-    color: colors.primary[600],
-    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.primary.main,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

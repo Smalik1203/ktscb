@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Text, Card, ActivityIndicator, Chip } from 'react-native-paper';
 import {
@@ -14,7 +16,7 @@ import {
   FileText,
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, typography, spacing, borderRadius, shadows } from '../../../lib/design-system';
+import { typography, spacing, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { ProgressRing } from '../analytics/ProgressRing';
 import { ThreeStateView } from '../common/ThreeStateView';
 import { supabase } from '../../data/supabaseClient';
@@ -64,6 +66,9 @@ interface StudentFeesData {
 }
 
 export const StudentFeesView: React.FC = () => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const { profile } = useAuth();
   const [studentId, setStudentId] = useState<string | null>(null);
   const [loadingStudentId, setLoadingStudentId] = useState(true);
@@ -526,7 +531,8 @@ export const StudentFeesView: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,

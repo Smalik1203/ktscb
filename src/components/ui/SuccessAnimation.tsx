@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, Animated } from 'react-native';
-import { colors } from '../../../lib/design-system';
 import { CheckCircle2 } from 'lucide-react-native';
 
 interface SuccessAnimationProps {
@@ -13,9 +14,13 @@ interface SuccessAnimationProps {
 export function SuccessAnimation({
   visible,
   size = 100,
-  color = colors.success[500],
+  color,
   onAnimationEnd,
 }: SuccessAnimationProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
+  const finalColor = color || colors.success[500];
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const ringScale = useRef(new Animated.Value(0)).current;
@@ -108,7 +113,8 @@ export function SuccessAnimation({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     position: 'absolute',
     top: 0,

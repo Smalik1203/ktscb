@@ -4,7 +4,8 @@ import { Card, List, ActivityIndicator, Button, Text, IconButton, TextInput, Por
 import Svg, { Circle } from 'react-native-svg';
 import { BookOpen, FileText, X, ChevronDown } from 'lucide-react-native';
 import StudentSyllabusTab from './StudentSyllabusScreen';
-import { colors, spacing, borderRadius, typography } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { spacing, borderRadius, typography, colors } from '../../../lib/design-system';
 import { EmptyState } from '../../components/ui';
 // removed import/export UI
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,6 +40,7 @@ function useInitialData() {
 }
 
 function TeacherSyllabusScreen() {
+    const { colors, isDark } = useTheme();
     const { subjects, classes, loading: metaLoading } = useInitialData();
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -49,6 +51,9 @@ function TeacherSyllabusScreen() {
     const [busy, setBusy] = useState(false);
     const [taught, setTaught] = useState<{ taughtChapters: Set<string>; taughtTopics: Set<string> }>({ taughtChapters: new Set(), taughtTopics: new Set() });
     const [editingTopic, setEditingTopic] = useState<{ id: string; title: string; description: string | null } | null>(null);
+    
+    // Create dynamic styles based on theme
+    const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
     const [editingChapter, setEditingChapter] = useState<{ id: string; title: string } | null>(null);
     const [expandedChapterId, setExpandedChapterId] = useState<string | null>(null);
     // Add form state
@@ -468,7 +473,7 @@ function TeacherSyllabusScreen() {
                                         mode="outlined" 
                                         onPress={() => setEditingTopic(null)}
                                         style={styles.modalCancelButton}
-                                        textColor="#374151"
+                                        textColor={colors.neutral[700]}
                                     >
                                         Cancel
                                     </Button>
@@ -540,7 +545,7 @@ function TeacherSyllabusScreen() {
                                         mode="outlined" 
                                         onPress={() => setEditingChapter(null)}
                                         style={styles.modalCancelButton}
-                                        textColor="#374151"
+                                        textColor={colors.neutral[700]}
                                     >
                                         Cancel
                                     </Button>
@@ -681,24 +686,26 @@ export default function SyllabusTab() {
     return <TeacherSyllabusScreen />;
 }
 
-const styles = StyleSheet.create({
-    container: { flex: 1 },
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background.app },
     center: { padding: 24, alignItems: 'center', justifyContent: 'center' },
     filterSection: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.lg },
     filterRow: {
         backgroundColor: colors.surface.primary,
         borderRadius: borderRadius.lg,
-        padding: spacing.md,
+        padding: spacing.sm,
         paddingHorizontal: spacing.sm,
         flexDirection: 'row',
         alignItems: 'center',
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: colors.text.primary,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: isDark ? 0.3 : 0.1,
         shadowRadius: 4,
+        borderWidth: isDark ? 1 : 0,
+        borderColor: colors.border.DEFAULT,
     },
-    filterItem: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0 },
+    filterItem: { flex: 1, flexDirection: 'row', alignItems: 'center', minWidth: 0, overflow: 'hidden' },
     filterIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary[600], alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm, flexShrink: 0 },
     filterContent: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
     filterLabel: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.medium, color: colors.text.secondary, marginBottom: spacing.xs },
@@ -715,7 +722,7 @@ const styles = StyleSheet.create({
         marginVertical: spacing.sm,
         borderRadius: 12,
         elevation: 1,
-        shadowColor: '#000',
+        shadowColor: colors.text.primary,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 2,
@@ -757,7 +764,7 @@ const styles = StyleSheet.create({
         borderRadius: 24,
         width: '60%',
         elevation: 2,
-        shadowColor: '#000',
+        shadowColor: colors.text.primary,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.1,
         shadowRadius: 3,
@@ -777,7 +784,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 6,
-        shadowColor: '#000',
+        shadowColor: colors.text.primary,
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.25,
         shadowRadius: 6,
@@ -796,7 +803,7 @@ const styles = StyleSheet.create({
         borderRadius: 16, 
         overflow: 'hidden',
         elevation: 1,
-        shadowColor: '#000',
+        shadowColor: colors.text.primary,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 2,
@@ -860,7 +867,7 @@ const styles = StyleSheet.create({
     actionButton: { 
         borderRadius: 20,
         elevation: 1,
-        shadowColor: '#000',
+        shadowColor: colors.text.primary,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05,
         shadowRadius: 2,
@@ -887,7 +894,7 @@ const styles = StyleSheet.create({
     addTopicFab: { borderRadius: 18, marginRight: -4 },
     topicActions: { flexDirection: 'row', alignItems: 'center' },
     segmented: { padding: 12 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalOverlay: { flex: 1, backgroundColor: colors.surface.overlay, justifyContent: 'flex-end' },
     sheet: { backgroundColor: colors.surface.primary, borderRadius: 16, padding: 16, maxHeight: '70%' },
     sheetTitle: { fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold as any, color: colors.text.primary, marginBottom: 8, paddingHorizontal: spacing.lg },
     sheetList: { maxHeight: 400, marginBottom: 8 },
@@ -899,7 +906,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing.md,
         borderRadius: borderRadius.md,
         marginVertical: 2,
-        backgroundColor: '#F9FAFB',
+        backgroundColor: colors.surface.secondary,
     },
     sheetItemText: {
         fontSize: typography.fontSize.base,
@@ -919,7 +926,7 @@ const styles = StyleSheet.create({
     sheetHandle: {
         width: 36,
         height: 4,
-        backgroundColor: '#D1D5DB',
+        backgroundColor: colors.border.DEFAULT,
         borderRadius: 2,
         alignSelf: 'center',
         marginBottom: spacing.sm,
@@ -929,7 +936,7 @@ const styles = StyleSheet.create({
         maxHeight: 400,
     },
     sheetItemActive: {
-        backgroundColor: '#EEF2FF',
+        backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
     },
     sheetItemTextActive: {
         color: colors.primary[600],
@@ -952,7 +959,7 @@ const styles = StyleSheet.create({
         paddingVertical: spacing.xl,
         paddingHorizontal: spacing.xl,
         justifyContent: 'center',
-        shadowColor: '#000',
+        shadowColor: colors.text.primary,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
         shadowRadius: 6,
@@ -965,7 +972,7 @@ const styles = StyleSheet.create({
         borderRadius: borderRadius.lg,
         margin: spacing.md,
         maxHeight: '90%',
-        shadowColor: '#000',
+        shadowColor: colors.text.primary,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 12,

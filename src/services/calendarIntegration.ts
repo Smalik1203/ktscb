@@ -151,7 +151,23 @@ export const getCalendarEventsForDateRange = async (
     const { data, error } = await query.order('start_date', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map(event => ({
+      id: event.id,
+      title: event.title,
+      description: event.description || undefined,
+      event_type: event.event_type,
+      start_date: event.start_date,
+      end_date: event.end_date || undefined,
+      start_time: event.start_time || undefined,
+      end_time: event.end_time || undefined,
+      is_all_day: event.is_all_day,
+      color: event.color || undefined,
+      is_active: event.is_active,
+      class_instance_id: event.class_instance_id || undefined,
+      school_code: event.school_code,
+      academic_year_id: event.academic_year_id || undefined,
+      created_by: event.created_by || undefined,
+    })) as CalendarEvent[];
   } catch (error) {
     console.error('Error fetching calendar events:', error);
     throw error;
@@ -242,7 +258,10 @@ export const getHolidayInfo = async (
     const { data, error } = await query.maybeSingle();
 
     if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    return data ? {
+      ...data,
+      description: data.description || undefined,
+    } as CalendarEvent : null;
   } catch (error) {
     console.error('Error checking holiday:', error);
     return null;

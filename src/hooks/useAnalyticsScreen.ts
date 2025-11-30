@@ -1,0 +1,147 @@
+import { useState, useCallback, useMemo } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useSuperAdminAnalytics, useStudentAggregatedAnalytics } from './analytics';
+import type { TimePeriod, AnalyticsFeature, DateRange } from '../components/analytics/types';
+import { getDateRangeForPeriod } from '../components/analytics/types';
+
+export interface UseAnalyticsScreenReturn {
+  // Data
+  analyticsData: unknown;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: Error | null;
+  
+  // State
+  timePeriod: TimePeriod;
+  selectedFeature: AnalyticsFeature;
+  refreshing: boolean;
+  dateRange: DateRange;
+  
+  // Computed
+  canViewAnalytics: boolean;
+  isSuperAdmin: boolean;
+  isStudent: boolean;
+  startDate: string;
+  endDate: string;
+  
+  // Actions
+  setTimePeriod: (period: TimePeriod) => void;
+  setSelectedFeature: (feature: AnalyticsFeature) => void;
+  setDateRange: (range: DateRange) => void;
+  handleRefresh: () => Promise<void>;
+  refetch: () => Promise<unknown>;
+}
+
+/**
+ * Custom hook for analytics screen data and state management
+ * Separates business logic from UI components
+ */
+export function useAnalyticsScreen(): UseAnalyticsScreenReturn {
+  const { profile } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
+  const [timePeriod, setTimePeriodState] = useState<TimePeriod>('week');
+  const [selectedFeature, setSelectedFeature] = useState<AnalyticsFeature>('overview');
+  
+  // Initialize with default date range
+  const [customDateRange, setCustomDateRange] = useState<DateRange>(() => 
+    getDateRangeForPeriod('week')
+  );
+
+  // Computed values
+  const role = profile?.role;
+  const canViewAnalytics = useMemo(
+    () => role === 'admin' || role === 'superadmin' || role === 'cb_admin' || role === 'student',
+    [role]
+  );
+
+  const isSuperAdmin = useMemo(
+    () => role === 'superadmin' || role === 'cb_admin',
+    [role]
+  );
+
+  const isStudent = useMemo(() => role === 'student', [role]);
+
+  // Calculate date range based on time period or custom range
+  const dateRange = useMemo(() => {
+    if (timePeriod === 'custom') {
+      return customDateRange;
+    }
+    return getDateRangeForPeriod(timePeriod);
+  }, [timePeriod, customDateRange]);
+
+  const { startDate, endDate } = dateRange;
+
+  // Handle time period change
+  const setTimePeriod = useCallback((period: TimePeriod) => {
+    setTimePeriodState(period);
+    if (period !== 'custom') {
+      // Update custom date range to match preset for seamless switching
+      setCustomDateRange(getDateRangeForPeriod(period));
+    }
+  }, []);
+
+  // Handle custom date range change
+  const setDateRange = useCallback((range: DateRange) => {
+    setCustomDateRange(range);
+    setTimePeriodState('custom');
+  }, []);
+
+  // Fetch analytics based on role
+  const superAdminQuery = useSuperAdminAnalytics({
+    timePeriod,
+    classInstanceId: profile?.class_instance_id || undefined,
+    customDateRange: timePeriod === 'custom' ? customDateRange : undefined,
+  });
+
+  const studentQuery = useStudentAggregatedAnalytics({
+    timePeriod,
+    customDateRange: timePeriod === 'custom' ? customDateRange : undefined,
+  });
+
+  // Select the appropriate query based on role
+  const analyticsQuery = !canViewAnalytics 
+    ? { data: null, isLoading: false, isFetching: false, error: null, refetch: async () => null }
+    : isSuperAdmin 
+    ? superAdminQuery 
+    : studentQuery;
+
+  // Safely extract query properties
+  const analyticsData = analyticsQuery?.data ?? null;
+  const isLoading = analyticsQuery?.isLoading ?? false;
+  const isFetching = analyticsQuery?.isFetching ?? false;
+  const error = (analyticsQuery?.error as Error | null) ?? null;
+  const refetch = analyticsQuery?.refetch ?? (async () => null);
+
+  // Memoized refresh handler
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } catch (err) {
+      console.error('Refresh error:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
+
+  return {
+    analyticsData,
+    isLoading,
+    isFetching,
+    error,
+    timePeriod,
+    selectedFeature,
+    refreshing,
+    dateRange,
+    canViewAnalytics,
+    isSuperAdmin,
+    isStudent,
+    startDate,
+    endDate,
+    setTimePeriod,
+    setSelectedFeature,
+    setDateRange,
+    handleRefresh,
+    refetch,
+  };
+}

@@ -58,6 +58,38 @@ export function useAcademicYears(schoolCode: string | null | undefined) {
 }
 
 /**
+ * Fetch the active academic year for a school
+ */
+export function useActiveAcademicYear(schoolCode: string | null | undefined) {
+  return useQuery({
+    queryKey: ['academic_years', 'active', schoolCode],
+    queryFn: async () => {
+      if (!schoolCode) {
+        throw new Error('School code is required');
+      }
+
+      log.info('Fetching active academic year', { schoolCode });
+
+      const { data, error } = await supabase
+        .from('academic_years')
+        .select('*')
+        .eq('school_code', schoolCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error) {
+        log.error('Failed to fetch active academic year', error);
+        throw error;
+      }
+
+      return (data as AcademicYear | null) || null;
+    },
+    enabled: !!schoolCode,
+    staleTime: 60_000, // 1 minute
+  });
+}
+
+/**
  * Create a new academic year
  */
 export function useCreateAcademicYear(schoolCode: string | null | undefined) {

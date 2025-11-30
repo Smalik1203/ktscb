@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
-import { Platform } from 'react-native';
-import { supabase, testSupabaseConnection } from '../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '../lib/supabase';
 import { log } from '../lib/logger';
 
 /** Auth state machine */
@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       // Fetch school name if school_code exists
-      let schoolName = null;
+      let schoolName: string | null = null;
       if (userProfile?.school_code && !profileError) {
         const { data: schoolData } = await supabase
           .from('schools')
@@ -117,15 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       clearTimeout(timeout);
 
-      // Discard stale results from a previous session
-      const stillCurrent = (() => {
-        let current = true;
-        setState((prev) => {
-          current = prev.sessionVersion === version;
-          return prev;
-        });
-        return current;
-      })();
+      // Discard stale results from a previous session by checking if version changed
+      let stillCurrent = true;
+      setState((prev) => {
+        stillCurrent = prev.sessionVersion === version;
+        return prev;
+      });
+
       if (!stillCurrent) {
         log.warn('Bootstrap result ignored – sessionVersion changed');
         return;
@@ -221,82 +219,112 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let alive = true;
 
+    // According to Supabase best practices, we should primarily rely on onAuthStateChange
+    // for initial session. getSession() is called as a fallback but shouldn't block.
     const prime = async () => {
       try {
-        // Test Supabase connection first
-        const connectionOk = await testSupabaseConnection();
-        if (!connectionOk) {
-          log.error('Supabase connection failed - check your configuration');
-          if (alive) setState((prev) => ({ ...prev, status: 'signedOut' }));
-          return;
-        }
+        // Try to get session with timeout (non-blocking - onAuthStateChange will handle it)
+        // This is just to get initial state faster
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((resolve) =>
+          setTimeout(() => resolve({ data: { session: null } }), 5000)
+        );
 
-        const { data: { session } } = await supabase.auth.getSession();
+        const result = await Promise.race([sessionPromise, timeoutPromise]);
+        const session = (result as { data: { session: Session | null } })?.data?.session ?? null;
+        
         if (!alive) return;
 
-        const version = session ? `${session.user.id}:${session.expires_at || Date.now()}` : 'none';
-
-        setState((prev) => ({
-          ...prev,
-          status: session ? 'signedIn' : 'signedOut',
-          session,
-          user: session?.user ?? null,
-          sessionVersion: version,
-          // do not set bootstrapping here; set it only when starting bootstrap
-        }));
-
-         if (session) {
-           maybeBootstrap(session, version);
-         }
-      } catch (e: any) {
-        // Handle invalid refresh token error - clear session and sign out
-        if (e?.message?.includes('Invalid Refresh Token') || e?.message?.includes('Refresh Token Not Found')) {
-          log.warn('Invalid refresh token detected - clearing session and signing out');
-          // Force sign out to clear the invalid session
-          supabase.auth.signOut().catch(() => {});
+        // Only update if we got a session (onAuthStateChange will handle the rest)
+        if (session) {
+          const version = `${session.user.id}:${session.expires_at || Date.now()}`;
+          setState((prev) => ({
+            ...prev,
+            status: 'signedIn',
+            session,
+            user: session.user,
+            sessionVersion: version,
+          }));
+          maybeBootstrap(session, version);
         } else {
-          log.error('Initial session check failed', e);
+          // No session found - onAuthStateChange will confirm this
+          setState((prev) => ({
+            ...prev,
+            status: 'signedOut',
+            session: null,
+            user: null,
+          }));
         }
-        if (alive) setState((prev) => ({ ...prev, status: 'signedOut', session: null, user: null, profile: null }));
+      } catch (e: any) {
+        // Handle JSON parse errors (malformed Supabase response)
+        if (e?.message?.includes('JSON Parse error') || e?.message?.includes('Unexpected character')) {
+          log.error('JSON parse error in auth - clearing corrupted session', {
+            error: e?.message,
+            name: e?.name,
+          });
+          // Clear potentially corrupted session data
+          try {
+            await AsyncStorage.removeItem('cb-session-v1');
+            await AsyncStorage.removeItem('supabase.auth.token');
+            await supabase.auth.signOut();
+          } catch (cleanupError) {
+            log.warn('Failed to cleanup corrupted session', cleanupError);
+          }
+        }
+        // Handle invalid refresh token error
+        else if (e?.message?.includes('Invalid Refresh Token') || e?.message?.includes('Refresh Token Not Found')) {
+          log.warn('Invalid refresh token - clearing session');
+          supabase.auth.signOut().catch(() => {});
+        }
+        else {
+          log.warn('Initial session check failed (non-critical - onAuthStateChange will handle)', {
+            error: e?.message,
+            name: e?.name,
+          });
+        }
+        // Don't set signedOut here - let onAuthStateChange handle it
       }
     };
 
     prime();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    // Primary auth state handler - Supabase best practice
+    // This is the authoritative source for auth state changes
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!alive) return;
 
-      const version = session ? `${session.user.id}:${session.expires_at || Date.now()}` : 'none';
-      // Removed verbose auth state change logging
+      // Handle SIGNED_OUT or no session
+      if (event === 'SIGNED_OUT' || !session) {
+        setState((prev) => ({
+          ...prev,
+          status: 'signedOut',
+          session: null,
+          user: null,
+          profile: null,
+          bootstrapping: false,
+          sessionVersion: `${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        }));
+        return;
+      }
 
-       if (event === 'SIGNED_OUT' || !session) {
-         setState((prev) => ({
-           ...prev,
-           status: 'signedOut',
-           session: null,
-           user: null,
-           profile: null,
-           bootstrapping: false,
-           sessionVersion: `${Date.now()}:${Math.random().toString(36).slice(2)}`,
-         }));
-         return;
-       }
+      // Handle SIGNED_IN or INITIAL_SESSION (Supabase fires INITIAL_SESSION on startup)
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+        const version = `${session.user.id}:${session.expires_at || Date.now()}`;
+        setState((prev) => ({
+          ...prev,
+          status: 'signedIn',
+          session,
+          user: session.user,
+          sessionVersion: version,
+          // bootstrapping true gets set inside maybeBootstrap
+        }));
+        maybeBootstrap(session, version);
+        return;
+      }
 
-       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
-         setState((prev) => ({
-           ...prev,
-           status: 'signedIn',
-           session,
-           user: session.user,
-           sessionVersion: version,
-           // bootstrapping true gets set inside maybeBootstrap
-         }));
-         maybeBootstrap(session, version);
-         return;
-       }
-
+      // Handle TOKEN_REFRESHED - update session but don't restart bootstrap
       if (event === 'TOKEN_REFRESHED' && session) {
-        // only update tokens & sessionVersion; don't restart bootstrap
+        const version = `${session.user.id}:${session.expires_at || Date.now()}`;
         setState((prev) => ({
           ...prev,
           session,
@@ -318,22 +346,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function refresh() {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session) {
-          const version = `${data.session.user.id}:${data.session.expires_at || Date.now()}`;
+        // Use timeout but make it non-blocking
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((resolve) =>
+          setTimeout(() => resolve({ data: { session: null } }), 8000)
+        );
+
+        const result = await Promise.race([sessionPromise, timeoutPromise]);
+        const session = (result as { data: { session: Session | null } })?.data?.session ?? null;
+        
+        if (session) {
+          const version = `${session.user.id}:${session.expires_at || Date.now()}`;
           setState((prev) => ({
             ...prev,
             status: 'signedIn',
-            session: data.session,
-            user: data.session.user,
+            session,
+            user: session.user,
             sessionVersion: version,
             bootstrapping: true,
           }));
-          await bootstrapUser(data.session, version);
+          await bootstrapUser(session, version);
         } else {
           setState((prev) => ({ ...prev, status: 'signedOut', profile: null }));
         }
-      } catch (e) {
+      } catch (e: any) {
+        // Handle JSON parse errors
+        if (e?.message?.includes('JSON Parse error') || e?.message?.includes('Unexpected character')) {
+          log.error('JSON parse error during refresh - clearing session', e);
+          // Clear corrupted session
+          try {
+            await AsyncStorage.removeItem('cb-session-v1');
+            await supabase.auth.signOut();
+          } catch (cleanupError) {
+            log.warn('Failed to cleanup session during refresh', cleanupError);
+          }
+        }
         log.error('Auth refresh error', e);
         setState((prev) => ({ ...prev, status: 'signedOut', profile: null }));
       }

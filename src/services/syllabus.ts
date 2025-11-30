@@ -68,11 +68,22 @@ export async function ensureSyllabusId(classInstanceId: UUID, subjectId: UUID) {
 		.maybeSingle();
 	if (findError) throw findError;
 	if (found?.id) return found.id as UUID;
+	
+	// Get school_code from class_instance
+	const { data: classInstance, error: classError } = await supabase
+		.from('class_instances')
+		.select('school_code')
+		.eq('id', classInstanceId)
+		.single();
+	if (classError || !classInstance?.school_code) {
+		throw new Error('Could not find school_code for class instance');
+	}
+	
 	const { data: auth } = await supabase.auth.getUser();
 	const createdBy = auth.user?.id as UUID;
 	const { data: inserted, error: insError } = await supabase
 		.from('syllabi')
-		.insert({ class_instance_id: classInstanceId, subject_id: subjectId, school_code: undefined, created_by: createdBy } as Database['public']['Tables']['syllabi']['Insert'])
+		.insert({ class_instance_id: classInstanceId, subject_id: subjectId, school_code: classInstance.school_code, created_by: createdBy } as Database['public']['Tables']['syllabi']['Insert'])
 		.select('id')
 		.single();
 	if (insError) throw insError;

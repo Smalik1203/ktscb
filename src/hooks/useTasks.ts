@@ -116,6 +116,11 @@ export function useStudentTasks(studentId: string) {
         .single();
 
       if (studentError) throw studentError;
+      if (!student?.school_code) {
+        throw new Error('Student school code not found');
+      }
+
+      const studentSchoolCode = student.school_code;
 
       // Then get tasks for that class
       const { data: tasks, error: tasksError } = await supabase
@@ -125,8 +130,8 @@ export function useStudentTasks(studentId: string) {
           subjects(subject_name),
           class_instances(grade, section)
         `)
-        .eq('school_code', student.school_code)
-        .eq('class_instance_id', student.class_instance_id)
+        .eq('school_code', studentSchoolCode)
+        .eq('class_instance_id', student.class_instance_id || '')
         .eq('is_active', true)
         .order('due_date', { ascending: true });
 
@@ -210,7 +215,9 @@ export function useTaskStats(schoolCode: string, classInstanceId?: string) {
 
       data.forEach(task => {
         // Count by priority
-        stats.byPriority[task.priority] = (stats.byPriority[task.priority] || 0) + 1;
+        if (task.priority) {
+          stats.byPriority[task.priority] = (stats.byPriority[task.priority] || 0) + 1;
+        }
         
         // Count by due date
         if (task.due_date < today) {
@@ -250,16 +257,20 @@ export function useCreateTask() {
         created_by: sanitizeUUID(taskData.created_by),
       };
 
-      console.log('Creating task with sanitized data:', JSON.stringify(sanitizedData, null, 2));
-      
       // Validate required UUID field
       if (!sanitizedData.created_by) {
         throw new Error('User ID (created_by) is required to create a task. Please ensure you are logged in.');
       }
 
+      // Ensure created_by is a string (not null) for the insert
+      const insertData = {
+        ...sanitizedData,
+        created_by: sanitizedData.created_by, // TypeScript now knows this is not null due to check above
+      };
+
       const { data, error } = await supabase
         .from('tasks')
-        .insert([sanitizedData])
+        .insert([insertData])
         .select()
         .single();
 
@@ -294,8 +305,6 @@ export function useUpdateTask() {
         subject_id: sanitizeUUID(taskData.subject_id),
         updated_at: new Date().toISOString(),
       };
-
-      console.log('Updating task with sanitized data:', JSON.stringify(sanitizedData, null, 2));
 
       const { data, error } = await supabase
         .from('tasks')

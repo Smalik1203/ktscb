@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Image } from 'react-native';
+import React, { useState, useEffect , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { Image } from 'expo-image';
 import { Modal, Portal, TextInput, Button, ActivityIndicator } from 'react-native-paper';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { X, Upload, FileText, Paperclip, Image as ImageIcon } from 'lucide-react-native';
 import { Task } from '../../hooks/useTasks';
 import { supabase } from '../../data/supabaseClient';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { SuccessAnimation } from '../ui/SuccessAnimation';
 
 const STORAGE_BUCKET = 'task-submissions';
@@ -33,6 +37,9 @@ export function TaskSubmissionModal({
   studentId,
   existingSubmission,
 }: TaskSubmissionModalProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const [submissionText, setSubmissionText] = useState('');
   const [images, setImages] = useState<any[]>([]);
   const [attachments, setAttachments] = useState<any[]>([]);
@@ -144,38 +151,36 @@ export function TaskSubmissionModal({
       const fileName = `${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
       const filePath = `${taskId}/${studentId}/${fileName}`;
 
-      console.log('Uploading file to Supabase Storage:', file.name, 'Path:', filePath);
-
-      // Get file as ArrayBuffer for React Native compatibility
-      const fileResponse = await fetch(file.uri);
-      if (!fileResponse.ok) {
-        throw new Error(`Failed to read file: ${fileResponse.status} ${fileResponse.statusText}`);
+      // Get Supabase session for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session. Please log in again.');
       }
 
-      const fileArrayBuffer = await fileResponse.arrayBuffer();
-      if (fileArrayBuffer.byteLength === 0) {
-        throw new Error('File appears to be empty');
-      }
+      // Construct Supabase Storage upload URL
+      const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+      const uploadUrl = `${supabaseProjectUrl}/storage/v1/object/${STORAGE_BUCKET}/${filePath}`;
 
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(filePath, fileArrayBuffer, {
-          contentType: file.mimeType || (isImage ? 'image/jpeg' : 'application/octet-stream'),
-          upsert: false,
-        });
+      // Use uploadAsync for streaming upload (no memory overhead)
+      const uploadResult = await uploadAsync(uploadUrl, file.uri, {
+        httpMethod: 'POST',
+        uploadType: FileSystemUploadType.MULTIPART,
+        fieldName: 'file',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': session.access_token,
+        },
+      });
 
-      if (uploadError) {
-        console.error('Upload error details:', uploadError);
-        throw new Error(`Upload failed: ${uploadError.message}`);
+      if (uploadResult.status !== 200) {
+        const errorBody = uploadResult.body ? JSON.parse(uploadResult.body) : {};
+        throw new Error(`Upload failed with status ${uploadResult.status}: ${errorBody.message || 'Unknown error'}`);
       }
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from(STORAGE_BUCKET)
         .getPublicUrl(filePath);
-
-      console.log('✅ File uploaded successfully:', publicUrl);
 
       return {
         name: file.name,
@@ -192,20 +197,20 @@ export function TaskSubmissionModal({
   const uploadAttachments = async (taskId: string): Promise<any[]> => {
     if (images.length === 0 && attachments.length === 0) return [];
 
-    const uploadedFiles = [];
+    const uploadedFiles: any[] = [];
     setUploading(true);
 
     try {
       // Upload images
       for (const image of images) {
         const uploaded = await uploadFileToStorage(image, taskId, true);
-        uploadedFiles.push(uploaded);
+        uploadedFiles.push(uploaded as any);
       }
 
       // Upload documents
       for (const attachment of attachments) {
         const uploaded = await uploadFileToStorage(attachment, taskId, false);
-        uploadedFiles.push(uploaded);
+        uploadedFiles.push(uploaded as any);
       }
     } catch (error) {
       console.error('Error uploading attachments:', error);
@@ -219,11 +224,8 @@ export function TaskSubmissionModal({
 
   const handleSubmit = () => {
     if (!task) {
-      console.log('No task provided');
       return;
     }
-
-    console.log('handleSubmit called - showing confirmation dialog');
 
     // Show confirmation dialog
     const hasContent = submissionText.trim().length > 0 || images.length > 0 || attachments.length > 0;
@@ -238,15 +240,11 @@ export function TaskSubmissionModal({
         {
           text: 'Cancel',
           style: 'cancel',
-          onPress: () => {
-            console.log('Submission cancelled');
-          },
         },
         {
           text: 'Submit',
           style: 'default',
           onPress: async () => {
-            console.log('User confirmed submission - starting upload');
             setSubmitting(true);
             try {
               const uploadedAttachments = await uploadAttachments(task.id);
@@ -347,7 +345,13 @@ export function TaskSubmissionModal({
                 <View style={styles.imagesGrid}>
                   {images.map((image, index) => (
                     <View key={index} style={styles.imageItem}>
-                      <Image source={{ uri: image.uri || image.url }} style={styles.imagePreview} />
+                      <Image 
+                        source={{ uri: image.uri || image.url }} 
+                        style={styles.imagePreview}
+                        contentFit="cover"
+                        cachePolicy="memory-disk"
+                        transition={200}
+                      />
                       <TouchableOpacity
                         onPress={() => handleRemoveImage(index)}
                         style={styles.imageRemoveButton}
@@ -453,9 +457,10 @@ export function TaskSubmissionModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   modalContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.lg,

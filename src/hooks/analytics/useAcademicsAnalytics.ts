@@ -36,13 +36,14 @@ export function useAcademicsAnalytics(options: UseAcademicsAnalyticsOptions) {
           subjects(id, subject_name),
           class_instances!inner(
             id,
-            class_name,
+            grade,
+            section,
             school_code,
             academic_year_id
           )
         `)
-        .eq('class_instances.school_code', school_code)
-        .eq('class_instances.academic_year_id', academic_year_id)
+        .filter('class_instances.school_code', 'eq', school_code)
+        .filter('class_instances.academic_year_id', 'eq', academic_year_id)
         .gte('created_at', start_date)
         .lte('created_at', end_date);
 
@@ -96,7 +97,7 @@ export function useAcademicsAnalytics(options: UseAcademicsAnalyticsOptions) {
             id,
             full_name,
             class_instance_id,
-            class_instances(class_name)
+            class_instances(grade, section)
           )
         `)
         .in('test_id', testIds);
@@ -112,7 +113,10 @@ export function useAcademicsAnalytics(options: UseAcademicsAnalyticsOptions) {
 
         const studentId = mark.student_id;
         const studentName = mark.student.full_name;
-        const className = mark.student.class_instances.class_name;
+        const classInfo = mark.student.class_instances;
+        const className = classInfo?.grade !== null && classInfo?.grade !== undefined
+          ? `Grade ${classInfo.grade}${classInfo.section ? ` - ${classInfo.section}` : ''}`
+          : 'Unknown Class';
         const subjectId = test.subject_id;
         const subjectName = test.subjects?.subject_name || 'Unknown';
 
@@ -157,8 +161,8 @@ export function useAcademicsAnalytics(options: UseAcademicsAnalyticsOptions) {
           subject_id,
           class_instances!inner(school_code, academic_year_id)
         `)
-        .eq('class_instances.school_code', school_code)
-        .eq('class_instances.academic_year_id', academic_year_id)
+        .filter('class_instances.school_code', 'eq', school_code)
+        .filter('class_instances.academic_year_id', 'eq', academic_year_id)
         .gte('created_at', prevStartDate)
         .lte('created_at', prevEndDate);
 
@@ -283,6 +287,6 @@ export function useAcademicsAnalytics(options: UseAcademicsAnalyticsOptions) {
       return { aggregation, rankedRows: limitedRows };
     },
     staleTime: 5 * 60 * 1000,
-    enabled: !!school_code && !!academic_year_id && !!start_date && !!end_date,
+    enabled: !!(school_code && school_code !== '') && typeof academic_year_id === 'string' && !!(start_date && start_date !== '') && !!(end_date && end_date !== ''),
   });
 }

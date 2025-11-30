@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, ViewStyle, TouchableOpacity, Animated } from 'react-native';
-import { colors, borderRadius, shadows, spacing, animation } from '../../../lib/design-system';
+import { borderRadius, shadows, spacing, animation } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface CardProps {
   children: React.ReactNode;
@@ -19,6 +20,7 @@ export function Card({
   disabled = false,
   padding = 'lg'
 }: CardProps) {
+  const { colors, isDark } = useTheme();
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const opacityAnim = React.useRef(new Animated.Value(1)).current;
 
@@ -58,37 +60,38 @@ export function Card({
     }
   };
 
-  const getVariantStyles = (): any => {
+  // Memoize variant styles to avoid recalculation on every render
+  const getVariantStyles = useMemo((): any => {
+    // In dark mode, use subtle borders instead of shadows for depth
+    const darkModeBorder = isDark ? { borderWidth: 1, borderColor: colors.border.light } : {};
+    
     switch (variant) {
       case 'elevated':
         return {
           backgroundColor: colors.surface.elevated,
-          ...shadows.md, // Softer shadow (ClassBridge)
-          borderWidth: 0,
+          ...(isDark ? { ...shadows.none, ...darkModeBorder } : shadows.md),
         };
       case 'glass':
         return {
-          backgroundColor: colors.surface.glass,
-          ...shadows.sm,
-          borderWidth: 0, // No border for clean look
+          backgroundColor: isDark ? colors.surface.secondary : colors.surface.primary,
+          ...(isDark ? { ...shadows.none, ...darkModeBorder } : shadows.sm),
         };
       case 'outlined':
         return {
           backgroundColor: colors.surface.primary,
           ...shadows.none,
-          borderWidth: 1, // 1px border (ClassBridge)
+          borderWidth: 1,
           borderColor: colors.border.DEFAULT,
         };
       default:
         return {
           backgroundColor: colors.surface.primary,
-          ...shadows.md,
-          borderWidth: 0, // No border for clean look (ClassBridge)
+          ...(isDark ? { ...shadows.none, ...darkModeBorder } : shadows.md),
         };
     }
-  };
+  }, [variant, colors, isDark]);
 
-  const getPaddingStyles = () => {
+  const paddingStyles = useMemo(() => {
     switch (padding) {
       case 'none':
         return { padding: 0 };
@@ -103,10 +106,9 @@ export function Card({
       default:
         return { padding: spacing.lg };
     }
-  };
+  }, [padding]);
 
-  const variantStyles = getVariantStyles();
-  const paddingStyles = getPaddingStyles();
+  const variantStyles = getVariantStyles;
 
   const cardStyles: any[] = [
     styles.card,

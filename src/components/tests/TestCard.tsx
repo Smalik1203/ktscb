@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
-import { Card, Menu, IconButton, TouchableRipple } from 'react-native-paper';
-import { BookOpen, Calendar, Clock, Users, Edit, Trash2, Eye, FileText, MoreVertical, BarChart3 } from 'lucide-react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Card, Menu, IconButton } from 'react-native-paper';
+import { Clock, Eye, FileText, MoreVertical, BarChart3, HelpCircle, Hash, TrendingUp, Calendar, Trash2, Edit } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { TestWithDetails } from '../../types/test.types';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 
 interface TestCardProps {
   test: TestWithDetails;
@@ -25,273 +26,183 @@ export function TestCard({
   onUploadMarks,
   showActions = true,
 }: TestCardProps) {
+  const { colors, isDark } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
-
-  const getStatusColor = (status: string) => {
-    const statusColors = {
-      active: colors.success[600],
-      inactive: colors.neutral[400],
-      completed: colors.primary[600],
-      draft: colors.warning[600],
-    };
-    return statusColors[status as keyof typeof statusColors] || colors.neutral[400];
-  };
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const handleDelete = () => {
     setMenuVisible(false);
-    Alert.alert(
-      'Delete Test',
-      `Are you sure you want to delete "${test.title}"? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: onDelete,
-        },
-      ]
-    );
+    onDelete?.();
   };
 
-  const toggleMenu = () => setMenuVisible(!menuVisible);
   const closeMenu = () => setMenuVisible(false);
 
+  const isOnline = test.test_mode === 'online';
+  const completionRate = isOnline && test.total_students 
+    ? Math.round((test.attempts_count || 0) / test.total_students * 100)
+    : test.total_students 
+    ? Math.round((test.marks_uploaded || 0) / test.total_students * 100)
+    : 0;
+
   return (
-    <Card style={styles.card}>
-      <TouchableRipple 
-        onPress={onPress}
-        rippleColor="rgba(0, 0, 0, .05)"
-        style={styles.cardPressable}
-      >
-        <View style={styles.cardInner}>
-          <View style={styles.cardContent}>
-            {/* 3-dot menu in top right corner */}
-            {showActions && (
-              <View style={styles.menuContainer}>
-                <Menu
-                  visible={menuVisible}
-                  onDismiss={closeMenu}
-                  anchor={
-                    <IconButton
-                      icon={() => <MoreVertical size={20} color={colors.text.tertiary} />}
-                      size={20}
-                      onPress={toggleMenu}
-                      style={styles.menuButton}
-                    />
-                  }
-                >
-                  <Menu.Item
-                    onPress={() => {
-                      closeMenu();
-                      onPress?.();
-                    }}
-                    title="View"
-                    leadingIcon={() => <Eye size={16} color={colors.primary[600]} />}
-                  />
-                  {test.test_mode === 'online' && onManageQuestions && (
-                    <Menu.Item
-                      onPress={() => {
-                        closeMenu();
-                        onManageQuestions();
-                      }}
-                      title="View Progress"
-                      leadingIcon={() => <BarChart3 size={16} color={colors.primary[600]} />}
-                    />
-                  )}
-                  {test.test_mode === 'offline' && onUploadMarks && (
-                    <Menu.Item
-                      onPress={() => {
-                        closeMenu();
-                        onUploadMarks();
-                      }}
-                      title="Upload Marks"
-                      leadingIcon={() => <FileText size={16} color={colors.secondary[600]} />}
-                    />
-                  )}
-                  {onEdit && (
-                    <Menu.Item
-                      onPress={() => {
-                        closeMenu();
-                        onEdit();
-                      }}
-                      title="Edit"
-                      leadingIcon={() => <Edit size={16} color={colors.text.primary} />}
-                    />
-                  )}
-                  {onDelete && (
-                    <Menu.Item
-                      onPress={handleDelete}
-                      title="Delete"
-                      leadingIcon={() => <Trash2 size={16} color={colors.error[600]} />}
-                    />
-                  )}
-                </Menu>
-              </View>
-            )}
-
-            {/* Title and status */}
-            <View style={styles.titleRow}>
-              <View style={[styles.statusDot, { backgroundColor: getStatusColor(test.status) }]} />
-              <Text style={styles.testTitle} numberOfLines={2}>
-                {test.title}
-              </Text>
-            </View>
-
-            {/* All metadata in single row */}
-            <View style={styles.metaRow}>
-              <Text style={styles.metaText}>{test.subject_name || 'Subject'}</Text>
-              <Text style={styles.metaSeparator}> • </Text>
-              <Text style={styles.metaText}>
-                {test.class_name || 'Grade 1-A'}
-              </Text>
-              {test.test_mode === 'online' && test.time_limit_seconds && (
+    <Card style={styles.card} onPress={onPress}>
+      <View style={styles.cardContent}>
+        {/* Top Row: Title & Menu */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title} numberOfLines={1}>
+              {test.title}
+            </Text>
+            <View style={styles.subHeader}>
+              <Text style={styles.subjectText}>{test.subject_name}</Text>
+              {test.class_name && (
                 <>
-                  <Text style={styles.metaSeparator}> • </Text>
-                  <Text style={styles.metaText}>
-                    {Math.floor(test.time_limit_seconds / 60)} min
-                  </Text>
+                  <Text style={styles.dotSeparator}>•</Text>
+                  <Text style={styles.classText}>{test.class_name}</Text>
                 </>
               )}
-              <View style={styles.spacer} />
-              <View style={styles.dateContainer}>
-                <Calendar size={14} color={colors.primary[600]} />
-                <Text style={styles.highlightedDate}>
-                  {test.test_date ? format(new Date(test.test_date), 'MMM dd') : 'No date'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Stats Row */}
-            <View style={styles.statsRow}>
-              {test.test_mode === 'online' ? (
-                <>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statValue}>{test.question_count || 0}</Text>
-                    <Text style={styles.statLabel}>Questions</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statValue}>{test.attempts_count || 0}</Text>
-                    <Text style={styles.statLabel}>Attempts</Text>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statValue}>{test.max_marks || 100}</Text>
-                    <Text style={styles.statLabel}>Max Marks</Text>
-                  </View>
-                  <View style={styles.statBox}>
-                    <Text style={styles.statValue}>{(test.marks_uploaded || 0)}/{test.total_students || 0}</Text>
-                    <Text style={styles.statLabel}>Graded</Text>
-                  </View>
-                </>
-              )}
-              <View style={styles.statBox}>
-                <Text style={styles.statValue}>{test.total_students || 0}</Text>
-                <Text style={styles.statLabel}>Students</Text>
-              </View>
             </View>
           </View>
+
+          {showActions && (
+            <Menu
+              visible={menuVisible}
+              onDismiss={closeMenu}
+              anchor={
+                <IconButton
+                  icon={() => <MoreVertical size={20} color={colors.text.tertiary} />}
+                  size={20}
+                  onPress={() => setMenuVisible(true)}
+                  style={styles.menuButton}
+                />
+              }
+            >
+              <Menu.Item onPress={() => { closeMenu(); onPress?.(); }} title="View" leadingIcon={() => <Eye size={16} />} />
+              {onEdit && <Menu.Item onPress={() => { closeMenu(); onEdit(); }} title="Edit" leadingIcon={() => <Edit size={16} />} />}
+              {onDelete && <Menu.Item onPress={handleDelete} title="Delete" leadingIcon={() => <Trash2 size={16} />} />}
+            </Menu>
+          )}
         </View>
-      </TouchableRipple>
+
+        {/* Stats Row - Single Line */}
+        <View style={styles.statsRow}>
+          {isOnline ? (
+            <>
+              <Text style={styles.statText}>{test.question_count || 0} Questions</Text>
+              {(test.attempts_count || 0) > 0 && (
+                <>
+                  <Text style={styles.statSeparator}>•</Text>
+                  <Text style={styles.statText}>{test.attempts_count} Attempts</Text>
+                </>
+              )}
+              {test.time_limit_seconds && (
+                <>
+                  <Text style={styles.statSeparator}>•</Text>
+                  <Text style={styles.statText}>{Math.floor(test.time_limit_seconds / 60)}m</Text>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <Text style={styles.statText}>Max: {test.max_marks || 100}</Text>
+              {(test.total_students || 0) > 0 && (
+                <>
+                  <Text style={styles.statSeparator}>•</Text>
+                  <Text style={styles.statText}>{test.marks_uploaded || 0}/{test.total_students} Graded</Text>
+                </>
+              )}
+            </>
+          )}
+          
+          {/* Progress pushes to the right */}
+          {completionRate > 0 && (
+            <View style={styles.progressContainer}>
+              <Text style={styles.progressText}>{completionRate}%</Text>
+            </View>
+          )}
+        </View>
+      </View>
     </Card>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   card: {
     marginBottom: spacing.sm,
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    ...shadows.sm,
-  },
-  cardPressable: {
-    backgroundColor: colors.surface.primary,
-  },
-  cardInner: {
-    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    ...shadows.none,
+    elevation: 0,
   },
   cardContent: {
     padding: spacing.md,
   },
-  dateContainer: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
   },
-  menuContainer: {
-    position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
-    zIndex: 10,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  spacer: {
+  headerLeft: {
     flex: 1,
+    marginRight: spacing.sm,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    flexShrink: 0,
-  },
-  testTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.text.primary,
-    flex: 1,
-    lineHeight: 20,
+    marginBottom: 2,
   },
-  metaRow: {
+  subHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    marginBottom: spacing.sm,
   },
-  metaText: {
-    fontSize: typography.fontSize.sm,
+  subjectText: {
+    fontSize: 13,
     color: colors.text.secondary,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: '500',
   },
-  metaSeparator: {
-    fontSize: typography.fontSize.sm,
+  classText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+  },
+  dotSeparator: {
+    fontSize: 13,
     color: colors.text.tertiary,
-    marginHorizontal: 4,
+    marginHorizontal: 6,
   },
-  highlightedDate: {
-    fontSize: typography.fontSize.sm,
-    color: colors.primary[600],
-    fontWeight: typography.fontWeight.bold,
+  menuButton: {
+    margin: -8,
+    marginTop: -4,
   },
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-  },
-  statBox: {
     alignItems: 'center',
-    flex: 1,
   },
-  statValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  statLabel: {
-    fontSize: typography.fontSize.xs,
+  statText: {
+    fontSize: 13,
     color: colors.text.tertiary,
-    marginTop: 2,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: '400',
   },
-  menuButton: {
-    margin: -spacing.xs,
+  statSeparator: {
+    fontSize: 13,
+    color: colors.text.tertiary,
+    marginHorizontal: 6,
+  },
+  progressContainer: {
+    marginLeft: 'auto',
+    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary[700],
   },
 });

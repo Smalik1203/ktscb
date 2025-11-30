@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity, StyleSheet, ViewStyle, TextStyle, ActivityIndicator, Animated, View } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors, borderRadius, spacing, typography, shadows, animation } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
+import { borderRadius, spacing, typography, shadows, animation, colors } from '../../../lib/design-system';
 
 interface ButtonProps {
   title: string;
@@ -34,6 +35,7 @@ export function Button({
   accessibilityHint,
   fullWidth = false,
 }: ButtonProps) {
+  const { colors, isDark } = useTheme();
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const opacityAnim = React.useRef(new Animated.Value(1)).current;
 
@@ -80,7 +82,7 @@ export function Button({
         };
       case 'secondary':
         return {
-          backgroundColor: '#FFFFFF', // White (ClassBridge)
+          backgroundColor: colors.surface.primary, // White/Dark surface (theme-aware)
           borderColor: colors.primary[600], // Sapphire border
           textColor: colors.primary[600], // Sapphire text
           shadow: shadows.none, // No shadow (ClassBridge)

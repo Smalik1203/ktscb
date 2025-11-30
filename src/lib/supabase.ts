@@ -114,23 +114,38 @@ if (__DEV__) {
   };
 }
 
-// Test Supabase connection
+// Test Supabase connection (non-blocking, for diagnostics only)
+// Note: This should NOT block auth flow - auth can work even if this fails
 export const testSupabaseConnection = async () => {
   try {
-    const { error } = await supabase
+    // Add timeout to prevent hanging
+    const queryPromise = supabase
       .from('schools')
       .select('count')
       .limit(1);
     
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Connection test timeout after 5s')), 5000)
+    );
+
+    const { error } = await Promise.race([queryPromise, timeoutPromise]);
+    
     if (error) {
-      log.error('Supabase connection test failed:', error);
+      log.warn('Supabase connection test failed (non-critical):', error.message);
       return false;
     }
     
     log.info('Supabase connection test successful');
     return true;
-  } catch (error) {
-    log.error('Supabase connection test error:', error);
+  } catch (error: any) {
+    // Handle JSON parse errors
+    if (error?.message?.includes('JSON Parse error') || error?.message?.includes('Unexpected character')) {
+      log.warn('Supabase returned malformed JSON - check URL and network:', error.message);
+    } else if (error?.message?.includes('timeout')) {
+      log.warn('Supabase connection test timed out - network issue (non-critical)');
+    } else {
+      log.warn('Supabase connection test error (non-critical):', error?.message || error);
+    }
     return false;
   }
 };

@@ -1,6 +1,8 @@
-import React from 'react';
-import { View, StyleSheet, ViewStyle, Image, Text } from 'react-native';
-import { colors, borderRadius, typography, shadows } from '../../../lib/design-system';
+import React, { useMemo } from 'react';
+import { View, StyleSheet, ViewStyle, Text } from 'react-native';
+import { Image } from 'expo-image';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 
 interface AvatarProps {
   source?: { uri: string };
@@ -17,6 +19,8 @@ export function Avatar({
   variant = 'default',
   style,
 }: AvatarProps) {
+  const { colors, typography, borderRadius, shadows } = useTheme();
+
   const getSizeStyles = () => {
     switch (size) {
       case 'sm':
@@ -96,6 +100,8 @@ export function Avatar({
   const sizeStyles = getSizeStyles();
   const variantStyles = getVariantStyles();
 
+  const styles = useMemo(() => createStyles(borderRadius, shadows), [borderRadius, shadows]);
+
   const avatarStyles = [
     styles.avatar,
     {
@@ -127,7 +133,13 @@ export function Avatar({
   return (
     <View style={avatarStyles}>
       {source ? (
-        <Image source={source} style={styles.image} />
+        <Image 
+          source={source} 
+          style={styles.image}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
+        />
       ) : name ? (
         <Text style={textStyles}>{getInitials(name)}</Text>
       ) : (
@@ -137,19 +149,20 @@ export function Avatar({
   );
 }
 
-const styles = StyleSheet.create({
-  avatar: {
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-    ...shadows.sm,
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  text: {
-    textAlign: 'center',
-  },
-});
+const createStyles = (borderRadius: any, shadows: any) =>
+  StyleSheet.create({
+    avatar: {
+      borderRadius: borderRadius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+      ...shadows.sm,
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+    },
+    text: {
+      textAlign: 'center',
+    },
+  });

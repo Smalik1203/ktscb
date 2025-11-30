@@ -134,7 +134,7 @@ export function AddChapterTopicModal({
             loading={busy}
             disabled={busy || !title.trim()}
             buttonColor="#4f46e5"
-            textColor="#ffffff"
+            textColor={colors.surface.primary}
           >
             Create
           </Button>
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4f46e5',
   },
   submitButtonLabel: {
-    color: '#ffffff',
+    color: colors.surface.primary,
   },
 });
 

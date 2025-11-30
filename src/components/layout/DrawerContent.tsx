@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,9 +31,12 @@ import {
   Layers,
   ReceiptText,
   FolderOpen,
-  FileText
+  FileText,
+  Moon,
+  Sun
 } from 'lucide-react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useClass } from '../../hooks/useClasses';
@@ -228,7 +232,8 @@ const MENU: MenuItem[] = [
 export function DrawerContent(props: DrawerContentComponentProps) {
   const router = useRouter();
   const { profile, signOut } = useAuth();
-  const role = profile?.role as MenuItem['roles'][number];
+  const { colors, isDark, toggleTheme } = useTheme();
+  const role = profile?.role as MenuItem['roles'] extends (infer U)[] ? U : never;
   const [activeItem, setActiveItem] = React.useState<string>('home');
   const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set(['fees']));
   const insets = useSafeAreaInsets();
@@ -236,6 +241,117 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   // Fetch class information for students
   const isStudent = role === 'student';
   const { data: classData } = useClass(profile?.class_instance_id || undefined);
+  
+  // Dynamic styles based on theme
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface.primary,
+    },
+    sectionLabel: {
+      color: colors.text.tertiary,
+      fontSize: 13,
+      fontWeight: typography.fontWeight.semibold as any,
+      marginBottom: spacing.sm,
+      paddingHorizontal: spacing.sm,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    menuItemActive: {
+      backgroundColor: isDark ? colors.primary[50] : colors.primary[50],
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary[600],
+    },
+    menuItemLabel: {
+      fontSize: 17,
+      fontWeight: typography.fontWeight.medium as any,
+      color: colors.text.primary,
+      marginLeft: 10,
+      flex: 1,
+    },
+    menuItemLabelActive: {
+      color: colors.primary[isDark ? 600 : 700],
+      fontWeight: typography.fontWeight.semibold as any,
+    },
+    subMenuItem: {
+      marginLeft: 18,
+      paddingVertical: 10,
+      backgroundColor: colors.background.secondary,
+      borderRadius: borderRadius.sm,
+      marginVertical: 4,
+    },
+    subMenuItemLabel: {
+      fontSize: 15,
+      marginLeft: 10,
+      color: colors.text.secondary,
+    },
+    badge: {
+      backgroundColor: colors.error[500],
+      borderRadius: borderRadius.full,
+      minWidth: 20,
+      height: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+      marginLeft: spacing.sm,
+    },
+    badgeText: {
+      color: colors.text.inverse,
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.bold as any,
+    },
+    themeToggle: {
+      backgroundColor: colors.background.secondary,
+      borderWidth: 1,
+      borderColor: colors.border.light,
+    },
+    logoutButton: {
+      backgroundColor: colors.error[50],
+      borderWidth: 1,
+      borderColor: colors.error[200],
+    },
+    footerItemLabel: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.medium as any,
+      color: colors.text.primary,
+    },
+    footerBorder: {
+      borderTopColor: colors.border.light,
+    },
+    avatar: {
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    avatarText: {
+      fontSize: 18,
+      fontWeight: typography.fontWeight.bold as any,
+      color: colors.text.inverse,
+      letterSpacing: 0.5,
+    },
+    userName: {
+      fontSize: 18,
+      fontWeight: typography.fontWeight.semibold as any,
+      color: colors.text.inverse,
+      marginBottom: 3,
+    },
+    userRoleContainer: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    },
+    userRoleText: {
+      fontSize: 13,
+      fontWeight: typography.fontWeight.medium as any,
+      color: colors.text.inverse,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    headerLogoutButton: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderColor: 'rgba(255, 255, 255, 0.3)',
+    },
+    headerLogoutIcon: {
+      color: colors.text.inverse,
+    },
+  }), [colors, isDark]);
   
   // Format class name for display
   const displayText = useMemo(() => {
@@ -331,17 +447,22 @@ export function DrawerContent(props: DrawerContentComponentProps) {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'superadmin': return '#ef4444'; // Red
-      case 'cb_admin': return '#1E4EB8'; // Sapphire Blue (ClassBridge)
-      case 'admin': return '#2563eb'; // Blue
-      case 'teacher': return '#9DFF7A'; // Lime Green (ClassBridge)
-      case 'student': return '#4FA3FF'; // Sky Blue (ClassBridge)
+      case 'superadmin': return colors.error[500]; // Red
+      case 'cb_admin': return colors.primary[600]; // Sapphire Blue (ClassBridge)
+      case 'admin': return colors.info[600]; // Blue
+      case 'teacher': return colors.accent.main; // Lime Green (ClassBridge)
+      case 'student': return colors.secondary.main; // Sky Blue (ClassBridge)
       default: return colors.neutral[500];
     }
   };
 
+  // Gradient colors for header based on theme
+  const headerGradientColors = isDark 
+    ? [colors.primary[900], colors.primary[800], colors.primary[700]] as const
+    : [colors.primary[600], colors.info[600], colors.secondary.main] as const;
+
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       {/* Clean Header with Gradient */}
       <Animated.View
         style={[
@@ -354,7 +475,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         ]}
       >
         <LinearGradient
-          colors={['#1E4EB8', '#2563eb', '#4FA3FF']}
+          colors={headerGradientColors}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.headerGradient}
@@ -362,8 +483,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           <View style={styles.userSection}>
             {/* Avatar with initials */}
             <View style={styles.avatarContainer}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
+              <View style={[styles.avatarBase, dynamicStyles.avatar]}>
+                <Text style={dynamicStyles.avatarText}>
                   {(profile?.full_name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                 </Text>
               </View>
@@ -371,11 +492,11 @@ export function DrawerContent(props: DrawerContentComponentProps) {
 
             {/* User Details */}
             <View style={styles.userDetails}>
-              <Text style={styles.userName} numberOfLines={1}>
+              <Text style={dynamicStyles.userName} numberOfLines={1}>
                 {profile?.full_name || 'User'}
               </Text>
-              <View style={styles.roleContainer}>
-                <Text style={styles.userRole}>
+              <View style={[styles.roleContainer, dynamicStyles.userRoleContainer]}>
+                <Text style={dynamicStyles.userRoleText}>
                   {displayText}
                 </Text>
               </View>
@@ -383,7 +504,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
 
             {/* Logout Button */}
             <TouchableOpacity
-              style={styles.headerLogoutButton}
+              style={[styles.headerLogoutButtonBase, dynamicStyles.headerLogoutButton]}
               onPress={handleLogout}
               activeOpacity={0.7}
             >
@@ -408,7 +529,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           <View style={styles.menu}>
             {Object.entries(grouped).map(([section, items]) => (
               <View key={section} style={styles.section}>
-                <Text style={styles.sectionLabel}>{section}</Text>
+                <Text style={dynamicStyles.sectionLabel}>{section}</Text>
                 {items.filter(item => !item.parent).map((item) => {
                   const isExpanded = expandedMenus.has(item.key);
                   const subItems = items.filter(i => i.parent === item.key);
@@ -418,7 +539,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                   <TouchableOpacity
                     style={[
                       styles.menuItem,
-                      activeItem === item.key && styles.menuItemActive
+                      activeItem === item.key && dynamicStyles.menuItemActive
                     ]}
                     onPress={() => handleItemPress(item)}
                   >
@@ -427,8 +548,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                       color={activeItem === item.key ? colors.primary[600] : colors.text.secondary}
                     />
                     <Text style={[
-                      styles.menuItemLabel,
-                      activeItem === item.key && styles.menuItemLabelActive
+                      dynamicStyles.menuItemLabel,
+                      activeItem === item.key && dynamicStyles.menuItemLabelActive
                     ]}>
                       {item.label}
                     </Text>
@@ -443,8 +564,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                           />
                         )}
                     {item.badge && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{item.badge}</Text>
+                      <View style={dynamicStyles.badge}>
+                        <Text style={dynamicStyles.badgeText}>{item.badge}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -457,8 +578,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                             key={subItem.key}
                             style={[
                               styles.menuItem,
-                              styles.subMenuItem,
-                              isSubItemActive && styles.menuItemActive
+                              dynamicStyles.subMenuItem,
+                              isSubItemActive && dynamicStyles.menuItemActive
                             ]}
                             onPress={() => handleItemPress(subItem)}
                           >
@@ -467,9 +588,9 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                               color={isSubItemActive ? colors.primary[600] : colors.text.secondary}
                             />
                             <Text style={[
-                              styles.menuItemLabel,
-                              styles.subMenuItemLabel,
-                              isSubItemActive && styles.menuItemLabelActive
+                              dynamicStyles.menuItemLabel,
+                              dynamicStyles.subMenuItemLabel,
+                              isSubItemActive && dynamicStyles.menuItemLabelActive
                             ]}>
                               {subItem.label}
                             </Text>
@@ -485,15 +606,58 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         </DrawerContentScrollView>
       </Animated.View>
 
+      {/* Theme Toggle & Logout Footer */}
+      <Animated.View 
+        style={[
+          styles.footer,
+          dynamicStyles.footerBorder,
+          {
+            opacity: fadeAnim,
+            paddingBottom: insets.bottom + spacing.sm,
+          }
+        ]}
+      >
+        {/* Theme Toggle */}
+        <TouchableOpacity
+          style={[
+            styles.footerItem,
+            dynamicStyles.themeToggle
+          ]}
+          onPress={toggleTheme}
+          activeOpacity={0.7}
+        >
+          {isDark ? (
+            <Sun size={20} color={colors.text.primary} />
+          ) : (
+            <Moon size={20} color={colors.text.primary} />
+          )}
+          <Text style={[dynamicStyles.footerItemLabel, { marginLeft: spacing.sm }]}>
+            {isDark ? 'Light Mode' : 'Dark Mode'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={[
+            styles.footerItem,
+            dynamicStyles.logoutButton
+          ]}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <LogOut size={20} color={colors.error[600]} />
+          <Text style={[dynamicStyles.footerItemLabel, { marginLeft: spacing.sm, color: colors.error[600] }]}>
+            Logout
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
+
     </View>
   );
 }
 
+// Static styles that don't depend on theme
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface.primary,
-  },
   headerWrapper: {
     marginBottom: 0,
   },
@@ -510,54 +674,30 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginRight: 10,
   },
-  avatar: {
+  avatarBase: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: typography.fontWeight.bold as any,
-    color: colors.text.inverse,
-    letterSpacing: 0.5,
   },
   userDetails: {
     flex: 1,
   },
-  userName: {
-    fontSize: 18,
-    fontWeight: typography.fontWeight.semibold as any,
-    color: colors.text.inverse,
-    marginBottom: 3,
-  },
   roleContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
     alignSelf: 'flex-start',
   },
-  userRole: {
-    fontSize: 13,
-    fontWeight: typography.fontWeight.medium as any,
-    color: colors.text.inverse,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  headerLogoutButton: {
+  headerLogoutButtonBase: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   scrollView: {
     flex: 1,
@@ -570,15 +710,6 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 18,
   },
-  sectionLabel: {
-    color: colors.text.tertiary,
-    fontSize: 13,
-    fontWeight: typography.fontWeight.semibold as any,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -587,34 +718,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginVertical: 4,
   },
-  menuItemActive: {
-    backgroundColor: colors.primary[50],
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary[600],
-  },
-  menuItemLabel: {
-    fontSize: 17,
-    fontWeight: typography.fontWeight.medium as any,
-    color: colors.text.primary,
-    marginLeft: 10,
-    flex: 1,
-  },
-  menuItemLabelActive: {
-    color: colors.primary[700],
-    fontWeight: typography.fontWeight.semibold as any,
-  },
-  subMenuItem: {
-    marginLeft: 18,
-    paddingVertical: 10,
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.sm,
-    marginVertical: 4,
-  },
-  subMenuItemLabel: {
-    fontSize: 15,
-    marginLeft: 10,
-    color: colors.text.secondary,
-  },
   chevron: {
     marginLeft: 'auto',
     transform: [{ rotate: '0deg' }],
@@ -622,20 +725,18 @@ const styles = StyleSheet.create({
   chevronExpanded: {
     transform: [{ rotate: '90deg' }],
   },
-  badge: {
-    backgroundColor: colors.error[500],
-    borderRadius: borderRadius.full,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    marginLeft: spacing.sm,
+  footer: {
+    borderTopWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
   },
-  badgeText: {
-    color: colors.surface.primary,
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.bold as any,
+  footerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
   },
 });
 

@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import {
   View,
   Text,
@@ -14,14 +16,14 @@ import { X, Calendar as CalendarIcon, Clock } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { TestInput, TestMode, TestWithDetails } from '../../types/test.types';
 import { DatePickerModal } from '../common/DatePickerModal';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 
 interface CreateTestFormProps {
   visible: boolean;
   onClose: () => void;
   onSubmit: (testData: TestInput) => Promise<void>;
   initialData?: TestWithDetails;
-  classes: { id: string; grade: number; section: string }[];
+  classes: { id: string; grade: number | null; section: string | null }[];
   subjects: { id: string; subject_name: string }[];
   schoolCode: string;
   userId: string;
@@ -39,6 +41,9 @@ export function CreateTestForm({
   schoolCode,
   userId,
 }: CreateTestFormProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [classInstanceId, setClassInstanceId] = useState('');
@@ -457,7 +462,8 @@ export function CreateTestForm({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   modal: {
     margin: spacing.md,
     maxHeight: '90%',

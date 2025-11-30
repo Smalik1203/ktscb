@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { AlertCircle, Calendar as CalendarIcon } from 'lucide-react-native';
-import { colors, spacing, borderRadius, typography } from '../../../lib/design-system';
+import { spacing, borderRadius, typography, colors } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { useHolidayCheck } from '../../hooks/useCalendarEvents';
 
 interface HolidayCheckerProps {
@@ -20,6 +22,9 @@ export default function HolidayChecker({
   onHolidayClick,
   showAsAlert = true,
 }: HolidayCheckerProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  
   const { data: holidayInfo, isLoading } = useHolidayCheck(schoolCode, date, classInstanceId);
 
   if (isLoading || !holidayInfo) {
@@ -70,11 +75,11 @@ export default function HolidayChecker({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   alertContainer: {
-    backgroundColor: '#fff7e6',
+    backgroundColor: colors.warning[50],
     borderWidth: 1,
-    borderColor: '#ffd591',
+    borderColor: colors.warning[300],
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -88,7 +93,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   alertTitle: {
-    color: '#d46b08',
+    color: colors.warning[700],
     fontWeight: typography.fontWeight.bold,
   },
   alertDescription: {
@@ -100,22 +105,21 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   alertButtonLabel: {
-    color: '#d46b08',
+    color: colors.warning[700],
   },
   compactContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: '#fff7e6',
+    backgroundColor: colors.warning[50],
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
     borderWidth: 1,
-    borderColor: '#ffd591',
+    borderColor: colors.warning[300],
   },
   compactText: {
-    color: '#d46b08',
+    color: colors.warning[700],
     fontWeight: typography.fontWeight.medium,
   },
 });
-

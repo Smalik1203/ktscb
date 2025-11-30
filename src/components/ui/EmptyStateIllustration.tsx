@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, typography, spacing, borderRadius } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { typography, spacing, borderRadius, colors } from '../../../lib/design-system';
 import {
   BookOpen,
   CheckCircle2,
@@ -50,7 +51,11 @@ export function EmptyStateIllustration({
   description,
   action,
 }: EmptyStateIllustrationProps) {
+  const { colors, isDark } = useTheme();
   const Icon = iconMap[type] || iconMap.general;
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   return (
     <View style={styles.container}>
@@ -71,7 +76,7 @@ export function EmptyStateIllustration({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
@@ -86,11 +91,11 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colors.primary[50],
+    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: colors.primary[100],
+    borderColor: colors.primary[200],
   },
   title: {
     fontSize: typography.fontSize.xl,

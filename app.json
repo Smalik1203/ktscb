@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.classbridge.mobile",
+      "jsEngine": "hermes",
       "icon": "./assets/images/Image.png",
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -44,6 +45,7 @@
     "android": {
       "package": "com.classbridge.mobile",
       "versionCode": 1,
+      "jsEngine": "hermes",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/Image.png",
         "backgroundColor": "#1E4EB8"
@@ -77,7 +79,9 @@
         {
           "userInterfaceStyle": "light"
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true

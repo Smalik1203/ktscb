@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../../contexts/ThemeContext';
+import type { ThemeColors } from '../../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Text, Surface } from 'react-native-paper';
-import { colors, typography, spacing, borderRadius } from '../../../../lib/design-system';
+import { typography, spacing, borderRadius, colors } from '../../../../lib/design-system';
 import { ProgressRing } from '../ProgressRing';
 
 interface MetricCardProps {
@@ -17,10 +19,14 @@ export const MetricCard = React.memo<MetricCardProps>(({
   label,
   value,
   subtext,
-  valueColor = colors.text.primary,
+  valueColor,
   variant = 'default',
   progress,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
+  const finalValueColor = valueColor || colors.text.primary;
   if (variant === 'ring' && typeof progress === 'number') {
     return (
       <Surface style={styles.metricCard} elevation={2}>
@@ -48,7 +54,7 @@ export const MetricCard = React.memo<MetricCardProps>(({
   return (
     <Surface style={styles.metricCard} elevation={2}>
       <Text variant="labelLarge" style={styles.metricCardLabel}>{label}</Text>
-      <Text variant="headlineMedium" style={[styles.metricCardValue, { color: valueColor }]}>
+      <Text variant="headlineMedium" style={[styles.metricCardValue, { color: finalValueColor }]}>
         {value}
       </Text>
       {subtext && (
@@ -58,7 +64,10 @@ export const MetricCard = React.memo<MetricCardProps>(({
   );
 });
 
-const styles = StyleSheet.create({
+MetricCard.displayName = 'MetricCard';
+
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   metricCard: {
     backgroundColor: colors.background.app,
     borderRadius: borderRadius.lg,

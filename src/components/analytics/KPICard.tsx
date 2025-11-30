@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet } from 'react-native';
 import { Card, Text } from 'react-native-paper';
 import { LucideIcon } from 'lucide-react-native';
-import { colors, typography, spacing, borderRadius } from '../../../lib/design-system';
+import { typography, spacing, borderRadius, colors } from '../../../lib/design-system';
 
 export interface KPICardProps {
   title: string;
@@ -21,12 +23,18 @@ export const KPICard = React.memo<KPICardProps>(({
   value,
   subtitle,
   icon: Icon,
-  iconColor = colors.primary[600],
-  iconBackgroundColor = colors.primary[50],
+  iconColor,
+  iconBackgroundColor,
   trend,
   trendValue,
   isLoading = false,
 }) => {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
+  // Use theme colors as defaults if not provided
+  const finalIconColor = iconColor || colors.primary[600];
+  const finalIconBgColor = iconBackgroundColor || colors.primary[50];
   const getTrendColor = () => {
     if (!trend) return colors.text.secondary;
     switch (trend) {
@@ -55,8 +63,8 @@ export const KPICard = React.memo<KPICardProps>(({
     <Card style={styles.card} elevation={1}>
       <View style={styles.content}>
         {Icon && (
-          <View style={[styles.iconContainer, { backgroundColor: iconBackgroundColor }]}>
-            <Icon size={24} color={iconColor} />
+          <View style={[styles.iconContainer, { backgroundColor: finalIconBgColor }]}>
+            <Icon size={24} color={finalIconColor} />
           </View>
         )}
         <View style={styles.textContainer}>
@@ -86,7 +94,10 @@ export const KPICard = React.memo<KPICardProps>(({
   );
 });
 
-const styles = StyleSheet.create({
+KPICard.displayName = 'KPICard';
+
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   card: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,

@@ -1,8 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, ScrollView, StyleSheet, TouchableOpacity, TextInput as RNTextInput, Alert } from 'react-native';
 import { Text, Modal, Portal } from 'react-native-paper';
 import { UserPlus, Trash2, Edit, X, Search } from 'lucide-react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+import { spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 import { Card, Button, Input, EmptyState } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { sanitizeEmail, sanitizePhone, sanitizeCode, sanitizeName, validatePassword } from '../../utils/sanitize';
@@ -12,6 +14,12 @@ import { Pagination } from '../../components/common/Pagination';
 
 export default function AddAdminScreen() {
   const { profile } = useAuth();
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+  
   const schoolCode = profile?.school_code;
 
   // Queries
@@ -87,28 +95,8 @@ export default function AddAdminScreen() {
   }
 
   const handleCreate = async () => {
-    console.log('═══════════════════════════════════════════════════');
-    console.log('🎯 ADD ADMIN SCREEN - Button Clicked');
-    console.log('═══════════════════════════════════════════════════');
-    console.log('📝 Form data:', {
-      fullName: fullName,
-      email: email,
-      password: password ? `${password.length} characters` : 'empty',
-      phone: phone,
-      adminCode: adminCode,
-      schoolCode: schoolCode,
-    });
-    console.log('👤 Current profile:', {
-      auth_id: profile?.auth_id,
-      role: profile?.role,
-      school_code: profile?.school_code,
-      school_name: profile?.school_name,
-      email: profile?.email,
-    });
-
     // Validation
     if (!fullName.trim() || !email.trim() || !password.trim() || !phone.trim() || !adminCode.trim()) {
-      console.warn('⚠️ Validation failed: Missing fields');
       Alert.alert('Validation Error', 'Please fill in all fields');
       return;
     }
@@ -116,11 +104,10 @@ export default function AddAdminScreen() {
     // Validate password strength
     const passwordValidation = validatePassword(password);
     if (!passwordValidation.isValid) {
-      const missing = [];
+      const missing: string[] = [];
       if (!passwordValidation.requirements.minLength) missing.push('at least 8 characters');
       if (!passwordValidation.requirements.hasLetter) missing.push('at least one letter');
       if (!passwordValidation.requirements.hasNumber) missing.push('at least one number');
-      console.warn('⚠️ Validation failed: Password too weak');
       Alert.alert('Validation Error', `Password must contain: ${missing.join(', ')}`);
       return;
     }
@@ -139,9 +126,6 @@ export default function AddAdminScreen() {
       return;
     }
 
-    console.log('✅ Validation passed');
-    console.log('🚀 Calling createMutation.mutateAsync...');
-
     try {
       const payload = {
         full_name: sanitizedData.full_name,
@@ -150,35 +134,17 @@ export default function AddAdminScreen() {
         phone: sanitizedData.phone,
         admin_code: sanitizedData.admin_code,
       };
-      
-      console.log('📤 Mutation payload:', {
-        ...payload,
-        password: '[REDACTED]',
-      });
 
-      const result = await createMutation.mutateAsync(payload);
-
-      console.log('✅ Mutation completed successfully:', result);
+      await createMutation.mutateAsync(payload);
       Alert.alert('Success', 'Admin created successfully!');
       
       // Reset form
-      console.log('🔄 Resetting form...');
       setFullName('');
       setEmail('');
       setPassword('');
       setPhone('');
       setAdminCode('A');
-      console.log('✅ Form reset complete');
     } catch (error: any) {
-      console.error('═══════════════════════════════════════════════════');
-      console.error('💥 ADD ADMIN SCREEN - Error Caught');
-      console.error('═══════════════════════════════════════════════════');
-      console.error('Error object:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      });
-      console.error('═══════════════════════════════════════════════════');
       
       Alert.alert('Error', error.message || 'Failed to create admin');
     }
@@ -464,7 +430,8 @@ export default function AddAdminScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.primary,

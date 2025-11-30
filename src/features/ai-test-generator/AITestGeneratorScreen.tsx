@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import {
   View,
   Text,
@@ -24,7 +26,7 @@ import {
   BookOpen,
   Users,
 } from 'lucide-react-native';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { generateQuestionsFromImage, GeneratedQuestion } from '../../services/aiTestGeneratorFetch';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClasses } from '../../hooks/useClasses';
@@ -36,6 +38,12 @@ import { supabase } from '../../lib/supabase';
 export default function AITestGeneratorScreen() {
   const router = useRouter();
   const { profile, user } = useAuth();
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
+  
   const { data: classes = [] } = useClasses(profile?.school_code || '');
   const { data: subjectsResult } = useSubjects(profile?.school_code || '');
   const subjects = subjectsResult?.data || [];
@@ -73,7 +81,6 @@ export default function AITestGeneratorScreen() {
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
-        console.log('[AI Test Generator] Image selected');
         setSelectedImage(asset.uri);
         setGeneratedQuestions([]);
       }
@@ -535,7 +542,8 @@ export default function AITestGeneratorScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,
@@ -552,7 +560,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: colors.surface.glass,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
@@ -578,7 +586,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: colors.text.inverse,
     marginTop: 2,
   },
   scrollView: {

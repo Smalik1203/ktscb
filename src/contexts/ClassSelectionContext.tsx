@@ -8,8 +8,8 @@ const SCOPE_STORAGE_KEY = '@classbridge_app_scope';
 
 interface ClassListItem {
   id: string;
-  grade: number;
-  section: string;
+  grade: number | null;
+  section: string | null;
   school_code: string;
   academic_year_id: string | null;
   class_teacher_name?: string;
@@ -71,7 +71,7 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
   // Show for superadmins/cb_admin and admins managing multiple classes
   const shouldShowClassSelector = isSuperAdmin || profile?.role === 'admin';
   
-  const { data: classes = [], isLoading, error } = useClasses(profile?.school_code);
+  const { data: classes = [], isLoading, error } = useClasses(profile?.school_code || undefined);
 
   // Load scope from AsyncStorage on mount
   useEffect(() => {

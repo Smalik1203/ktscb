@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, TouchableOpacity, StyleSheet, Animated, Modal, ScrollView, Dimensions } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { DrawerActions , useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Menu, Plus, RefreshCw, Bell, UserCheck, NotebookText, Target, CalendarDays, Activity, X } from 'lucide-react-native';
-import { colors, spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRecentActivity } from '../../hooks/useDashboard';
 
@@ -26,6 +27,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
+  const { colors, isDark } = useTheme();
   const [showActivityModal, setShowActivityModal] = useState(false);
   const slideAnim = React.useRef(new Animated.Value(0)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
@@ -35,6 +37,93 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
     profile?.class_instance_id || undefined
   );
 
+  // Dynamic styles based on theme
+  const dynamicStyles = useMemo(() => StyleSheet.create({
+    safeArea: {
+      backgroundColor: colors.surface.primary,
+    },
+    container: {
+      height: 56,
+      backgroundColor: colors.surface.primary,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.light,
+      paddingHorizontal: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    title: {
+      marginLeft: spacing.sm,
+      fontWeight: typography.fontWeight.semibold as any,
+      fontSize: typography.fontSize.lg,
+      color: colors.text.primary,
+    },
+    notificationBadge: {
+      position: 'absolute',
+      top: 2,
+      right: 2,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.error[500],
+      borderWidth: 1.5,
+      borderColor: colors.surface.primary,
+    },
+    bottomSheet: {
+      backgroundColor: colors.surface.elevated,
+      borderTopLeftRadius: borderRadius.xl,
+      borderTopRightRadius: borderRadius.xl,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.xl,
+      maxHeight: '80%',
+      minHeight: 300,
+    },
+    sheetHandle: {
+      width: 36,
+      height: 4,
+      backgroundColor: colors.neutral[isDark ? 500 : 300],
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginBottom: spacing.md,
+    },
+    sheetTitle: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    activityItemBorder: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.light,
+    },
+    activityTitle: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+      marginBottom: 2,
+    },
+    activitySubtitle: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      marginBottom: 4,
+    },
+    activityTime: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.tertiary,
+    },
+    emptyStateTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+      marginTop: spacing.md,
+      marginBottom: spacing.xs,
+    },
+    emptyStateText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      textAlign: 'center',
+    },
+  }), [colors, isDark]);
+
   const handleBack = () => {
     if (router.canGoBack()) {
       router.back();
@@ -43,10 +132,8 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
 
   const handleMenuPress = () => {
     try {
-      // Open the drawer using navigation dispatch
       navigation.dispatch(DrawerActions.openDrawer());
     } catch (error) {
-      // Fallback navigation
       router.push('/(tabs)');
     }
   };
@@ -122,8 +209,8 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   };
 
   return (
-    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
-      <View style={styles.container}>
+    <View style={[dynamicStyles.safeArea, { paddingTop: insets.top }]}>
+      <View style={dynamicStyles.container}>
         <View style={styles.left}>
           {showBackButton ? (
             <TouchableOpacity onPress={handleBack} style={styles.iconBtn}>
@@ -139,7 +226,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
               <Menu size={22} color={colors.text.primary} />
             </TouchableOpacity>
           )}
-          <Text style={styles.title}>{title}</Text>
+          <Text style={dynamicStyles.title}>{title}</Text>
         </View>
         <View style={styles.right}>
           {onRefreshPress ? (
@@ -161,7 +248,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             <View style={styles.notificationContainer}>
               <Bell size={20} color={colors.text.primary} />
               {recentActivity && recentActivity.length > 0 && (
-                <View style={styles.notificationBadge} />
+                <View style={dynamicStyles.notificationBadge} />
               )}
             </View>
           </TouchableOpacity>
@@ -183,7 +270,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
           />
           <Animated.View
             style={[
-              styles.bottomSheet,
+              dynamicStyles.bottomSheet,
               {
                 transform: [
                   {
@@ -196,9 +283,9 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
               },
             ]}
           >
-            <View style={styles.sheetHandle} />
+            <View style={dynamicStyles.sheetHandle} />
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Recent Activity</Text>
+              <Text style={dynamicStyles.sheetTitle}>Recent Activity</Text>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeButton}>
                 <X size={20} color={colors.text.primary} />
               </TouchableOpacity>
@@ -206,7 +293,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             <ScrollView style={styles.sheetContent} showsVerticalScrollIndicator={true}>
               {activityLoading ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyStateText}>Loading...</Text>
+                  <Text style={dynamicStyles.emptyStateText}>Loading...</Text>
                 </View>
               ) : recentActivity && recentActivity.length > 0 ? (
                 recentActivity.map((activity, index) => {
@@ -218,16 +305,16 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
                       key={activity.id}
                       style={[
                         styles.activityItem,
-                        index < recentActivity.length - 1 && styles.activityItemBorder,
+                        index < recentActivity.length - 1 && dynamicStyles.activityItemBorder,
                       ]}
                     >
                       <View style={[styles.activityIcon, { backgroundColor: activityColor.bg }]}>
                         <ActivityIcon size={18} color={activityColor.icon} />
                       </View>
                       <View style={styles.activityContent}>
-                        <Text style={styles.activityTitle}>{activity.title}</Text>
-                        <Text style={styles.activitySubtitle}>{activity.subtitle}</Text>
-                        <Text style={styles.activityTime}>{formatTimeAgo(activity.timestamp)}</Text>
+                        <Text style={dynamicStyles.activityTitle}>{activity.title}</Text>
+                        <Text style={dynamicStyles.activitySubtitle}>{activity.subtitle}</Text>
+                        <Text style={dynamicStyles.activityTime}>{formatTimeAgo(activity.timestamp)}</Text>
                       </View>
                     </View>
                   );
@@ -235,8 +322,8 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
               ) : (
                 <View style={styles.emptyState}>
                   <Activity size={40} color={colors.text.secondary} />
-                  <Text style={styles.emptyStateTitle}>No recent activity</Text>
-                  <Text style={styles.emptyStateText}>
+                  <Text style={dynamicStyles.emptyStateTitle}>No recent activity</Text>
+                  <Text style={dynamicStyles.emptyStateText}>
                     Your recent activity will appear here
                   </Text>
                 </View>
@@ -249,20 +336,8 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   );
 };
 
+// Static styles that don't depend on theme
 const styles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: colors.surface.primary,
-  },
-  container: {
-    height: 56,
-    backgroundColor: colors.surface.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    paddingHorizontal: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
   left: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -270,12 +345,6 @@ const styles = StyleSheet.create({
   right: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  title: {
-    marginLeft: spacing.sm,
-    fontWeight: typography.fontWeight.semibold as any,
-    fontSize: typography.fontSize.lg,
-    color: colors.text.primary,
   },
   iconBtn: {
     width: 44,
@@ -285,7 +354,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 0,
     backgroundColor: 'transparent',
-    // Ensure touch area is large enough
     minWidth: 44,
     minHeight: 44,
   },
@@ -294,38 +362,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notificationBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.error[500],
-    borderWidth: 1.5,
-    borderColor: colors.surface.primary,
-  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.surface.overlay,
     justifyContent: 'flex-end',
-  },
-  bottomSheet: {
-    backgroundColor: colors.surface.primary,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-    maxHeight: '80%',
-    minHeight: 300,
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: colors.neutral[300],
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: spacing.md,
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -333,11 +373,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
-  },
-  sheetTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
   },
   closeButton: {
     padding: spacing.xs,
@@ -351,10 +386,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingVertical: spacing.md,
   },
-  activityItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
   activityIcon: {
     width: 40,
     height: 40,
@@ -366,38 +397,11 @@ const styles = StyleSheet.create({
   activityContent: {
     flex: 1,
   },
-  activityTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  activitySubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  activityTime: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.tertiary,
-  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.lg,
-  },
-  emptyStateTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
-  },
-  emptyStateText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    textAlign: 'center',
   },
 });
 

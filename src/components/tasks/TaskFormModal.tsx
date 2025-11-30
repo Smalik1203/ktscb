@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect , useMemo } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Modal, Portal, Text, TextInput, Button, ActivityIndicator, IconButton, ProgressBar } from 'react-native-paper';
 import { Calendar, X, Upload, FileText, Check, Loader2 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { colors, spacing, typography, borderRadius } from '../../../lib/design-system';
+import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
+import { spacing, typography, borderRadius, colors } from '../../../lib/design-system';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
 import { Task } from '../../hooks/useTasks';
@@ -20,13 +23,6 @@ interface TaskFormModalProps {
   academicYearId?: string;
 }
 
-const PRIORITIES = [
-  { value: 'low', label: 'Low', color: colors.success[500] },
-  { value: 'medium', label: 'Medium', color: colors.warning[500] },
-  { value: 'high', label: 'High', color: colors.error[500] },
-  { value: 'urgent', label: 'Urgent', color: colors.error[600] },
-];
-
 export function TaskFormModal({
   visible,
   onDismiss,
@@ -36,6 +32,15 @@ export function TaskFormModal({
   userId,
   academicYearId,
 }: TaskFormModalProps) {
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+
+  const PRIORITIES = [
+    { value: 'low', label: 'Low', color: colors.success[500] },
+    { value: 'medium', label: 'Medium', color: colors.warning[500] },
+    { value: 'high', label: 'High', color: colors.error[500] },
+    { value: 'urgent', label: 'Urgent', color: colors.error[600] },
+  ];
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [instructions, setInstructions] = useState('');
@@ -127,14 +132,10 @@ export function TaskFormModal({
 
   const uploadFileToStorage = async (file: any, taskId: string): Promise<any> => {
     try {
-      console.log('Uploading file:', file.name, 'Type:', file.type);
-      
       // Create file path: school_code/task_id/timestamp_filename
       const timestamp = Date.now();
       const fileName = `${timestamp}_${file.name}`;
       const filePath = `${schoolCode}/${taskId}/${fileName}`;
-
-      console.log('Uploading to path:', filePath);
 
       // Simulate progress since Supabase doesn't expose upload progress
       const progressInterval = setInterval(() => {
@@ -150,58 +151,52 @@ export function TaskFormModal({
       try {
         setUploadingStatus(`Uploading ${file.name}...`);
 
-      // Get file as ArrayBuffer for React Native compatibility
-      console.log('Fetching file from URI:', file.uri);
-      const fileResponse = await fetch(file.uri);
-        
-        if (!fileResponse.ok) {
-          throw new Error(`Failed to read file: ${fileResponse.status} ${fileResponse.statusText}`);
-        }
-        
-      const fileArrayBuffer = await fileResponse.arrayBuffer();
-      console.log('File ArrayBuffer created, size:', fileArrayBuffer.byteLength);
-        
-        if (fileArrayBuffer.byteLength === 0) {
-          throw new Error('File appears to be empty');
+        // Get Supabase session for authorization
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('No active session. Please log in again.');
         }
 
-      // Use Supabase SDK to upload with ArrayBuffer (React Native compatible)
-      const { data, error } = await supabase.storage
-        .from('task-attachments')
-        .upload(filePath, fileArrayBuffer, {
-          contentType: file.type || 'application/octet-stream',
-          upsert: false,
+        // Construct Supabase Storage upload URL
+        const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+        const uploadUrl = `${supabaseProjectUrl}/storage/v1/object/task-attachments/${filePath}`;
+
+        // Use uploadAsync for streaming upload (no memory overhead)
+        const uploadResult = await uploadAsync(uploadUrl, file.uri, {
+          httpMethod: 'POST',
+          uploadType: FileSystemUploadType.MULTIPART,
+          fieldName: 'file',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': session.access_token,
+          },
         });
 
-      if (error) {
-        console.error('Supabase upload error:', error);
-        throw error;
-      }
-
-      console.log('File uploaded successfully:', data);
+        if (uploadResult.status !== 200) {
+          const errorBody = uploadResult.body ? JSON.parse(uploadResult.body) : {};
+          throw new Error(`Upload failed with status ${uploadResult.status}: ${errorBody.message || 'Unknown error'}`);
+        }
 
         // Complete progress
         clearInterval(progressInterval);
         setUploadProgress(100);
         setUploadingStatus('Upload complete!');
-        
+
         // Small delay to show completion
         await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('task-attachments')
-        .getPublicUrl(filePath);
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('task-attachments')
+          .getPublicUrl(filePath);
 
-      console.log('Public URL:', publicUrl);
-
-      return {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        url: publicUrl,
-        path: filePath,
-      };
+        return {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: publicUrl,
+          path: filePath,
+        };
       } catch (error) {
         clearInterval(progressInterval);
         setUploadProgress(0);
@@ -235,12 +230,7 @@ export function TaskFormModal({
 
     setSubmitting(true);
     try {
-      let uploadedAttachments = [];
-
-      // If we have attachments, show uploading message
-      if (attachments.length > 0) {
-        console.log(`Uploading ${attachments.length} file(s)...`);
-      }
+      let uploadedAttachments: any[] = [];
 
       // First create/update the task without attachments
       const tempTaskData = {
@@ -261,22 +251,18 @@ export function TaskFormModal({
 
       // Submit task and get the task ID
       const taskId = await onSubmit(tempTaskData);
-      console.log('Task created with ID:', taskId);
 
       // Upload attachments if any
       if (attachments.length > 0) {
         try {
-          console.log(`Uploading ${attachments.length} attachments to Supabase Storage...`);
           const uploadPromises = attachments.map(file => 
             uploadFileToStorage(file, taskId)
           );
           
-          uploadedAttachments = await Promise.all(uploadPromises);
-          console.log('All files uploaded successfully:', uploadedAttachments);
-          console.log('Attachments JSON:', JSON.stringify(uploadedAttachments, null, 2));
+          uploadedAttachments = await Promise.all(uploadPromises) as any[];
 
           // Update task with attachment URLs
-          const { data: updateData, error: updateError } = await supabase
+          const { error: updateError } = await supabase
             .from('tasks')
             .update({ 
               attachments: uploadedAttachments,
@@ -285,16 +271,12 @@ export function TaskFormModal({
             .eq('id', taskId)
             .select();
 
-          console.log('Update response:', { updateData, updateError });
-
           if (updateError) {
-            console.error('Error updating task with attachments:', updateError);
             Alert.alert(
               'Warning', 
               `Task created but failed to save attachments: ${updateError.message}. Please try editing the task to add files.`
             );
           } else {
-            console.log('Task updated with attachments successfully:', updateData);
             Alert.alert('Success', `Task created with ${uploadedAttachments.length} file(s)!`);
           }
         } catch (uploadError: any) {
@@ -737,7 +719,8 @@ export function TaskFormModal({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   modal: {
     backgroundColor: colors.surface.primary,
     margin: spacing.md,

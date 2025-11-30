@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Search, X } from 'lucide-react-native';
 import { TestCard } from './TestCard';
 import { StudentTestCard } from './StudentTestCard';
 import { TestWithDetails, TestAttempt } from '../../types/test.types';
-import { colors, spacing, typography, borderRadius } from '../../../lib/design-system';
+import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 
 interface TestListProps {
   tests: TestWithDetails[];
@@ -18,6 +19,8 @@ interface TestListProps {
   isStudentView?: boolean;
   studentAttempts?: TestAttempt[];
   studentMarks?: Record<string, { marks_obtained: number; max_marks: number; remarks?: string | null; test_mode?: string }>;
+  headerComponent?: React.ComponentType<any> | React.ReactElement | null;
+  filteredCount?: number;
 }
 
 export function TestList({
@@ -32,8 +35,14 @@ export function TestList({
   isStudentView = false,
   studentAttempts = [],
   studentMarks = {},
+  headerComponent,
+  filteredCount,
 }: TestListProps) {
+  const { colors, isDark } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Create dynamic styles based on theme
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   // Filter and search tests
   const filteredTests = useMemo(() => {
@@ -49,15 +58,10 @@ export function TestList({
     });
   }, [tests, searchQuery]);
 
-  // Separate tests by mode
-  const onlineTests = useMemo(() => 
-    filteredTests.filter(test => test.test_mode === 'online'),
-    [filteredTests]
-  );
-  const offlineTests = useMemo(() => 
-    filteredTests.filter(test => test.test_mode === 'offline'),
-    [filteredTests]
-  );
+  // Flatten data for FlatList (no section headers)
+  const flatListData = useMemo(() => {
+    return filteredTests.map(test => ({ type: 'item' as const, data: test }));
+  }, [filteredTests]);
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -70,7 +74,7 @@ export function TestList({
     </View>
   );
 
-  const renderTestCard = (item: any) => {
+  const renderTestCard = (item: TestWithDetails) => {
     if (isStudentView) {
       const attempt = studentAttempts.find((a) => a.test_id === item.id);
       const mark = studentMarks[item.id];
@@ -90,43 +94,43 @@ export function TestList({
     );
   };
 
-  const renderSection = (title: string, tests: any[], mode: 'online' | 'offline') => {
-    if (tests.length === 0) return null;
-
+  const renderItem = ({ item }: { item: { type: 'item'; data: any } }) => {
     return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <View style={[styles.sectionHeaderDot, { backgroundColor: mode === 'online' ? colors.primary[600] : colors.secondary[600] }]} />
-          <Text style={styles.sectionTitle}>{title}</Text>
-          <Text style={styles.sectionCount}>({tests.length})</Text>
-        </View>
-        {tests.map((item) => (
-          <View key={item.id}>
-            {renderTestCard(item)}
-          </View>
-        ))}
+      <View style={styles.testItem}>
+        {renderTestCard(item.data)}
       </View>
     );
   };
 
   return (
     <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Search size={20} color={colors.text.secondary} style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search tests..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholderTextColor={colors.text.secondary}
-        />
-        {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <X size={20} color={colors.text.secondary} />
-          </TouchableOpacity>
-        ) : null}
-      </View>
+      {/* Prominent Search Bar - Always visible and anchored */}
+      {tests.length > 0 && (
+        <View style={styles.searchSection}>
+          <View style={styles.searchRow}>
+            <View style={styles.searchContainer}>
+              <Search size={18} color={colors.primary[600]} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search assessments..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholderTextColor={colors.text.tertiary}
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                  <X size={18} color={colors.text.secondary} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {filteredCount !== undefined && filteredCount > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{filteredCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
 
       {/* Test List */}
       {loading ? (
@@ -136,17 +140,22 @@ export function TestList({
         </View>
       ) : (
         <>
-          {onlineTests.length === 0 && offlineTests.length === 0 ? (
+          {flatListData.length === 0 ? (
             renderEmptyState()
           ) : (
-            <ScrollView 
+            <FlatList
+              data={flatListData}
+              renderItem={renderItem}
+              keyExtractor={(item, index) => `test-${item.data.id}-${index}`}
               style={styles.scrollView}
-              showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.listContent}
-            >
-              {renderSection('Online Tests', onlineTests, 'online')}
-              {renderSection('Offline Tests', offlineTests, 'offline')}
-            </ScrollView>
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={true}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              ListEmptyComponent={renderEmptyState}
+            />
           )}
         </>
       )}
@@ -154,23 +163,58 @@ export function TestList({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background.app,
   },
   scrollView: {
     flex: 1,
   },
+  searchSection: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.background.app,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    marginBottom: spacing.md,
+    borderWidth: 1.5,
+    borderColor: colors.border.DEFAULT,
+    ...shadows.sm,
+    elevation: 2,
+  },
+  countBadge: {
+    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minWidth: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.border.DEFAULT,
+    alignSelf: 'stretch',
+  },
+  countBadgeText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary[600],
+    lineHeight: typography.fontSize.sm,
   },
   searchIcon: {
     marginRight: spacing.sm,
@@ -178,11 +222,18 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
     padding: 0,
   },
+  clearButton: {
+    padding: spacing.xs,
+    marginLeft: spacing.xs,
+  },
   listContent: {
+    paddingTop: spacing.sm,
     paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.md,
   },
   loadingContainer: {
     flex: 1,
@@ -210,30 +261,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
   },
-  section: {
-    marginBottom: spacing.xl,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    paddingHorizontal: spacing.xs,
-  },
-  sectionHeaderDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  sectionCount: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-    marginLeft: spacing.xs,
+  testItem: {
+    marginBottom: spacing.sm,
   },
 });

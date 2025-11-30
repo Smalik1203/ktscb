@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, ViewStyle, TextStyle, TextInput, TextInputProps } from 'react-native';
 import { Text } from 'react-native-paper';
-import { colors, borderRadius, spacing, typography, shadows, animation } from '../../../lib/design-system';
+import { useTheme } from '../../contexts/ThemeContext';
+import { borderRadius, spacing, typography, shadows, animation, colors } from '../../../lib/design-system';
 
 interface InputProps extends TextInputProps {
   label?: string;
@@ -31,6 +32,7 @@ export function Input({
   onBlur,
   ...props
 }: InputProps) {
+  const { colors, isDark } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
 
   const handleFocus = (e: any) => {

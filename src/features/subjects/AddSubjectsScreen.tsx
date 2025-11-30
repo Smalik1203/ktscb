@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput as RNTextInput } from 'react-native';
 import { Text, Portal, Modal } from 'react-native-paper';
 import { BookOpen, Edit, Trash2, X, Plus, Search } from 'lucide-react-native';
-import { colors, spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 import { Card, Button, Input, EmptyState, Badge } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSubjects } from '../../hooks/useSubjects';
@@ -11,6 +12,9 @@ import { Pagination } from '../../components/common/Pagination';
 
 export default function AddSubjectsScreen() {
   const { profile } = useAuth();
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
+  
   const schoolCode = profile?.school_code;
 
   // Query
@@ -363,7 +367,8 @@ export default function AddSubjectsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.primary,
