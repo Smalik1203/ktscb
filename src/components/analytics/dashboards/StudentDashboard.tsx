@@ -2,24 +2,43 @@ import React, { useMemo } from 'react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { View, StyleSheet } from 'react-native';
 import { Text, Card } from 'react-native-paper';
-import { BookOpen, TrendingUp } from 'lucide-react-native';
-import type { StudentAnalytics } from '../types';
+import { BookOpen, TrendingUp, Calendar } from 'lucide-react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import type { StudentAnalytics, TimePeriod, DateRange } from '../types';
 import type { DataPoint } from '../TrendChart';
 import { KPICard, TrendChart, ProgressRing } from '../';
-import { LoadingState } from '../shared';
+import { LoadingState, TimePeriodFilter } from '../shared';
 import { formatCurrency } from '../../../utils/analytics.utils';
+import { formatDateRange } from '../../../utils/analytics.utils';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../../theme/types';
 
 export interface StudentDashboardProps {
   data: StudentAnalytics;
   isLoading: boolean;
+  isFetching?: boolean;
+  timePeriod: TimePeriod;
+  setTimePeriod: (period: TimePeriod) => void;
+  startDate: string;
+  endDate: string;
+  dateRange: DateRange;
+  onDateRangeChange: (range: DateRange) => void;
 }
 
 /**
  * Student Dashboard Component
  * Memoized to prevent unnecessary re-renders
  */
-export const StudentDashboard = React.memo<StudentDashboardProps>(({ data, isLoading }) => {
+export const StudentDashboard = React.memo<StudentDashboardProps>(({ 
+  data, 
+  isLoading, 
+  isFetching = false,
+  timePeriod,
+  setTimePeriod,
+  startDate,
+  endDate,
+  dateRange,
+  onDateRangeChange,
+}) => {
   const { colors, typography, spacing, borderRadius, shadows } = useTheme();
   const styles = useMemo(
     () => createStyles(colors, typography, spacing, borderRadius, shadows),
@@ -41,29 +60,72 @@ export const StudentDashboard = React.memo<StudentDashboardProps>(({ data, isLoa
     return (daysAttended / totalDays) * 100;
   }, [data?.attendanceRhythm?.daysAttendedThisMonth, data?.attendanceRhythm?.totalDaysThisMonth]);
 
+  const getAttendanceTitle = () => {
+    switch (timePeriod) {
+      case 'today':
+        return 'Attendance Today';
+      case 'week':
+        return 'Attendance This Week';
+      case 'month':
+        return 'Attendance This Month';
+      default:
+        return 'Attendance';
+    }
+  };
+
   if (isLoading) {
     return <LoadingState />;
   }
 
   return (
     <View style={styles.container}>
-      <Card style={styles.summaryCard}>
-        <Text variant="titleLarge" style={styles.className}>
-          {data?.summary?.studentName}
-        </Text>
-        <Text variant="bodyMedium" style={styles.classInfo}>
-          {data?.summary?.className}
-        </Text>
-      </Card>
+      {isFetching && (
+        <View style={styles.topFetchingBar}>
+          <Text style={styles.topFetchingText}>
+            Loading {timePeriod} data...
+          </Text>
+        </View>
+      )}
 
-      <Card style={styles.sectionCard}>
+      {/* Header */}
+      <Animated.View entering={FadeInDown.delay(0)} style={styles.headerSection}>
+        <Text variant="headlineSmall" style={styles.headerTitle}>
+          {data?.summary?.studentName || 'Student'}
+        </Text>
+        <Text variant="bodyMedium" style={styles.headerSubtitle}>
+          {data?.summary?.className || 'Class'}
+        </Text>
+      </Animated.View>
+
+      {/* Filters */}
+      <Animated.View entering={FadeInDown.delay(50)} style={styles.filterContainer}>
+        <TimePeriodFilter 
+          timePeriod={timePeriod} 
+          setTimePeriod={setTimePeriod}
+          dateRange={dateRange}
+          onDateRangeChange={onDateRangeChange}
+        />
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(100)} style={styles.dateRangeContainer}>
+        <View style={styles.dateRangeBadge}>
+          <Calendar size={14} color={colors.primary[600]} />
+          <Text variant="bodySmall" style={styles.dateRangeText}>
+            {formatDateRange(startDate, endDate)}
+          </Text>
+        </View>
+      </Animated.View>
+
+      {/* Attendance Section */}
+      <Animated.View entering={FadeInDown.delay(150)} style={[isFetching && styles.fetchingContent]}>
+        <View style={styles.sectionCard}>
         <Text variant="titleMedium" style={styles.sectionTitle}>
-          Attendance This Month
+            {getAttendanceTitle()}
         </Text>
         <View style={styles.attendanceContainer}>
-          <ProgressRing progress={attendanceProgress} size={120} label="Days Present" />
+            <ProgressRing progress={attendanceProgress} size={100} label="Days Present" />
           <View style={styles.attendanceStats}>
-            <Text variant="headlineMedium" style={styles.attendanceValue}>
+              <Text variant="headlineLarge" style={styles.attendanceValue}>
               {data?.attendanceRhythm?.daysAttendedThisMonth || 0}/
               {data?.attendanceRhythm?.totalDaysThisMonth || 0}
             </Text>
@@ -80,10 +142,13 @@ export const StudentDashboard = React.memo<StudentDashboardProps>(({ data, isLoa
             <TrendChart data={fourWeekTrendData} height={150} showLabels showDots />
           </>
         )}
-      </Card>
+        </View>
+      </Animated.View>
 
-      {data?.progressHighlights?.closestToPersonalBest && (
-        <Card style={styles.sectionCard}>
+      {/* Personal Best */}
+      {data?.progressHighlights?.closestToPersonalBest && data.progressHighlights.closestToPersonalBest.bestScore > 0 && (
+        <Animated.View entering={FadeInDown.delay(200)} style={[isFetching && styles.fetchingContent]}>
+          <View style={styles.sectionCard}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
             Personal Best
           </Text>
@@ -91,36 +156,81 @@ export const StudentDashboard = React.memo<StudentDashboardProps>(({ data, isLoa
             <Text variant="bodyLarge" style={styles.subjectName}>
               {data.progressHighlights.closestToPersonalBest.subjectName}
             </Text>
-            <Text variant="headlineSmall" style={styles.bestScore}>
+              <Text variant="headlineLarge" style={styles.bestScore}>
               {Math.round(data.progressHighlights.closestToPersonalBest.bestScore)}%
             </Text>
             <Text variant="bodySmall" style={styles.scoreLabel}>
               Your highest score
             </Text>
           </View>
-        </Card>
+          </View>
+        </Animated.View>
       )}
 
-      <View style={styles.statsRow}>
-        <KPICard
-          title="Assignments On-Time"
-          value={data?.learning?.assignmentOnTimeStreak || 0}
-          subtitle={`out of ${data?.learning?.totalAssignments || 0} total`}
-          icon={BookOpen}
-          iconColor={colors.success[600]}
-          iconBackgroundColor={colors.success[50]}
-        />
-        <KPICard
-          title="Overall Attendance"
-          value={`${Math.round(data?.attendanceRhythm?.currentRate || 0)}%`}
-          icon={TrendingUp}
-          iconColor={colors.primary[600]}
-          iconBackgroundColor={colors.primary[50]}
-        />
-      </View>
+      {/* KPI Cards */}
+      <Animated.View entering={FadeInDown.delay(250)} style={[isFetching && styles.fetchingContent]}>
+        <View style={styles.kpiGrid}>
+          <View style={styles.kpiCard}>
+            <View style={[styles.kpiIcon, { backgroundColor: colors.success[50] }]}>
+              <BookOpen size={20} color={colors.success[600]} />
+            </View>
+            <Text variant="headlineMedium" style={styles.kpiValue}>
+              {data?.learning?.assignmentOnTimeStreak || 0}
+            </Text>
+            <Text variant="bodySmall" style={styles.kpiLabel}>Assignments On-Time</Text>
+            {data?.learning?.totalAssignments && (
+              <Text variant="bodySmall" style={styles.kpiSubtext}>
+                of {data.learning.totalAssignments} total
+              </Text>
+            )}
+          </View>
+          <View style={styles.kpiCard}>
+            <View style={[styles.kpiIcon, { backgroundColor: colors.primary[50] }]}>
+              <TrendingUp size={20} color={colors.primary[600]} />
+            </View>
+            <Text variant="headlineMedium" style={styles.kpiValue}>
+              {Math.round(data?.attendanceRhythm?.currentRate || 0)}%
+            </Text>
+            <Text variant="bodySmall" style={styles.kpiLabel}>Overall Attendance</Text>
+          </View>
+        </View>
+      </Animated.View>
 
+      {/* Test Performance */}
+      {data?.learning?.subjectScoreTrend && data.learning.subjectScoreTrend.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(300)} style={[isFetching && styles.fetchingContent]}>
+          <View style={styles.sectionCard}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Test Performance
+            </Text>
+            {data.learning.subjectScoreTrend.slice(0, 5).map((subject) => (
+              <View key={subject.subjectId} style={styles.progressItem}>
+                <View style={styles.subjectHeader}>
+                  <Text variant="bodyMedium" style={styles.subjectName}>
+                    {subject.subjectName}
+                  </Text>
+                  <Text variant="bodySmall" style={styles.testCount}>
+                    {subject.testCount} test{subject.testCount !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                <View style={styles.scoreContainer}>
+                  <Text variant="headlineMedium" style={styles.avgScore}>
+                    {Math.round(subject.avgScore)}%
+                  </Text>
+                  <Text variant="bodySmall" style={styles.scoreLabel}>
+                    Average
+                  </Text>
+                </View>
+              </View>
+            ))}
+      </View>
+        </Animated.View>
+      )}
+
+      {/* Fee Status */}
       {data?.fees && data.fees.status !== 'no_billing' && (
-        <Card style={styles.sectionCard}>
+        <Animated.View entering={FadeInDown.delay(350)} style={[isFetching && styles.fetchingContent]}>
+          <View style={styles.sectionCard}>
           <Text variant="titleMedium" style={styles.sectionTitle}>
             Fee Status
           </Text>
@@ -152,18 +262,27 @@ export const StudentDashboard = React.memo<StudentDashboardProps>(({ data, isLoa
               </View>
             )}
           </View>
-        </Card>
+          </View>
+        </Animated.View>
       )}
 
-      <Card style={styles.sectionCard}>
+      {/* Syllabus Progress */}
+      {data?.progressHighlights?.syllabusProgress && data.progressHighlights.syllabusProgress.length > 0 && (
+        <Animated.View entering={FadeInDown.delay(400)} style={[isFetching && styles.fetchingContent]}>
+          <View style={styles.sectionCard}>
         <Text variant="titleMedium" style={styles.sectionTitle}>
           Syllabus Progress
         </Text>
-        {data?.progressHighlights?.syllabusProgress?.slice(0, 5).map((subject) => (
+            {data.progressHighlights.syllabusProgress.slice(0, 5).map((subject) => (
           <View key={subject.subjectId} style={styles.progressItem}>
+                <View style={styles.progressHeader}>
             <Text variant="bodyMedium" style={styles.subjectName}>
               {subject.subjectName}
             </Text>
+                  <Text variant="bodySmall" style={styles.progressPercent}>
+                    {Math.round(subject.progress)}%
+                  </Text>
+                </View>
             <View style={styles.progressBar}>
               <View
                 style={[
@@ -173,11 +292,13 @@ export const StudentDashboard = React.memo<StudentDashboardProps>(({ data, isLoa
               />
             </View>
             <Text variant="bodySmall" style={styles.progressText}>
-              {Math.round(subject.progress)}% complete
+                  {subject.completedTopics}/{subject.totalTopics} topics completed
             </Text>
           </View>
         ))}
-      </Card>
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 });
@@ -195,31 +316,72 @@ const createStyles = (
     container: {
       flex: 1,
       padding: spacing.md,
+      backgroundColor: colors.background.app,
     },
-    summaryCard: {
-      padding: spacing.lg,
-      marginBottom: spacing.md,
-      borderRadius: borderRadius.card,
-      backgroundColor: colors.surface.primary,
+    headerSection: {
+      marginBottom: spacing.lg,
     },
-    className: {
+    headerTitle: {
       color: colors.text.primary,
       fontWeight: typography.fontWeight.bold,
       marginBottom: spacing.xs,
     },
-    classInfo: {
+    headerSubtitle: {
       color: colors.text.secondary,
     },
+    kpiGrid: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    kpiCard: {
+      flex: 1,
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+      alignItems: 'center',
+      ...shadows.sm,
+      borderWidth: 0.5,
+      borderColor: colors.border.light,
+    },
+    kpiIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: borderRadius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    kpiValue: {
+      color: colors.text.primary,
+      fontWeight: typography.fontWeight.bold,
+      marginBottom: spacing.xs,
+    },
+    kpiLabel: {
+      color: colors.text.secondary,
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.medium,
+      textAlign: 'center',
+    },
+    kpiSubtext: {
+      color: colors.text.tertiary,
+      fontSize: typography.fontSize.xs,
+      marginTop: 2,
+    },
     sectionCard: {
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
       padding: spacing.lg,
       marginBottom: spacing.md,
-      borderRadius: borderRadius.card,
-      backgroundColor: colors.surface.primary,
+      ...shadows.sm,
+      borderWidth: 0.5,
+      borderColor: colors.border.light,
     },
     sectionTitle: {
       color: colors.text.primary,
-      fontWeight: typography.fontWeight.semibold,
+      fontWeight: typography.fontWeight.bold,
       marginBottom: spacing.md,
+      fontSize: typography.fontSize.lg,
     },
     subSectionTitle: {
       color: colors.text.secondary,
@@ -242,6 +404,7 @@ const createStyles = (
     },
     attendanceLabel: {
       color: colors.text.tertiary,
+      fontSize: typography.fontSize.xs,
     },
     personalBest: {
       alignItems: 'center',
@@ -254,11 +417,7 @@ const createStyles = (
     },
     scoreLabel: {
       color: colors.text.tertiary,
-    },
-    statsRow: {
-      flexDirection: 'row',
-      gap: spacing.md,
-      marginBottom: spacing.md,
+      fontSize: typography.fontSize.xs,
     },
     feesOverview: {
       gap: spacing.sm,
@@ -273,14 +432,27 @@ const createStyles = (
     },
     feeValue: {
       color: colors.text.primary,
-      fontWeight: typography.fontWeight.medium,
+      fontWeight: typography.fontWeight.semibold,
     },
     progressItem: {
       marginBottom: spacing.md,
+      paddingBottom: spacing.md,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border.light,
+    },
+    progressHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.xs,
     },
     subjectName: {
       color: colors.text.primary,
-      marginBottom: spacing.xs,
+      fontWeight: typography.fontWeight.semibold,
+    },
+    progressPercent: {
+      color: colors.primary[600],
+      fontWeight: typography.fontWeight.bold,
     },
     progressBar: {
       height: 8,
@@ -295,5 +467,60 @@ const createStyles = (
     },
     progressText: {
       color: colors.text.tertiary,
+      fontSize: typography.fontSize.xs,
+    },
+    subjectHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.xs,
+    },
+    testCount: {
+      color: colors.text.tertiary,
+      fontSize: typography.fontSize.xs,
+    },
+    scoreContainer: {
+      alignItems: 'center',
+      marginTop: spacing.xs,
+    },
+    avgScore: {
+      color: colors.primary[600],
+      fontWeight: typography.fontWeight.bold,
+    },
+    topFetchingBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.md,
+      backgroundColor: colors.primary[50],
+      borderRadius: borderRadius.md,
+    },
+    topFetchingText: {
+      color: colors.primary[600],
+      fontSize: typography.fontSize.sm,
+    },
+    fetchingContent: {
+      opacity: 0.7,
+    },
+    filterContainer: {
+      marginBottom: spacing.md,
+    },
+    dateRangeContainer: {
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+    },
+    dateRangeBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary[50],
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs + 2,
+      borderRadius: borderRadius.full,
+      gap: spacing.xs,
+    },
+    dateRangeText: {
+      color: colors.primary[600],
+      fontWeight: typography.fontWeight.medium,
     },
   });

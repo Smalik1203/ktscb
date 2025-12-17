@@ -1,8 +1,9 @@
 /**
- * ClassBridge Light Theme
+ * Krishnaveni Talent School Light Theme
  * 
- * The default light theme with Sapphire Blue primary and Lime Green accent.
+ * The default light theme with Royal Purple primary and Golden Orange secondary.
  * Clean, professional, and optimized for readability.
+ * Brand: "Mentored for Life"
  */
 
 import type { Theme, ThemeColors, ComponentStyles } from '../types';
@@ -17,56 +18,56 @@ import {
 } from '../tokens';
 
 // ============================================================================
-// LIGHT THEME COLORS - ClassBridge Brand
+// LIGHT THEME COLORS - KTS Brand (Purple & Orange)
 // ============================================================================
 
 export const lightColors: ThemeColors = {
-  // Primary - ClassBridge Blue
+  // Primary - KTS Royal Purple
   primary: {
-    50: '#E8F4FD',
-    100: '#D1E9FB',
-    200: '#A3D3F7',
-    300: '#75BDF3',
-    400: '#47A7EF',
-    500: '#2678BE',  // ClassBridge Brand Blue
-    600: '#2678BE',  // Main brand color
-    700: '#1E5F98',
-    800: '#164672',
-    900: '#0E2D4C',
-    950: '#071626',
-    main: '#2678BE',
+    50: '#F5F0FA',
+    100: '#EBE0F5',
+    200: '#D6C2EB',
+    300: '#C2A3E0',
+    400: '#9B6BC9',
+    500: '#7B4BAF',  // KTS Brand Purple
+    600: '#6B3FA0',  // Main brand color
+    700: '#5A3587',
+    800: '#4A2B6E',
+    900: '#3A2156',
+    950: '#2A173D',
+    main: '#6B3FA0',
   },
 
-  // Secondary - Light Blue
+  // Secondary - KTS Golden Orange
   secondary: {
-    50: '#F0F7FF',
-    100: '#E0EFFF',
-    200: '#B8DCFF',
-    300: '#8AC7FF',
-    400: '#5CB2FF',
-    500: '#3B9EF5',
-    600: '#2678BE',
-    700: '#1E5F98',
-    800: '#164672',
-    900: '#0E2D4C',
-    950: '#071626',
-    main: '#3B9EF5',
+    50: '#FFF8EB',
+    100: '#FFEFD6',
+    200: '#FFDFAD',
+    300: '#FFCF85',
+    400: '#FFBF5C',
+    500: '#F5A623',  // KTS Brand Orange
+    600: '#E09620',
+    700: '#C4831B',
+    800: '#A87016',
+    900: '#8C5D11',
+    950: '#704A0D',
+    main: '#F5A623',
   },
 
-  // Accent - Emerald Green
+  // Accent - KTS Crimson Red (from crown accent)
   accent: {
-    50: '#ECFDF5',
-    100: '#D1FAE5',
-    200: '#A7F3D0',
-    300: '#6EE7B7',
-    400: '#34D399',
-    500: '#10B981',
-    600: '#059669',
-    700: '#047857',
-    800: '#065F46',
-    900: '#064E3B',
-    950: '#022C22',
-    main: '#10B981',
+    50: '#FEF2F2',
+    100: '#FEE2E2',
+    200: '#FECACA',
+    300: '#FCA5A5',
+    400: '#F87171',
+    500: '#E74C3C',  // KTS Accent Red
+    600: '#DC2626',
+    700: '#B91C1C',
+    800: '#991B1B',
+    900: '#7F1D1D',
+    950: '#450A0A',
+    main: '#E74C3C',
   },
 
   // Success - Emerald Green
@@ -85,52 +86,52 @@ export const lightColors: ThemeColors = {
     main: '#10B981',
   },
 
-  // Warning - Amber
+  // Warning - Golden Orange (aligned with KTS secondary)
   warning: {
-    50: '#fffbeb',
-    100: '#fef3c7',
-    200: '#fde68a',
-    300: '#fcd34d',
-    400: '#fbbf24',
-    500: '#f59e0b',
-    600: '#d97706',
-    700: '#b45309',
-    800: '#92400e',
-    900: '#78350f',
-    950: '#451a03',
-    main: '#f59e0b',
+    50: '#FFF8EB',
+    100: '#FFEFD6',
+    200: '#FFDFAD',
+    300: '#FFCF85',
+    400: '#FFBF5C',
+    500: '#F5A623',
+    600: '#E09620',
+    700: '#C4831B',
+    800: '#A87016',
+    900: '#8C5D11',
+    950: '#704A0D',
+    main: '#F5A623',
   },
 
-  // Error - Red
+  // Error - KTS Crimson
   error: {
-    50: '#fef2f2',
-    100: '#fee2e2',
-    200: '#fecaca',
-    300: '#fca5a5',
-    400: '#f87171',
-    500: '#ef4444',
-    600: '#dc2626',
-    700: '#b91c1c',
-    800: '#991b1b',
-    900: '#7f1d1d',
-    950: '#450a0a',
-    main: '#ef4444',
+    50: '#FEF2F2',
+    100: '#FEE2E2',
+    200: '#FECACA',
+    300: '#FCA5A5',
+    400: '#F87171',
+    500: '#E74C3C',
+    600: '#DC2626',
+    700: '#B91C1C',
+    800: '#991B1B',
+    900: '#7F1D1D',
+    950: '#450A0A',
+    main: '#E74C3C',
   },
 
-  // Info - ClassBridge Blue
+  // Info - KTS Purple (aligned with primary)
   info: {
-    50: '#E8F4FD',
-    100: '#D1E9FB',
-    200: '#A3D3F7',
-    300: '#75BDF3',
-    400: '#47A7EF',
-    500: '#2678BE',
-    600: '#2678BE',
-    700: '#1E5F98',
-    800: '#164672',
-    900: '#0E2D4C',
-    950: '#071626',
-    main: '#2678BE',
+    50: '#F5F0FA',
+    100: '#EBE0F5',
+    200: '#D6C2EB',
+    300: '#C2A3E0',
+    400: '#9B6BC9',
+    500: '#7B4BAF',
+    600: '#6B3FA0',
+    700: '#5A3587',
+    800: '#4A2B6E',
+    900: '#3A2156',
+    950: '#2A173D',
+    main: '#6B3FA0',
   },
 
   // Neutral
@@ -152,14 +153,14 @@ export const lightColors: ThemeColors = {
   // Backgrounds
   background: {
     primary: '#FFFFFF',
-    secondary: '#F5F7FA',
-    tertiary: '#F3F4F6',
-    quaternary: '#eff6ff',
+    secondary: '#FAF8FC',
+    tertiary: '#F5F0FA',
+    quaternary: '#EBE0F5',
     elevated: '#FFFFFF',
-    app: '#F5F7FA',
-    dark: '#0B1A3C',
+    app: '#FAF8FC',
+    dark: '#2A173D',
     glass: 'rgba(255, 255, 255, 0.9)',
-    default: '#F5F7FA',
+    default: '#FAF8FC',
     light: '#FFFFFF',
     paper: '#FFFFFF',
     card: '#FFFFFF',
@@ -168,13 +169,13 @@ export const lightColors: ThemeColors = {
   // Surfaces
   surface: {
     primary: '#FFFFFF',
-    secondary: '#F5F7FA',
-    tertiary: '#F3F4F6',
+    secondary: '#FAF8FC',
+    tertiary: '#F5F0FA',
     elevated: '#FFFFFF',
-    overlay: 'rgba(11, 26, 60, 0.6)',
+    overlay: 'rgba(42, 23, 61, 0.6)',
     glass: 'rgba(255, 255, 255, 0.95)',
-    dark: '#0B1A3C',
-    light: '#F5F7FA',
+    dark: '#2A173D',
+    light: '#FAF8FC',
     paper: '#FFFFFF',
   },
 
@@ -186,39 +187,39 @@ export const lightColors: ThemeColors = {
     quaternary: '#9CA3AF',
     inverse: '#FFFFFF',
     disabled: '#D1D5DB',
-    accent: '#2678BE',
+    accent: '#6B3FA0',
   },
 
   // Borders
   border: {
-    light: '#E5E7EB',
-    DEFAULT: '#D1D5DB',
-    dark: '#9CA3AF',
-    accent: '#2678BE',
+    light: '#EBE0F5',
+    DEFAULT: '#D6C2EB',
+    dark: '#9B6BC9',
+    accent: '#6B3FA0',
   },
 
-  // Gradients - ClassBridge Brand
+  // Gradients - KTS Brand (Purple & Orange)
   gradient: {
-    primary: ['#2678BE', '#3B9EF5', '#5CB2FF'],
-    secondary: ['#3B9EF5', '#5CB2FF', '#8AC7FF'],
+    primary: ['#6B3FA0', '#7B4BAF', '#9B6BC9'],
+    secondary: ['#F5A623', '#FFBF5C', '#FFCF85'],
     success: ['#10B981', '#34D399', '#6EE7B7'],
-    warning: ['#F59E0B', '#FBBF24', '#FCD34D'],
-    sunset: ['#2678BE', '#3B9EF5', '#5CB2FF'],
-    ocean: ['#164672', '#2678BE', '#3B9EF5'],
+    warning: ['#F5A623', '#FFBF5C', '#FFCF85'],
+    sunset: ['#6B3FA0', '#E74C3C', '#F5A623'],
+    ocean: ['#5A3587', '#6B3FA0', '#9B6BC9'],
     forest: ['#059669', '#10B981', '#34D399'],
-    cosmic: ['#164672', '#2678BE', '#5CB2FF'],
+    cosmic: ['#2A173D', '#6B3FA0', '#F5A623'],
   },
 
-  // Education
+  // Education - KTS themed
   education: {
-    math: '#2678BE',
+    math: '#6B3FA0',
     science: '#10B981',
-    english: '#3B9EF5',
-    history: '#EF4444',
+    english: '#F5A623',
+    history: '#E74C3C',
     art: '#EC4899',
-    music: '#A855F7',
-    sports: '#2678BE',
-    library: '#3B9EF5',
+    music: '#9B6BC9',
+    sports: '#F5A623',
+    library: '#6B3FA0',
   },
 
   statusBar: 'dark',

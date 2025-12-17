@@ -11,21 +11,4 @@
 -keep class com.swmansion.reanimated.** { *; }
 -keep class com.facebook.react.turbomodule.** { *; }
 
-# Supabase
--keep class io.supabase.** { *; }
-
-# React Native
--keep class com.facebook.react.** { *; }
--keep class com.facebook.hermes.** { *; }
-
-# Expo
--keep class expo.modules.** { *; }
-
-# Remove unused code aggressively
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
-}
-
 # Add any project specific keep options here:

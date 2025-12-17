@@ -99,11 +99,12 @@ export function useAnalyticsScreen(): UseAnalyticsScreenReturn {
   });
 
   // Select the appropriate query based on role
+  // Admin uses superAdminQuery filtered to their class, SuperAdmin uses it for all classes
   const analyticsQuery = !canViewAnalytics 
     ? { data: null, isLoading: false, isFetching: false, error: null, refetch: async () => null }
-    : isSuperAdmin 
-    ? superAdminQuery 
-    : studentQuery;
+    : isStudent
+    ? studentQuery
+    : superAdminQuery; // Both admin and superadmin use superAdminQuery
 
   // Safely extract query properties
   const analyticsData = analyticsQuery?.data ?? null;

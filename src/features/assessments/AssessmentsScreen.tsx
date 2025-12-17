@@ -217,9 +217,17 @@ export default function AssessmentsScreen() {
   };
 
   const handleTestPress = (test: TestWithDetails) => {
-    // For admins/superadmins, navigate to questions screen to view questions and answers
+    // For admins/superadmins
     if (canManageTests) {
-      router.push(`/test/${test.id}/questions?testTitle=${encodeURIComponent(test.title)}`);
+      // For offline tests, navigate to marks screen (student list)
+      if (test.test_mode === 'offline') {
+        router.push(
+          `/test/${test.id}/marks?testTitle=${encodeURIComponent(test.title)}&maxMarks=${test.max_marks || 100}&classInstanceId=${test.class_instance_id}`
+        );
+      } else {
+        // For online tests, navigate to questions screen
+        router.push(`/test/${test.id}/questions?testTitle=${encodeURIComponent(test.title)}`);
+      }
     } else {
       // For students, show alert or navigate to appropriate screen
       Alert.alert('Test Details', `View details for: ${test.title}`);

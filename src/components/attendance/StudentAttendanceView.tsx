@@ -184,7 +184,7 @@ export const StudentAttendanceView: React.FC = () => {
                 onPress={() => setShowHistoryStartDatePicker(true)}
               >
                 <View style={styles.filterIcon}>
-                  <CalendarIcon size={16} color={colors.text.inverse} />
+                  <CalendarIcon size={14} color={colors.primary[600]} />
                 </View>
                 <View style={styles.filterContent}>
                   <Text style={styles.filterLabel}>Start</Text>
@@ -206,7 +206,7 @@ export const StudentAttendanceView: React.FC = () => {
                 onPress={() => setShowHistoryEndDatePicker(true)}
               >
                 <View style={styles.filterIcon}>
-                  <CalendarIcon size={16} color={colors.text.inverse} />
+                  <CalendarIcon size={14} color={colors.primary[600]} />
                 </View>
                 <View style={styles.filterContent}>
                   <Text style={styles.filterLabel}>End</Text>
@@ -516,15 +516,13 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   filterRow: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    padding: spacing.sm,
     paddingHorizontal: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    ...shadows.xs,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
   },
   filterItem: {
     flex: 1,
@@ -533,10 +531,10 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     minWidth: 0,
   },
   filterIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary[600],
+    width: 28,
+    height: 28,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
@@ -618,8 +616,8 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     padding: spacing.md,
   },
   recordIcon: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
     borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
@@ -640,7 +638,7 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   },
   recordStatus: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs + 1,
     borderRadius: borderRadius.sm,
   },
   recordStatusText: {
@@ -682,9 +680,9 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     padding: spacing.md,
   },
   historyRecordIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.sm,
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,

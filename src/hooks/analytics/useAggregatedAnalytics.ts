@@ -407,7 +407,7 @@ export function useSuperAdminAnalytics(options: UseAggregatedAnalyticsOptions) {
   const { startDate, endDate } = getDateRangeForPeriod(timePeriod, customDateRange);
 
   const schoolCode = profile?.school_code || null;
-  const hasValidRole = profile?.role === 'superadmin' || profile?.role === 'cb_admin';
+  const hasValidRole = profile?.role === 'superadmin' || profile?.role === 'cb_admin' || profile?.role === 'admin';
 
   // Fetch active academic year
   const activeAcademicYearQuery = useActiveAcademicYear(schoolCode);
@@ -587,6 +587,301 @@ async function fetchStudentAttendanceData(
   return { rate, presentCount, totalCount, weeklyTrend };
 }
 
+async function fetchStudentLearningData(
+  schoolCode: string,
+  academicYearId: string,
+  studentId: string,
+  startDate: string,
+  endDate: string
+) {
+  // Fetch test marks for the student
+  const { data: testMarks } = await supabase
+    .from('test_marks')
+    .select(`
+      *,
+      tests!inner(
+        id,
+        title,
+        subject_id,
+        test_date,
+        max_marks,
+        subjects(subject_name)
+      )
+    `)
+    .eq('student_id', studentId)
+    .gte('tests.test_date', startDate)
+    .lte('tests.test_date', endDate)
+    .order('tests.test_date', { ascending: false });
+
+  // Fetch tasks/assignments
+  const { data: student } = await supabase
+    .from('student')
+    .select('class_instance_id')
+    .eq('id', studentId)
+    .single();
+
+  let assignmentOnTimeStreak = 0;
+  let totalAssignments = 0;
+  const subjectScoreMap = new Map<string, { scores: number[]; subjectName: string; dates: string[] }>();
+
+  if (student?.class_instance_id) {
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select(`
+        *,
+        subjects(subject_name)
+      `)
+      .eq('class_instance_id', student.class_instance_id)
+      .gte('due_date', startDate)
+      .lte('due_date', endDate);
+
+    if (tasks && tasks.length > 0) {
+      // Get submissions for these tasks
+      const taskIds = tasks.map(t => t.id);
+      const { data: submissions } = await supabase
+        .from('task_submissions')
+        .select('task_id, status, submitted_at')
+        .eq('student_id', studentId)
+        .in('task_id', taskIds);
+
+      const submissionMap = new Map(
+        submissions?.map(s => [s.task_id, s]) || []
+      );
+
+      totalAssignments = tasks.length;
+      assignmentOnTimeStreak = tasks.filter(task => {
+        const submission = submissionMap.get(task.id);
+        if (!submission || submission.status !== 'submitted') return false;
+        const dueDate = new Date(task.due_date);
+        const submittedDate = new Date(submission.submitted_at);
+        return submittedDate <= dueDate;
+      }).length;
+    }
+  }
+
+  // Process test marks by subject
+  if (testMarks) {
+    testMarks.forEach((mark: any) => {
+      const test = mark.tests;
+      if (!test) return;
+      
+      const subjectId = test.subject_id;
+      const subjectName = test.subjects?.subject_name || 'Unknown';
+      const score = test.max_marks > 0 
+        ? (mark.marks_obtained / test.max_marks) * 100 
+        : mark.marks_obtained;
+
+      if (!subjectScoreMap.has(subjectId)) {
+        subjectScoreMap.set(subjectId, { scores: [], subjectName, dates: [] });
+      }
+      const subjectData = subjectScoreMap.get(subjectId)!;
+      subjectData.scores.push(score);
+      subjectData.dates.push(test.test_date);
+    });
+  }
+
+  const subjectScoreTrend = Array.from(subjectScoreMap.entries()).map(([subjectId, data]) => {
+    const avgScore = data.scores.length > 0
+      ? data.scores.reduce((a, b) => a + b, 0) / data.scores.length
+      : 0;
+    
+    // Get recent trend (last 5 tests)
+    const recentTrend = data.scores.slice(-5).map((score, index) => ({
+      date: data.dates[data.dates.length - 5 + index] || '',
+      score,
+    }));
+
+    return {
+      subjectId,
+      subjectName: data.subjectName,
+      avgScore,
+      testCount: data.scores.length,
+      recentTrend,
+    };
+  });
+
+  return {
+    subjectScoreTrend,
+    assignmentOnTimeStreak,
+    totalAssignments,
+  };
+}
+
+async function fetchStudentFeesData(
+  studentId: string,
+  academicYearId: string
+) {
+  const { data: feeSummary } = await supabase
+    .from('student_fee_summary')
+    .select('*')
+    .eq('student_id', studentId)
+    .single();
+
+  if (!feeSummary) {
+    return {
+      totalBilled: 0,
+      totalPaid: 0,
+      totalDue: 0,
+      lastPaymentDate: null,
+      status: 'no_billing' as const,
+    };
+  }
+
+  const totalBilled = feeSummary.total_billed || 0;
+  const totalPaid = feeSummary.total_paid || 0;
+  const totalDue = totalBilled - totalPaid;
+
+  let status: 'paid' | 'current' | 'overdue' | 'no_billing' = 'no_billing';
+  if (totalBilled > 0) {
+    if (totalDue <= 0) {
+      status = 'paid';
+    } else {
+      // Check if overdue (simplified - would need due dates)
+      status = 'current';
+    }
+  }
+
+  // Get last payment date
+  const { data: lastPayment } = await supabase
+    .from('fee_payments')
+    .select('payment_date')
+    .eq('student_id', studentId)
+    .order('payment_date', { ascending: false })
+    .limit(1)
+    .single();
+
+  return {
+    totalBilled,
+    totalPaid,
+    totalDue,
+    lastPaymentDate: lastPayment?.payment_date || null,
+    status,
+  };
+}
+
+async function fetchStudentSyllabusProgress(
+  schoolCode: string,
+  academicYearId: string,
+  studentId: string
+) {
+  // Get student's class
+  const { data: student } = await supabase
+    .from('student')
+    .select('class_instance_id')
+    .eq('id', studentId)
+    .single();
+
+  if (!student?.class_instance_id) {
+    return {
+      closestToPersonalBest: {
+        subjectId: '',
+        subjectName: 'No data available',
+        bestScore: 0,
+        recentScore: 0,
+      },
+      syllabusProgress: [],
+    };
+  }
+
+  // Get syllabus progress for the class
+  const { data: progress } = await supabase
+    .from('syllabus_progress')
+    .select(`
+      *,
+      syllabus_chapters!inner(
+        id,
+        chapter_name,
+        subjects!inner(id, subject_name)
+      )
+    `)
+    .eq('class_instance_id', student.class_instance_id);
+
+  // Get test scores to find personal best
+  const { data: testMarks } = await supabase
+    .from('test_marks')
+    .select(`
+      *,
+      tests!inner(
+        subject_id,
+        max_marks,
+        subjects(subject_name)
+      )
+    `)
+    .eq('student_id', studentId);
+
+  // Calculate syllabus progress by subject
+  const progressBySubject = new Map<string, { completed: number; total: number; subjectName: string }>();
+  const subjectScores = new Map<string, number[]>();
+
+  if (progress) {
+    progress.forEach((p: any) => {
+      const subjectId = p.syllabus_chapters?.subjects?.id;
+      const subjectName = p.syllabus_chapters?.subjects?.subject_name || 'Unknown';
+      if (subjectId) {
+        if (!progressBySubject.has(subjectId)) {
+          progressBySubject.set(subjectId, { completed: 0, total: 0, subjectName });
+        }
+        const subjData = progressBySubject.get(subjectId)!;
+        subjData.total++;
+        if (p.date) subjData.completed++;
+      }
+    });
+  }
+
+  // Process test scores
+  if (testMarks) {
+    testMarks.forEach((mark: any) => {
+      const test = mark.tests;
+      if (!test) return;
+      const subjectId = test.subject_id;
+      const score = test.max_marks > 0
+        ? (mark.marks_obtained / test.max_marks) * 100
+        : mark.marks_obtained;
+      
+      if (!subjectScores.has(subjectId)) {
+        subjectScores.set(subjectId, []);
+      }
+      subjectScores.get(subjectId)!.push(score);
+    });
+  }
+
+  // Find personal best
+  let personalBest = {
+    subjectId: '',
+    subjectName: 'No data available',
+    bestScore: 0,
+    recentScore: 0,
+  };
+
+  subjectScores.forEach((scores, subjectId) => {
+    const best = Math.max(...scores);
+    const recent = scores[scores.length - 1] || 0;
+    if (best > personalBest.bestScore) {
+      const subjectName = Array.from(progressBySubject.values()).find(s => s.subjectName)?.subjectName || 'Unknown';
+      personalBest = {
+        subjectId,
+        subjectName,
+        bestScore: best,
+        recentScore: recent,
+      };
+    }
+  });
+
+  // Format syllabus progress
+  const syllabusProgress = Array.from(progressBySubject.entries()).map(([subjectId, data]) => ({
+    subjectId,
+    subjectName: data.subjectName,
+    completedTopics: data.completed,
+    totalTopics: data.total,
+    progress: data.total > 0 ? (data.completed / data.total) * 100 : 0,
+  }));
+
+  return {
+    closestToPersonalBest: personalBest,
+    syllabusProgress,
+  };
+}
+
 /**
  * Hook to aggregate all analytics data for Student dashboard
  */
@@ -614,25 +909,39 @@ export function useStudentAggregatedAnalytics(options: UseAggregatedAnalyticsOpt
         throw new Error('Missing required parameters');
       }
 
-      const attendance = await fetchStudentAttendanceData(
-        schoolCode,
-        academicYearId,
-        studentId,
-        startDate,
-        endDate
-      );
+      // Fetch all data in parallel
+      const [attendance, learning, fees, progress] = await Promise.all([
+        fetchStudentAttendanceData(schoolCode, academicYearId, studentId, startDate, endDate),
+        fetchStudentLearningData(schoolCode, academicYearId, studentId, startDate, endDate),
+        fetchStudentFeesData(studentId, academicYearId),
+        fetchStudentSyllabusProgress(schoolCode, academicYearId, studentId),
+      ]);
+
+      // Get student's class name
+      const { data: student } = await supabase
+        .from('student')
+        .select(`
+          full_name,
+          class_instances!inner(grade, section)
+        `)
+        .eq('id', studentId)
+        .single();
+
+      const className = student?.class_instances
+        ? `Grade ${student.class_instances.grade}${student.class_instances.section ? ` - ${student.class_instances.section}` : ''}`
+        : '';
 
       return {
         summary: {
-          studentName: profile?.full_name || 'Student',
-          className: '',
+          studentName: profile?.full_name || student?.full_name || 'Student',
+          className,
           schoolName: profile?.school_name || '',
         },
         attendanceRhythm: {
           currentRate: attendance.rate,
           daysAttendedThisMonth: attendance.presentCount,
           totalDaysThisMonth: attendance.totalCount,
-          fourWeekTrend: attendance.weeklyTrend.map((week, index) => ({
+          fourWeekTrend: attendance.weeklyTrend.slice(0, 4).map((week, index) => ({
             week: index + 1,
             presentDays: week.presentCount,
             totalDays: week.totalCount,
@@ -640,26 +949,12 @@ export function useStudentAggregatedAnalytics(options: UseAggregatedAnalyticsOpt
           })),
         },
         learning: {
-          subjectScoreTrend: [],
-          assignmentOnTimeStreak: 0,
-          totalAssignments: 0,
+          subjectScoreTrend: learning.subjectScoreTrend,
+          assignmentOnTimeStreak: learning.assignmentOnTimeStreak,
+          totalAssignments: learning.totalAssignments,
         },
-        fees: {
-          totalBilled: 0,
-          totalPaid: 0,
-          totalDue: 0,
-          lastPaymentDate: null,
-          status: 'no_billing',
-        },
-        progressHighlights: {
-          closestToPersonalBest: {
-            subjectId: '',
-            subjectName: 'No data available',
-            bestScore: 0,
-            recentScore: 0,
-          },
-          syllabusProgress: [],
-        },
+        fees: fees,
+        progressHighlights: progress,
       };
     },
     enabled,

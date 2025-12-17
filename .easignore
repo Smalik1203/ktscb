@@ -1,44 +1,132 @@
 # Dependencies
 node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # Build outputs
 .expo/
 dist/
 web-build/
 *.tsbuildinfo
+build/
+*.apk
+*.aab
+*.ipa
+
+# Native build artifacts
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
 
 # Documentation and markdown files
 *.md
 docs/
+README.md
+CHANGELOG.md
+MIGRATION*.md
+DESIGN*.md
+SETUP*.md
+QUICK*.md
 
 # Git
 .git/
 .gitignore
+.gitattributes
 
-# IDE
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-*
+.project
+.classpath
+.settings/
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
+*.pem
+*.key
+*.jks
+*.p8
+*.p12
+*.mobileprovision
 
-# Environment files
+# Environment and secrets
 .env*.local
 .env
+.env.*
+*.env
+eas.json.local
+eas.local.json
 
-# Debug
+# Debug and logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
+typescript-errors.log
+load-test-results-*.json
 
-# Assets (if not needed for build)
+# Scripts and utilities (not needed for build)
+*.sh
+*.exp
+*.py
+fix-*.js
+fix-*.sh
+fix-*.py
+migrate-*.js
+extreme-*.js
+setup-*.sh
+
+# SQL files and database scripts
+*.sql
+CREATE_*.sql
+SET_*.sql
+PREVENT_*.sql
+populate_*.sql
+
+# Backup files
+*.backup
+*.backup2
+*.bak
+*.old
+*.orig
+*.tmp
+
+# Template files (not needed in build)
 assets/templates/
+*.template.*
+questions_template.*
 
-# Cache
+# Test files
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+coverage/
+.nyc_output/
+
+# Cache and temporary files
 .npm-cache/
+.cache/
+.temp/
+tmp/
+*.cache
 
+# Other unnecessary files
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
 

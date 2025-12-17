@@ -1,8 +1,10 @@
-# ClassBridge - School Management System
+# Krishnaveni Talent School - School Management System
 
 ## 📚 Project Overview
 
-ClassBridge is a comprehensive **React Native** school management system built with **Expo** and **Supabase**. It provides a unified platform for administrators, teachers, and students to manage academic activities, track attendance, monitor performance, and facilitate communication.
+Krishnaveni Talent School (KTS) is a comprehensive **React Native** school management system built with **Expo** and **Supabase**. It provides a unified platform for administrators, teachers, and students to manage academic activities, track attendance, monitor performance, and facilitate communication.
+
+**Brand**: "Mentored for Life"
 
 ### Key Highlights
 - **Multi-platform**: iOS, Android, and Web support via Expo
@@ -973,10 +975,11 @@ export function useMyData(id?: string) {
 - **Responsive**: Adapts to different screen sizes
 
 ### Color Palette
-- **Primary**: Orange (#FF6B35) - Actions, CTAs
-- **Secondary**: Blue (#1976D2) - Information
-- **Success**: Green - Confirmations
-- **Error**: Red - Errors, warnings
+- **Primary**: Royal Purple (#6B3FA0) - Actions, CTAs
+- **Secondary**: Golden Orange (#F5A623) - Highlights, badges
+- **Accent**: Crimson Red (#E74C3C) - Alerts, accents
+- **Success**: Emerald Green - Confirmations
+- **Error**: Crimson Red - Errors, warnings
 - **Neutral**: Grays - Text, borders
 
 ### Typography
@@ -1056,7 +1059,7 @@ npm start
 
 ## 📄 License
 
-Proprietary - ClassBridge School Management System
+Proprietary - Krishnaveni Talent School Management System
 
 ---
 

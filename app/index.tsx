@@ -8,11 +8,7 @@ import { colors } from '../lib/design-system';
 export default function IndexScreen() {
   const auth = useAuth();
 
-  useEffect(() => {
-    // Handle auth state changes
-  }, [auth.status, auth.bootstrapping, auth.loading, auth.profile]);
-
-  // 1) While checking session or bootstrapping profile, show splash (no redirects).
+  // 1) While checking session or bootstrapping profile, show loading
   if (auth.status === 'checking' || auth.loading || auth.bootstrapping) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
@@ -21,24 +17,12 @@ export default function IndexScreen() {
     );
   }
 
-  // 2) Signed in but no profile -> sign out and redirect to login
-  // This handles edge cases where user might have session but no profile
-  if (auth.status === 'signedIn' && !auth.profile) {
-    // Auth context should handle this, but as fallback redirect to login
-    return <Redirect href="/login" />;
-  }
-
-  // 3) Fully signed in with a resolved profile -> go to app
+  // 2) Signed in with profile -> redirect to app (Drawer will handle this)
   if (auth.status === 'signedIn' && auth.profile) {
     return <Redirect href="/(tabs)" />;
   }
 
-  // 4) Access denied routes to login (LoginScreen will show the reason via context)
-  if (auth.status === 'accessDenied') {
-    return <Redirect href="/login" />;
-  }
-
-  // 5) Default: signedOut or fallback -> login
+  // 3) All other cases (signedOut, accessDenied, no profile) -> redirect to login
   return <Redirect href="/login" />;
 }
 

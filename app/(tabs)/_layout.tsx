@@ -34,7 +34,7 @@ export default function TabLayout() {
       screenOptions={{
         header: ({ options }) => (
           <AppNavbar 
-            title={options.title || 'ClassBridge'} 
+            title={options.title || 'KTS'} 
             showBackButton={false}
           />
         ),

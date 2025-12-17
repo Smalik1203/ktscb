@@ -284,6 +284,7 @@ export function StudentTimetableScreen() {
         </View>
       </View>
 
+
       {/* Timetable List */}
       <ScrollView
         style={styles.scrollView}
@@ -432,6 +433,99 @@ const createStyles = (
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
+  },
+
+  // Today's Classes Summary
+  todaysClassesSummary: {
+    backgroundColor: colors.surface.primary,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    ...shadows.sm,
+  },
+  todaysClassesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  todaysClassesTitle: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    flex: 1,
+  },
+  todaysClassesBadge: {
+    backgroundColor: colors.primary[100],
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todaysClassesBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary[700],
+  },
+  todaysClassesScroll: {
+    maxHeight: 80,
+  },
+  todaysClassesScrollContent: {
+    gap: spacing.xs,
+    paddingRight: spacing.xs,
+  },
+  todaysClassChip: {
+    backgroundColor: colors.surface.secondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    marginRight: spacing.xs,
+    minWidth: 120,
+  },
+  todaysClassChipCurrent: {
+    backgroundColor: colors.success[50],
+    borderColor: colors.success[300],
+    borderWidth: 2,
+  },
+  todaysClassChipUpcoming: {
+    backgroundColor: colors.info[50],
+    borderColor: colors.info[300],
+  },
+  todaysClassChipSubject: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  todaysClassChipSubjectCurrent: {
+    color: colors.success[700],
+  },
+  todaysClassChipCount: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  todaysClassChipIndicator: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: colors.success[500],
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  todaysClassChipIndicatorText: {
+    fontSize: typography.fontSize.xs - 2,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
   },
 
   // Scrollable Content

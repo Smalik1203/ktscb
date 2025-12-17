@@ -66,7 +66,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     autoRefreshToken: true,
     detectSessionInUrl: false, // RN has no URL callbacks
     storage: AsyncStorage,
-    storageKey: 'cb-session-v1'
+    storageKey: 'cb-session-v1',
+    flowType: 'pkce', // Use PKCE flow for better security
   },
   db: {
     schema: 'public',
@@ -74,6 +75,52 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
   global: {
     headers: {
       'x-client-info': 'classbridge-mobile',
+    },
+    fetch: async (url, options = {}) => {
+      try {
+        const response = await fetch(url, options);
+        
+        // Check if response is actually JSON before parsing
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const text = await response.text();
+          if (!text || text.trim() === '') {
+            log.warn('Empty response from Supabase API');
+            return new Response(JSON.stringify({ error: 'Empty response' }), {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+            });
+          }
+          
+          try {
+            JSON.parse(text);
+          } catch (parseError) {
+            log.error('JSON parse error in Supabase response:', {
+              url,
+              status: response.status,
+              contentType,
+              responsePreview: text.substring(0, 200),
+            });
+            throw new Error(`Invalid JSON response from Supabase: ${text.substring(0, 100)}`);
+          }
+          
+          return new Response(text, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers,
+          });
+        }
+        
+        return response;
+      } catch (error: any) {
+        log.error('Supabase fetch error:', {
+          url,
+          error: error.message,
+          stack: error.stack,
+        });
+        throw error;
+      }
     },
   },
   // Realtime performance optimizations

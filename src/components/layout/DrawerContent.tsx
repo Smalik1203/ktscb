@@ -448,18 +448,19 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'superadmin': return colors.error[500]; // Red
-      case 'cb_admin': return colors.primary[600]; // Sapphire Blue (ClassBridge)
-      case 'admin': return colors.info[600]; // Blue
-      case 'teacher': return colors.accent.main; // Lime Green (ClassBridge)
-      case 'student': return colors.secondary.main; // Sky Blue (ClassBridge)
+      case 'cb_admin': return colors.primary[600]; // KTS Purple
+      case 'admin': return colors.info[600]; // Purple
+      case 'teacher': return colors.accent.main; // KTS Crimson
+      case 'student': return colors.secondary.main; // KTS Orange
       default: return colors.neutral[500];
     }
   };
 
-  // Gradient colors for header based on theme
+  // Gradient colors for header based on theme - KTS Brand (Purple to Orange)
+  // Smooth gradient from Royal Purple to Golden Orange
   const headerGradientColors = isDark 
-    ? [colors.primary[900], colors.primary[800], colors.primary[700]] as const
-    : [colors.primary[600], colors.info[600], colors.secondary.main] as const;
+    ? [colors.primary[700], colors.primary[500], colors.secondary[400]] as const
+    : [colors.primary.main, colors.primary[400], colors.secondary.main] as const;
 
   return (
     <View style={dynamicStyles.container}>
@@ -477,7 +478,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         <LinearGradient
           colors={headerGradientColors}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 1, y: 0 }}
           style={styles.headerGradient}
         >
           <View style={styles.userSection}>
@@ -664,7 +665,7 @@ const styles = StyleSheet.create({
   headerGradient: {
     paddingHorizontal: 18,
     paddingVertical: 14,
-    paddingBottom: 20,
+    paddingBottom: 14,
   },
   userSection: {
     flexDirection: 'row',
@@ -704,7 +705,7 @@ const styles = StyleSheet.create({
   },
   menu: {
     paddingHorizontal: 10,
-    paddingTop: 16,
+    paddingTop: 0,
     paddingBottom: 10,
   },
   section: {

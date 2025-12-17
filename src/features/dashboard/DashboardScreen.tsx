@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Text as RNText } from 'react-native';
 import { 
   CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound, 
   LineChart, TrendingUp, Activity, CalendarDays, 
@@ -21,12 +21,12 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Hooks
-import { useClass } from '../../hooks/useClasses';
-import { 
-  useDashboardStats, useRecentActivity, useUpcomingEvents, 
-  useFeeOverview, useTaskOverview, useSyllabusOverview 
-} from '../../hooks/useDashboard';
+// Hooks (commented out - using hardcoded data)
+// import { useClass } from '../../hooks/useClasses';
+// import { 
+//   useDashboardStats, useRecentActivity, useUpcomingEvents, 
+//   useFeeOverview, useTaskOverview, useSyllabusOverview 
+// } from '../../hooks/useDashboard';
 
 // UI Kit Components
 import {
@@ -67,28 +67,59 @@ interface QuickActionProps {
 }
 
 function QuickAction({ title, icon: Icon, color, bgColor, onPress }: QuickActionProps) {
-  const { spacing, borderRadius } = useTheme();
+  const { spacing, borderRadius, shadows, colors: themeColors, typography } = useTheme();
   
   return (
     <TouchableOpacity
       onPress={onPress}
-      activeOpacity={0.6}
-      style={{ alignItems: 'center', marginRight: spacing.lg, minWidth: 70 }}
+      activeOpacity={0.7}
+      style={{
+        width: 80,
+        minHeight: 100,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        backgroundColor: themeColors.surface.primary,
+        borderRadius: borderRadius.md,
+        paddingTop: spacing.sm,
+        paddingBottom: spacing.sm,
+        paddingHorizontal: spacing.xs,
+        ...shadows.sm,
+        borderWidth: 0.5,
+        borderColor: themeColors.border.light,
+        marginRight: spacing.sm,
+      }}
     >
       <View style={{
-        width: 56,
-        height: 56,
-        borderRadius: borderRadius.lg,
+        width: 44,
+        height: 44,
+        borderRadius: borderRadius.md,
         backgroundColor: bgColor,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: spacing.xs,
+        marginBottom: spacing.sm,
       }}>
-        <Icon size={24} color={color} strokeWidth={2.5} />
+        <Icon size={20} color={color} strokeWidth={2.5} />
       </View>
-      <Caption weight="semibold" align="center" color="primary" numberOfLines={1}>
-        {title}
-      </Caption>
+      <View style={{ 
+        width: '100%', 
+        minHeight: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
+        <RNText 
+          style={{
+            fontSize: 11,
+            fontWeight: typography.fontWeight.semibold,
+            color: themeColors.text.primary,
+            textAlign: 'center',
+            lineHeight: 14,
+          }} 
+          numberOfLines={2}
+          ellipsizeMode="tail"
+        >
+          {title}
+        </RNText>
+      </View>
     </TouchableOpacity>
   );
 }
@@ -110,7 +141,7 @@ function StatCard({
   title, value, change, icon: Icon, color, bgColor, 
   onPress, showProgress, progressValue, trend 
 }: StatCardProps) {
-  const { colors, spacing, borderRadius, shadows, isDark } = useTheme();
+  const { colors, spacing, borderRadius, shadows, typography } = useTheme();
   const cardWidth = (SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2;
 
   return (
@@ -119,87 +150,118 @@ function StatCard({
       onPress={onPress}
       style={{
         width: cardWidth,
-        backgroundColor: colors.surface.elevated,
+        backgroundColor: colors.surface.primary,
         padding: spacing.md,
-        borderRadius: borderRadius.xl,
-        borderWidth: isDark ? 1 : 0,
+        borderRadius: borderRadius.lg,
+        borderWidth: 0.5,
         borderColor: colors.border.light,
-        ...(!isDark && shadows.sm),
+        ...shadows.sm,
       }}
     >
-      <Row justify="space-between" align="flex-start" spacing="none">
+      {/* Header: Icon and Actions */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
         <View style={{
-          width: 36,
-          height: 36,
-          borderRadius: borderRadius.lg,
+          width: 44,
+          height: 44,
+          borderRadius: borderRadius.md,
           backgroundColor: bgColor,
           justifyContent: 'center',
           alignItems: 'center',
         }}>
-          <Icon size={18} color={color} strokeWidth={2.5} />
+          <Icon size={22} color={color} strokeWidth={2.5} />
         </View>
-        {trend && (
-          <View style={{ marginLeft: 'auto', marginRight: spacing.xs, padding: 2 }}>
-            {trend === 'up' ? (
-              <ArrowUpRight size={12} color={colors.success.main} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          {trend && (
+            trend === 'up' ? (
+              <ArrowUpRight size={16} color={colors.success[600]} />
             ) : (
-              <ArrowDownRight size={12} color={colors.error.main} />
-            )}
-          </View>
-        )}
-        {onPress && (
-          <ChevronRight size={14} color={colors.text.tertiary} style={{ marginLeft: 'auto' }} />
-        )}
-      </Row>
+              <ArrowDownRight size={16} color={colors.error[600]} />
+            )
+          )}
+          {onPress && (
+            <ChevronRight size={18} color={colors.text.tertiary} />
+          )}
+        </View>
+      </View>
       
+      {/* Value Display */}
       {showProgress && progressValue !== undefined ? (
-        <Center style={{ marginVertical: spacing.xs }}>
+        <View style={{ alignItems: 'center', marginVertical: spacing.sm }}>
           <ProgressRing
             progress={progressValue}
-            size={60}
+            size={64}
             strokeWidth={6}
             color={color}
             backgroundColor={colors.neutral[100]}
             showPercentage={false}
           />
-          <Heading level={4} style={{ position: 'absolute' }}>{value}</Heading>
-        </Center>
+          <RNText style={{ 
+            position: 'absolute', 
+            fontSize: typography.fontSize.xl, 
+            fontWeight: typography.fontWeight.bold,
+            color: colors.text.primary 
+          }}>
+            {value}
+          </RNText>
+        </View>
       ) : (
-        <Heading level={2} style={{ marginBottom: 2 }}>{value}</Heading>
+        <RNText style={{ 
+          fontSize: typography.fontSize['2xl'], 
+          fontWeight: typography.fontWeight.bold,
+          color: colors.text.primary,
+          marginBottom: spacing.xs 
+        }}>
+          {value}
+        </RNText>
       )}
       
-      <Caption color="secondary" style={{ marginBottom: spacing.xs }}>{title}</Caption>
+      {/* Title */}
+      <RNText style={{ 
+        fontSize: typography.fontSize.sm, 
+        color: colors.text.secondary,
+        fontWeight: typography.fontWeight.medium,
+        marginBottom: spacing.sm 
+      }}>
+        {title}
+      </RNText>
       
+      {/* Badge */}
       <View style={{
         backgroundColor: color,
-        paddingHorizontal: spacing.xs,
-        paddingVertical: 2,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 5,
         borderRadius: borderRadius.sm,
         alignSelf: 'flex-start',
-        marginTop: spacing.xs,
       }}>
-        <Caption weight="semibold" color="inverse">{change}</Caption>
+        <RNText style={{ 
+          fontSize: 11, 
+          fontWeight: typography.fontWeight.semibold,
+          color: colors.text.inverse 
+        }}>
+          {change}
+        </RNText>
       </View>
     </TouchableOpacity>
   );
 }
 
 function StatCardSkeleton() {
-  const { colors, spacing, borderRadius, shadows, isDark } = useTheme();
+  const { colors, spacing, borderRadius, shadows } = useTheme();
   const cardWidth = (SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2;
 
   return (
     <View style={{
       width: cardWidth,
+      minHeight: 140, // Match StatCard minHeight
       backgroundColor: colors.surface.elevated,
       padding: spacing.md,
-      borderRadius: borderRadius.xl,
-      borderWidth: isDark ? 1 : 0,
+      borderRadius: borderRadius.lg,
+      borderWidth: 0.5,
       borderColor: colors.border.light,
-      ...(!isDark && shadows.sm),
+      ...shadows.sm,
       opacity: 0.6,
     }}>
-      <Skeleton width={36} height={36} variant="rounded" style={{ marginBottom: spacing.sm }} />
+      <Skeleton width={40} height={40} variant="rounded" style={{ marginBottom: spacing.sm }} />
       <Skeleton width="60%" height={28} variant="rounded" style={{ marginBottom: spacing.xs }} />
       <Skeleton width="80%" height={14} variant="rounded" style={{ marginBottom: spacing.xs }} />
       <Skeleton width="50%" height={20} variant="rounded" style={{ marginTop: spacing.xs }} />
@@ -249,39 +311,178 @@ function DashboardEmptyState({ icon: Icon, title, message, actionLabel, onAction
 export default function DashboardScreen() {
   const router = useRouter();
   const { profile, loading: authLoading } = useAuth();
-  const { colors, spacing, borderRadius, isDark } = useTheme();
+  const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
   
   const isStudent = profile?.role === 'student';
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
   
-  // Get class data for display
-  const { data: classData } = useClass(profile?.class_instance_id || '');
+  // Hardcoded class data for display
+  const classData = {
+    grade: '10',
+    section: 'A',
+  };
   
-  // Real data hooks
-  const { data: stats, isLoading: statsLoading, error: statsError, refetch: refetchStats } = useDashboardStats(
-    profile?.auth_id || '', 
-    profile?.class_instance_id || undefined,
-    profile?.role
-  );
-  const { data: recentActivity, isLoading: activityLoading, error: activityError, refetch: refetchActivity } = useRecentActivity(
-    profile?.auth_id || '', 
-    profile?.class_instance_id || undefined
-  );
-  const { data: upcomingEvents, refetch: refetchEvents } = useUpcomingEvents(
-    profile?.school_code || '',
-    profile?.class_instance_id || undefined
-  );
-  const { data: feeOverview, refetch: refetchFee } = useFeeOverview(
-    isStudent ? profile?.auth_id || '' : ''
-  );
-  const { data: taskOverview, refetch: refetchTask } = useTaskOverview(
-    isStudent ? profile?.auth_id || '' : '',
-    profile?.class_instance_id || undefined
-  );
-  const { data: syllabusOverview, refetch: refetchSyllabus } = useSyllabusOverview(
-    profile?.class_instance_id || ''
-  );
+  // Hardcoded data for dashboard
+  const stats = {
+    todaysClasses: 4,
+    attendancePercentage: 92,
+    weekAttendance: 88,
+    pendingAssignments: 3,
+    upcomingTests: 2,
+    achievements: 5,
+    totalStudents: 35,
+  };
+  const statsLoading = false;
+  const statsError = null;
+  const refetchStats = async () => {};
+
+  const recentActivity = [
+    {
+      id: '1',
+      type: 'attendance' as const,
+      title: 'Attendance marked',
+      subtitle: 'Today - Present',
+      timestamp: new Date().toISOString(),
+      icon: 'CheckSquare',
+      color: 'success',
+    },
+    {
+      id: '2',
+      type: 'assignment' as const,
+      title: 'Math Homework Assignment',
+      subtitle: 'Mathematics - Due Dec 25, 2024',
+      timestamp: new Date(Date.now() - 86400000).toISOString(),
+      icon: 'BookOpen',
+      color: 'info',
+    },
+    {
+      id: '3',
+      type: 'test' as const,
+      title: 'Test graded: Unit Test 3',
+      subtitle: 'Score: 85/100',
+      timestamp: new Date(Date.now() - 172800000).toISOString(),
+      icon: 'Award',
+      color: 'secondary',
+    },
+    {
+      id: '4',
+      type: 'attendance' as const,
+      title: 'Attendance marked',
+      subtitle: 'Dec 20, 2024 - Present',
+      timestamp: new Date(Date.now() - 259200000).toISOString(),
+      icon: 'CheckSquare',
+      color: 'success',
+    },
+    {
+      id: '5',
+      type: 'assignment' as const,
+      title: 'Science Project',
+      subtitle: 'Science - Due Dec 28, 2024',
+      timestamp: new Date(Date.now() - 345600000).toISOString(),
+      icon: 'BookOpen',
+      color: 'warning',
+    },
+  ];
+  const activityLoading = false;
+  const activityError = null;
+  const refetchActivity = async () => {};
+
+  const upcomingEvents = [
+    {
+      id: '1',
+      title: 'Annual Day Celebration',
+      date: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
+      type: 'Event',
+      description: 'School annual day celebration',
+      color: '#6366f1',
+    },
+    {
+      id: '2',
+      title: 'Science Fair',
+      date: new Date(Date.now() + 86400000 * 10).toISOString().split('T')[0],
+      type: 'Competition',
+      description: 'Inter-school science fair',
+      color: '#10b981',
+    },
+    {
+      id: '3',
+      title: 'Parent-Teacher Meeting',
+      date: new Date(Date.now() + 86400000 * 15).toISOString().split('T')[0],
+      type: 'Meeting',
+      description: 'Quarterly PTM',
+      color: '#f59e0b',
+    },
+    {
+      id: '4',
+      title: 'Sports Day',
+      date: new Date(Date.now() + 86400000 * 20).toISOString().split('T')[0],
+      type: 'Event',
+      description: 'Annual sports day',
+      color: '#ef4444',
+    },
+  ];
+  const refetchEvents = async () => {};
+
+  const feeOverview = isStudent ? {
+    totalFee: 50000,
+    paidAmount: 35000,
+    pendingAmount: 15000,
+    nextDueDate: new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0],
+  } : null;
+  const refetchFee = async () => {};
+
+  const taskOverview = isStudent ? {
+    total: 8,
+    completed: 5,
+    pending: 3,
+    overdue: 1,
+    dueThisWeek: 2,
+  } : null;
+  const refetchTask = async () => {};
+
+  const syllabusOverview = isStudent ? {
+    overallProgress: 68,
+    totalSubjects: 5,
+    subjectBreakdown: [
+      {
+        subjectId: '1',
+        subjectName: 'Mathematics',
+        progress: 75,
+        totalTopics: 20,
+        completedTopics: 15,
+      },
+      {
+        subjectId: '2',
+        subjectName: 'Science',
+        progress: 70,
+        totalTopics: 18,
+        completedTopics: 13,
+      },
+      {
+        subjectId: '3',
+        subjectName: 'English',
+        progress: 65,
+        totalTopics: 15,
+        completedTopics: 10,
+      },
+      {
+        subjectId: '4',
+        subjectName: 'Social Studies',
+        progress: 60,
+        totalTopics: 12,
+        completedTopics: 7,
+      },
+      {
+        subjectId: '5',
+        subjectName: 'Hindi',
+        progress: 55,
+        totalTopics: 10,
+        completedTopics: 6,
+      },
+    ],
+  } : null;
+  const refetchSyllabus = async () => {};
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -425,23 +626,29 @@ export default function DashboardScreen() {
           />
           }
         >
-        {/* Profile Header */}
-        <Stack spacing="xs" padding="md" style={{ paddingTop: spacing.lg, marginBottom: spacing.sm }}>
-          <Body color="secondary" weight="medium">{getGreeting()} 👋</Body>
+        {/* Profile Header - Modern Design */}
+        <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.md, marginBottom: spacing.sm }}>
+          <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, fontWeight: typography.fontWeight.medium, marginBottom: spacing.xs }}>
+            {getGreeting()} 👋
+          </RNText>
           <Row spacing="xs" align="center">
-            <Heading level={3}>{profile?.full_name || 'User'}</Heading>
-              {classData && (
-              <Body color="secondary"> • Class {classData.grade}-{classData.section}</Body>
-              )}
+            <Heading level={2} style={{ fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+              {profile?.full_name || 'User'}
+            </Heading>
+            {classData && (
+              <RNText style={{ fontSize: typography.fontSize.base, color: colors.text.secondary, marginLeft: spacing.xs }}>
+                • Class {classData.grade}-{classData.section}
+              </RNText>
+            )}
           </Row>
-        </Stack>
+        </View>
 
-        {/* Quick Actions */}
-        <View style={{ marginBottom: spacing.md }}>
+        {/* Quick Actions - Horizontal Scrollable */}
+        <View style={{ marginBottom: spacing.lg }}>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
+            contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm }}
           >
             {quickActions.map((action, index) => (
               <QuickAction
@@ -483,104 +690,146 @@ export default function DashboardScreen() {
           </Row>
         </View>
 
-        {/* Class Overview (Admin Only) */}
-        {isAdmin && stats && (
-          <SectionBlock title="Class Overview" action={{ label: 'Manage', onPress: () => router.push('/manage') }}>
-            <Card variant="elevated">
-              <Row wrap spacing="md" justify="space-between">
-                {[
-                  { icon: UsersRound, value: stats.totalStudents || 0, label: 'Total Students', color: colors.info },
-                  { icon: CalendarRange, value: stats.todaysClasses, label: "Today's Classes", color: colors.primary },
-                  { icon: FileText, value: stats.pendingAssignments, label: 'Active Tasks', color: colors.warning },
-                  { icon: Target, value: stats.upcomingTests, label: 'Upcoming Tests', color: colors.error },
-                ].map((item, index) => (
-                  <View key={index} style={{
-                    width: (SCREEN_WIDTH - spacing.md * 4) / 2,
-                    alignItems: 'center',
-                    padding: spacing.md,
-                    backgroundColor: colors.background.secondary,
-                    borderRadius: borderRadius.lg,
-                    borderWidth: isDark ? 1 : 0,
-                    borderColor: colors.border.light,
-                  }}>
+        {/* Quick Stats (Admin Only) - Modern Design */}
+        {isAdmin && (
+          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+                Quick Stats
+              </RNText>
+              <TouchableOpacity onPress={() => router.push('/analytics')}>
+                <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.primary[600] }}>
+                  Analytics
+                </RNText>
+              </TouchableOpacity>
+            </View>
+            <View style={{
+              backgroundColor: colors.surface.primary,
+              borderRadius: borderRadius.lg,
+              padding: spacing.md,
+              ...shadows.sm,
+              borderWidth: 0.5,
+              borderColor: colors.border.light,
+            }}>
+              {[
+                { icon: UserCheck, label: 'Class Attendance', value: `${stats?.attendancePercentage || 0}% Today`, color: colors.success[600] },
+                { icon: FolderOpen, label: 'Resources Shared', value: 'View resources →', color: colors.info[600] },
+                { icon: LineChart, label: 'Class Performance', value: 'View analytics →', color: colors.secondary[600] },
+              ].map((item, index, arr) => (
+                <React.Fragment key={index}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm }}>
                     <View style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: borderRadius.lg,
-                      backgroundColor: item.color[50],
+                      width: 36,
+                      height: 36,
+                      borderRadius: borderRadius.md,
+                      backgroundColor: item.color === colors.success[600] ? colors.success[50] : 
+                                       item.color === colors.info[600] ? colors.info[50] : 
+                                       colors.secondary[50],
                       justifyContent: 'center',
                       alignItems: 'center',
-                      marginBottom: spacing.xs,
+                      marginRight: spacing.sm,
                     }}>
-                      <item.icon size={20} color={item.color.main} />
-            </View>
-                    <Heading level={3}>{item.value}</Heading>
-                    <Caption color="secondary" align="center">{item.label}</Caption>
+                      <item.icon size={18} color={item.color} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <RNText style={{ 
+                        fontSize: typography.fontSize.xs, 
+                        color: colors.text.secondary,
+                        marginBottom: 2 
+                      }}>
+                        {item.label}
+                      </RNText>
+                      <RNText style={{ 
+                        fontSize: typography.fontSize.base, 
+                        fontWeight: typography.fontWeight.semibold,
+                        color: colors.text.primary 
+                      }}>
+                        {item.value}
+                      </RNText>
+                    </View>
                   </View>
-                ))}
-              </Row>
-            </Card>
-          </SectionBlock>
+                  {index < arr.length - 1 && (
+                    <View style={{ 
+                      height: 0.5, 
+                      backgroundColor: colors.border.light,
+                      marginLeft: 44 
+                    }} />
+                  )}
+                </React.Fragment>
+              ))}
+            </View>
+          </View>
         )}
 
-        {/* Quick Stats (Admin Only) */}
-        {isAdmin && (
-          <SectionBlock title="Quick Stats" action={{ label: 'Analytics', onPress: () => router.push('/analytics') }}>
-            <Card variant="elevated">
-              <Stack spacing="none">
-                {[
-                  { icon: UserCheck, label: 'Class Attendance', value: `${stats?.attendancePercentage || 0}% Today`, color: colors.success.main },
-                  { icon: FolderOpen, label: 'Resources Shared', value: 'View resources →', color: colors.info.main },
-                  { icon: LineChart, label: 'Class Performance', value: 'View analytics →', color: colors.secondary.main },
-                ].map((item, index, arr) => (
-                  <React.Fragment key={index}>
-                    <Row spacing="sm" padding="sm" align="center">
-                      <item.icon size={20} color={item.color} />
-                      <Stack spacing="none" flex>
-                        <Caption color="secondary">{item.label}</Caption>
-                        <Body weight="semibold">{item.value}</Body>
-                      </Stack>
-                    </Row>
-                    {index < arr.length - 1 && <Divider spacing="none" />}
-                  </React.Fragment>
-                ))}
-              </Stack>
-            </Card>
-          </SectionBlock>
-        )}
-
-        {/* Task Overview (Students Only) */}
+        {/* Task Overview (Students Only) - Modern Design */}
         {isStudent && taskOverview && (
-          <SectionBlock title="Task Overview" action={{ label: 'View All', onPress: () => router.push('/tasks') }}>
-            <Card variant="elevated">
+          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+                Task Overview
+              </RNText>
+              <TouchableOpacity onPress={() => router.push('/tasks')}>
+                <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.primary[600] }}>
+                  View All
+                </RNText>
+              </TouchableOpacity>
+            </View>
+            <View style={{
+              backgroundColor: colors.surface.primary,
+              borderRadius: borderRadius.lg,
+              padding: spacing.lg,
+              ...shadows.sm,
+              borderWidth: 0.5,
+              borderColor: colors.border.light,
+            }}>
               {taskOverview.total > 0 ? (
-                <Stack spacing="sm">
-                  <Row justify="space-around">
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.md }}>
                     {[
                       { value: taskOverview.total, label: 'Total', color: colors.text.primary },
-                      { value: taskOverview.completed, label: 'Completed', color: colors.success.main },
-                      { value: taskOverview.dueThisWeek, label: 'This Week', color: colors.warning.main },
-                      { value: taskOverview.overdue, label: 'Overdue', color: colors.error.main },
+                      { value: taskOverview.completed, label: 'Completed', color: colors.success[600] },
+                      { value: taskOverview.dueThisWeek, label: 'This Week', color: colors.warning[600] },
+                      { value: taskOverview.overdue, label: 'Overdue', color: colors.error[600] },
                     ].map((item, index) => (
-                      <Stack key={index} align="center" spacing="xs">
-                        <Heading level={2} style={{ color: item.color }}>{item.value}</Heading>
-                        <Caption color="secondary" align="center">{item.label}</Caption>
-                      </Stack>
+                      <View key={index} style={{ alignItems: 'center' }}>
+                        <RNText style={{ 
+                          fontSize: typography.fontSize.xl, 
+                          fontWeight: typography.fontWeight.bold,
+                          color: item.color,
+                          marginBottom: spacing.xs 
+                        }}>
+                          {item.value}
+                        </RNText>
+                        <RNText style={{ 
+                          fontSize: typography.fontSize.xs, 
+                          color: colors.text.secondary,
+                          fontWeight: typography.fontWeight.medium 
+                        }}>
+                          {item.label}
+                        </RNText>
+                      </View>
                     ))}
-                  </Row>
+                  </View>
                   {taskOverview.overdue > 0 && (
-                    <Row spacing="xs" align="center" style={{
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
                       backgroundColor: colors.error[50],
                       padding: spacing.sm,
-                      borderRadius: borderRadius.sm,
+                      borderRadius: borderRadius.md,
+                      gap: spacing.xs,
                     }}>
-                      <AlertCircle size={16} color={colors.error.main} />
-                      <Caption color="error">
+                      <AlertCircle size={16} color={colors.error[600]} />
+                      <RNText style={{ 
+                        fontSize: typography.fontSize.sm, 
+                        color: colors.error[700],
+                        fontWeight: typography.fontWeight.medium 
+                      }}>
                         You have {taskOverview.overdue} overdue task{taskOverview.overdue > 1 ? 's' : ''}
-                      </Caption>
-                    </Row>
+                      </RNText>
+                    </View>
                   )}
-                </Stack>
+                </>
               ) : (
                 <DashboardEmptyState
                   icon={CheckCircle2}
@@ -590,67 +839,130 @@ export default function DashboardScreen() {
                   onAction={() => router.push('/tasks')}
                 />
               )}
-            </Card>
-          </SectionBlock>
+            </View>
+          </View>
         )}
 
-        {/* Syllabus Progress (Students Only) */}
+        {/* Syllabus Progress (Students Only) - Modern Design */}
         {isStudent && syllabusOverview && (
-          <SectionBlock title="Syllabus Progress" action={{ label: 'View All', onPress: () => router.push('/syllabus') }}>
-            <Card variant="elevated">
+          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+                Syllabus Progress
+              </RNText>
+              <TouchableOpacity onPress={() => router.push('/syllabus')}>
+                <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.primary[600] }}>
+                  View All
+                </RNText>
+              </TouchableOpacity>
+            </View>
+            <View style={{
+              backgroundColor: colors.surface.primary,
+              borderRadius: borderRadius.lg,
+              padding: spacing.lg,
+              ...shadows.sm,
+              borderWidth: 0.5,
+              borderColor: colors.border.light,
+            }}>
               {syllabusOverview.totalSubjects > 0 && syllabusOverview.subjectBreakdown.length > 0 ? (
-                <Stack spacing="lg">
-                  <Row spacing="lg" align="center">
-                    <Center style={{ position: 'relative' }}>
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
+                    <View style={{ position: 'relative', marginRight: spacing.lg }}>
                       <ProgressRing
                         progress={syllabusOverview.overallProgress}
                         size={80}
                         strokeWidth={8}
-                        color={colors.primary.main}
+                        color={colors.primary[600]}
                         backgroundColor={colors.neutral[100]}
                         showPercentage={false}
                       />
-                      <Heading level={4} style={{ position: 'absolute' }}>
-                        {syllabusOverview.overallProgress}%
-                      </Heading>
-                    </Center>
-                    <Stack spacing="xs" flex>
-                      <Heading level={4}>Overall Progress</Heading>
-                      <Body color="secondary">
+                      <View style={{ 
+                        position: 'absolute', 
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}>
+                        <RNText style={{ 
+                          fontSize: typography.fontSize.lg,
+                          fontWeight: typography.fontWeight.bold,
+                          color: colors.text.primary 
+                        }}>
+                          {syllabusOverview.overallProgress}%
+                        </RNText>
+                      </View>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <RNText style={{ 
+                        fontSize: typography.fontSize.lg, 
+                        fontWeight: typography.fontWeight.bold,
+                        color: colors.text.primary,
+                        marginBottom: spacing.xs 
+                      }}>
+                        Overall Progress
+                      </RNText>
+                      <RNText style={{ 
+                        fontSize: typography.fontSize.sm, 
+                        color: colors.text.secondary 
+                      }}>
                         {syllabusOverview.subjectBreakdown.reduce((sum, s) => sum + s.completedTopics, 0)} / {' '}
                         {syllabusOverview.subjectBreakdown.reduce((sum, s) => sum + s.totalTopics, 0)} topics completed
-                      </Body>
-                    </Stack>
-                  </Row>
+                      </RNText>
+                    </View>
+                  </View>
                   
-                  <Stack spacing="md">
-                      {syllabusOverview.subjectBreakdown.slice(0, 3).map((subject) => (
-                      <Stack key={subject.subjectId} spacing="xs" style={{ 
+                  <View style={{ gap: spacing.md }}>
+                    {syllabusOverview.subjectBreakdown.slice(0, 3).map((subject) => (
+                      <View key={subject.subjectId} style={{ 
                         paddingTop: spacing.md, 
-                        borderTopWidth: 1, 
+                        borderTopWidth: 0.5, 
                         borderTopColor: colors.border.light 
                       }}>
-                        <Row justify="space-between">
-                          <Body weight="semibold" numberOfLines={1} style={{ flex: 1 }}>{subject.subjectName}</Body>
-                          <Body weight="bold" color="accent">{subject.progress}%</Body>
-                        </Row>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                          <RNText style={{ 
+                            fontSize: typography.fontSize.base, 
+                            fontWeight: typography.fontWeight.semibold,
+                            color: colors.text.primary,
+                            flex: 1 
+                          }} numberOfLines={1}>
+                            {subject.subjectName}
+                          </RNText>
+                          <RNText style={{ 
+                            fontSize: typography.fontSize.base, 
+                            fontWeight: typography.fontWeight.bold,
+                            color: colors.primary[600] 
+                          }}>
+                            {subject.progress}%
+                          </RNText>
+                        </View>
                         <ProgressBar 
                           progress={subject.progress} 
-                          variant={subject.progress >= 80 ? 'success' : subject.progress >= 50 ? 'info' : 'warning'}
+                          fillColor={colors.primary[600]}
                           size="sm"
-                            />
-                        <Caption color="secondary">{subject.completedTopics} / {subject.totalTopics} topics</Caption>
-                      </Stack>
-                      ))}
-                      {syllabusOverview.subjectBreakdown.length > 3 && (
+                        />
+                        <RNText style={{ 
+                          fontSize: typography.fontSize.xs, 
+                          color: colors.text.secondary 
+                        }}>
+                          {subject.completedTopics} / {subject.totalTopics} topics
+                        </RNText>
+                      </View>
+                    ))}
+                    {syllabusOverview.subjectBreakdown.length > 3 && (
                       <TouchableOpacity onPress={() => router.push('/syllabus')} style={{ alignItems: 'center', paddingTop: spacing.sm }}>
-                        <Caption color="accent" weight="medium">
-                            +{syllabusOverview.subjectBreakdown.length - 3} more subject{syllabusOverview.subjectBreakdown.length - 3 > 1 ? 's' : ''}
-                        </Caption>
-                        </TouchableOpacity>
-                      )}
-                  </Stack>
-                </Stack>
+                        <RNText style={{ 
+                          fontSize: typography.fontSize.sm, 
+                          fontWeight: typography.fontWeight.medium,
+                          color: colors.primary[600] 
+                        }}>
+                          +{syllabusOverview.subjectBreakdown.length - 3} more subject{syllabusOverview.subjectBreakdown.length - 3 > 1 ? 's' : ''}
+                        </RNText>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
               ) : (
                 <DashboardEmptyState
                   icon={NotebookText}
@@ -660,8 +972,8 @@ export default function DashboardScreen() {
                   onAction={() => router.push('/syllabus')}
                 />
               )}
-            </Card>
-          </SectionBlock>
+            </View>
+          </View>
         )}
 
         {/* Fee Overview (Students Only) */}

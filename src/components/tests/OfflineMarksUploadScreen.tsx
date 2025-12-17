@@ -10,25 +10,23 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Animated,
-  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Save, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, Save, Check, Search, X, Users, MessageSquare, Zap } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestMarks, useCreateBulkMarks } from '../../hooks/tests';
 import { useStudents } from '../../hooks/useStudents';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { spacing, borderRadius, colors } from '../../../lib/design-system';
+import { spacing, borderRadius } from '../../../lib/design-system';
 
 export function OfflineMarksUploadScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user, profile } = useAuth();
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, typography: themeTypography, shadows: themeShadows, borderRadius: themeBorderRadius } = useTheme();
+  const styles = useMemo(() => createStyles(colors, themeTypography, themeShadows, themeBorderRadius), [colors, themeTypography, themeShadows, themeBorderRadius]);
 
   const testId = params.testId as string;
   const testTitle = params.testTitle as string;
@@ -45,11 +43,11 @@ export function OfflineMarksUploadScreen() {
 
   const [marks, setMarks] = useState<Record<string, { marks: string; remarks: string }>>({});
   const [saving, setSaving] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [quickMarks, setQuickMarks] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedRemarks, setExpandedRemarks] = useState<Record<string, boolean>>({});
+  const [bulkMarksValue, setBulkMarksValue] = useState('');
   const inputRefs = useRef<{ [key: string]: TextInput | null }>({});
   const flatListRef = useRef<FlatList>(null);
-  const slideAnim = useRef(new Animated.Value(0)).current;
 
   // Initialize marks from existing data
   React.useEffect(() => {
@@ -85,92 +83,33 @@ export function OfflineMarksUploadScreen() {
     }));
   };
 
-  const handleQuickMarkSubmit = () => {
-    if (!quickMarks.trim() || currentIndex >= students.length) return;
+  const handleBulkFill = () => {
+    if (!bulkMarksValue.trim()) {
+      Alert.alert('Invalid Input', 'Please enter marks value');
+      return;
+    }
 
-    const currentStudent = students[currentIndex];
-    const marksNum = parseFloat(quickMarks);
-
+    const marksNum = parseFloat(bulkMarksValue);
     if (isNaN(marksNum) || marksNum < 0 || marksNum > maxMarks) {
       Alert.alert('Invalid Marks', `Please enter a value between 0 and ${maxMarks}`);
       return;
     }
 
-    updateMarks(currentStudent.id, quickMarks);
-    setQuickMarks('');
-
-    // Move to next student
-    if (currentIndex < students.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
-      flatListRef.current?.scrollToIndex({ index: currentIndex - 1, animated: true });
-    }
-  };
-
-  const handleNext = () => {
-    if (currentIndex < students.length - 1) {
-      // Slide animation
-      Animated.sequence([
-        Animated.timing(slideAnim, {
-          toValue: -50,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      setCurrentIndex(currentIndex + 1);
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
-    }
-  };
-
-  // Swipe gesture handler
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 20;
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > 50) {
-          // Swipe right - previous
-          handlePrevious();
-        } else if (gestureState.dx < -50) {
-          // Swipe left - next
-          handleNext();
-        }
-      },
-    })
-  ).current;
-
-  const handleQuickFillAll = () => {
     Alert.alert(
-      'Quick Fill',
-      'Fill same marks for all unmarked students?',
+      'Bulk Fill Marks',
+      `Fill ${bulkMarksValue} marks for all unmarked students?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Fill',
           onPress: () => {
-            const marksValue = quickMarks.trim();
-            if (!marksValue) return;
-
             students.forEach((student: any) => {
               const existing = marks[student.id];
               if (!existing || !existing.marks) {
-                updateMarks(student.id, marksValue);
+                updateMarks(student.id, bulkMarksValue);
               }
             });
-            setQuickMarks('');
+            setBulkMarksValue('');
             Alert.alert('Success', 'Marks filled for all unmarked students');
           },
         },
@@ -178,17 +117,65 @@ export function OfflineMarksUploadScreen() {
     );
   };
 
-  // Calculate progress
+  const handleClearAll = () => {
+    Alert.alert(
+      'Clear All Marks',
+      'Are you sure you want to clear all entered marks?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: () => {
+            setMarks({});
+            Alert.alert('Cleared', 'All marks have been cleared');
+          },
+        },
+      ]
+    );
+  };
+
+  const toggleRemarks = (studentId: string) => {
+    setExpandedRemarks(prev => ({
+      ...prev,
+      [studentId]: !prev[studentId],
+    }));
+  };
+
+  // Filter students based on search
+  const filteredStudents = useMemo(() => {
+    if (!searchQuery.trim()) return students;
+    const query = searchQuery.toLowerCase();
+    return students.filter((student: any) => 
+      student.full_name?.toLowerCase().includes(query) ||
+      student.student_code?.toLowerCase().includes(query)
+    );
+  }, [students, searchQuery]);
+
+  // Calculate progress and statistics
   const progress = useMemo(() => {
     const markedCount = students.filter((student: any) => {
       const studentMarks = marks[student.id];
       return studentMarks?.marks && studentMarks.marks.trim() !== '';
     }).length;
 
+    const totalMarks = students.reduce((sum: number, student: any) => {
+      const studentMarks = marks[student.id];
+      if (studentMarks?.marks && studentMarks.marks.trim() !== '') {
+        const marksNum = parseFloat(studentMarks.marks);
+        return sum + (isNaN(marksNum) ? 0 : marksNum);
+      }
+      return sum;
+    }, 0);
+
+    const averageMarks = markedCount > 0 ? totalMarks / markedCount : 0;
+
     return {
       marked: markedCount,
       total: students.length,
       percentage: students.length > 0 ? Math.round((markedCount / students.length) * 100) : 0,
+      totalMarks,
+      averageMarks: Math.round(averageMarks * 10) / 10,
     };
   }, [students, marks]);
 
@@ -257,7 +244,6 @@ export function OfflineMarksUploadScreen() {
                 { text: 'OK', onPress: () => router.back() },
               ]);
             } catch (error: any) {
-              console.error('Save error:', error);
               Alert.alert('Error', error.message || 'Failed to save marks');
             } finally {
               setSaving(false);
@@ -317,84 +303,216 @@ export function OfflineMarksUploadScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Simple Header */}
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <ArrowLeft size={22} color={colors.text.primary} />
           </TouchableOpacity>
           <View style={styles.headerContent}>
-            <Text style={styles.headerTitle}>{testTitle}</Text>
+            <Text style={styles.headerTitle} numberOfLines={1}>{testTitle}</Text>
             <Text style={styles.headerSubtitle}>Max: {maxMarks} marks</Text>
           </View>
-          <Text style={styles.progressText}>{progress.marked}/{progress.total}</Text>
         </View>
+
+        {/* Progress Bar & Statistics */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <View style={styles.progressInfo}>
+              <Users size={16} color={colors.primary[600]} />
+              <Text style={styles.progressText}>
+                {progress.marked} of {progress.total} students
+              </Text>
+            </View>
+            <Text style={styles.progressPercentage}>{progress.percentage}%</Text>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBar, { width: `${progress.percentage}%` }]} />
+          </View>
+        </View>
+
+        {/* Search Bar */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchContainer}>
+            <Search size={18} color={colors.text.secondary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search students..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholderTextColor={colors.text.tertiary}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <X size={18} color={colors.text.secondary} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Quick Actions */}
+        {(
+          <View style={styles.quickActionsSection}>
+            <View style={styles.quickActionsRow}>
+              <View style={styles.bulkInputContainer}>
+                <TextInput
+                  style={styles.bulkInput}
+                  placeholder="Bulk fill"
+                  value={bulkMarksValue}
+                  onChangeText={setBulkMarksValue}
+                  keyboardType="number-pad"
+                  placeholderTextColor={colors.text.tertiary}
+                />
+                <TouchableOpacity
+                  style={[styles.quickActionButton, !bulkMarksValue && styles.quickActionButtonDisabled]}
+                  onPress={handleBulkFill}
+                  disabled={!bulkMarksValue}
+                >
+                  <Zap size={16} color={colors.text.inverse} />
+                  <Text style={styles.quickActionText}>Fill</Text>
+                </TouchableOpacity>
+              </View>
+              {progress.marked > 0 && (
+                <TouchableOpacity
+                  style={[styles.quickActionButton, styles.clearButton]}
+                  onPress={handleClearAll}
+                >
+                  <X size={16} color={colors.error[600]} />
+                  <Text style={[styles.quickActionText, { color: colors.error[600] }]}>Clear</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* Student List */}
         <FlatList
-          data={students}
+          ref={flatListRef}
+          data={filteredStudents}
           keyExtractor={(item: any) => item.id}
           contentContainerStyle={styles.listContent}
           renderItem={({ item, index }) => {
             const studentMarks = marks[item.id] || { marks: '', remarks: '' };
             const hasMarks = studentMarks.marks && studentMarks.marks.trim() !== '';
+            const marksNum = hasMarks ? parseFloat(studentMarks.marks) : null;
+            const isValidMarks = marksNum !== null && !isNaN(marksNum) && marksNum >= 0 && marksNum <= maxMarks;
+            const hasRemarks = studentMarks.remarks && studentMarks.remarks.trim() !== '';
+            const isExpanded = expandedRemarks[item.id];
 
             return (
-              <View style={styles.studentRow}>
-                {/* Student Info */}
-                <View style={styles.studentLeft}>
-                  <Text style={styles.studentNumber}>{index + 1}</Text>
-                  <View style={styles.studentDetails}>
-                    <Text style={styles.studentName}>{item.full_name}</Text>
-                    <Text style={styles.studentCode}>{item.student_code}</Text>
+              <View style={[styles.studentCard, hasMarks && isValidMarks && styles.studentCardFilled]}>
+                <View style={styles.studentRow}>
+                  {/* Left: Student Info */}
+                  <View style={styles.studentInfo}>
+                    <Text style={styles.studentNumber}>{String(index + 1).padStart(2, '0')}</Text>
+                    <View style={styles.studentDetails}>
+                      <Text style={styles.studentName} numberOfLines={1}>{item.full_name}</Text>
+                      <Text style={styles.studentCode}>{item.student_code}</Text>
+                    </View>
+                  </View>
+
+                  {/* Right: Marks Input */}
+                  <View style={styles.marksInputWrapper}>
+                    <TextInput
+                      ref={(ref) => { inputRefs.current[item.id] = ref; }}
+                      style={[
+                        styles.marksInput,
+                        hasMarks && isValidMarks && styles.marksInputFilled,
+                        hasMarks && !isValidMarks && styles.marksInputError
+                      ]}
+                      placeholder="—"
+                      value={studentMarks.marks}
+                      onChangeText={(text) => updateMarks(item.id, text)}
+                      keyboardType="number-pad"
+                      maxLength={String(maxMarks).length}
+                      placeholderTextColor={colors.text.tertiary}
+                    />
+                    {hasMarks && isValidMarks && (
+                      <View style={styles.checkIndicator}>
+                        <Check size={10} color={colors.text.inverse} strokeWidth={2.5} />
+                      </View>
+                    )}
                   </View>
                 </View>
 
-                {/* Marks Input */}
-                <View style={styles.inputWrapper}>
-                  <TextInput
-                    style={[styles.marksInput, hasMarks && styles.marksInputFilled]}
-                    placeholder="—"
-                    value={studentMarks.marks}
-                    onChangeText={(text) => updateMarks(item.id, text)}
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    placeholderTextColor={colors.text.tertiary}
-                  />
-                  {hasMarks && (
-                    <View style={styles.checkIcon}>
-                      <Check size={14} color={colors.success[600]} strokeWidth={3} />
+                {/* Remarks - Always visible, compact */}
+                <View style={styles.remarksRow}>
+                  <TouchableOpacity
+                    style={styles.remarksButton}
+                    onPress={() => toggleRemarks(item.id)}
+                    activeOpacity={0.7}
+                  >
+                    <MessageSquare size={12} color={hasRemarks ? colors.primary[600] : colors.text.tertiary} />
+                    <Text style={[styles.remarksButtonText, hasRemarks && styles.remarksButtonTextActive]}>
+                      {hasRemarks ? 'Remarks added' : 'Add remarks'}
+                    </Text>
+                  </TouchableOpacity>
+                  {isExpanded && (
+                    <View style={styles.remarksInputWrapper}>
+                      <TextInput
+                        style={styles.remarksInput}
+                        placeholder="Optional remarks..."
+                        value={studentMarks.remarks}
+                        onChangeText={(text) => updateRemarks(item.id, text)}
+                        multiline
+                        numberOfLines={2}
+                        placeholderTextColor={colors.text.tertiary}
+                        autoFocus={false}
+                      />
                     </View>
                   )}
                 </View>
               </View>
             );
           }}
+          ListEmptyComponent={
+            searchQuery ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No students found</Text>
+                <Text style={styles.emptyStateSubtext}>Try a different search term</Text>
+              </View>
+            ) : null
+          }
         />
 
         {/* Fixed Save Button */}
         <View style={styles.saveBar}>
-          <TouchableOpacity
-            style={[styles.saveButton, (saving || progress.marked === 0) && styles.saveButtonDisabled]}
-            onPress={handleSaveMarks}
-            disabled={saving || progress.marked === 0}
-            activeOpacity={0.8}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color={colors.surface.primary} />
-            ) : (
-              <Text style={styles.saveButtonText}>Save All Marks</Text>
-            )}
-          </TouchableOpacity>
+          <View style={styles.saveBarContent}>
+            <View style={styles.saveBarStats}>
+              <Text style={styles.saveBarStatsText}>
+                {progress.marked} student{progress.marked !== 1 ? 's' : ''} marked
+              </Text>
+              {progress.marked > 0 && (
+                <Text style={styles.saveBarStatsSubtext}>
+                  Avg: {progress.averageMarks} / {maxMarks}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.saveButton, (saving || progress.marked === 0) && styles.saveButtonDisabled]}
+              onPress={handleSaveMarks}
+              disabled={saving || progress.marked === 0}
+              activeOpacity={0.8}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color={colors.text.inverse} />
+              ) : (
+                <>
+                  <Save size={18} color={colors.text.inverse} />
+                  <Text style={styles.saveButtonText}>Save Marks</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, typography: any, shadows: any, borderRadius: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.neutral[50],
+    backgroundColor: colors.background.app,
   },
   loadingContainer: {
     flex: 1,
@@ -403,180 +521,380 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 15,
+    fontSize: typography.fontSize.base,
     color: colors.text.secondary,
-    fontWeight: '500',
-  },
-  backButton: {
-    padding: 8,
+    fontWeight: typography.fontWeight.medium,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surface.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
-    gap: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.border.light,
+    gap: spacing.sm,
   },
   headerContent: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
   },
   headerSubtitle: {
-    fontSize: 13,
+    fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
-    fontWeight: '500',
+    fontWeight: typography.fontWeight.medium,
     marginTop: 2,
   },
+  progressSection: {
+    backgroundColor: colors.surface.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.border.light,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  progressInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   progressText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary.main,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+  },
+  progressPercentage: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary[600],
+  },
+  progressBarContainer: {
+    height: 4,
+    backgroundColor: colors.neutral[100],
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+    marginBottom: spacing.xs,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: colors.primary[600],
+    borderRadius: borderRadius.full,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginTop: 4,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+  },
+  searchSection: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surface.primary,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.border.light,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    gap: spacing.xs,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: typography.fontSize.base,
+    color: colors.text.primary,
+    padding: 0,
+  },
+  quickActionsSection: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surface.primary,
+    borderBottomWidth: 0.5,
+    borderBottomColor: colors.border.light,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  bulkInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  bulkInput: {
+    flex: 1,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.primary,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
+  },
+  quickActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.sm,
+  },
+  quickActionButtonDisabled: {
+    opacity: 0.5,
+  },
+  quickActionText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.inverse,
+  },
+  clearButton: {
+    backgroundColor: colors.error[50],
+    borderWidth: 1,
+    borderColor: colors.error[200],
   },
   listContent: {
-    padding: 20,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: 100,
+  },
+  studentCard: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.xs,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
+  },
+  studentCardFilled: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success[500],
   },
   studentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: colors.surface.primary,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: colors.surface.overlay,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 3,
-    elevation: 2,
+    marginBottom: spacing.xs,
   },
-  studentLeft: {
+  studentInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 12,
+    gap: spacing.sm,
+    minWidth: 0,
   },
   studentNumber: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.tertiary,
-    width: 24,
+    width: 28,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
   },
   studentDetails: {
     flex: 1,
+    minWidth: 0,
   },
   studentName: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
     marginBottom: 2,
   },
   studentCode: {
-    fontSize: 12,
+    fontSize: typography.fontSize.xs,
     color: colors.text.secondary,
-    fontWeight: '500',
+    fontWeight: typography.fontWeight.medium,
   },
-  inputWrapper: {
+  marksInputWrapper: {
     position: 'relative',
   },
   marksInput: {
-    width: 56,
+    width: 70,
     height: 48,
-    backgroundColor: colors.neutral[50],
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 17,
-    fontWeight: '600',
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
     textAlign: 'center',
     borderWidth: 1.5,
     borderColor: colors.border.DEFAULT,
   },
   marksInputFilled: {
-    borderColor: colors.success[600],
+    borderColor: colors.success[500],
     backgroundColor: colors.success[50],
-    color: colors.success[600],
+    color: colors.success[700],
+    borderWidth: 2,
   },
-  checkIcon: {
+  marksInputError: {
+    borderColor: colors.error[500],
+    backgroundColor: colors.error[50],
+    color: colors.error[700],
+    borderWidth: 2,
+  },
+  checkIndicator: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.surface.primary,
+    top: -8,
+    right: -8,
+    width: 18,
+    height: 18,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.success[500],
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.surface.overlay,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: colors.surface.primary,
+    ...shadows.sm,
+  },
+  remarksRow: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.border.light,
+  },
+  remarksButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: spacing.xs,
+  },
+  remarksButtonText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.tertiary,
+  },
+  remarksButtonTextActive: {
+    color: colors.primary[600],
+    fontWeight: typography.fontWeight.semibold,
+  },
+  remarksInputWrapper: {
+    marginTop: spacing.xs,
+  },
+  remarksInput: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.primary,
+    minHeight: 52,
+    textAlignVertical: 'top',
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
   },
   saveBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
     backgroundColor: colors.surface.primary,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.DEFAULT,
-    shadowColor: colors.surface.overlay,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: colors.border.light,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingBottom: Platform.OS === 'ios' ? 28 : spacing.sm,
+    ...shadows.md,
+  },
+  saveBarContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  saveBarStats: {
+    flex: 1,
+  },
+  saveBarStatsText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+  },
+  saveBarStatsSubtext: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: 1,
   },
   saveButton: {
-    paddingVertical: 16,
-    backgroundColor: colors.primary.main,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.primary[600],
+    borderRadius: borderRadius.sm,
   },
   saveButtonDisabled: {
     opacity: 0.5,
   },
   saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
   },
+  emptyState: {
+    paddingVertical: spacing.xl * 2,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  emptyStateSubtext: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+  },
   errorText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: spacing.md,
   },
   errorSubtext: {
-    fontSize: 14,
+    fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 8,
-    fontWeight: '500',
+    marginBottom: spacing.xs,
+    fontWeight: typography.fontWeight.medium,
   },
   retryButton: {
-    marginTop: 24,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    backgroundColor: colors.primary.main,
-    borderRadius: 12,
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    backgroundColor: colors.primary[600],
+    borderRadius: borderRadius.md,
   },
   retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
     textAlign: 'center',
   },

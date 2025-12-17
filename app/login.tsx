@@ -1,8 +1,9 @@
 /**
- * LoginScreen
+ * LoginScreen - Krishnaveni Talent School
  * 
  * Refactored to use centralized design system.
  * All styling comes from theme tokens - no hardcoded values.
+ * Brand: "Mentored for Life"
  */
 
 import React, { useState } from 'react';
@@ -75,10 +76,10 @@ export default function LoginScreen() {
     }
   }, [auth.status]);
 
-  // Gradient colors based on theme - ClassBridge brand
+  // Gradient colors based on theme - KTS brand (Purple & Orange)
   const gradientColors = isDark 
     ? [colors.background.primary, colors.background.secondary, colors.background.tertiary] as const
-    : ['#FFFFFF', '#F5FAFF', '#EBF5FF'] as const;
+    : ['#FFFFFF', '#FAF8FC', '#F5F0FA'] as const;
   
   const buttonGradientColors = isDark
     ? [colors.primary[700], colors.primary.main] as const
@@ -227,11 +228,11 @@ export default function LoginScreen() {
                   color="accent"
                   style={{ textAlign: 'center', letterSpacing: -0.5 }}
                 >
-                  ClassBridge
+                  Krishnaveni Talent School
                 </Heading>
                 
                 <Stack spacing="xs" style={{ alignItems: 'center' }}>
-                  <Heading level={4} align="center">Bridge The Gap</Heading>
+                  <Heading level={4} align="center" style={{ color: colors.secondary.main }}>Mentored for Life</Heading>
                   <View style={{
                     width: 80,
                     height: 4,

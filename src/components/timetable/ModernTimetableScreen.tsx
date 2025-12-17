@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration, Modal as RNModal, Text as RNText } from 'react-native';
 import { Text, Card, Button, Chip, Portal, Modal, TextInput, SegmentedButtons, Snackbar } from 'react-native-paper';
-import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo, X } from 'lucide-react-native';
+import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo, X, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEnhancedTimetable } from '../../hooks/useEnhancedTimetable';
 import { useSyllabusLoader } from '../../hooks/useSyllabusLoader';
@@ -28,7 +28,31 @@ const isVerySmallScreen = screenWidth < 320;
 
 const { width } = Dimensions.get('window');
 
-// Clean Timetable Card Component
+// Get subtle subject color for visual recognition
+function getSubjectColor(subjectName: string, colors: ThemeColors): string {
+  if (!subjectName) return colors.neutral[400];
+  
+  const colorMap: Record<string, string> = {
+    'Mathematics': colors.primary[500],
+    'Math': colors.primary[500],
+    'English': colors.info[500],
+    'Science': colors.success[500],
+    'Physics': colors.accent[500],
+    'Chemistry': colors.warning[500],
+    'Biology': colors.success[600],
+    'History': colors.error[500],
+    'Geography': colors.info[600],
+    'Art': colors.accent[600],
+    'Music': colors.warning[600],
+    'Physical Education': colors.success[500],
+    'PE': colors.success[500],
+  };
+  
+  const normalizedName = subjectName.trim();
+  return colorMap[normalizedName] || colors.primary[500];
+}
+
+// Premium Timetable Card - iOS + Material Hybrid
 function CleanTimetableCard({
   slot,
   onEdit,
@@ -45,31 +69,39 @@ function CleanTimetableCard({
   setShowSlotMenu,
   styles,
   colors,
+  getTopicName,
+  getChapterName,
 }: any) {
+  // Early return if slot is missing critical data
+  if (!slot || !slot.id) {
+    return null;
+  }
+  
   const isTaught = taughtSlotIds.has(slot.id);
+  const subjectColor = getSubjectColor(slot?.subject_name, colors);
+  
+  // Get topic name from slot or syllabus map - ensure we always have a value or null
+  const topicName = slot?.topic_name || (slot?.syllabus_topic_id && getTopicName ? getTopicName(slot.syllabus_topic_id) : null) || null;
+  const chapterName = slot?.chapter_name || (slot?.syllabus_chapter_id && getChapterName ? getChapterName(slot.syllabus_chapter_id) : null) || null;
 
   if (slot.slot_type === 'break') {
     return (
-      <View style={styles.cleanBreakCard}>
-        <View style={styles.cleanBreakContent}>
-          <View style={styles.cleanBreakIcon}>
-            <Coffee size={18} color={colors.warning[800]} />
-          </View>
-          <View style={styles.cleanBreakText}>
-            <Text style={styles.cleanBreakTitle}>{slot.name || 'Break'}</Text>
-            <Text style={styles.cleanBreakTime}>
+      <View style={styles.premiumBreakCard}>
+        <View style={styles.premiumBreakContent}>
+          <Coffee size={18} color={colors.warning[600]} />
+          <View style={styles.premiumBreakText}>
+            <RNText style={styles.premiumBreakTitle}>{slot.name || 'Break'}</RNText>
+            <RNText style={styles.premiumBreakTime}>
               {formatTime12Hour(slot.start_time)} - {formatTime12Hour(slot.end_time)}
-            </Text>
+            </RNText>
           </View>
         </View>
         <TouchableOpacity
           onPress={() => onEdit(slot)}
-          style={styles.cleanCardMenu}
+          style={styles.premiumCardEditButton}
           activeOpacity={0.6}
         >
-          <View style={styles.menuIconContainer}>
-            <Edit size={18} color={colors.info[600]} />
-          </View>
+          <Edit size={16} color={colors.text.tertiary} />
         </TouchableOpacity>
       </View>
     );
@@ -77,47 +109,107 @@ function CleanTimetableCard({
 
   return (
     <View style={[
-      styles.cleanPeriodCard,
-      isCurrentPeriod && styles.cleanCurrentCard,
-      isUpcomingPeriod && styles.cleanUpcomingCard,
-      isPastPeriod && styles.cleanPastCard,
-      isTaught ? styles.cleanCompletedCard : styles.cleanPendingCard
+      styles.premiumPeriodCard,
+      isCurrentPeriod && styles.premiumCurrentCard,
+      isTaught && styles.premiumTaughtCard
     ]}>
-      <View style={styles.cleanPeriodLeftBorder} />
+      {/* 2-3px Colored Vertical Strip - Green for completed, subject color for pending */}
+      <View style={[
+        styles.premiumAccentStrip, 
+        { backgroundColor: isTaught ? colors.success[500] : subjectColor }
+      ]} />
       
-      <View style={styles.cleanPeriodContent}>
-        {/* Line 1: Time + Subject */}
-        <View style={styles.cleanPeriodHeader}>
-          <View style={styles.cleanContentColumn}>
-            <RNText style={styles.cleanTimeText}>
-              {`${formatTime12Hour(slot?.start_time)} - ${formatTime12Hour(slot?.end_time)}`}
-            </RNText>
-            <RNText style={styles.cleanSubjectName} numberOfLines={2} ellipsizeMode="tail">
-              {slot?.subject_name?.trim?.() || 'Unassigned'}
+      <View style={styles.premiumCardContent}>
+        {/* Top Row: Period Badge | Time | Edit Button */}
+        <View style={styles.premiumCardTopRow}>
+          <View style={styles.premiumCardTopLeft}>
+            {slot?.period_number && (
+              <View style={styles.periodNumberBadge}>
+                <RNText style={styles.periodNumberText}>P{slot.period_number}</RNText>
+              </View>
+            )}
+            <RNText style={[
+              styles.premiumTimeText,
+              isTaught && styles.premiumTimeTextCompleted
+            ]}>
+              {formatTime12Hour(slot?.start_time)} - {formatTime12Hour(slot?.end_time)}
             </RNText>
           </View>
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedSlotForMenu(slot);
-              setShowSlotMenu(true);
-            }}
-            style={styles.cleanCardMenu}
-            activeOpacity={0.6}
-          >
-            <Edit size={20} color={colors.info[500]} />
-          </TouchableOpacity>
+          <View style={styles.premiumCardTopRight}>
+            {isTaught && (
+              <View style={styles.completedIndicator}>
+                <CheckCircle size={14} color={colors.success[600]} />
+                <RNText style={styles.completedLabel}>Done</RNText>
+              </View>
+            )}
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedSlotForMenu(slot);
+                setShowSlotMenu(true);
+              }}
+              style={styles.premiumCardEditButton}
+              activeOpacity={0.6}
+            >
+              <Edit size={16} color={colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
         </View>
-
-        {/* Lines 2 & 3: Topic and Teacher */}
-        <View style={styles.cleanLines}>
-          <RNText style={styles.cleanLineText} numberOfLines={1}>
-            <RNText style={styles.cleanLabel}>Topic: </RNText>
-            {slot?.topic_name?.trim?.() || '—'}
-          </RNText>
-          <RNText style={styles.cleanLineText} numberOfLines={1}>
-            <RNText style={styles.cleanLabel}>Teacher: </RNText>
-            {slot?.teacher_name?.trim?.() || '—'}
-          </RNText>
+        
+        {/* Main Content: Two Column Layout */}
+        <View style={styles.premiumCardMainRow}>
+          {/* Left Column: Subject & Teacher */}
+          <View style={styles.premiumCardLeftColumn}>
+            <RNText 
+              style={[
+                styles.premiumSubjectText,
+                isTaught && styles.premiumSubjectTextCompleted
+              ]} 
+              numberOfLines={2} 
+              ellipsizeMode="tail"
+            >
+              {slot?.subject_name?.trim?.() || 'Unassigned'}
+            </RNText>
+            {slot?.teacher_name ? (
+              <View style={styles.teacherRow}>
+                <User size={12} color={colors.text.secondary} />
+                <RNText style={[
+                  styles.premiumTeacherText,
+                  isTaught && styles.premiumTeacherTextCompleted
+                ]} numberOfLines={1}>
+                  {slot.teacher_name.trim()}
+                </RNText>
+              </View>
+            ) : null}
+          </View>
+          
+          {/* Right Column: Topic/Chapter & Plan */}
+          {(chapterName || topicName || slot?.plan_text) ? (
+            <View style={styles.premiumCardRightColumn}>
+              {chapterName ? (
+                <View style={styles.topicRow}>
+                  <BookOpen size={11} color={colors.text.tertiary} />
+                  <RNText style={styles.topicText} numberOfLines={1}>
+                    {chapterName}
+                  </RNText>
+                </View>
+              ) : null}
+              {topicName ? (
+                <View style={styles.topicRow}>
+                  <BookOpen size={11} color={colors.text.tertiary} />
+                  <RNText style={styles.topicText} numberOfLines={1}>
+                    {topicName}
+                  </RNText>
+                </View>
+              ) : null}
+              {slot?.plan_text ? (
+                <RNText style={styles.planText} numberOfLines={2} ellipsizeMode="tail">
+                  {slot.plan_text}
+                </RNText>
+              ) : null}
+            </View>
+          ) : (
+            <View style={styles.premiumCardRightColumn} />
+          )}
         </View>
       </View>
     </View>
@@ -1037,15 +1129,17 @@ export function ModernTimetableScreen() {
           />
         }
       >
-        {/* Quick Actions Cards */}
-        <View style={styles.filterBar}>
-          <TouchableOpacity style={[styles.filterItem, !selectedClassId && styles.filterItemDisabled]} onPress={() => setShowClassSelector(true)}>
-            <View style={styles.filterIcon}>
-              <Users size={16} color={colors.surface.primary} />
-            </View>
-            <View style={styles.filterContent}>
-              <Text style={styles.filterLabel}>Class</Text>
-              <Text style={styles.filterValue}>
+        {/* Compact Filter Row - Soft Cards */}
+        <View style={styles.modernFilterBar}>
+          <TouchableOpacity 
+            style={[styles.modernFilterCard, !selectedClassId && styles.modernFilterCardDisabled]} 
+            onPress={() => setShowClassSelector(true)}
+            activeOpacity={0.7}
+          >
+            <Users size={16} color={colors.primary[600]} />
+            <View style={styles.modernFilterContent}>
+              <Text style={styles.modernFilterLabel}>Class</Text>
+              <Text style={styles.modernFilterValue} numberOfLines={1}>
                 {selectedClassId && selectedClass
                   ? `${selectedClass.grade || ''} ${selectedClass.section || ''}`.trim() || 'No Class'
                   : 'Select Class'}
@@ -1053,16 +1147,21 @@ export function ModernTimetableScreen() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.filterItem} onPress={() => setShowDatePicker(true)}>
-            <View style={styles.filterIcon}>
-              <ListTodo size={16} color={colors.surface.primary} />
-            </View>
-            <View style={styles.filterContent}>
-              <Text style={styles.filterLabel}>Date</Text>
-              <Text style={styles.filterValue}>{format(selectedDate, 'MMM yyyy')}</Text>
+          <TouchableOpacity 
+            style={styles.modernFilterCard} 
+            onPress={() => setShowDatePicker(true)}
+            activeOpacity={0.7}
+          >
+            <Calendar size={16} color={colors.primary[600]} />
+            <View style={styles.modernFilterContent}>
+              <Text style={styles.modernFilterLabel}>Date</Text>
+              <Text style={styles.modernFilterValue} numberOfLines={1}>
+                {format(selectedDate, 'MMM d, yyyy')}
+              </Text>
             </View>
           </TouchableOpacity>
         </View>
+
 
         {/* No Class Selected - Responsive Card */}
         {!selectedClassId && (
@@ -1119,6 +1218,8 @@ export function ModernTimetableScreen() {
                     setShowSlotMenu={setShowSlotMenu}
                     styles={styles}
                     colors={colors}
+                    getTopicName={getTopicName}
+                    getChapterName={getChapterName}
                   />
                 );
               })}
@@ -1386,78 +1487,188 @@ export function ModernTimetableScreen() {
         <Modal
           visible={showQuickGenerateModal}
           onDismiss={() => setShowQuickGenerateModal(false)}
-          contentContainerStyle={styles.modalContainer}
+          contentContainerStyle={styles.quickGenerateModalContainer}
         >
-          <Text style={styles.modalTitle}>Quick Generate Timetable</Text>
-
-          <TextInput
-            label="Number of Periods"
-            value={String(quickForm.numPeriods)}
-            onChangeText={(v) => setQuickForm(f => ({ ...f, numPeriods: Math.max(1, parseInt(v || '0')) }))}
-            style={styles.textInput}
-            keyboardType="number-pad"
-            mode="outlined"
-          />
-
-          <TextInput
-            label="Period Duration (minutes)"
-            value={String(quickForm.periodDurationMin)}
-            onChangeText={(v) => setQuickForm(f => ({ ...f, periodDurationMin: Math.max(1, parseInt(v || '0')) }))}
-            style={styles.textInput}
-            keyboardType="number-pad"
-            mode="outlined"
-          />
-
-          <TextInput
-            label="Start Time"
-            value={quickForm.startTime}
-            onChangeText={(v) => setQuickForm(f => ({ ...f, startTime: v }))}
-            style={styles.textInput}
-            placeholder="HH:MM"
-            mode="outlined"
-          />
-
-          <Text style={{ marginTop: 8, marginBottom: 4, color: colors.text.primary, fontWeight: '600' }}>Break Configuration</Text>
-          {quickForm.breaks.map((b, idx) => (
-            <View key={idx} style={styles.breakRow}>
-              <TextInput
-                label="After Period"
-                value={String(b.afterPeriod)}
-                onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i===idx ? { ...bb, afterPeriod: parseInt(v || '0') } : bb) }))}
-                style={[styles.textInput, { flex: 1 }]}
-                keyboardType="number-pad"
-                mode="outlined"
-              />
-              <TextInput
-                label="Duration (min)"
-                value={String(b.durationMin)}
-                onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i===idx ? { ...bb, durationMin: parseInt(v || '0') } : bb) }))}
-                style={[styles.textInput, { flex: 1, marginLeft: 8 }]}
-                keyboardType="number-pad"
-                mode="outlined"
-              />
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.quickGenerateModalContent}
+          >
+            {/* Header */}
+            <View style={styles.quickGenerateHeader}>
+              <View style={styles.quickGenerateHeaderIcon}>
+                <Settings size={24} color={colors.primary[600]} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quickGenerateTitle}>Quick Generate</Text>
+                <Text style={styles.quickGenerateSubtitle}>Create a timetable template automatically</Text>
+              </View>
               <TouchableOpacity
-                onPress={() => setQuickForm(f => ({ ...f, breaks: f.breaks.filter((_, i) => i!==idx) }))}
-                style={styles.removeBreakBtn}
-                activeOpacity={0.8}
+                onPress={() => setShowQuickGenerateModal(false)}
+                style={styles.quickGenerateCloseBtn}
+                activeOpacity={0.7}
               >
-                <Text style={styles.removeBreakText}>Remove</Text>
+                <X size={20} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
-          ))}
-          <TouchableOpacity
-            onPress={() => setQuickForm(f => ({ ...f, breaks: [...f.breaks, { afterPeriod: 2, durationMin: 15, name: 'Break' }] }))}
-            style={styles.addBreakBtn}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.addBreakText}>Add Break</Text>
-          </TouchableOpacity>
 
-          <Text style={styles.warningText}>⚠️ This will replace any existing slots for this date.</Text>
+            {/* Basic Settings Section */}
+            <View style={styles.quickGenerateSection}>
+              <Text style={styles.quickGenerateSectionTitle}>Basic Settings</Text>
+              
+              <View style={styles.quickGenerateInputGroup}>
+                <View style={styles.quickGenerateInputIcon}>
+                  <ListTodo size={18} color={colors.primary[600]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.quickGenerateLabel}>Number of Periods</Text>
+                  <TextInput
+                    value={String(quickForm.numPeriods)}
+                    onChangeText={(v) => setQuickForm(f => ({ ...f, numPeriods: Math.max(1, parseInt(v || '0')) }))}
+                    style={styles.quickGenerateInput}
+                    keyboardType="number-pad"
+                    mode="outlined"
+                    outlineColor={colors.border.light}
+                    activeOutlineColor={colors.primary[600]}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.modalActions}>
-            <Button mode="outlined" onPress={() => setShowQuickGenerateModal(false)} style={styles.cancelButton} textColor={colors.text.primary} labelStyle={styles.buttonLabel}>Cancel</Button>
-            <Button mode="contained" onPress={handleQuickGenerate} style={styles.confirmButton} buttonColor={colors.primary[600]} textColor={colors.text.inverse} labelStyle={styles.buttonLabel}>OK</Button>
+              <View style={styles.quickGenerateInputGroup}>
+                <View style={styles.quickGenerateInputIcon}>
+                  <Clock size={18} color={colors.primary[600]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.quickGenerateLabel}>Period Duration (minutes)</Text>
+                  <TextInput
+                    value={String(quickForm.periodDurationMin)}
+                    onChangeText={(v) => setQuickForm(f => ({ ...f, periodDurationMin: Math.max(1, parseInt(v || '0')) }))}
+                    style={styles.quickGenerateInput}
+                    keyboardType="number-pad"
+                    mode="outlined"
+                    outlineColor={colors.border.light}
+                    activeOutlineColor={colors.primary[600]}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.quickGenerateInputGroup}>
+                <View style={styles.quickGenerateInputIcon}>
+                  <Clock size={18} color={colors.primary[600]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.quickGenerateLabel}>Start Time</Text>
+                  <TextInput
+                    value={quickForm.startTime}
+                    onChangeText={(v) => setQuickForm(f => ({ ...f, startTime: v }))}
+                    style={styles.quickGenerateInput}
+                    placeholder="09:00"
+                    mode="outlined"
+                    outlineColor={colors.border.light}
+                    activeOutlineColor={colors.primary[600]}
+                  />
+                  <Text style={styles.quickGenerateHelperText}>Format: HH:MM (24-hour)</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Break Configuration Section */}
+            <View style={styles.quickGenerateSection}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+                <Text style={styles.quickGenerateSectionTitle}>Break Configuration</Text>
+                <TouchableOpacity
+                  onPress={() => setQuickForm(f => ({ ...f, breaks: [...f.breaks, { afterPeriod: 2, durationMin: 15, name: 'Break' }] }))}
+                  style={styles.quickGenerateAddBreakBtn}
+                  activeOpacity={0.7}
+                >
+                  <Plus size={16} color={colors.primary[600]} />
+                  <Text style={styles.quickGenerateAddBreakText}>Add Break</Text>
+                </TouchableOpacity>
+              </View>
+
+              {quickForm.breaks.length === 0 ? (
+                <View style={styles.quickGenerateEmptyBreaks}>
+                  <Coffee size={24} color={colors.text.tertiary} />
+                  <Text style={styles.quickGenerateEmptyBreaksText}>No breaks configured</Text>
+                  <Text style={styles.quickGenerateEmptyBreaksSubtext}>Add breaks to schedule rest periods</Text>
+                </View>
+              ) : (
+                quickForm.breaks.map((b, idx) => (
+                  <View key={idx} style={styles.quickGenerateBreakCard}>
+                    <View style={styles.quickGenerateBreakHeader}>
+                      <View style={styles.quickGenerateBreakIcon}>
+                        <Coffee size={16} color={colors.warning[600]} />
+                      </View>
+                      <Text style={styles.quickGenerateBreakTitle}>Break {idx + 1}</Text>
+                      <TouchableOpacity
+                        onPress={() => setQuickForm(f => ({ ...f, breaks: f.breaks.filter((_, i) => i!==idx) }))}
+                        style={styles.quickGenerateRemoveBreakBtn}
+                        activeOpacity={0.7}
+                      >
+                        <X size={16} color={colors.error[600]} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.quickGenerateBreakInputs}>
+                      <View style={{ flex: 1, marginRight: spacing.xs }}>
+                        <Text style={styles.quickGenerateLabel}>After Period</Text>
+                        <TextInput
+                          value={String(b.afterPeriod)}
+                          onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i===idx ? { ...bb, afterPeriod: parseInt(v || '0') } : bb) }))}
+                          style={styles.quickGenerateInput}
+                          keyboardType="number-pad"
+                          mode="outlined"
+                          outlineColor={colors.border.light}
+                          activeOutlineColor={colors.primary[600]}
+                        />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: spacing.xs }}>
+                        <Text style={styles.quickGenerateLabel}>Duration (min)</Text>
+                        <TextInput
+                          value={String(b.durationMin)}
+                          onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i===idx ? { ...bb, durationMin: parseInt(v || '0') } : bb) }))}
+                          style={styles.quickGenerateInput}
+                          keyboardType="number-pad"
+                          mode="outlined"
+                          outlineColor={colors.border.light}
+                          activeOutlineColor={colors.primary[600]}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Warning */}
+            <View style={styles.quickGenerateWarning}>
+              <AlertCircle size={18} color={colors.warning[600]} />
+              <Text style={styles.quickGenerateWarningText}>
+                This will replace any existing slots for {formatDateFull(selectedDate)}
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* Actions */}
+          <View style={styles.quickGenerateActions}>
+            <Button 
+              mode="outlined" 
+              onPress={() => setShowQuickGenerateModal(false)} 
+              style={styles.quickGenerateCancelBtn}
+              textColor={colors.text.primary}
+              labelStyle={styles.quickGenerateButtonLabel}
+            >
+              Cancel
+            </Button>
+            <Button 
+              mode="contained" 
+              onPress={handleQuickGenerate} 
+              style={styles.quickGenerateConfirmBtn}
+              buttonColor={colors.primary[600]}
+              textColor={colors.text.inverse}
+              labelStyle={styles.quickGenerateButtonLabel}
+              icon={() => <Settings size={18} color={colors.text.inverse} />}
+            >
+              Generate
+            </Button>
           </View>
         </Modal>
       </Portal>
@@ -1728,16 +1939,16 @@ export function ModernTimetableScreen() {
         {snackbarMessage}
       </Snackbar>
 
-      {/* Floating Actions Button */}
+      {/* FAB - Bottom-right, Elevated, Circular, Primary Purple */}
       {selectedClassId && (
         <TouchableOpacity
-          style={styles.fab}
+          style={styles.premiumFab}
           onPress={() => {
             setShowActionsModal(true);
           }}
           activeOpacity={0.85}
         >
-          <Plus size={24} color={colors.text.inverse} />
+          <Plus size={24} color={colors.text.inverse} strokeWidth={2.5} />
         </TouchableOpacity>
       )}
 
@@ -1999,64 +2210,156 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
-  // Filter bar styles (match calendar)
-  filterBar: {
+  // Compact Filter Row - Soft Cards (44-50px high)
+  modernFilterBar: {
     flexDirection: 'row',
-    backgroundColor: colors.background.secondary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    gap: spacing.md,
-  },
-  filterItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.full,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: spacing.sm,
+    backgroundColor: colors.surface.primary,
+  },
+  modernFilterCard: {
     flex: 1,
-    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 48,
+    backgroundColor: isDark ? colors.primary[900] : '#F8F6FF', // Light tinted surface
+    borderRadius: 12,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.xs,
+    borderWidth: 0.5,
     borderColor: colors.border.light,
   },
-  filterIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary[600],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterItemDisabled: {
+  modernFilterCardDisabled: {
     opacity: 0.6,
   },
-  filterContent: { flex: 1 },
-  filterLabel: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.normal,
-    color: colors.text.secondary,
-    marginBottom: 2,
+  modernFilterContent: {
+    flex: 1,
+    minWidth: 0,
   },
-  filterValue: {
-    fontSize: typography.fontSize.base,
+  modernFilterLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.tertiary,
+    marginBottom: 1,
+    letterSpacing: 0.3,
+  },
+  modernFilterValue: {
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
   },
 
-  // Floating button
-  fab: {
+  // Today's Classes Summary
+  todaysClassesSummary: {
+    backgroundColor: colors.surface.primary,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    ...shadows.sm,
+  },
+  todaysClassesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  todaysClassesTitle: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    flex: 1,
+  },
+  todaysClassesBadge: {
+    backgroundColor: colors.primary[100],
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  todaysClassesBadgeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary[700],
+  },
+  todaysClassesScroll: {
+    maxHeight: 80,
+  },
+  todaysClassesScrollContent: {
+    gap: spacing.xs,
+    paddingRight: spacing.xs,
+  },
+  todaysClassChip: {
+    backgroundColor: colors.surface.secondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    marginRight: spacing.xs,
+    minWidth: 120,
+  },
+  todaysClassChipCurrent: {
+    backgroundColor: colors.success[50],
+    borderColor: colors.success[300],
+    borderWidth: 2,
+  },
+  todaysClassChipUpcoming: {
+    backgroundColor: colors.info[50],
+    borderColor: colors.info[300],
+  },
+  todaysClassChipSubject: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: 2,
+  },
+  todaysClassChipSubjectCurrent: {
+    color: colors.success[700],
+  },
+  todaysClassChipCount: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  todaysClassChipIndicator: {
     position: 'absolute',
-    bottom: spacing.md,
-    right: spacing.md,
+    top: 4,
+    right: 4,
+    backgroundColor: colors.success[500],
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  todaysClassChipIndicatorText: {
+    fontSize: typography.fontSize.xs - 2,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.inverse,
+  },
+
+  // Premium FAB - Bottom-right, Elevated, Circular, Primary Purple, ~56px
+  premiumFab: {
+    position: 'absolute',
+    bottom: spacing.lg,
+    right: spacing.lg,
     width: 56,
     height: 56,
-    borderRadius: borderRadius.full,
+    borderRadius: 28,
     backgroundColor: colors.primary[600],
     justifyContent: 'center',
     alignItems: 'center',
-    ...shadows.lg,
+    ...shadows.xl,
+    elevation: 8,
+    shadowColor: colors.primary[900],
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
   },
   fabSecondary: {
     display: 'none',
@@ -2260,17 +2563,17 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
   },
   timetableContentContainer: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xl + 24, // Extra space for FAB
   },
   cleanScrollView: {
     flex: 1,
   },
   cleanSlotsContainer: {
-    paddingBottom: 16,
+    paddingBottom: spacing.md,
   },
   cleanTimetableGrid: {
-    gap: 8,
+    gap: spacing.xs + 2,
   },
   // Empty State Action Button
   emptyActionButton: {
@@ -2287,123 +2590,163 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold as any,
   },
-  cleanPeriodCard: {
+  // Premium Period Card - iOS + Material Hybrid
+  premiumPeriodCard: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    ...shadows.sm,
+    borderRadius: 12,
     flexDirection: 'row',
-    minHeight: 96,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.neutral[300],
-    marginHorizontal: spacing.sm,
+    marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
-    padding: spacing.md,
+    overflow: 'hidden',
+    ...shadows.sm,
+    elevation: 2,
+    minHeight: 100,
   },
-  cleanCurrentCard: {
-    borderWidth: 2,
-    borderColor: colors.success[600],
-    ...shadows.md,
+  premiumCurrentCard: {
+    borderWidth: 1.5,
+    borderColor: colors.success[500],
+    ...shadows.lg,
+    elevation: 6,
   },
-  cleanUpcomingCard: {
+  premiumTaughtCard: {
+    backgroundColor: colors.success[50],
     borderWidth: 1,
-    borderColor: colors.info[600],
+    borderColor: colors.success[200],
+    opacity: 0.95,
   },
-  cleanPastCard: {
-    opacity: 0.85, // Increased from 0.7 for better readability
+  completedIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.success[100],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
   },
-  cleanCompletedCard: {
-    borderLeftColor: colors.success[600], // ✅ GREEN for completed (taught)
-    backgroundColor: colors.success[50], // ✅ Light green background
-    borderLeftWidth: 4,
+  completedLabel: {
+    fontSize: typography.fontSize.xs - 1,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.success[700],
+    letterSpacing: 0.3,
   },
-  cleanPendingCard: {
-    borderLeftColor: colors.primary[600], // Primary orange for pending
-    backgroundColor: colors.surface.primary, // White background
-    borderLeftWidth: 4,
+  premiumTimeTextCompleted: {
+    color: colors.text.secondary,
   },
-  cleanPeriodLeftBorder: {
-    width: 4,
-    backgroundColor: 'transparent', // Will be overridden by card status colors
+  premiumSubjectTextCompleted: {
+    color: colors.text.secondary,
+    opacity: 0.85,
   },
-  cleanPeriodContent: {
+  premiumTeacherTextCompleted: {
+    color: colors.text.tertiary,
+    opacity: 0.8,
+  },
+  premiumAccentStrip: {
+    width: 3,
+    backgroundColor: colors.primary[500],
+  },
+  premiumCardContent: {
     flex: 1,
-    padding: spacing.sm,
-    paddingBottom: spacing.sm,
+    padding: spacing.md,
     minWidth: 0,
   },
-  cleanPeriodHeader: {
+  premiumCardTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: spacing.sm,
-    width: '100%',
   },
-  cleanContentColumn: {
+  premiumCardTopLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     flex: 1,
-    flexDirection: 'column',
+  },
+  premiumCardTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  premiumCardMainRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
     alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    marginRight: spacing.sm,
+  },
+  premiumCardLeftColumn: {
+    flex: 1,
     minWidth: 0,
   },
-  cleanTimeText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    lineHeight: 18,
-    marginBottom: spacing.sm,
-    width: '100%',
+  premiumCardRightColumn: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
   },
-  cleanCardMenu: {
-    padding: 6,
-    minWidth: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
+  periodNumberBadge: {
+    backgroundColor: colors.primary[100],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: borderRadius.sm,
-    backgroundColor: colors.info[50],
-    borderWidth: 1,
-    borderColor: colors.info[200],
-    ...shadows.xs,
   },
-  menuIconContainer: {
-    width: 24,
-    height: 24,
+  periodNumberText: {
+    fontSize: typography.fontSize.xs - 1,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary[700],
+  },
+  teacherRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 4,
+    gap: 4,
+    marginTop: 4,
   },
-  cleanSubjectName: {
-    fontSize: typography.fontSize.xl,
+  premiumTimeText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.tertiary,
+    letterSpacing: 0.2,
+  },
+  premiumSubjectText: {
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    lineHeight: 24,
-    width: '100%',
-    flexWrap: 'wrap',
-    paddingRight: 40, // ensure room for menu button
-    overflow: 'hidden',
-    marginBottom: 6,
+    lineHeight: 20,
+    marginBottom: 2,
+    letterSpacing: -0.2,
   },
-  cleanInfoLabelRow: {
+  premiumTeacherText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.normal,
+    color: colors.text.tertiary,
+    lineHeight: 16,
+  },
+  topicRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginBottom: 3,
+    maxWidth: '100%',
   },
-  cleanLines: {
-    marginTop: spacing.sm,
-    gap: 4,
+  topicText: {
+    fontSize: typography.fontSize.xs - 1,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+    flex: 1,
+    textAlign: 'right',
   },
-  cleanLabel: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
+  planText: {
+    fontSize: typography.fontSize.xs - 1,
     color: colors.text.tertiary,
-    textTransform: 'uppercase',
-    letterSpacing: typography.letterSpacing.wide,
+    lineHeight: 14,
+    fontStyle: 'italic',
+    textAlign: 'right',
+    marginTop: 2,
   },
-  cleanLineText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-    lineHeight: 20,
+  premiumCardEditButton: {
+    padding: spacing.xs,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.sm,
   },
   cleanPlanText: {
     fontSize: typography.fontSize.base,
@@ -2459,42 +2802,41 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     lineHeight: 20,
     marginTop: spacing.xs,
   },
-  cleanBreakCard: {
-    backgroundColor: colors.warning[50],
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+  premiumBreakCard: {
+    backgroundColor: colors.warning[25],
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...shadows.xs,
-    minHeight: 96,
-    opacity: 0.9,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.warning[700],
-    marginHorizontal: spacing.sm,
+    marginHorizontal: spacing.md,
     marginBottom: spacing.sm,
+    padding: 16,
+    borderWidth: 0.5,
+    borderColor: colors.warning[200],
+    ...shadows.sm,
+    elevation: 2,
   },
-  cleanBreakContent: {
+  premiumBreakContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    gap: spacing.sm,
   },
-  cleanBreakIcon: {
-    marginRight: 12,
-  },
-  cleanBreakText: {
+  premiumBreakText: {
     flex: 1,
   },
-  cleanBreakTitle: {
+  premiumBreakTitle: {
     fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.warning[800],
     marginBottom: 2,
+    letterSpacing: -0.1,
   },
-  cleanBreakTime: {
+  premiumBreakTime: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
-    color: colors.warning[700],
+    color: colors.warning[600],
+    letterSpacing: 0.1,
   },
 
   // Slot Menu Styles
@@ -3035,7 +3377,211 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     fontWeight: '600',
   },
 
-  // Quick Generate Modal
+  // Quick Generate Modal - New Design
+  quickGenerateModalContainer: {
+    backgroundColor: colors.surface.primary,
+    margin: spacing.md,
+    borderRadius: borderRadius.xl,
+    maxHeight: '90%',
+    overflow: 'hidden',
+    ...shadows.lg,
+  },
+  quickGenerateModalContent: {
+    padding: spacing.lg,
+  },
+  quickGenerateHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.xl,
+    paddingBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  quickGenerateHeaderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primary[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  quickGenerateTitle: {
+    fontSize: typography.fontSize['2xl'],
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  quickGenerateSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    lineHeight: 20,
+  },
+  quickGenerateCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.background.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickGenerateSection: {
+    marginBottom: spacing.xl,
+  },
+  quickGenerateSectionTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  quickGenerateInputGroup: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+  },
+  quickGenerateInputIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  quickGenerateLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  quickGenerateInput: {
+    backgroundColor: colors.surface.primary,
+    marginBottom: spacing.xs,
+  },
+  quickGenerateHelperText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+  },
+  quickGenerateAddBreakBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary[50],
+    borderWidth: 1,
+    borderColor: colors.primary[200],
+    gap: spacing.xs,
+  },
+  quickGenerateAddBreakText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary[600],
+  },
+  quickGenerateEmptyBreaks: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border.light,
+  },
+  quickGenerateEmptyBreaksText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+    marginTop: spacing.sm,
+  },
+  quickGenerateEmptyBreaksSubtext: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+  },
+  quickGenerateBreakCard: {
+    backgroundColor: colors.surface.secondary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  quickGenerateBreakHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  quickGenerateBreakIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.warning[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  quickGenerateBreakTitle: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    flex: 1,
+  },
+  quickGenerateRemoveBreakBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.error[50],
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickGenerateBreakInputs: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  quickGenerateWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.warning[50],
+    padding: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.warning[200],
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  quickGenerateWarningText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.warning[700],
+    fontWeight: typography.fontWeight.medium,
+    flex: 1,
+  },
+  quickGenerateActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+    backgroundColor: colors.surface.primary,
+  },
+  quickGenerateCancelBtn: {
+    flex: 1,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.lg,
+  },
+  quickGenerateConfirmBtn: {
+    flex: 1,
+    borderRadius: borderRadius.lg,
+  },
+  quickGenerateButtonLabel: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+  },
+
+  // Quick Generate Modal - Old (keeping for reference)
   modalDescription: {
     fontSize: 16,
     color: colors.text.primary,
@@ -3634,3 +4180,4 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     color: colors.text.primary,
   },
 });
+

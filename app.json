@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "ClassBridge",
-    "slug": "classbridge",
+    "name": "Krishnaveni Talent School",
+    "slug": "kts-mobile",
     "version": "1.0.0",
     "orientation": "default",
-    "scheme": "classbridge",
+    "scheme": "kts",
     "icon": "./assets/images/Image.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.classbridge.mobile",
+      "bundleIdentifier": "com.kts.mobile",
       "jsEngine": "hermes",
       "icon": "./assets/images/Image.png",
       "infoPlist": {
@@ -43,19 +43,19 @@
       }
     },
     "android": {
-      "package": "com.classbridge.mobile",
+      "package": "com.kts.mobile",
       "versionCode": 1,
       "jsEngine": "hermes",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/Image.png",
-        "backgroundColor": "#1E4EB8"
+        "backgroundColor": "#6B3FA0"
       },
       "icon": "./assets/images/Image.png",
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE"
       ],
-      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.classbridge.mobile"
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.kts.mobile"
     },
     "web": {
       "bundler": "metro",
@@ -89,8 +89,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "b364796a-abfd-4a5c-bf65-0d122433bc2c"
+        "projectId": "f9bfdbf0-86d0-462d-b627-2a4edad56adc"
       }
-    }
+    },
+    "owner": "krishnaveni-talent-school"
   }
 }

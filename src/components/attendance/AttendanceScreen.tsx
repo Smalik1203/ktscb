@@ -291,7 +291,7 @@ export const AttendanceScreen: React.FC = () => {
               onPress={() => bottomSheetRef.current?.present()}
             >
               <View style={styles.filterIcon}>
-                <Users size={16} color={colors.text.inverse} />
+                <Users size={14} color={colors.primary[600]} />
               </View>
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Class</Text>
@@ -309,7 +309,7 @@ export const AttendanceScreen: React.FC = () => {
                 onPress={() => setShowDatePicker(true)}
             >
               <View style={styles.filterIcon}>
-                <Calendar size={16} color={colors.text.inverse} />
+              <Calendar size={14} color={colors.primary[600]} />
               </View>
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Date</Text>
@@ -326,7 +326,7 @@ export const AttendanceScreen: React.FC = () => {
               onPress={() => bottomSheetRef.current?.present()}
             >
               <View style={styles.filterIcon}>
-                <Users size={16} color={colors.text.inverse} />
+                <Users size={14} color={colors.primary[600]} />
               </View>
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Class</Text>
@@ -344,7 +344,7 @@ export const AttendanceScreen: React.FC = () => {
               onPress={() => setShowHistoryStartDatePicker(true)}
             >
               <View style={styles.filterIcon}>
-                <Calendar size={16} color={colors.text.inverse} />
+              <Calendar size={14} color={colors.primary[600]} />
               </View>
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Start</Text>
@@ -361,7 +361,7 @@ export const AttendanceScreen: React.FC = () => {
               onPress={() => setShowHistoryEndDatePicker(true)}
             >
               <View style={styles.filterIcon}>
-                <Calendar size={16} color={colors.text.inverse} />
+              <Calendar size={14} color={colors.primary[600]} />
               </View>
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>End</Text>
@@ -377,16 +377,40 @@ export const AttendanceScreen: React.FC = () => {
 
       {activeTab === 'mark' ? (
         <View style={styles.studentsSection}>
+          {/* Statistics Cards */}
+          <View style={styles.markStatsContainer}>
+            <View style={styles.markStatCard}>
+              <Text style={styles.markStatNumber}>{attendanceData?.length || 0}</Text>
+              <Text style={styles.markStatLabel}>Students</Text>
+            </View>
+            <View style={[styles.markStatCard, styles.markStatCardPresent]}>
+              <Text style={[styles.markStatNumber, { color: colors.success[600] }]}>
+                {attendanceData?.length > 0 
+                  ? Math.round((attendanceData.filter(s => s.status === 'present').length / attendanceData.length) * 100)
+                  : 0}%
+              </Text>
+              <Text style={styles.markStatLabel}>Present</Text>
+            </View>
+            <View style={[styles.markStatCard, styles.markStatCardAbsent]}>
+              <Text style={[styles.markStatNumber, { color: colors.error[600] }]}>
+                {attendanceData?.length > 0 
+                  ? Math.round((attendanceData.filter(s => s.status === 'absent').length / attendanceData.length) * 100)
+                  : 0}%
+              </Text>
+              <Text style={styles.markStatLabel}>Absent</Text>
+            </View>
+          </View>
+
           <View style={styles.studentsHeader}>
             <View>
               <Text style={styles.sectionTitle}>Students</Text>
               <Text style={styles.studentsSubtitle}>
-                {attendanceData?.length || 0} total • {attendanceData?.filter(s => s.status === null).length || 0} unmarked
+                {attendanceData?.filter(s => s.status === null).length || 0} unmarked
               </Text>
             </View>
             {hasChanges && (
               <View style={styles.changesBadge}>
-                <Text style={styles.changesBadgeText}>Unsaved changes</Text>
+                <Text style={styles.changesBadgeText}>Unsaved</Text>
               </View>
             )}
           </View>
@@ -438,24 +462,22 @@ export const AttendanceScreen: React.FC = () => {
                       <View style={styles.studentInfo}>
                         <View style={styles.studentNameRow}>
                           <Text style={styles.studentName}>{student.studentName}</Text>
-                          {isMarked ? (
+                          {isMarked && (
                             <View style={[
                               styles.statusBadge,
                               isPresent ? styles.statusBadgePresent : styles.statusBadgeAbsent
                             ]}>
                               {isPresent ? (
-                                <CheckCircle size={12} color={colors.text.inverse} />
+                                <CheckCircle size={12} color={colors.success[600]} />
                               ) : (
-                                <XCircle size={12} color={colors.text.inverse} />
+                                <XCircle size={12} color={colors.error[600]} />
                               )}
-                              <Text style={styles.statusBadgeText}>
+                              <Text style={[
+                                styles.statusBadgeText,
+                                isPresent ? styles.statusBadgeTextPresent : styles.statusBadgeTextAbsent
+                              ]}>
                                 {isPresent ? 'Present' : 'Absent'}
                               </Text>
-                            </View>
-                          ) : (
-                            <View style={styles.statusBadgeUnmarked}>
-                              <Circle size={12} color={colors.text.tertiary} fill={colors.text.tertiary} />
-                              <Text style={styles.statusBadgeTextUnmarked}>Unmarked</Text>
                             </View>
                           )}
                         </View>
@@ -467,15 +489,15 @@ export const AttendanceScreen: React.FC = () => {
                           <TouchableOpacity
                             style={[styles.statusButton, presentButtonStyle]}
                             onPress={() => handleStatusChange(student.studentId, 'present')}
-                            activeOpacity={0.7}
+                            activeOpacity={0.6}
                           >
                             <CheckCircle 
-                              size={16} 
-                              color={isPresent ? colors.text.inverse : colors.success.main} 
+                              size={18} 
+                              color={isPresent ? colors.success[600] : colors.text.tertiary} 
                             />
                             <Text style={[
                               styles.statusButtonText,
-                              isPresent && styles.statusButtonTextActive,
+                              isPresent && styles.statusButtonTextActivePresent,
                               !isMarked && styles.statusButtonTextUnmarked
                             ]}>
                               Present
@@ -485,15 +507,15 @@ export const AttendanceScreen: React.FC = () => {
                           <TouchableOpacity
                             style={[styles.statusButton, absentButtonStyle]}
                             onPress={() => handleStatusChange(student.studentId, 'absent')}
-                            activeOpacity={0.7}
+                            activeOpacity={0.6}
                           >
                             <XCircle 
-                              size={16} 
-                              color={isAbsent ? colors.text.inverse : colors.error.main} 
+                              size={18} 
+                              color={isAbsent ? colors.error[600] : colors.text.tertiary} 
                             />
                             <Text style={[
                               styles.statusButtonText,
-                              isAbsent && styles.statusButtonTextActive,
+                              isAbsent && styles.statusButtonTextActiveAbsent,
                               !isMarked && styles.statusButtonTextUnmarked
                             ]}>
                               Absent
@@ -527,21 +549,27 @@ export const AttendanceScreen: React.FC = () => {
                 </View>
               ) : (
                 <>
+                  {/* Statistics Cards */}
                   <View style={styles.historyStats}>
-                    <View style={styles.statCard}>
-                      <Text style={styles.statNumber}>{historyStats.total}</Text>
-                      <Text style={styles.statLabel} numberOfLines={1}>Students</Text>
+                    <View style={styles.historyStatCard}>
+                      <Text style={styles.historyStatNumber}>{historyStats.total}</Text>
+                      <Text style={styles.historyStatLabel}>Students</Text>
                     </View>
-                    <View style={styles.statCard}>
-                      <Text style={[styles.statNumber, { color: colors.success.main }]}>{historyStats.averageAttendance}%</Text>
-                      <Text style={styles.statLabel} numberOfLines={1}>Present</Text>
+                    <View style={[styles.historyStatCard, styles.historyStatCardPresent]}>
+                      <Text style={[styles.historyStatNumber, { color: colors.success[600] }]}>
+                        {historyStats.averageAttendance}%
+                      </Text>
+                      <Text style={styles.historyStatLabel}>Present</Text>
                     </View>
-                    <View style={styles.statCard}>
-                      <Text style={[styles.statNumber, { color: colors.error.main }]}>{historyStats.averageAbsent}%</Text>
-                      <Text style={styles.statLabel} numberOfLines={1}>Absent</Text>
+                    <View style={[styles.historyStatCard, styles.historyStatCardAbsent]}>
+                      <Text style={[styles.historyStatNumber, { color: colors.error[600] }]}>
+                        {historyStats.averageAbsent}%
+                      </Text>
+                      <Text style={styles.historyStatLabel}>Absent</Text>
                     </View>
                   </View>
 
+                  {/* Date Range Display */}
                   <View style={styles.dateRangeContainer}>
                     <Text style={styles.dateRangeText}>
                       {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -566,7 +594,7 @@ export const AttendanceScreen: React.FC = () => {
                           <View style={styles.summaryItem}>
                             <View style={styles.summaryStudentInfo}>
                               <Text style={styles.summaryStudentName}>{student.studentName}</Text>
-                              <Text style={styles.studentCode}>{student.studentCode}</Text>
+                              <Text style={styles.summaryStudentCode}>{student.studentCode}</Text>
                             </View>
                             <View style={styles.summaryStats}>
                               <Text style={styles.summaryStatText}>
@@ -574,15 +602,15 @@ export const AttendanceScreen: React.FC = () => {
                               </Text>
                               <View style={[
                                 styles.summaryStatus,
-                                student.percentage >= 75 ? styles.summaryStatusPresent :
-                                student.percentage >= 50 ? styles.summaryStatusUnmarked :
-                                styles.summaryStatusAbsent
+                                student.percentage >= 75 ? styles.summaryStatusGood :
+                                student.percentage >= 50 ? styles.summaryStatusFair :
+                                styles.summaryStatusLow
                               ]}>
                                 <Text style={[
                                   styles.summaryStatusText,
-                                  student.percentage >= 75 ? styles.summaryStatusTextPresent :
-                                  student.percentage >= 50 ? styles.summaryStatusTextUnmarked :
-                                  styles.summaryStatusTextAbsent
+                                  student.percentage >= 75 ? styles.summaryStatusTextGood :
+                                  student.percentage >= 50 ? styles.summaryStatusTextFair :
+                                  styles.summaryStatusTextLow
                                 ]}>
                                   {student.percentage >= 75 ? 'Good' : student.percentage >= 50 ? 'Fair' : 'Low'}
                                 </Text>
@@ -755,9 +783,9 @@ const createStyles = (
     paddingHorizontal: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: colors.border.DEFAULT,
+    ...shadows.xs,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
   },
   filterItem: {
     flex: 1,
@@ -767,10 +795,10 @@ const createStyles = (
     overflow: 'hidden',
   },
   filterIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary.main,
+    width: 28,
+    height: 28,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
@@ -803,6 +831,41 @@ const createStyles = (
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
     flex: 1,
+  },
+  markStatsContainer: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  markStatCard: {
+    flex: 1,
+    backgroundColor: colors.surface.primary,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    ...shadows.sm,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
+  },
+  markStatCardPresent: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success[500],
+  },
+  markStatCardAbsent: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.error[500],
+  },
+  markStatNumber: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
+  },
+  markStatLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+    textAlign: 'center',
   },
   studentsHeader: {
     flexDirection: 'row',
@@ -838,29 +901,27 @@ const createStyles = (
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
     ...shadows.sm,
-    minHeight: 56,
-    borderWidth: 2,
+    minHeight: 72,
+    borderWidth: 0.5,
     borderColor: colors.border.light,
-    borderStyle: 'dashed',
   },
   studentCardUnmarked: {
-    backgroundColor: colors.background.secondary,
+    backgroundColor: colors.surface.primary,
     borderColor: colors.border.light,
-    borderStyle: 'dashed',
   },
   studentCardPresent: {
-    borderColor: colors.success.main,
-    backgroundColor: colors.success[50],
-    borderStyle: 'solid',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success[500],
+    backgroundColor: colors.surface.primary,
   },
   studentCardAbsent: {
-    borderColor: colors.error.main,
-    backgroundColor: colors.error[50],
-    borderStyle: 'solid',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.error[500],
+    backgroundColor: colors.surface.primary,
   },
   studentInfo: {
     flex: 1,
@@ -885,36 +946,26 @@ const createStyles = (
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 3,
-    borderRadius: borderRadius.full,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
     gap: 4,
     flexShrink: 0,
   },
   statusBadgePresent: {
-    backgroundColor: colors.success.main,
+    backgroundColor: colors.success[50],
   },
   statusBadgeAbsent: {
-    backgroundColor: colors.error.main,
-  },
-  statusBadgeUnmarked: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 3,
-    borderRadius: borderRadius.full,
-    gap: 4,
-    backgroundColor: colors.neutral[200],
-    flexShrink: 0,
+    backgroundColor: colors.error[50],
   },
   statusBadgeText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
   },
-  statusBadgeTextUnmarked: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.tertiary,
+  statusBadgeTextPresent: {
+    color: colors.success[700],
+  },
+  statusBadgeTextAbsent: {
+    color: colors.error[700],
   },
   studentCode: {
     fontSize: typography.fontSize.sm,
@@ -929,42 +980,42 @@ const createStyles = (
   statusButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 1.5,
-    borderColor: colors.border.DEFAULT,
+    borderColor: colors.border.light,
+    backgroundColor: colors.surface.primary,
     gap: spacing.xs,
-    minWidth: 75,
+    minWidth: 80,
     justifyContent: 'center',
   },
   statusButtonUnmarked: {
-    borderStyle: 'dashed',
     borderColor: colors.border.light,
-    opacity: 0.7,
+    backgroundColor: colors.background.secondary,
   },
   statusButtonActivePresent: {
-    backgroundColor: colors.success.main,
-    borderColor: colors.success.main,
-    borderStyle: 'solid',
-    opacity: 1,
+    backgroundColor: colors.success[50],
+    borderColor: colors.success[300],
   },
   statusButtonActiveAbsent: {
-    backgroundColor: colors.error.main,
-    borderColor: colors.error.main,
-    borderStyle: 'solid',
-    opacity: 1,
+    backgroundColor: colors.error[50],
+    borderColor: colors.error[300],
   },
   statusButtonText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
   },
   statusButtonTextUnmarked: {
     color: colors.text.tertiary,
+    fontWeight: typography.fontWeight.medium,
   },
-  statusButtonTextActive: {
-    color: colors.text.inverse,
+  statusButtonTextActivePresent: {
+    color: colors.success[700],
+  },
+  statusButtonTextActiveAbsent: {
+    color: colors.error[700],
   },
   saveButtonContainer: {
     position: 'absolute',
@@ -1065,37 +1116,48 @@ const createStyles = (
   },
   historyStats: {
     flexDirection: 'row',
-    gap: spacing.xs,
-    marginBottom: spacing.lg,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
-  statCard: {
+  historyStatCard: {
     flex: 1,
     backgroundColor: colors.surface.primary,
-    padding: spacing.sm,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
-    minWidth: 0,
     ...shadows.sm,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
   },
-  statNumber: {
-    fontSize: typography.fontSize.lg,
+  historyStatCardPresent: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success[500],
+  },
+  historyStatCardAbsent: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.error[500],
+  },
+  historyStatNumber: {
+    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.primary.main,
-    marginBottom: 2,
+    color: colors.text.primary,
+    marginBottom: spacing.xs,
   },
-  statLabel: {
+  historyStatLabel: {
     fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.secondary,
     textAlign: 'center',
   },
   dateRangeContainer: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     alignItems: 'center',
-    ...shadows.sm,
+    ...shadows.xs,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
   },
   dateRangeText: {
     fontSize: typography.fontSize.sm,
@@ -1103,73 +1165,80 @@ const createStyles = (
     fontWeight: typography.fontWeight.medium,
   },
   summaryContainer: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
     flex: 1,
-    ...shadows.sm,
   },
   summaryTitle: {
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
     marginBottom: spacing.md,
   },
   summaryList: {
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   summaryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.md,
+    ...shadows.xs,
+    borderWidth: 0.5,
+    borderColor: colors.border.light,
   },
   summaryStudentInfo: {
     flex: 1,
+    minWidth: 0,
   },
   summaryStudentName: {
     fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
+    marginBottom: 2,
+  },
+  summaryStudentCode: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
   },
   summaryStats: {
     alignItems: 'flex-end',
     gap: spacing.xs,
+    marginLeft: spacing.sm,
   },
   summaryStatText: {
     fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    fontWeight: typography.fontWeight.medium,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
   },
   summaryStatus: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.xs + 1,
     borderRadius: borderRadius.sm,
   },
-  summaryStatusPresent: {
+  summaryStatusGood: {
     backgroundColor: colors.success[50],
   },
-  summaryStatusAbsent: {
+  summaryStatusFair: {
+    backgroundColor: colors.warning[50],
+  },
+  summaryStatusLow: {
     backgroundColor: colors.error[50],
   },
-  summaryStatusUnmarked: {
-    backgroundColor: colors.background.secondary,
-  },
   summaryStatusText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
   },
-  summaryStatusTextPresent: {
+  summaryStatusTextGood: {
     color: colors.success[700],
   },
-  summaryStatusTextAbsent: {
-    color: colors.error[700],
+  summaryStatusTextFair: {
+    color: colors.warning[700],
   },
-  summaryStatusTextUnmarked: {
-    color: colors.text.secondary,
+  summaryStatusTextLow: {
+    color: colors.error[700],
   },
   emptyContainer: {
     flex: 1,

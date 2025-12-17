@@ -1,4 +1,4 @@
-package com.classbridge.mobile
+package com.kts.mobile
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

@@ -1,11 +1,13 @@
 /**
- * ClassBridge Theme Context
+ * Krishnaveni Talent School Theme Context
  * 
  * Provides theme management for the entire application with:
  * - Dynamic theme switching (light, dark, per-school themes)
  * - System theme detection and auto-switching
  * - Persistent theme preference storage
  * - Convenient shortcuts for common theme values
+ * 
+ * Brand: "Mentored for Life"
  * 
  * Usage:
  * ```tsx
@@ -21,7 +23,7 @@
  * 
  * // Switch themes
  * <Button onPress={() => setTheme('dark')} title="Dark Mode" />
- * <Button onPress={() => setTheme('schoolA')} title="Emerald Theme" />
+ * <Button onPress={() => setTheme('schoolA')} title="Purple Theme" />
  * <Button onPress={toggleTheme} title="Toggle Light/Dark" />
  * ```
  */
@@ -33,7 +35,7 @@ import type { Theme, ThemeId, ThemeContextValue, ThemeColors, Typography, Spacin
 import { getTheme, lightTheme, darkTheme } from '../theme/themes';
 
 // Storage key for persisted theme preference
-const THEME_STORAGE_KEY = '@classbridge_theme_preference';
+const THEME_STORAGE_KEY = '@kts_theme_preference';
 
 // ============================================================================
 // CONTEXT

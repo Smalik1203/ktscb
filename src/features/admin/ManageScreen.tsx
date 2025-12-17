@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Platform, Dimensions } from 'react-native';
 import { Text, Card, ActivityIndicator, Avatar } from 'react-native-paper';
-import { Users, Shield, Activity, AlertCircle, UserCheck, UserX, Clock, TrendingUp, Zap, ChevronRight } from 'lucide-react-native';
+import { Users, Shield, Activity, AlertCircle, UserCheck, Clock, TrendingUp, Zap, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { typography, spacing, borderRadius } from '../../../lib/design-system';
 import { useUserActivityStats } from '../../hooks/useUserActivityStats';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as analyticsUtils from '../../lib/analytics-utils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -83,7 +84,6 @@ export default function ManageScreen() {
   const studentWithAccount = activityStats?.students.withAccount || 0;
   const studentActive = activityStats?.students.active || 0;
   const studentInactive = activityStats?.students.inactive || 0;
-  const studentDormant = activityStats?.students.dormant || 0;
   const studentNeverLoggedIn = activityStats?.students.neverLoggedIn || 0;
 
   const adminTotal = activityStats?.admins.total || 0;
@@ -91,19 +91,27 @@ export default function ManageScreen() {
   const adminNoAccount = activityStats?.admins.noAccount || 0;
   const adminActive = activityStats?.admins.active || 0;
   const adminInactive = activityStats?.admins.inactive || 0;
-  const adminDormant = activityStats?.admins.dormant || 0;
   const adminNeverLoggedIn = activityStats?.admins.neverLoggedIn || 0;
 
-  const studentLoginRate = studentWithAccount > 0 
-    ? (studentWithAccount - studentNeverLoggedIn) / studentWithAccount 
-    : 0;
-  const adminLoginRate = adminWithAccount > 0 
-    ? (adminWithAccount - adminNeverLoggedIn) / adminWithAccount 
-    : 0;
+  // Calculate login rates as percentages (0-100)
+  const studentLoginRate = analyticsUtils.calculatePercentage(
+    studentWithAccount - studentNeverLoggedIn,
+    studentWithAccount,
+    1
+  );
+  const adminLoginRate = analyticsUtils.calculatePercentage(
+    adminWithAccount - adminNeverLoggedIn,
+    adminWithAccount,
+    1
+  );
   
   const totalActive = studentActive + adminActive;
   const totalUsers = studentTotal + adminTotal;
-  const adoptionRate = Math.round((studentLoginRate + adminLoginRate) / 2 * 100);
+  
+  // Calculate overall adoption rate: (students who logged in + admins who logged in) / (total with accounts)
+  const totalWithAccounts = studentWithAccount + adminWithAccount;
+  const totalLoggedIn = (studentWithAccount - studentNeverLoggedIn) + (adminWithAccount - adminNeverLoggedIn);
+  const adoptionRate = analyticsUtils.calculatePercentage(totalLoggedIn, totalWithAccounts, 1);
   const recentLogins = activityStats?.recentLogins || [];
 
   const formatRelativeTime = (dateStr: string) => {
@@ -160,7 +168,7 @@ export default function ManageScreen() {
                 </View>
                 <View style={styles.heroStatItem}>
                   <View style={[styles.heroStatDot, { backgroundColor: colors.warning[400] }]} />
-                  <Text style={styles.heroStatValue}>{adoptionRate}%</Text>
+                  <Text style={styles.heroStatValue}>{adoptionRate.toFixed(1)}%</Text>
                   <Text style={styles.heroStatLabel}>Adoption</Text>
                 </View>
               </View>
@@ -188,7 +196,7 @@ export default function ManageScreen() {
           <View style={styles.loginRateSection}>
             <View style={[styles.loginRateCircle, { borderColor: colors.success[500] }]}>
               <Text style={[styles.loginRateValue, { color: colors.success[600] }]}>
-                {Math.round(studentLoginRate * 100)}%
+                {studentLoginRate.toFixed(1)}%
               </Text>
             </View>
             <Text style={styles.loginRateLabel}>Login Rate</Text>
@@ -198,7 +206,7 @@ export default function ManageScreen() {
                   styles.loginRateBarFill, 
                   { 
                     backgroundColor: colors.success[500],
-                    width: `${Math.round(studentLoginRate * 100)}%`
+                    width: `${Math.min(100, Math.max(0, studentLoginRate))}%`
                   }
                 ]} />
               </View>
@@ -216,11 +224,6 @@ export default function ManageScreen() {
               <Clock size={16} color={colors.warning[600]} />
               <Text style={[styles.statusValue, { color: colors.warning[700] }]}>{studentInactive}</Text>
               <Text style={styles.statusLabel}>Idle</Text>
-            </View>
-            <View style={[styles.statusCard, { backgroundColor: colors.error[50] }]}>
-              <UserX size={16} color={colors.error[600]} />
-              <Text style={[styles.statusValue, { color: colors.error[700] }]}>{studentDormant}</Text>
-              <Text style={styles.statusLabel}>Dormant</Text>
             </View>
             <View style={[styles.statusCard, { backgroundColor: colors.neutral[100] }]}>
               <AlertCircle size={16} color={colors.neutral[500]} />
@@ -250,7 +253,7 @@ export default function ManageScreen() {
           <View style={styles.loginRateSection}>
             <View style={[styles.loginRateCircle, { borderColor: colors.primary[500] }]}>
               <Text style={[styles.loginRateValue, { color: colors.primary[600] }]}>
-                {Math.round(adminLoginRate * 100)}%
+                {adminLoginRate.toFixed(1)}%
               </Text>
             </View>
             <Text style={styles.loginRateLabel}>Login Rate</Text>
@@ -260,7 +263,7 @@ export default function ManageScreen() {
                   styles.loginRateBarFill, 
                   { 
                     backgroundColor: colors.primary[500],
-                    width: `${Math.round(adminLoginRate * 100)}%`
+                    width: `${Math.min(100, Math.max(0, adminLoginRate))}%`
                   }
                 ]} />
               </View>
@@ -278,11 +281,6 @@ export default function ManageScreen() {
               <Clock size={16} color={colors.warning[600]} />
               <Text style={[styles.statusValue, { color: colors.warning[700] }]}>{adminInactive}</Text>
               <Text style={styles.statusLabel}>Idle</Text>
-            </View>
-            <View style={[styles.statusCard, { backgroundColor: colors.error[50] }]}>
-              <UserX size={16} color={colors.error[600]} />
-              <Text style={[styles.statusValue, { color: colors.error[700] }]}>{adminDormant}</Text>
-              <Text style={styles.statusLabel}>Dormant</Text>
             </View>
             <View style={[styles.statusCard, { backgroundColor: colors.neutral[100] }]}>
               <AlertCircle size={16} color={colors.neutral[500]} />
@@ -353,10 +351,6 @@ export default function ManageScreen() {
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: colors.warning[500] }]} />
             <Text style={styles.legendText}>Idle (7-30d)</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.error[500] }]} />
-            <Text style={styles.legendText}>Dormant (30d+)</Text>
           </View>
         </View>
       </ScrollView>

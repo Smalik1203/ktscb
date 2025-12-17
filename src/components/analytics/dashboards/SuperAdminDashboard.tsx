@@ -202,16 +202,44 @@ export const SuperAdminDashboard = React.memo<SuperAdminDashboardProps>(({
         )}
 
         <View style={[isFetching && styles.fetchingContent]}>
-          <Animated.View entering={FadeInDown.delay(0)}>
-            <SummaryCard
-              academicYear={data?.summary?.activeAcademicYear || '2025–2026'}
-              totalStudents={data?.summary?.totalStudents || 0}
-              totalClasses={data?.summary?.totalClasses || 0}
-              totalTeachers={data?.summary?.totalTeachers || 0}
-            />
+          {/* Header Section */}
+          <Animated.View entering={FadeInDown.delay(0)} style={styles.headerSection}>
+            <View style={styles.headerContent}>
+              <Text variant="headlineSmall" style={styles.headerTitle}>
+                Analytics Overview
+              </Text>
+              <Text variant="bodyMedium" style={styles.headerSubtitle}>
+                {data?.summary?.activeAcademicYear || '2025–2026'}
+              </Text>
+            </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(50)} style={styles.filterContainer}>
+          {/* Summary Stats Grid */}
+          <Animated.View entering={FadeInDown.delay(50)}>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryStatCard}>
+                <Text variant="headlineLarge" style={styles.summaryStatValue}>
+                  {data?.summary?.totalStudents || 0}
+                </Text>
+                <Text variant="bodySmall" style={styles.summaryStatLabel}>Total Students</Text>
+              </View>
+              <View style={styles.summaryStatCard}>
+                <Text variant="headlineLarge" style={styles.summaryStatValue}>
+                  {data?.summary?.totalClasses || 0}
+                </Text>
+                <Text variant="bodySmall" style={styles.summaryStatLabel}>Classes</Text>
+              </View>
+              <View style={styles.summaryStatCard}>
+                <Text variant="headlineLarge" style={styles.summaryStatValue}>
+                  {data?.summary?.totalTeachers || 0}
+                </Text>
+                <Text variant="bodySmall" style={styles.summaryStatLabel}>Teachers</Text>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Filters */}
+          <Animated.View entering={FadeInDown.delay(100)} style={styles.filterContainer}>
             <TimePeriodFilter 
               timePeriod={timePeriod} 
               setTimePeriod={setTimePeriod}
@@ -220,7 +248,7 @@ export const SuperAdminDashboard = React.memo<SuperAdminDashboardProps>(({
             />
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(100)} style={styles.dateRangeContainer}>
+          <Animated.View entering={FadeInDown.delay(150)} style={styles.dateRangeContainer}>
             <View style={styles.dateRangeBadge}>
               <Calendar size={14} color={colors.primary[600]} />
               <Text variant="bodySmall" style={styles.dateRangeText}>
@@ -229,14 +257,30 @@ export const SuperAdminDashboard = React.memo<SuperAdminDashboardProps>(({
             </View>
           </Animated.View>
 
+          {/* Category Cards Grid */}
           {categoryCards.length > 0 && (
             <Animated.View entering={FadeInDown.delay(200)}>
-              <CategoryCards
-                cards={categoryCards.map((card) => ({
-                  ...card,
-                  onPress: () => handleCategoryPress(card.onPress),
-                }))}
-              />
+              <View style={styles.categoryGrid}>
+                {categoryCards.map((card) => (
+                  <TouchableOpacity
+                    key={card.id}
+                    style={styles.modernCategoryCard}
+                    onPress={() => handleCategoryPress(card.onPress)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.modernCategoryIcon, { backgroundColor: card.iconBackgroundColor }]}>
+                      <card.icon size={22} color={card.iconColor} strokeWidth={2.5} />
+                    </View>
+                    <View style={styles.modernCategoryContent}>
+                      <Text variant="bodySmall" style={styles.modernCategoryTitle}>{card.title}</Text>
+                      <Text variant="headlineSmall" style={[styles.modernCategoryMetric, { color: card.metricColor }]}>
+                        {card.metric}
+                      </Text>
+                      <Text variant="bodySmall" style={styles.modernCategorySubtext}>{card.subtext}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </Animated.View>
           )}
         </View>
@@ -283,6 +327,47 @@ const createStyles = (
     container: {
       flex: 1,
       padding: spacing.md,
+      backgroundColor: colors.background.app,
+    },
+    headerSection: {
+      marginBottom: spacing.lg,
+    },
+    headerContent: {
+      marginBottom: spacing.md,
+    },
+    headerTitle: {
+      color: colors.text.primary,
+      fontWeight: typography.fontWeight.bold,
+      marginBottom: spacing.xs,
+    },
+    headerSubtitle: {
+      color: colors.text.secondary,
+    },
+    summaryGrid: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    summaryStatCard: {
+      flex: 1,
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+      alignItems: 'center',
+      ...shadows.sm,
+      borderWidth: 0.5,
+      borderColor: colors.border.light,
+    },
+    summaryStatValue: {
+      color: colors.text.primary,
+      fontWeight: typography.fontWeight.bold,
+      marginBottom: spacing.xs,
+    },
+    summaryStatLabel: {
+      color: colors.text.secondary,
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.medium,
+      textAlign: 'center',
     },
     topFetchingBar: {
       flexDirection: 'row',
@@ -313,12 +398,53 @@ const createStyles = (
       alignItems: 'center',
       backgroundColor: colors.primary[50],
       paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
+      paddingVertical: spacing.xs + 2,
       borderRadius: borderRadius.full,
       gap: spacing.xs,
     },
     dateRangeText: {
       color: colors.primary[600],
+      fontWeight: typography.fontWeight.medium,
+    },
+    categoryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    modernCategoryCard: {
+      width: '48%',
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+      ...shadows.sm,
+      borderWidth: 0.5,
+      borderColor: colors.border.light,
+    },
+    modernCategoryIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: borderRadius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    modernCategoryContent: {
+      flex: 1,
+    },
+    modernCategoryTitle: {
+      color: colors.text.secondary,
+      fontWeight: typography.fontWeight.medium,
+      marginBottom: spacing.xs,
+      fontSize: typography.fontSize.sm,
+    },
+    modernCategoryMetric: {
+      fontWeight: typography.fontWeight.bold,
+      marginBottom: spacing.xs,
+      fontSize: typography.fontSize.xl,
+    },
+    modernCategorySubtext: {
+      color: colors.text.tertiary,
+      fontSize: typography.fontSize.xs,
     },
     backButton: {
       flexDirection: 'row',

@@ -1,5 +1,5 @@
 /**
- * ClassBridge Dark Theme
+ * Krishnaveni Talent School Dark Theme
  * 
  * Dark Mode Best Practices Applied:
  * 1. Dark gray (#0F0F0F) instead of pure black - reduces eye strain
@@ -8,6 +8,7 @@
  * 4. Elevation through lighter surfaces, not shadows
  * 5. Subtle borders instead of shadows for depth
  * 6. Maintains WCAG 4.5:1 contrast ratio
+ * Brand: "Mentored for Life"
  */
 
 import type { Theme, ThemeColors, ComponentStyles } from '../types';
@@ -22,56 +23,56 @@ import {
 } from '../tokens';
 
 // ============================================================================
-// DARK THEME COLORS - ClassBridge Brand
+// DARK THEME COLORS - KTS Brand (Purple & Orange)
 // ============================================================================
 
 export const darkColors: ThemeColors = {
-  // Primary - ClassBridge Blue (lighter for dark backgrounds)
+  // Primary - KTS Purple (lighter for dark backgrounds)
   primary: {
-    50: '#0E2D4C',
-    100: '#164672',
-    200: '#1E5F98',
-    300: '#2678BE',
-    400: '#3B9EF5',
-    500: '#5CB2FF',
-    600: '#7AC4FF',
-    700: '#99D3FF',
-    800: '#B8E2FF',
-    900: '#D6F0FF',
-    950: '#EBF7FF',
-    main: '#5CB2FF',
+    50: '#2A173D',
+    100: '#3A2156',
+    200: '#4A2B6E',
+    300: '#5A3587',
+    400: '#6B3FA0',
+    500: '#9B6BC9',
+    600: '#B48AD9',
+    700: '#C9A8E6',
+    800: '#DEC6F2',
+    900: '#EBE0F5',
+    950: '#F5F0FA',
+    main: '#9B6BC9',
   },
 
-  // Secondary
+  // Secondary - KTS Golden Orange
   secondary: {
-    50: '#0E2D4C',
-    100: '#164672',
-    200: '#1E5F98',
-    300: '#2678BE',
-    400: '#3B9EF5',
-    500: '#5CB2FF',
-    600: '#7AC4FF',
-    700: '#99D3FF',
-    800: '#B8E2FF',
-    900: '#D6F0FF',
-    950: '#EBF7FF',
-    main: '#7AC4FF',
+    50: '#704A0D',
+    100: '#8C5D11',
+    200: '#A87016',
+    300: '#C4831B',
+    400: '#E09620',
+    500: '#F5A623',
+    600: '#FFBF5C',
+    700: '#FFCF85',
+    800: '#FFDFAD',
+    900: '#FFEFD6',
+    950: '#FFF8EB',
+    main: '#FFBF5C',
   },
 
-  // Accent - Emerald (desaturated for dark)
+  // Accent - KTS Crimson (desaturated for dark)
   accent: {
-    50: '#022C22',
-    100: '#064E3B',
-    200: '#065F46',
-    300: '#047857',
-    400: '#059669',
-    500: '#10B981',
-    600: '#34D399',
-    700: '#6EE7B7',
-    800: '#A7F3D0',
-    900: '#D1FAE5',
-    950: '#ECFDF5',
-    main: '#34D399',
+    50: '#450A0A',
+    100: '#7F1D1D',
+    200: '#991B1B',
+    300: '#B91C1C',
+    400: '#DC2626',
+    500: '#E74C3C',
+    600: '#F87171',
+    700: '#FCA5A5',
+    800: '#FECACA',
+    900: '#FEE2E2',
+    950: '#FEF2F2',
+    main: '#F87171',
   },
 
   // Success - Emerald (desaturated for dark)
@@ -90,52 +91,52 @@ export const darkColors: ThemeColors = {
     main: '#34D399',
   },
 
-  // Warning - Desaturated amber
+  // Warning - KTS Golden Orange (desaturated for dark)
   warning: {
-    50: '#2e2a1a',
-    100: '#3d351f',
-    200: '#5a4f2d',
-    300: '#7a6a3d',
-    400: '#9a875a',
-    500: '#D4A656',
-    600: '#E4BA6B',
-    700: '#F0CE8C',
-    800: '#F8E0B0',
-    900: '#FCF0D4',
-    950: '#FEF8EC',
-    main: '#E4BA6B',
+    50: '#704A0D',
+    100: '#8C5D11',
+    200: '#A87016',
+    300: '#C4831B',
+    400: '#E09620',
+    500: '#F5A623',
+    600: '#FFBF5C',
+    700: '#FFCF85',
+    800: '#FFDFAD',
+    900: '#FFEFD6',
+    950: '#FFF8EB',
+    main: '#FFBF5C',
   },
 
-  // Error - Desaturated red
+  // Error - KTS Crimson (desaturated for dark)
   error: {
-    50: '#2e1a1a',
-    100: '#3d1f1f',
-    200: '#5a2d2d',
-    300: '#7a3d3d',
-    400: '#9a5a5a',
-    500: '#E06B6B',
-    600: '#EB8585',
-    700: '#F5A8A8',
-    800: '#FAC8C8',
-    900: '#FDE8E8',
-    950: '#FEF4F4',
-    main: '#EB8585',
+    50: '#450A0A',
+    100: '#7F1D1D',
+    200: '#991B1B',
+    300: '#B91C1C',
+    400: '#DC2626',
+    500: '#E74C3C',
+    600: '#F87171',
+    700: '#FCA5A5',
+    800: '#FECACA',
+    900: '#FEE2E2',
+    950: '#FEF2F2',
+    main: '#F87171',
   },
 
-  // Info - ClassBridge Blue
+  // Info - KTS Purple
   info: {
-    50: '#0E2D4C',
-    100: '#164672',
-    200: '#1E5F98',
-    300: '#2678BE',
-    400: '#3B9EF5',
-    500: '#5CB2FF',
-    600: '#7AC4FF',
-    700: '#99D3FF',
-    800: '#B8E2FF',
-    900: '#D6F0FF',
-    950: '#EBF7FF',
-    main: '#5CB2FF',
+    50: '#2A173D',
+    100: '#3A2156',
+    200: '#4A2B6E',
+    300: '#5A3587',
+    400: '#6B3FA0',
+    500: '#9B6BC9',
+    600: '#B48AD9',
+    700: '#C9A8E6',
+    800: '#DEC6F2',
+    900: '#EBE0F5',
+    950: '#F5F0FA',
+    main: '#9B6BC9',
   },
 
   // Neutral - Inverted scale for dark mode
@@ -191,7 +192,7 @@ export const darkColors: ThemeColors = {
     quaternary: '#666666',
     inverse: '#0F0F0F',
     disabled: '#4A4A4A',
-    accent: '#5CB2FF',
+    accent: '#9B6BC9',
   },
 
   // Borders - Subtle borders for depth
@@ -199,31 +200,31 @@ export const darkColors: ThemeColors = {
     light: '#2A2A2A',
     DEFAULT: '#3A3A3A',
     dark: '#4A4A4A',
-    accent: '#5CB2FF',
+    accent: '#9B6BC9',
   },
 
-  // Gradients - ClassBridge brand for dark mode
+  // Gradients - KTS brand for dark mode
   gradient: {
-    primary: ['#1E5F98', '#2678BE', '#5CB2FF'],
-    secondary: ['#2678BE', '#3B9EF5', '#7AC4FF'],
+    primary: ['#5A3587', '#6B3FA0', '#9B6BC9'],
+    secondary: ['#E09620', '#F5A623', '#FFBF5C'],
     success: ['#047857', '#10B981', '#34D399'],
-    warning: ['#B45309', '#F59E0B', '#FBBF24'],
-    sunset: ['#0E2D4C', '#2678BE', '#5CB2FF'],
-    ocean: ['#0E2D4C', '#1E5F98', '#3B9EF5'],
+    warning: ['#C4831B', '#F5A623', '#FFBF5C'],
+    sunset: ['#5A3587', '#E74C3C', '#F5A623'],
+    ocean: ['#2A173D', '#5A3587', '#9B6BC9'],
     forest: ['#064E3B', '#059669', '#34D399'],
-    cosmic: ['#0E2D4C', '#2678BE', '#7AC4FF'],
+    cosmic: ['#2A173D', '#6B3FA0', '#FFBF5C'],
   },
 
-  // Education - ClassBridge brand for dark mode
+  // Education - KTS brand for dark mode
   education: {
-    math: '#5CB2FF',
+    math: '#9B6BC9',
     science: '#34D399',
-    english: '#7AC4FF',
-    history: '#EB8585',
+    english: '#FFBF5C',
+    history: '#F87171',
     art: '#F472B6',
-    music: '#C084FC',
-    sports: '#5CB2FF',
-    library: '#7AC4FF',
+    music: '#B48AD9',
+    sports: '#FFBF5C',
+    library: '#9B6BC9',
   },
 
   statusBar: 'light',

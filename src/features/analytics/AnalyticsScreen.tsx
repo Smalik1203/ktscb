@@ -147,10 +147,31 @@ export default function AnalyticsScreen() {
           ) : null
         ) : isStudent ? (
           analyticsData ? (
-            <StudentDashboard data={analyticsData as StudentAnalytics} isLoading={isLoading} />
+            <StudentDashboard 
+              data={analyticsData as StudentAnalytics} 
+              isLoading={isLoading}
+              isFetching={isFetching}
+              timePeriod={timePeriod}
+              setTimePeriod={setTimePeriod}
+              startDate={startDate}
+              endDate={endDate}
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+            />
           ) : null
         ) : analyticsData ? (
-          <AdminDashboard data={analyticsData as AdminAnalytics} isLoading={isLoading} />
+          // Admin uses SuperAdminAnalytics filtered to their class
+          <AdminDashboard 
+            data={analyticsData as SuperAdminAnalytics} 
+            isLoading={isLoading}
+            isFetching={isFetching}
+            timePeriod={timePeriod}
+            setTimePeriod={setTimePeriod}
+            startDate={startDate}
+            endDate={endDate}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
         ) : null}
       </ScrollView>
     </View>

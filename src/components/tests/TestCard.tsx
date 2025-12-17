@@ -79,7 +79,11 @@ export function TestCard({
                 />
               }
             >
-              <Menu.Item onPress={() => { closeMenu(); onPress?.(); }} title="View" leadingIcon={() => <Eye size={16} />} />
+              <Menu.Item 
+                onPress={() => { closeMenu(); onPress?.(); }} 
+                title={isOnline ? "View Questions" : "Manage Marks"} 
+                leadingIcon={() => <Eye size={16} />} 
+              />
               {onEdit && <Menu.Item onPress={() => { closeMenu(); onEdit(); }} title="Edit" leadingIcon={() => <Edit size={16} />} />}
               {onDelete && <Menu.Item onPress={handleDelete} title="Delete" leadingIcon={() => <Trash2 size={16} />} />}
             </Menu>
