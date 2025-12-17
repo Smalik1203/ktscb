@@ -706,6 +706,7 @@ export default function PaymentHistory() {
           transaction_id: receiptNumber || null,
           receipt_number: receiptNumber || null,
           remarks: remarks || null,
+          school_code: schoolCode,
           created_by: profile?.auth_id || undefined,
           recorded_by_name: profile?.full_name || null,
         } as any);

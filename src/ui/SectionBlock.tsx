@@ -19,8 +19,7 @@
 import React from 'react';
 import { View, ViewStyle, TouchableOpacity, StyleSheet } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
-import { Heading } from './Text';
-import { Caption } from './Text';
+import { Heading , Caption } from './Text';
 
 export interface SectionBlockProps {
   children: React.ReactNode;

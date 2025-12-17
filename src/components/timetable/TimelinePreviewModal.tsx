@@ -24,7 +24,7 @@ interface TimelinePreviewModalProps {
     name?: string;
     subject_name?: string;
   };
-  shifts: Array<{ slot: TimetableSlot; newStart: string; newEnd: string }>;
+  shifts: { slot: TimetableSlot; newStart: string; newEnd: string }[];
   shiftDelta: number;
 }
 
@@ -50,14 +50,14 @@ export function TimelinePreviewModal({
   );
   
   // Create timeline items
-  const timelineItems: Array<{
+  const timelineItems: {
     type: 'existing' | 'new' | 'shifted';
     slot: TimetableSlot | typeof newSlot;
     oldStart?: string;
     oldEnd?: string;
     newStart?: string;
     newEnd?: string;
-  }> = [];
+  }[] = [];
 
   // Add existing slots before new slot
   for (let i = 0; i < insertIndex; i++) {

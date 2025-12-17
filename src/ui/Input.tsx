@@ -41,8 +41,7 @@ import {
   Animated,
 } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
-import { Label } from './Text';
-import { Caption } from './Text';
+import { Label , Caption } from './Text';
 
 export type InputVariant = 'default' | 'filled' | 'outlined';
 export type InputSize = 'sm' | 'md' | 'lg';

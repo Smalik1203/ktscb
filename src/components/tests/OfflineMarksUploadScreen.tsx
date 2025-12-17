@@ -146,7 +146,7 @@ export function OfflineMarksUploadScreen() {
   const filteredStudents = useMemo(() => {
     if (!searchQuery.trim()) return students;
     const query = searchQuery.toLowerCase();
-    return students.filter((student: any) => 
+    return students.filter((student: any) =>
       student.full_name?.toLowerCase().includes(query) ||
       student.student_code?.toLowerCase().includes(query)
     );
@@ -897,5 +897,8 @@ const createStyles = (colors: ThemeColors, typography: any, shadows: any, border
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
     textAlign: 'center',
+  },
+  backButton: {
+    padding: spacing.xs,
   },
 });

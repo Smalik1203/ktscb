@@ -7,10 +7,10 @@
 
 import React from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Text as RNText } from 'react-native';
-import { 
-  CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound, 
-  LineChart, TrendingUp, Activity, CalendarDays, 
-  Target, AlertCircle, FolderOpen, ArrowUpRight, 
+import {
+  CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound,
+  LineChart, TrendingUp, Activity, CalendarDays,
+  Target, AlertCircle, FolderOpen, ArrowUpRight,
   ArrowDownRight, ChevronRight, UserPlus, List, Layers,
   ReceiptText, ClipboardList, GraduationCap, Building2, School,
   FileText, CheckCircle2
@@ -68,7 +68,7 @@ interface QuickActionProps {
 
 function QuickAction({ title, icon: Icon, color, bgColor, onPress }: QuickActionProps) {
   const { spacing, borderRadius, shadows, colors: themeColors, typography } = useTheme();
-  
+
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -100,20 +100,20 @@ function QuickAction({ title, icon: Icon, color, bgColor, onPress }: QuickAction
       }}>
         <Icon size={20} color={color} strokeWidth={2.5} />
       </View>
-      <View style={{ 
-        width: '100%', 
+      <View style={{
+        width: '100%',
         minHeight: 28,
         justifyContent: 'center',
         alignItems: 'center',
       }}>
-        <RNText 
+        <RNText
           style={{
             fontSize: 11,
             fontWeight: typography.fontWeight.semibold,
             color: themeColors.text.primary,
             textAlign: 'center',
             lineHeight: 14,
-          }} 
+          }}
           numberOfLines={2}
           ellipsizeMode="tail"
         >
@@ -137,9 +137,9 @@ interface StatCardProps {
   trend?: 'up' | 'down' | null;
 }
 
-function StatCard({ 
-  title, value, change, icon: Icon, color, bgColor, 
-  onPress, showProgress, progressValue, trend 
+function StatCard({
+  title, value, change, icon: Icon, color, bgColor,
+  onPress, showProgress, progressValue, trend
 }: StatCardProps) {
   const { colors, spacing, borderRadius, shadows, typography } = useTheme();
   const cardWidth = (SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2;
@@ -183,7 +183,7 @@ function StatCard({
           )}
         </View>
       </View>
-      
+
       {/* Value Display */}
       {showProgress && progressValue !== undefined ? (
         <View style={{ alignItems: 'center', marginVertical: spacing.sm }}>
@@ -195,36 +195,36 @@ function StatCard({
             backgroundColor={colors.neutral[100]}
             showPercentage={false}
           />
-          <RNText style={{ 
-            position: 'absolute', 
-            fontSize: typography.fontSize.xl, 
+          <RNText style={{
+            position: 'absolute',
+            fontSize: typography.fontSize.xl,
             fontWeight: typography.fontWeight.bold,
-            color: colors.text.primary 
+            color: colors.text.primary
           }}>
             {value}
           </RNText>
         </View>
       ) : (
-        <RNText style={{ 
-          fontSize: typography.fontSize['2xl'], 
+        <RNText style={{
+          fontSize: typography.fontSize['2xl'],
           fontWeight: typography.fontWeight.bold,
           color: colors.text.primary,
-          marginBottom: spacing.xs 
+          marginBottom: spacing.xs
         }}>
           {value}
         </RNText>
       )}
-      
+
       {/* Title */}
-      <RNText style={{ 
-        fontSize: typography.fontSize.sm, 
+      <RNText style={{
+        fontSize: typography.fontSize.sm,
         color: colors.text.secondary,
         fontWeight: typography.fontWeight.medium,
-        marginBottom: spacing.sm 
+        marginBottom: spacing.sm
       }}>
         {title}
       </RNText>
-      
+
       {/* Badge */}
       <View style={{
         backgroundColor: color,
@@ -233,10 +233,10 @@ function StatCard({
         borderRadius: borderRadius.sm,
         alignSelf: 'flex-start',
       }}>
-        <RNText style={{ 
-          fontSize: 11, 
+        <RNText style={{
+          fontSize: 11,
           fontWeight: typography.fontWeight.semibold,
-          color: colors.text.inverse 
+          color: colors.text.inverse
         }}>
           {change}
         </RNText>
@@ -313,16 +313,16 @@ export default function DashboardScreen() {
   const { profile, loading: authLoading } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
-  
+
   const isStudent = profile?.role === 'student';
   const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
-  
+
   // Hardcoded class data for display
   const classData = {
     grade: '10',
     section: 'A',
   };
-  
+
   // Hardcoded data for dashboard
   const stats = {
     todaysClasses: 4,
@@ -334,8 +334,8 @@ export default function DashboardScreen() {
     totalStudents: 35,
   };
   const statsLoading = false;
-  const statsError = null;
-  const refetchStats = async () => {};
+  const statsError: { message?: string } | null = null;
+  const refetchStats = async () => { };
 
   const recentActivity = [
     {
@@ -385,8 +385,8 @@ export default function DashboardScreen() {
     },
   ];
   const activityLoading = false;
-  const activityError = null;
-  const refetchActivity = async () => {};
+  const activityError: { message?: string } | null = null;
+  const refetchActivity = async () => { };
 
   const upcomingEvents = [
     {
@@ -422,7 +422,7 @@ export default function DashboardScreen() {
       color: '#ef4444',
     },
   ];
-  const refetchEvents = async () => {};
+  const refetchEvents = async () => { };
 
   const feeOverview = isStudent ? {
     totalFee: 50000,
@@ -430,7 +430,7 @@ export default function DashboardScreen() {
     pendingAmount: 15000,
     nextDueDate: new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0],
   } : null;
-  const refetchFee = async () => {};
+  const refetchFee = async () => { };
 
   const taskOverview = isStudent ? {
     total: 8,
@@ -439,7 +439,7 @@ export default function DashboardScreen() {
     overdue: 1,
     dueThisWeek: 2,
   } : null;
-  const refetchTask = async () => {};
+  const refetchTask = async () => { };
 
   const syllabusOverview = isStudent ? {
     overallProgress: 68,
@@ -482,13 +482,13 @@ export default function DashboardScreen() {
       },
     ],
   } : null;
-  const refetchSyllabus = async () => {};
+  const refetchSyllabus = async () => { };
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
       const promises: Promise<any>[] = [];
-      
+
       if (profile?.auth_id && profile?.class_instance_id) {
         promises.push(refetchStats(), refetchActivity());
       }
@@ -501,7 +501,7 @@ export default function DashboardScreen() {
       if (isStudent && profile?.class_instance_id) {
         promises.push(refetchSyllabus());
       }
-      
+
       await Promise.all(promises);
     } catch (err) {
       log.error('Refresh error:', err);
@@ -551,14 +551,14 @@ export default function DashboardScreen() {
     {
       title: isStudent ? 'Month Attendance' : 'Total Students',
       value: isStudent ? `${stats.attendancePercentage}%` : (stats.totalStudents?.toString() || '0'),
-      change: isStudent 
+      change: isStudent
         ? (stats.attendancePercentage >= 90 ? 'Excellent' : stats.attendancePercentage >= 80 ? 'Good' : stats.attendancePercentage >= 75 ? 'Fair' : 'Low')
         : 'in class',
       icon: isStudent ? TrendingUp : UsersRound,
-      color: isStudent 
+      color: isStudent
         ? (stats.attendancePercentage >= 90 ? colors.success.main : stats.attendancePercentage >= 80 ? colors.info.main : stats.attendancePercentage >= 75 ? colors.warning.main : colors.error.main)
         : colors.info.main,
-      bgColor: isStudent 
+      bgColor: isStudent
         ? (stats.attendancePercentage >= 90 ? colors.success[50] : stats.attendancePercentage >= 80 ? colors.info[50] : stats.attendancePercentage >= 75 ? colors.warning[50] : colors.error[50])
         : colors.info[50],
       route: isStudent ? '/(tabs)/attendance' : '/(tabs)/manage',
@@ -586,10 +586,10 @@ export default function DashboardScreen() {
     },
   ] : [];
 
-  const viewState = (authLoading || statsLoading || activityLoading) ? 'loading' 
-    : (statsError || activityError) ? 'error' 
-    : !profile ? 'empty' : 'success';
-  
+  const viewState = (authLoading || statsLoading || activityLoading) ? 'loading'
+    : (statsError || activityError) ? 'error'
+      : !profile ? 'empty' : 'success';
+
   const hasIncompleteProfile = profile && (!profile.school_code || !profile.class_instance_id);
 
   // Get greeting based on time
@@ -599,33 +599,33 @@ export default function DashboardScreen() {
     if (hour < 17) return 'Good Afternoon';
     return 'Good Evening';
   };
-  
+
   return (
     <ThreeStateView
       state={viewState}
       loadingMessage="Loading dashboard..."
       errorMessage="Failed to load dashboard"
-      errorDetails={statsError?.message || activityError?.message}
+      errorDetails={(statsError as any)?.message || (activityError as any)?.message || undefined}
       emptyMessage={
-        hasIncompleteProfile 
+        hasIncompleteProfile
           ? "Profile setup required. Please contact your administrator to complete your account setup."
           : "No profile data available"
       }
       onRetry={handleRefresh}
     >
-        <ScrollView
+      <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: spacing.sm, paddingBottom: spacing.xl }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={handleRefresh}
             tintColor={colors.primary.main}
             colors={[colors.primary.main]}
           />
-          }
-        >
+        }
+      >
         {/* Profile Header - Modern Design */}
         <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.md, marginBottom: spacing.sm }}>
           <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, fontWeight: typography.fontWeight.medium, marginBottom: spacing.xs }}>
@@ -645,8 +645,8 @@ export default function DashboardScreen() {
 
         {/* Quick Actions - Horizontal Scrollable */}
         <View style={{ marginBottom: spacing.lg }}>
-          <ScrollView 
-            horizontal 
+          <ScrollView
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm }}
           >
@@ -673,12 +673,12 @@ export default function DashboardScreen() {
             ) : (
               dashboardStats.map((stat, index) => (
                 <StatCard
-                  key={index} 
+                  key={index}
                   title={stat.title}
                   value={stat.value}
                   change={stat.change}
                   icon={stat.icon}
-                        color={stat.color}
+                  color={stat.color}
                   bgColor={stat.bgColor}
                   onPress={() => stat.route && router.push(stat.route as any)}
                   showProgress={stat.showProgress}
@@ -722,9 +722,9 @@ export default function DashboardScreen() {
                       width: 36,
                       height: 36,
                       borderRadius: borderRadius.md,
-                      backgroundColor: item.color === colors.success[600] ? colors.success[50] : 
-                                       item.color === colors.info[600] ? colors.info[50] : 
-                                       colors.secondary[50],
+                      backgroundColor: item.color === colors.success[600] ? colors.success[50] :
+                        item.color === colors.info[600] ? colors.info[50] :
+                          colors.secondary[50],
                       justifyContent: 'center',
                       alignItems: 'center',
                       marginRight: spacing.sm,
@@ -732,27 +732,27 @@ export default function DashboardScreen() {
                       <item.icon size={18} color={item.color} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <RNText style={{ 
-                        fontSize: typography.fontSize.xs, 
+                      <RNText style={{
+                        fontSize: typography.fontSize.xs,
                         color: colors.text.secondary,
-                        marginBottom: 2 
+                        marginBottom: 2
                       }}>
                         {item.label}
                       </RNText>
-                      <RNText style={{ 
-                        fontSize: typography.fontSize.base, 
+                      <RNText style={{
+                        fontSize: typography.fontSize.base,
                         fontWeight: typography.fontWeight.semibold,
-                        color: colors.text.primary 
+                        color: colors.text.primary
                       }}>
                         {item.value}
                       </RNText>
                     </View>
                   </View>
                   {index < arr.length - 1 && (
-                    <View style={{ 
-                      height: 0.5, 
+                    <View style={{
+                      height: 0.5,
                       backgroundColor: colors.border.light,
-                      marginLeft: 44 
+                      marginLeft: 44
                     }} />
                   )}
                 </React.Fragment>
@@ -792,18 +792,18 @@ export default function DashboardScreen() {
                       { value: taskOverview.overdue, label: 'Overdue', color: colors.error[600] },
                     ].map((item, index) => (
                       <View key={index} style={{ alignItems: 'center' }}>
-                        <RNText style={{ 
-                          fontSize: typography.fontSize.xl, 
+                        <RNText style={{
+                          fontSize: typography.fontSize.xl,
                           fontWeight: typography.fontWeight.bold,
                           color: item.color,
-                          marginBottom: spacing.xs 
+                          marginBottom: spacing.xs
                         }}>
                           {item.value}
                         </RNText>
-                        <RNText style={{ 
-                          fontSize: typography.fontSize.xs, 
+                        <RNText style={{
+                          fontSize: typography.fontSize.xs,
                           color: colors.text.secondary,
-                          fontWeight: typography.fontWeight.medium 
+                          fontWeight: typography.fontWeight.medium
                         }}>
                           {item.label}
                         </RNText>
@@ -820,10 +820,10 @@ export default function DashboardScreen() {
                       gap: spacing.xs,
                     }}>
                       <AlertCircle size={16} color={colors.error[600]} />
-                      <RNText style={{ 
-                        fontSize: typography.fontSize.sm, 
+                      <RNText style={{
+                        fontSize: typography.fontSize.sm,
                         color: colors.error[700],
-                        fontWeight: typography.fontWeight.medium 
+                        fontWeight: typography.fontWeight.medium
                       }}>
                         You have {taskOverview.overdue} overdue task{taskOverview.overdue > 1 ? 's' : ''}
                       </RNText>
@@ -876,8 +876,8 @@ export default function DashboardScreen() {
                         backgroundColor={colors.neutral[100]}
                         showPercentage={false}
                       />
-                      <View style={{ 
-                        position: 'absolute', 
+                      <View style={{
+                        position: 'absolute',
                         top: 0,
                         left: 0,
                         right: 0,
@@ -885,66 +885,66 @@ export default function DashboardScreen() {
                         justifyContent: 'center',
                         alignItems: 'center',
                       }}>
-                        <RNText style={{ 
+                        <RNText style={{
                           fontSize: typography.fontSize.lg,
                           fontWeight: typography.fontWeight.bold,
-                          color: colors.text.primary 
+                          color: colors.text.primary
                         }}>
                           {syllabusOverview.overallProgress}%
                         </RNText>
                       </View>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <RNText style={{ 
-                        fontSize: typography.fontSize.lg, 
+                      <RNText style={{
+                        fontSize: typography.fontSize.lg,
                         fontWeight: typography.fontWeight.bold,
                         color: colors.text.primary,
-                        marginBottom: spacing.xs 
+                        marginBottom: spacing.xs
                       }}>
                         Overall Progress
                       </RNText>
-                      <RNText style={{ 
-                        fontSize: typography.fontSize.sm, 
-                        color: colors.text.secondary 
+                      <RNText style={{
+                        fontSize: typography.fontSize.sm,
+                        color: colors.text.secondary
                       }}>
                         {syllabusOverview.subjectBreakdown.reduce((sum, s) => sum + s.completedTopics, 0)} / {' '}
                         {syllabusOverview.subjectBreakdown.reduce((sum, s) => sum + s.totalTopics, 0)} topics completed
                       </RNText>
                     </View>
                   </View>
-                  
+
                   <View style={{ gap: spacing.md }}>
                     {syllabusOverview.subjectBreakdown.slice(0, 3).map((subject) => (
-                      <View key={subject.subjectId} style={{ 
-                        paddingTop: spacing.md, 
-                        borderTopWidth: 0.5, 
-                        borderTopColor: colors.border.light 
+                      <View key={subject.subjectId} style={{
+                        paddingTop: spacing.md,
+                        borderTopWidth: 0.5,
+                        borderTopColor: colors.border.light
                       }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
-                          <RNText style={{ 
-                            fontSize: typography.fontSize.base, 
+                          <RNText style={{
+                            fontSize: typography.fontSize.base,
                             fontWeight: typography.fontWeight.semibold,
                             color: colors.text.primary,
-                            flex: 1 
+                            flex: 1
                           }} numberOfLines={1}>
                             {subject.subjectName}
                           </RNText>
-                          <RNText style={{ 
-                            fontSize: typography.fontSize.base, 
+                          <RNText style={{
+                            fontSize: typography.fontSize.base,
                             fontWeight: typography.fontWeight.bold,
-                            color: colors.primary[600] 
+                            color: colors.primary[600]
                           }}>
                             {subject.progress}%
                           </RNText>
                         </View>
-                        <ProgressBar 
-                          progress={subject.progress} 
+                        <ProgressBar
+                          progress={subject.progress}
                           fillColor={colors.primary[600]}
                           size="sm"
                         />
-                        <RNText style={{ 
-                          fontSize: typography.fontSize.xs, 
-                          color: colors.text.secondary 
+                        <RNText style={{
+                          fontSize: typography.fontSize.xs,
+                          color: colors.text.secondary
                         }}>
                           {subject.completedTopics} / {subject.totalTopics} topics
                         </RNText>
@@ -952,10 +952,10 @@ export default function DashboardScreen() {
                     ))}
                     {syllabusOverview.subjectBreakdown.length > 3 && (
                       <TouchableOpacity onPress={() => router.push('/syllabus')} style={{ alignItems: 'center', paddingTop: spacing.sm }}>
-                        <RNText style={{ 
-                          fontSize: typography.fontSize.sm, 
+                        <RNText style={{
+                          fontSize: typography.fontSize.sm,
                           fontWeight: typography.fontWeight.medium,
-                          color: colors.primary[600] 
+                          color: colors.primary[600]
                         }}>
                           +{syllabusOverview.subjectBreakdown.length - 3} more subject{syllabusOverview.subjectBreakdown.length - 3 > 1 ? 's' : ''}
                         </RNText>
@@ -995,11 +995,11 @@ export default function DashboardScreen() {
                     ))}
                   </Row>
                   <Stack spacing="xs">
-                    <ProgressBar 
-                      progress={(feeOverview.paidAmount / feeOverview.totalFee) * 100} 
+                    <ProgressBar
+                      progress={(feeOverview.paidAmount / feeOverview.totalFee) * 100}
                       variant="success"
                       size="md"
-                      />
+                    />
                     <Caption color="tertiary" align="center">
                       {Math.round((feeOverview.paidAmount / feeOverview.totalFee) * 100)}% paid
                     </Caption>
@@ -1024,15 +1024,15 @@ export default function DashboardScreen() {
             {upcomingEvents && Array.isArray(upcomingEvents) && upcomingEvents.length > 0 ? (
               <Stack spacing="none">
                 {upcomingEvents.map((event, index) => (
-                  <Row 
-                  key={event.id} 
+                  <Row
+                    key={event.id}
                     spacing="sm"
                     style={{
                       paddingVertical: spacing.sm,
                       borderBottomWidth: index < upcomingEvents.length - 1 ? 1 : 0,
                       borderBottomColor: colors.border.light,
                     }}
-                >
+                  >
                     <View style={{
                       width: 3,
                       borderRadius: borderRadius.sm,
@@ -1042,11 +1042,11 @@ export default function DashboardScreen() {
                     <Stack spacing="xs" flex>
                       <Body weight="semibold">{event.title}</Body>
                       <Row spacing="xs" align="center">
-                      <CalendarDays size={14} color={colors.text.tertiary} />
+                        <CalendarDays size={14} color={colors.text.tertiary} />
                         <Caption color="tertiary">
                           {new Date(event.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                         </Caption>
-                      <Badge variant="secondary" size="sm">{event.type}</Badge>
+                        <Badge variant="secondary" size="sm">{event.type}</Badge>
                       </Row>
                     </Stack>
                   </Row>
@@ -1070,42 +1070,42 @@ export default function DashboardScreen() {
             {recentActivity && recentActivity.length > 0 ? (
               <Stack spacing="none">
                 {recentActivity.map((activity, index) => {
-                const getActivityIcon = (type: string) => {
-                  switch (type) {
-                    case 'attendance': return UserCheck;
-                    case 'assignment':
-                    case 'task': return NotebookText;
-                    case 'test': return Target;
-                    case 'event': return CalendarDays;
-                    default: return Activity;
-                  }
-                };
-                
-                const getActivityColor = (color?: string) => {
-                  switch (color) {
+                  const getActivityIcon = (type: string) => {
+                    switch (type) {
+                      case 'attendance': return UserCheck;
+                      case 'assignment':
+                      case 'task': return NotebookText;
+                      case 'test': return Target;
+                      case 'event': return CalendarDays;
+                      default: return Activity;
+                    }
+                  };
+
+                  const getActivityColor = (color?: string) => {
+                    switch (color) {
                       case 'success': return { bg: colors.success[50], icon: colors.success.main };
                       case 'error': return { bg: colors.error[50], icon: colors.error.main };
                       case 'warning': return { bg: colors.warning[50], icon: colors.warning.main };
                       case 'info': return { bg: colors.info[50], icon: colors.info.main };
                       case 'secondary': return { bg: colors.secondary[50], icon: colors.secondary.main };
                       default: return { bg: colors.primary[50], icon: colors.primary.main };
-                  }
-                };
+                    }
+                  };
 
-                const ActivityIcon = getActivityIcon(activity.type);
-                const activityColor = getActivityColor(activity.color);
+                  const ActivityIcon = getActivityIcon(activity.type);
+                  const activityColor = getActivityColor(activity.color);
 
-                return (
-                    <Row 
-                    key={activity.id} 
-                      spacing="sm" 
+                  return (
+                    <Row
+                      key={activity.id}
+                      spacing="sm"
                       align="center"
                       style={{
                         paddingVertical: spacing.sm,
                         borderBottomWidth: index < recentActivity.length - 1 ? 1 : 0,
                         borderBottomColor: colors.border.light,
                       }}
-                  >
+                    >
                       <View style={{
                         width: 28,
                         height: 28,
@@ -1114,14 +1114,14 @@ export default function DashboardScreen() {
                         justifyContent: 'center',
                         alignItems: 'center',
                       }}>
-                      <ActivityIcon size={16} color={activityColor.icon} />
-                    </View>
+                        <ActivityIcon size={16} color={activityColor.icon} />
+                      </View>
                       <Stack spacing="none" flex>
                         <Body weight="semibold">{activity.title}</Body>
                         <Caption color="secondary">{activity.subtitle}</Caption>
                       </Stack>
                     </Row>
-                );
+                  );
                 })}
               </Stack>
             ) : (
@@ -1133,7 +1133,7 @@ export default function DashboardScreen() {
             )}
           </Card>
         </SectionBlock>
-        </ScrollView>
-      </ThreeStateView>
+      </ScrollView>
+    </ThreeStateView>
   );
 }

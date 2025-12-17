@@ -164,11 +164,11 @@ async function fetchFeesData(
     totalBilled,
     totalCollected,
     totalOutstanding,
-    agingBreakdown: { 
-      current: studentsWithOutstanding, 
-      '30-60': 0, 
-      '60-90': 0, 
-      '90+': 0 
+    agingBreakdown: {
+      current: studentsWithOutstanding,
+      '30-60': 0,
+      '60-90': 0,
+      '90+': 0
     },
   };
 }
@@ -204,14 +204,14 @@ async function fetchAcademicsData(
   }
 
   const { data: allTests } = await testsQuery;
-  
+
   // Filter tests by date range (using test_date if available, otherwise created_at)
   const tests = (allTests || []).filter((t: any) => {
     const testDateStr = t.test_date || t.created_at?.split('T')[0];
     if (!testDateStr) return true; // Include if no date
     return testDateStr >= startDate && testDateStr <= endDate;
   });
-  
+
   if (!tests || tests.length === 0) {
     return {
       avgScore: 0,
@@ -651,7 +651,7 @@ async function fetchStudentLearningData(
       totalAssignments = tasks.length;
       assignmentOnTimeStreak = tasks.filter(task => {
         const submission = submissionMap.get(task.id);
-        if (!submission || submission.status !== 'submitted') return false;
+        if (!submission || submission.status !== 'submitted' || !submission.submitted_at) return false;
         const dueDate = new Date(task.due_date);
         const submittedDate = new Date(submission.submitted_at);
         return submittedDate <= dueDate;
@@ -664,11 +664,11 @@ async function fetchStudentLearningData(
     testMarks.forEach((mark: any) => {
       const test = mark.tests;
       if (!test) return;
-      
+
       const subjectId = test.subject_id;
       const subjectName = test.subjects?.subject_name || 'Unknown';
-      const score = test.max_marks > 0 
-        ? (mark.marks_obtained / test.max_marks) * 100 
+      const score = test.max_marks > 0
+        ? (mark.marks_obtained / test.max_marks) * 100
         : mark.marks_obtained;
 
       if (!subjectScoreMap.has(subjectId)) {
@@ -684,7 +684,7 @@ async function fetchStudentLearningData(
     const avgScore = data.scores.length > 0
       ? data.scores.reduce((a, b) => a + b, 0) / data.scores.length
       : 0;
-    
+
     // Get recent trend (last 5 tests)
     const recentTrend = data.scores.slice(-5).map((score, index) => ({
       date: data.dates[data.dates.length - 5 + index] || '',
@@ -727,8 +727,8 @@ async function fetchStudentFeesData(
     };
   }
 
-  const totalBilled = feeSummary.total_billed || 0;
-  const totalPaid = feeSummary.total_paid || 0;
+  const totalBilled = (feeSummary as any).total_billed ?? (feeSummary as any).billed_amount ?? 0;
+  const totalPaid = (feeSummary as any).total_paid ?? (feeSummary as any).collected_amount_inr ?? 0;
   const totalDue = totalBilled - totalPaid;
 
   let status: 'paid' | 'current' | 'overdue' | 'no_billing' = 'no_billing';
@@ -837,7 +837,7 @@ async function fetchStudentSyllabusProgress(
       const score = test.max_marks > 0
         ? (mark.marks_obtained / test.max_marks) * 100
         : mark.marks_obtained;
-      
+
       if (!subjectScores.has(subjectId)) {
         subjectScores.set(subjectId, []);
       }

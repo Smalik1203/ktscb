@@ -93,10 +93,10 @@ export function calculateShift(
   newEnd: string,
   existingSlots: TimetableSlot[],
   excludeSlotId?: string
-): Array<{ slot: TimetableSlot; newStart: string; newEnd: string }> {
+): { slot: TimetableSlot; newStart: string; newEnd: string }[] {
   const newStartMin = timeToMinutes(newStart);
   const newEndMin = timeToMinutes(newEnd);
-  const shifts: Array<{ slot: TimetableSlot; newStart: string; newEnd: string }> = [];
+  const shifts: { slot: TimetableSlot; newStart: string; newEnd: string }[] = [];
 
   for (const slot of existingSlots) {
     if (excludeSlotId && slot.id === excludeSlotId) {

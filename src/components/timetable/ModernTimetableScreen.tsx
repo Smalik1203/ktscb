@@ -31,7 +31,7 @@ const { width } = Dimensions.get('window');
 // Get subtle subject color for visual recognition
 function getSubjectColor(subjectName: string, colors: ThemeColors): string {
   if (!subjectName) return colors.neutral[400];
-  
+
   const colorMap: Record<string, string> = {
     'Mathematics': colors.primary[500],
     'Math': colors.primary[500],
@@ -47,7 +47,7 @@ function getSubjectColor(subjectName: string, colors: ThemeColors): string {
     'Physical Education': colors.success[500],
     'PE': colors.success[500],
   };
-  
+
   const normalizedName = subjectName.trim();
   return colorMap[normalizedName] || colors.primary[500];
 }
@@ -76,10 +76,10 @@ function CleanTimetableCard({
   if (!slot || !slot.id) {
     return null;
   }
-  
+
   const isTaught = taughtSlotIds.has(slot.id);
   const subjectColor = getSubjectColor(slot?.subject_name, colors);
-  
+
   // Get topic name from slot or syllabus map - ensure we always have a value or null
   const topicName = slot?.topic_name || (slot?.syllabus_topic_id && getTopicName ? getTopicName(slot.syllabus_topic_id) : null) || null;
   const chapterName = slot?.chapter_name || (slot?.syllabus_chapter_id && getChapterName ? getChapterName(slot.syllabus_chapter_id) : null) || null;
@@ -115,10 +115,10 @@ function CleanTimetableCard({
     ]}>
       {/* 2-3px Colored Vertical Strip - Green for completed, subject color for pending */}
       <View style={[
-        styles.premiumAccentStrip, 
+        styles.premiumAccentStrip,
         { backgroundColor: isTaught ? colors.success[500] : subjectColor }
       ]} />
-      
+
       <View style={styles.premiumCardContent}>
         {/* Top Row: Period Badge | Time | Edit Button */}
         <View style={styles.premiumCardTopRow}>
@@ -154,17 +154,17 @@ function CleanTimetableCard({
             </TouchableOpacity>
           </View>
         </View>
-        
+
         {/* Main Content: Two Column Layout */}
         <View style={styles.premiumCardMainRow}>
           {/* Left Column: Subject & Teacher */}
           <View style={styles.premiumCardLeftColumn}>
-            <RNText 
+            <RNText
               style={[
                 styles.premiumSubjectText,
                 isTaught && styles.premiumSubjectTextCompleted
-              ]} 
-              numberOfLines={2} 
+              ]}
+              numberOfLines={2}
               ellipsizeMode="tail"
             >
               {slot?.subject_name?.trim?.() || 'Unassigned'}
@@ -181,7 +181,7 @@ function CleanTimetableCard({
               </View>
             ) : null}
           </View>
-          
+
           {/* Right Column: Topic/Chapter & Plan */}
           {(chapterName || topicName || slot?.plan_text) ? (
             <View style={styles.premiumCardRightColumn}>
@@ -289,7 +289,7 @@ function ModernTimetableSlotCard({
           {formatTime12Hour(slot.end_time)}
         </Text>
       </View>
-      
+
       <View style={styles.modernPeriodContent}>
         <View style={styles.modernPeriodHeader}>
           <Text
@@ -307,7 +307,7 @@ function ModernTimetableSlotCard({
             <MoreVertical size={20} color={colors.text.secondary} />
           </TouchableOpacity>
         </View>
-        
+
         <View style={styles.modernTeacherInfo}>
           <View style={styles.modernTeacherAvatar}>
             <User size={16} color={colors.text.secondary} />
@@ -316,13 +316,13 @@ function ModernTimetableSlotCard({
             {slot.teacher_name || 'No Teacher'}
           </Text>
         </View>
-        
+
         {slot.plan_text && (
           <Text style={styles.modernPlanText}>
             {slot.plan_text}
           </Text>
         )}
-        
+
         <View style={styles.modernPeriodStatus}>
           <TouchableOpacity
             onPress={() => isTaught ? onUnmarkTaught(slot.id) : onMarkTaught(slot.id)}
@@ -353,10 +353,10 @@ function ModernTimetableSlotCard({
 export function ModernTimetableScreen() {
   const { profile } = useAuth();
   const { colors, isDark, shadows } = useTheme();
-  
+
   // Create dynamic styles based on theme
   const styles = useMemo(() => createStyles(colors, isDark, shadows), [colors, isDark, shadows]);
-  
+
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -407,13 +407,13 @@ export function ModernTimetableScreen() {
     syllabus_chapter_id: '',
     syllabus_topic_id: '',
   });
-  
+
   // Conflict resolution state
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [conflictInfo, setConflictInfo] = useState<{
     conflicts: any[];
-    affectedSlots: Array<{ slot: any; newStart: string; newEnd: string }>;
+    affectedSlots: { slot: any; newStart: string; newEnd: string }[];
     shiftDelta: number;
   } | null>(null);
   const [pendingResolution, setPendingResolution] = useState<{
@@ -428,7 +428,7 @@ export function ModernTimetableScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [compactView, setCompactView] = useState(false);
   const [showActionsModal, setShowActionsModal] = useState(false);
-  
+
   // Animation values
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -440,17 +440,17 @@ export function ModernTimetableScreen() {
   const subjects = subjectsResult?.data || [];
   const { data: adminsResult } = useAdmins(schoolCode);
   const adminsList = adminsResult?.data || [];
-  const { 
-    slots, 
-    displayPeriodNumber, 
-    loading, 
-    error, 
-    refetch, 
-    deleteSlot, 
-    quickGenerate, 
-    markSlotTaught, 
-    unmarkSlotTaught, 
-    updateSlotStatus, 
+  const {
+    slots,
+    displayPeriodNumber,
+    loading,
+    error,
+    refetch,
+    deleteSlot,
+    quickGenerate,
+    markSlotTaught,
+    unmarkSlotTaught,
+    updateSlotStatus,
     taughtSlotIds,
     parseTimeInput,
     detectSlotConflicts,
@@ -644,13 +644,13 @@ export function ModernTimetableScreen() {
   const handleSlotFormChange = (field: string, value: any) => {
     setSlotForm(prev => {
       const newForm = { ...prev, [field]: value };
-      
+
       // Clear chapter and topic when subject changes
       if (field === 'subject_id') {
         newForm.syllabus_chapter_id = '';
         newForm.syllabus_topic_id = '';
       }
-      
+
       return newForm;
     });
   };
@@ -696,31 +696,31 @@ export function ModernTimetableScreen() {
     // No conflicts, proceed with create
     await performAddSlot({ action: 'abort' });
   };
-  
+
   // Perform the actual create with resolution
   const performAddSlot = async (resolution: { action: 'abort' | 'replace' | 'shift'; replaceSlotId?: string; shiftDelta?: number }) => {
     if (!selectedClassId || !profile?.school_code) return;
 
-            try {
+    try {
       const result = await createSlotWithResolution({
-                class_instance_id: selectedClassId,
+        class_instance_id: selectedClassId,
         school_code: profile.school_code,
-                class_date: dateStr,
-                slot_type: slotForm.slot_type as 'period' | 'break',
+        class_date: dateStr,
+        slot_type: slotForm.slot_type as 'period' | 'break',
         start_time_input: slotForm.start_time_input,
         end_time_input: slotForm.end_time_input,
-                name: slotForm.slot_type === 'break' ? slotForm.name : null,
-                subject_id: slotForm.slot_type === 'period' ? slotForm.subject_id : null,
-                teacher_id: slotForm.slot_type === 'period' ? slotForm.teacher_id : null,
-                plan_text: slotForm.slot_type === 'period' ? slotForm.plan_text : null,
-                syllabus_chapter_id: slotForm.slot_type === 'period' ? slotForm.syllabus_chapter_id : null,
-                syllabus_topic_id: slotForm.slot_type === 'period' ? slotForm.syllabus_topic_id : null,
+        name: slotForm.slot_type === 'break' ? slotForm.name : null,
+        subject_id: slotForm.slot_type === 'period' ? slotForm.subject_id : null,
+        teacher_id: slotForm.slot_type === 'period' ? slotForm.teacher_id : null,
+        plan_text: slotForm.slot_type === 'period' ? slotForm.plan_text : null,
+        syllabus_chapter_id: slotForm.slot_type === 'period' ? slotForm.syllabus_chapter_id : null,
+        syllabus_topic_id: slotForm.slot_type === 'period' ? slotForm.syllabus_topic_id : null,
       }, resolution);
 
       if (result.success) {
         showSuccess(`Slot created successfully${result.slots_shifted ? ` (${result.slots_shifted} slot(s) shifted)` : ''}`);
-              closeModal();
-              closeAllDropdowns();
+        closeModal();
+        closeAllDropdowns();
       } else {
         showError('Failed to create slot. Please try a different time slot.');
       }
@@ -729,18 +729,18 @@ export function ModernTimetableScreen() {
         showError('A timetable entry already exists for this class, date, and time period. Please choose a different time.');
       } else {
         showError(error.message || 'Failed to create slot. Please try again.');
-            }
+      }
     }
   };
-  
+
   // Handle conflict resolution
   const handleConflictResolution = (action: 'abort' | 'replace' | 'shift') => {
     setShowConflictModal(false);
-    
+
     if (action === 'abort') {
       return; // User cancelled
     }
-    
+
     if (action === 'shift' && conflictInfo) {
       // Show preview modal before applying shift
       setPendingResolution({ action, shiftDelta: conflictInfo.shiftDelta });
@@ -767,7 +767,7 @@ export function ModernTimetableScreen() {
       }
     }
   };
-  
+
   // Helper to show success message
   const showSuccess = (message: string) => {
     setSnackbarMessage(message);
@@ -797,8 +797,8 @@ export function ModernTimetableScreen() {
     }
 
     // Only check for conflicts if the TIME has changed
-    const timeChanged = 
-      slotForm.start_time !== editingSlot.start_time || 
+    const timeChanged =
+      slotForm.start_time !== editingSlot.start_time ||
       slotForm.end_time !== editingSlot.end_time;
 
     if (timeChanged) {
@@ -820,43 +820,43 @@ export function ModernTimetableScreen() {
     // No conflicts or time unchanged, proceed with update
     await performEditSlot({ action: 'abort' });
   };
-  
+
   // Perform the actual edit with resolution
   const performEditSlot = async (resolution: { action: 'abort' | 'replace' | 'shift'; replaceSlotId?: string; shiftDelta?: number }) => {
     if (!editingSlot) return;
 
     try {
       // Only pass time inputs if they've actually changed from the original
-      const timeChanged = 
-        slotForm.start_time !== editingSlot.start_time || 
+      const timeChanged =
+        slotForm.start_time !== editingSlot.start_time ||
         slotForm.end_time !== editingSlot.end_time;
 
       const result = await updateSlotWithResolution(editingSlot.id, {
-                slot_type: slotForm.slot_type as 'period' | 'break',
+        slot_type: slotForm.slot_type as 'period' | 'break',
         start_time_input: timeChanged ? slotForm.start_time_input : undefined,
         end_time_input: timeChanged ? slotForm.end_time_input : undefined,
-                name: slotForm.slot_type === 'break' ? slotForm.name : null,
-                subject_id: slotForm.slot_type === 'period' ? slotForm.subject_id : null,
-                teacher_id: slotForm.slot_type === 'period' ? slotForm.teacher_id : null,
-                plan_text: slotForm.slot_type === 'period' ? slotForm.plan_text : null,
-                syllabus_chapter_id: slotForm.slot_type === 'period' ? slotForm.syllabus_chapter_id : null,
-                syllabus_topic_id: slotForm.slot_type === 'period' ? slotForm.syllabus_topic_id : null,
+        name: slotForm.slot_type === 'break' ? slotForm.name : null,
+        subject_id: slotForm.slot_type === 'period' ? slotForm.subject_id : null,
+        teacher_id: slotForm.slot_type === 'period' ? slotForm.teacher_id : null,
+        plan_text: slotForm.slot_type === 'period' ? slotForm.plan_text : null,
+        syllabus_chapter_id: slotForm.slot_type === 'period' ? slotForm.syllabus_chapter_id : null,
+        syllabus_topic_id: slotForm.slot_type === 'period' ? slotForm.syllabus_topic_id : null,
       }, resolution);
-              
+
       if (result.success) {
         showSuccess(`Slot ${editingSlot ? 'updated' : 'created'} successfully${result.slots_shifted ? ` (${result.slots_shifted} slot(s) shifted)` : ''}`);
-              closeModal();
-              closeAllDropdowns();
+        closeModal();
+        closeAllDropdowns();
       }
     } catch (error: any) {
       showError(error.message || 'Failed to update slot. Please try again.');
-            }
+    }
   };
 
   // Handle delete slot
   const handleDeleteSlot = async (slotId: string) => {
     const slot = slots.find(s => s.id === slotId);
-    const slotDescription = slot ? 
+    const slotDescription = slot ?
       `${slot.slot_type === 'period' ? 'Period' : 'Break'}: ${slot.slot_type === 'period' ? slot.subject_name : slot.name} (${slot.start_time} - ${slot.end_time})` :
       'this slot';
 
@@ -915,7 +915,7 @@ export function ModernTimetableScreen() {
     const isTaught = taughtSlotIds.has(slot.id);
     const action = isTaught ? 'unmark' : 'mark';
     const actionText = isTaught ? 'unmark as completed' : 'mark as completed';
-    
+
     Alert.alert(
       `${isTaught ? 'Unmark' : 'Mark'} as Completed`,
       `Are you sure you want to ${actionText} this period?\n\n${slot.subject_name || 'No Subject'} - ${formatTime12Hour(slot.start_time)} to ${formatTime12Hour(slot.end_time)}`,
@@ -1005,19 +1005,19 @@ export function ModernTimetableScreen() {
     setConflictInfo(null);
     setPendingResolution(null);
   };
-  
+
   // Handle time input change with parsing
   const handleTimeInputChange = (field: 'start_time_input' | 'end_time_input', value: string) => {
     setSlotForm(prev => {
       const newForm = { ...prev, [field]: value };
-      
+
       // Parse the input
-      const startParsed = field === 'end_time_input' && newForm.start_time_input 
-        ? parseTimeInput(newForm.start_time_input) 
+      const startParsed = field === 'end_time_input' && newForm.start_time_input
+        ? parseTimeInput(newForm.start_time_input)
         : null;
       const referenceHour = startParsed?.isValid ? (startParsed as any).hour : undefined;
       const parsed = parseTimeInput(value, referenceHour);
-      
+
       if (parsed.isValid) {
         // Update the parsed time field
         if (field === 'start_time_input') {
@@ -1026,7 +1026,7 @@ export function ModernTimetableScreen() {
           newForm.end_time = parsed.formatted;
         }
       }
-      
+
       return newForm;
     });
   };
@@ -1117,7 +1117,7 @@ export function ModernTimetableScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         style={styles.mainScrollView}
         contentContainerStyle={styles.mainScrollContent}
         refreshControl={
@@ -1131,8 +1131,8 @@ export function ModernTimetableScreen() {
       >
         {/* Compact Filter Row - Soft Cards */}
         <View style={styles.modernFilterBar}>
-          <TouchableOpacity 
-            style={[styles.modernFilterCard, !selectedClassId && styles.modernFilterCardDisabled]} 
+          <TouchableOpacity
+            style={[styles.modernFilterCard, !selectedClassId && styles.modernFilterCardDisabled]}
             onPress={() => setShowClassSelector(true)}
             activeOpacity={0.7}
           >
@@ -1147,8 +1147,8 @@ export function ModernTimetableScreen() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.modernFilterCard} 
+          <TouchableOpacity
+            style={styles.modernFilterCard}
             onPress={() => setShowDatePicker(true)}
             activeOpacity={0.7}
           >
@@ -1174,58 +1174,58 @@ export function ModernTimetableScreen() {
 
         {/* Clean Timetable Content */}
         {selectedClassId ? (
-        <View style={styles.timetableContentContainer}>
-          
-          {selectedClassId && slots.length === 0 ? (
-            <EmptyStateIllustration
-              type="calendar"
-              title="No Timetable"
-              description={`No timetable for ${formatDateFull(selectedDate, 'MMM d, yyyy')}`}
-              action={
-                <TouchableOpacity
-                  style={styles.emptyActionButton}
-                  onPress={() => setShowActionsModal(true)}
-                >
-                  <Plus size={20} color={colors.text.inverse} />
-                  <RNText style={styles.emptyActionButtonText}>Add Period</RNText>
-                </TouchableOpacity>
-              }
-            />
-          ) : (
-            <View style={styles.cleanTimetableGrid}>
-              {slots.map((slot, index) => {
-                // Compact view logic - hide completed periods
-                if (compactView && isCompletedPeriod(slot) && slot.slot_type === 'period') {
-                  return null;
-                }
+          <View style={styles.timetableContentContainer}>
 
-                return (
-                  <CleanTimetableCard
-                    key={slot.id}
-                    slot={slot}
-                    index={index}
-                    onEdit={openEditModal}
-                    onDelete={handleDeleteSlot}
-                    onMarkTaught={markSlotTaught}
-                    onUnmarkTaught={unmarkSlotTaught}
-                    onStatusToggle={handleStatusToggle}
-                    taughtSlotIds={taughtSlotIds}
-                    formatTime12Hour={formatTime12Hour}
-                    isCurrentPeriod={isCurrentPeriod(slot)}
-                    isUpcomingPeriod={isUpcomingPeriod(slot)}
-                    isPastPeriod={isCompletedPeriod(slot)}
-                    setSelectedSlotForMenu={setSelectedSlotForMenu}
-                    setShowSlotMenu={setShowSlotMenu}
-                    styles={styles}
-                    colors={colors}
-                    getTopicName={getTopicName}
-                    getChapterName={getChapterName}
-                  />
-                );
-              })}
-            </View>
-          )}
-        </View>
+            {selectedClassId && slots.length === 0 ? (
+              <EmptyStateIllustration
+                type="calendar"
+                title="No Timetable"
+                description={`No timetable for ${formatDateFull(selectedDate, 'MMM d, yyyy')}`}
+                action={
+                  <TouchableOpacity
+                    style={styles.emptyActionButton}
+                    onPress={() => setShowActionsModal(true)}
+                  >
+                    <Plus size={20} color={colors.text.inverse} />
+                    <RNText style={styles.emptyActionButtonText}>Add Period</RNText>
+                  </TouchableOpacity>
+                }
+              />
+            ) : (
+              <View style={styles.cleanTimetableGrid}>
+                {slots.map((slot, index) => {
+                  // Compact view logic - hide completed periods
+                  if (compactView && isCompletedPeriod(slot) && slot.slot_type === 'period') {
+                    return null;
+                  }
+
+                  return (
+                    <CleanTimetableCard
+                      key={slot.id}
+                      slot={slot}
+                      index={index}
+                      onEdit={openEditModal}
+                      onDelete={handleDeleteSlot}
+                      onMarkTaught={markSlotTaught}
+                      onUnmarkTaught={unmarkSlotTaught}
+                      onStatusToggle={handleStatusToggle}
+                      taughtSlotIds={taughtSlotIds}
+                      formatTime12Hour={formatTime12Hour}
+                      isCurrentPeriod={isCurrentPeriod(slot)}
+                      isUpcomingPeriod={isUpcomingPeriod(slot)}
+                      isPastPeriod={isCompletedPeriod(slot)}
+                      setSelectedSlotForMenu={setSelectedSlotForMenu}
+                      setShowSlotMenu={setShowSlotMenu}
+                      styles={styles}
+                      colors={colors}
+                      getTopicName={getTopicName}
+                      getChapterName={getChapterName}
+                    />
+                  );
+                })}
+              </View>
+            )}
+          </View>
         ) : null}
       </ScrollView>
 
@@ -1236,7 +1236,7 @@ export function ModernTimetableScreen() {
         animationType="none"
         onRequestClose={() => setShowClassSelector(false)}
       >
-        <Animated.View style={[styles.bsOverlay, { opacity: overlayOpacity }]}> 
+        <Animated.View style={[styles.bsOverlay, { opacity: overlayOpacity }]}>
           <TouchableOpacity
             style={StyleSheet.absoluteFill as any}
             activeOpacity={1}
@@ -1299,35 +1299,35 @@ export function ModernTimetableScreen() {
           contentContainerStyle={styles.modalContainer}
         >
           <View style={styles.modalHeaderContainer}>
-          <Text style={styles.modalTitle}>
-            {editingSlot ? 'Edit Slot' : `Add ${slotForm.slot_type === 'period' ? 'Period' : 'Break'}`}
-          </Text>
+            <Text style={styles.modalTitle}>
+              {editingSlot ? 'Edit Slot' : `Add ${slotForm.slot_type === 'period' ? 'Period' : 'Break'}`}
+            </Text>
           </View>
 
-          <ScrollView 
+          <ScrollView
             style={styles.modalScrollContent}
             contentContainerStyle={styles.modalScrollContentContainer}
             showsVerticalScrollIndicator={true}
           >
-          <SegmentedButtons
-            value={slotForm.slot_type}
-            onValueChange={(value) => handleSlotFormChange('slot_type', value)}
-            buttons={[
-              { value: 'period', label: 'Period' },
-              { value: 'break', label: 'Break' },
-            ]}
-            style={styles.segmentedButtons}
-          />
+            <SegmentedButtons
+              value={slotForm.slot_type}
+              onValueChange={(value) => handleSlotFormChange('slot_type', value)}
+              buttons={[
+                { value: 'period', label: 'Period' },
+                { value: 'break', label: 'Break' },
+              ]}
+              style={styles.segmentedButtons}
+            />
 
             <View>
-          <TextInput
-            label="Start Time"
+              <TextInput
+                label="Start Time"
                 value={slotForm.start_time_input}
                 onChangeText={(text) => handleTimeInputChange('start_time_input', text)}
-            style={styles.textInput}
-            mode="outlined"
+                style={styles.textInput}
+                mode="outlined"
                 placeholder="e.g., 9am, 530pm, 14:30, noon"
-            outlineColor={colors.border.light}
+                outlineColor={colors.border.light}
                 activeOutlineColor={colors.primary[600]}
                 textColor={colors.text.primary}
                 placeholderTextColor={colors.text.tertiary}
@@ -1349,14 +1349,14 @@ export function ModernTimetableScreen() {
             </View>
 
             <View>
-          <TextInput
-            label="End Time"
+              <TextInput
+                label="End Time"
                 value={slotForm.end_time_input}
                 onChangeText={(text) => handleTimeInputChange('end_time_input', text)}
-            style={styles.textInput}
-            mode="outlined"
+                style={styles.textInput}
+                mode="outlined"
                 placeholder="e.g., 10am, 630pm, 15:30"
-            outlineColor={colors.border.light}
+                outlineColor={colors.border.light}
                 activeOutlineColor={colors.primary[600]}
                 textColor={colors.text.primary}
                 placeholderTextColor={colors.text.tertiary}
@@ -1377,89 +1377,89 @@ export function ModernTimetableScreen() {
               )}
             </View>
 
-          {slotForm.slot_type === 'break' && (
-            <TextInput
-              label="Break Name"
-              value={slotForm.name}
-              onChangeText={(text) => handleSlotFormChange('name', text)}
-              style={styles.textInput}
-              mode="outlined"
-              placeholder="e.g., Lunch Break"
-              outlineColor={colors.border.light}
+            {slotForm.slot_type === 'break' && (
+              <TextInput
+                label="Break Name"
+                value={slotForm.name}
+                onChangeText={(text) => handleSlotFormChange('name', text)}
+                style={styles.textInput}
+                mode="outlined"
+                placeholder="e.g., Lunch Break"
+                outlineColor={colors.border.light}
                 activeOutlineColor={colors.primary[600]}
                 textColor={colors.text.primary}
                 placeholderTextColor={colors.text.tertiary}
-            />
-          )}
+              />
+            )}
 
-          {slotForm.slot_type === 'period' && (
-            <>
-              {/* Subject Selection Button */}
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowSubjectDropdown(true)}
-              >
-                <Text style={styles.dropdownButtonText}>
-                  {subjects?.find(s => s.id === slotForm.subject_id)?.subject_name || 'Select Subject'}
-                </Text>
+            {slotForm.slot_type === 'period' && (
+              <>
+                {/* Subject Selection Button */}
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={() => setShowSubjectDropdown(true)}
+                >
+                  <Text style={styles.dropdownButtonText}>
+                    {subjects?.find(s => s.id === slotForm.subject_id)?.subject_name || 'Select Subject'}
+                  </Text>
                   <ChevronRight size={20} color={colors.text.secondary} />
-              </TouchableOpacity>
+                </TouchableOpacity>
 
-              {/* Teacher Selection Button */}
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowTeacherDropdown(true)}
-              >
-                <Text style={styles.dropdownButtonText}>
-                  {adminsList?.find(t => t.id === slotForm.teacher_id)?.full_name || 'Select Teacher'}
-                </Text>
+                {/* Teacher Selection Button */}
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={() => setShowTeacherDropdown(true)}
+                >
+                  <Text style={styles.dropdownButtonText}>
+                    {adminsList?.find(t => t.id === slotForm.teacher_id)?.full_name || 'Select Teacher'}
+                  </Text>
                   <ChevronRight size={20} color={colors.text.secondary} />
-              </TouchableOpacity>
+                </TouchableOpacity>
 
-              {/* Chapter Selection Button */}
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowChapterDropdown(true)}
-              >
-                <Text style={styles.dropdownButtonText}>
-                  {getChapterName(slotForm.syllabus_chapter_id) || 'Select Chapter'}
-                </Text>
+                {/* Chapter Selection Button */}
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={() => setShowChapterDropdown(true)}
+                >
+                  <Text style={styles.dropdownButtonText}>
+                    {getChapterName(slotForm.syllabus_chapter_id) || 'Select Chapter'}
+                  </Text>
                   <ChevronRight size={20} color={colors.text.secondary} />
-              </TouchableOpacity>
+                </TouchableOpacity>
 
-              {/* Topic Selection Button */}
-              <TouchableOpacity
-                style={styles.dropdownButton}
-                onPress={() => setShowTopicDropdown(true)}
-              >
-                <Text style={styles.dropdownButtonText}>
-                  {getTopicName(slotForm.syllabus_topic_id) || 'Select Topic'}
-                </Text>
+                {/* Topic Selection Button */}
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  onPress={() => setShowTopicDropdown(true)}
+                >
+                  <Text style={styles.dropdownButtonText}>
+                    {getTopicName(slotForm.syllabus_topic_id) || 'Select Topic'}
+                  </Text>
                   <ChevronRight size={20} color={colors.text.secondary} />
-              </TouchableOpacity>
+                </TouchableOpacity>
 
-              <TextInput
-                label="Plan Text"
-                value={slotForm.plan_text}
-                onChangeText={(text) => handleSlotFormChange('plan_text', text)}
-                style={styles.textInput}
-                mode="outlined"
-                placeholder="Lesson plan..."
-                multiline
-                numberOfLines={3}
-                outlineColor={colors.border.light}
+                <TextInput
+                  label="Plan Text"
+                  value={slotForm.plan_text}
+                  onChangeText={(text) => handleSlotFormChange('plan_text', text)}
+                  style={styles.textInput}
+                  mode="outlined"
+                  placeholder="Lesson plan..."
+                  multiline
+                  numberOfLines={3}
+                  outlineColor={colors.border.light}
                   activeOutlineColor={colors.primary[600]}
                   textColor={colors.text.primary}
                   placeholderTextColor={colors.text.tertiary}
-              />
-            </>
-          )}
+                />
+              </>
+            )}
           </ScrollView>
 
           <View style={styles.modalActions}>
-            <Button 
-              mode="outlined" 
-              onPress={closeModal} 
+            <Button
+              mode="outlined"
+              onPress={closeModal}
               style={styles.cancelButton}
               buttonColor={colors.surface.primary}
               textColor={colors.text.primary}
@@ -1489,7 +1489,7 @@ export function ModernTimetableScreen() {
           onDismiss={() => setShowQuickGenerateModal(false)}
           contentContainerStyle={styles.quickGenerateModalContainer}
         >
-          <ScrollView 
+          <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.quickGenerateModalContent}
           >
@@ -1514,7 +1514,7 @@ export function ModernTimetableScreen() {
             {/* Basic Settings Section */}
             <View style={styles.quickGenerateSection}>
               <Text style={styles.quickGenerateSectionTitle}>Basic Settings</Text>
-              
+
               <View style={styles.quickGenerateInputGroup}>
                 <View style={styles.quickGenerateInputIcon}>
                   <ListTodo size={18} color={colors.primary[600]} />
@@ -1600,7 +1600,7 @@ export function ModernTimetableScreen() {
                       </View>
                       <Text style={styles.quickGenerateBreakTitle}>Break {idx + 1}</Text>
                       <TouchableOpacity
-                        onPress={() => setQuickForm(f => ({ ...f, breaks: f.breaks.filter((_, i) => i!==idx) }))}
+                        onPress={() => setQuickForm(f => ({ ...f, breaks: f.breaks.filter((_, i) => i !== idx) }))}
                         style={styles.quickGenerateRemoveBreakBtn}
                         activeOpacity={0.7}
                       >
@@ -1612,7 +1612,7 @@ export function ModernTimetableScreen() {
                         <Text style={styles.quickGenerateLabel}>After Period</Text>
                         <TextInput
                           value={String(b.afterPeriod)}
-                          onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i===idx ? { ...bb, afterPeriod: parseInt(v || '0') } : bb) }))}
+                          onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i === idx ? { ...bb, afterPeriod: parseInt(v || '0') } : bb) }))}
                           style={styles.quickGenerateInput}
                           keyboardType="number-pad"
                           mode="outlined"
@@ -1624,7 +1624,7 @@ export function ModernTimetableScreen() {
                         <Text style={styles.quickGenerateLabel}>Duration (min)</Text>
                         <TextInput
                           value={String(b.durationMin)}
-                          onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i===idx ? { ...bb, durationMin: parseInt(v || '0') } : bb) }))}
+                          onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i === idx ? { ...bb, durationMin: parseInt(v || '0') } : bb) }))}
                           style={styles.quickGenerateInput}
                           keyboardType="number-pad"
                           mode="outlined"
@@ -1649,18 +1649,18 @@ export function ModernTimetableScreen() {
 
           {/* Actions */}
           <View style={styles.quickGenerateActions}>
-            <Button 
-              mode="outlined" 
-              onPress={() => setShowQuickGenerateModal(false)} 
+            <Button
+              mode="outlined"
+              onPress={() => setShowQuickGenerateModal(false)}
               style={styles.quickGenerateCancelBtn}
               textColor={colors.text.primary}
               labelStyle={styles.quickGenerateButtonLabel}
             >
               Cancel
             </Button>
-            <Button 
-              mode="contained" 
-              onPress={handleQuickGenerate} 
+            <Button
+              mode="contained"
+              onPress={handleQuickGenerate}
               style={styles.quickGenerateConfirmBtn}
               buttonColor={colors.primary[600]}
               textColor={colors.text.inverse}
@@ -1689,7 +1689,7 @@ export function ModernTimetableScreen() {
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalScrollView}>
             {subjects?.map((subject) => (
               <TouchableOpacity
@@ -1735,7 +1735,7 @@ export function ModernTimetableScreen() {
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalScrollView}>
             {adminsList?.map((teacher) => (
               <TouchableOpacity
@@ -1781,7 +1781,7 @@ export function ModernTimetableScreen() {
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalScrollView}>
             {getChaptersForSubject(slotForm.subject_id).map((chapter) => (
               <TouchableOpacity
@@ -1827,7 +1827,7 @@ export function ModernTimetableScreen() {
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalScrollView}>
             {getTopicsForSubject(slotForm.subject_id).map((topic) => (
               <TouchableOpacity
@@ -1873,7 +1873,7 @@ export function ModernTimetableScreen() {
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.slotMenuActions}>
             <TouchableOpacity
               onPress={() => {
@@ -1886,7 +1886,7 @@ export function ModernTimetableScreen() {
               <Edit size={20} color={colors.primary[600]} />
               <Text style={styles.slotMenuActionText}>Edit Period</Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               onPress={() => {
                 setShowSlotMenu(false);
@@ -1910,7 +1910,7 @@ export function ModernTimetableScreen() {
                 {taughtSlotIds.has(selectedSlotForMenu?.id) ? 'Mark Pending' : 'Mark Completed'}
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               onPress={() => {
                 setShowSlotMenu(false);
@@ -2038,8 +2038,8 @@ export function ModernTimetableScreen() {
               end_time: slotForm.end_time,
               slot_type: slotForm.slot_type as 'period' | 'break',
               name: slotForm.name || undefined,
-              subject_name: slotForm.slot_type === 'period' 
-                ? subjects?.find(s => s.id === slotForm.subject_id)?.subject_name 
+              subject_name: slotForm.slot_type === 'period'
+                ? subjects?.find(s => s.id === slotForm.subject_id)?.subject_name
                 : undefined,
             }}
           />
@@ -2059,8 +2059,8 @@ export function ModernTimetableScreen() {
               end_time: slotForm.end_time,
               slot_type: slotForm.slot_type as 'period' | 'break',
               name: slotForm.name || undefined,
-              subject_name: slotForm.slot_type === 'period' 
-                ? subjects?.find(s => s.id === slotForm.subject_id)?.subject_name 
+              subject_name: slotForm.slot_type === 'period'
+                ? subjects?.find(s => s.id === slotForm.subject_id)?.subject_name
                 : undefined,
             }}
             shifts={conflictInfo.affectedSlots}
@@ -2077,7 +2077,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     flex: 1,
     backgroundColor: colors.background.app,
   },
-  
+
   // Modern Header
   header: {
     backgroundColor: colors.surface.primary,
@@ -3139,11 +3139,6 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
   statusButtonTextActive: {
     color: colors.surface.primary,
   },
-  planText: {
-    fontSize: 14,
-    color: colors.text.primary,
-    fontStyle: 'italic',
-  },
   syllabusContainer: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -3309,7 +3304,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     fontSize: typography.fontSize.xs,
     color: colors.text.secondary,
   },
-  
+
   // Dropdown Button Styles
   dropdownButton: {
     flexDirection: 'row',
@@ -3635,7 +3630,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     color: colors.error[700],
     fontWeight: '600',
   },
-  
+
   // Visual Hierarchy Styles
   currentPeriodCard: {
     backgroundColor: colors.info[100],
@@ -3658,7 +3653,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     fontWeight: '600',
     color: colors.success[700],
   },
-  
+
   // Jump to Current Button
   jumpToCurrentButton: {
     backgroundColor: colors.info[100],
@@ -3673,7 +3668,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     fontWeight: '600',
     color: colors.primary[600],
   },
-  
+
   // Compact View Styles
   compactViewActive: {
     backgroundColor: colors.info[100],
@@ -3693,13 +3688,13 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     marginBottom: spacing.sm,
     paddingVertical: spacing.sm,
   },
-  
+
   // Mobile Responsive Styles
   smallScreenSlotCard: {
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.sm,
   },
-  
+
   // Teacher Avatar Styles
   subjectTeacherRow: {
     flexDirection: 'row',
@@ -3724,7 +3719,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     fontWeight: '600',
     color: colors.surface.primary,
   },
-  
+
   // Mobile Responsive Styles
   smallScreenSlotHeader: {
     marginBottom: spacing.sm,
@@ -3764,7 +3759,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
   smallScreenTeacherAvatarText: {
     fontSize: 12,
   },
-  
+
   // Mobile Break Styles
   smallScreenBreakContent: {
     paddingVertical: spacing.xs,
@@ -3784,12 +3779,12 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
   smallScreenBreakSubtitle: {
     fontSize: 10,
   },
-  
+
   // Mobile Header Styles
   smallScreenHeaderTitle: {
     fontSize: 16,
   },
-  
+
   // Status Field Styles
   statusField: {
     flexDirection: 'row',
@@ -3837,7 +3832,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
   statusFieldTextPlanned: {
     color: colors.info[600],
   },
-  
+
   // Single Line: Date Strip + Filters
   singleLineContainer: {
     flexDirection: 'row',
@@ -3915,7 +3910,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     color: colors.text.primary,
     fontWeight: '700',
   },
-  
+
   // Modern Design Styles
   modernHeader: {
     backgroundColor: colors.surface.primary,
@@ -3935,7 +3930,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     color: colors.text.secondary,
     fontWeight: '500',
   },
-  
+
   // Date Strip (for single line layout)
   dateStripContent: {
     paddingHorizontal: 0,
@@ -3981,7 +3976,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
   dateChipDateSelected: {
     color: colors.text.inverse,
   },
-  
+
   // Modern Timetable
   modernScrollView: {
     flex: 1,
@@ -4019,7 +4014,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     letterSpacing: typography.letterSpacing.wide,
     flex: 0.7,
   },
-  
+
   // Modern Period Cards
   modernPeriodCard: {
     backgroundColor: colors.surface.primary,
@@ -4145,7 +4140,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
   modernNotTaughtText: {
     color: colors.text.secondary,
   },
-  
+
   // Modern Break Cards
   modernBreakCard: {
     backgroundColor: colors.warning[100],

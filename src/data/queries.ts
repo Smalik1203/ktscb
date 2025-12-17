@@ -697,7 +697,7 @@ export async function getClassStudentsFees(
   classInstanceId: string,
   academicYearId: string,
   schoolCode: string
-): Promise<QueryResult<Array<{
+): Promise<QueryResult<{
   id: string;
   student_code: string;
   full_name: string;
@@ -709,7 +709,7 @@ export async function getClassStudentsFees(
     totalPaid: number;
     balance: number;
   };
-}>>> {
+}[]>> {
   try {
     // Get all students in this class
     const { data: students, error: studentsError } = await supabase
@@ -763,7 +763,7 @@ export async function getClassStudentsFees(
     const allPayments = normalizedPayments.data || [];
     
     // Combine student data with fee information
-    const studentsWithFees: Array<{
+    const studentsWithFees: {
       id: string;
       student_code: string;
       full_name: string;
@@ -775,7 +775,7 @@ export async function getClassStudentsFees(
         totalPaid: number;
         balance: number;
       };
-    }> = [];
+    }[] = [];
     const warnings: string[] = [...normalizedPayments.warnings];
     
     for (const student of students) {

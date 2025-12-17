@@ -1,5 +1,6 @@
 # dependencies
 node_modules/
+.npm-cache/
 
 # expo
 .expo/
@@ -37,3 +38,29 @@ eas.local.json
 
 # typescript
 *.tsbuildinfo
+
+# backup files
+*.backup
+*.backup2
+
+# log files
+*.log
+typescript-errors.log
+
+# test results
+load-test-results-*.json
+
+# temporary migration/fix scripts (one-time use)
+fix-*.js
+fix-*.sh
+fix-*.py
+migrate-*.js
+extreme-load-test.js
+
+# one-off SQL scripts (already applied)
+populate_attendance.sql
+SET_SUPER_ADMIN_ROLE.sql
+rls_security_fixes.sql
+database_optimization_queries.sql
+PREVENT_OVERPAYMENT_TRIGGER.sql
+CREATE_TASK_SUBMISSIONS_BUCKET.sql

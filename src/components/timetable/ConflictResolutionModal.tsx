@@ -16,7 +16,7 @@ interface ConflictResolutionModalProps {
   visible: boolean;
   onDismiss: () => void;
   conflicts: TimetableSlot[];
-  affectedSlots: Array<{ slot: TimetableSlot; newStart: string; newEnd: string }>;
+  affectedSlots: { slot: TimetableSlot; newStart: string; newEnd: string }[];
   shiftDelta: number;
   onResolve: (action: 'abort' | 'replace' | 'shift') => void;
   newSlotInfo: {

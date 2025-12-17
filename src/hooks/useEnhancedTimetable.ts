@@ -74,7 +74,7 @@ export interface EnhancedTimetableResult {
     excludeSlotId?: string
   ) => {
     conflicts: TimetableSlot[];
-    affectedSlots: Array<{ slot: TimetableSlot; newStart: string; newEnd: string }>;
+    affectedSlots: { slot: TimetableSlot; newStart: string; newEnd: string }[];
     shiftDelta: number;
   } | null;
   createSlotWithResolution: (

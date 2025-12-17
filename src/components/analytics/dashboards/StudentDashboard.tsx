@@ -8,8 +8,7 @@ import type { StudentAnalytics, TimePeriod, DateRange } from '../types';
 import type { DataPoint } from '../TrendChart';
 import { KPICard, TrendChart, ProgressRing } from '../';
 import { LoadingState, TimePeriodFilter } from '../shared';
-import { formatCurrency } from '../../../utils/analytics.utils';
-import { formatDateRange } from '../../../utils/analytics.utils';
+import { formatCurrency , formatDateRange } from '../../../utils/analytics.utils';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../../theme/types';
 
 export interface StudentDashboardProps {
