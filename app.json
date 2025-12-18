@@ -43,7 +43,7 @@
       }
     },
     "android": {
-      "package": "com.kts.mobile",
+      "package": "com.ktsboduppal",
       "versionCode": 1,
       "jsEngine": "hermes",
       "adaptiveIcon": {
@@ -55,7 +55,7 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE"
       ],
-      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.kts.mobile"
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.ktsboduppal"
     },
     "web": {
       "bundler": "metro",
