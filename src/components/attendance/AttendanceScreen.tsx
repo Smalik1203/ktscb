@@ -16,11 +16,13 @@ import {
   XCircle, 
   Save, 
   ChevronDown,
-  Circle
+  Circle,
+  AlertCircle
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { useStudents } from '../../hooks/useStudents';
 import { useClasses } from '../../hooks/useClasses';
@@ -41,11 +43,19 @@ export const AttendanceScreen: React.FC = () => {
   const { profile } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
   const { selectedClass, scope, setSelectedClass } = useClassSelection();
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
+  
+  // Capability-based checks (NO role checks in UI)
+  const canMarkAttendance = can('attendance.mark');
+  const canBulkMark = can('attendance.bulk_mark');
+  const canReadAllAttendance = can('attendance.read');
+  const canReadOwnAttendance = can('attendance.read_own') && !canReadAllAttendance;
+  
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState<StudentAttendanceData[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'mark' | 'history'>(
-    profile?.role === 'student' ? 'history' : 'mark'
+    canReadOwnAttendance ? 'history' : 'mark'
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [historyStartDate, setHistoryStartDate] = useState<Date>(() => {
@@ -67,28 +77,26 @@ export const AttendanceScreen: React.FC = () => {
   const dateString = selectedDate.toISOString().split('T')[0];
   const historyStartDateString = historyStartDate.toISOString().split('T')[0];
   const historyEndDateString = historyEndDate.toISOString().split('T')[0];
-  const canMark = profile?.role === 'admin' || profile?.role === 'superadmin';
-  const isStudent = profile?.role === 'student';
 
-  const { data: classes = [] } = useClasses(!isStudent ? (scope.school_code ?? undefined) : undefined);
+  const { data: classes = [] } = useClasses(canReadAllAttendance ? (scope.school_code ?? undefined) : undefined);
   const effectiveSchoolCode = scope.school_code ?? profile?.school_code ?? selectedClass?.school_code ?? null;
 
   const { data: studentsResponse, isLoading: studentsLoading, error: studentsError } = useStudents(
-    !isStudent && selectedClass?.id ? selectedClass.id : undefined,
-    !isStudent && effectiveSchoolCode ? effectiveSchoolCode : undefined
+    canReadAllAttendance && selectedClass?.id ? selectedClass.id : undefined,
+    canReadAllAttendance && effectiveSchoolCode ? effectiveSchoolCode : undefined
   );
   const students = useMemo(() => studentsResponse?.data || [], [studentsResponse?.data]);
 
   const { data: existingAttendanceRaw, isLoading: attendanceLoading, error: attendanceError } = useClassAttendance(
-    !isStudent && selectedClass?.id ? selectedClass.id : undefined,
-    !isStudent ? dateString : undefined
+    canReadAllAttendance && selectedClass?.id ? selectedClass.id : undefined,
+    canReadAllAttendance ? dateString : undefined
   );
   const existingAttendance = useMemo(() => existingAttendanceRaw || [], [existingAttendanceRaw]);
 
   const { data: attendanceSummaryRaw, isLoading: summaryLoading } = useClassAttendanceSummary(
-    !isStudent && activeTab === 'history' && selectedClass?.id ? selectedClass.id : undefined,
-    !isStudent && activeTab === 'history' ? historyStartDateString : undefined,
-    !isStudent && activeTab === 'history' ? historyEndDateString : undefined
+    canReadAllAttendance && activeTab === 'history' && selectedClass?.id ? selectedClass.id : undefined,
+    canReadAllAttendance && activeTab === 'history' ? historyStartDateString : undefined,
+    canReadAllAttendance && activeTab === 'history' ? historyEndDateString : undefined
   );
   const attendanceSummary = useMemo(() => attendanceSummaryRaw || [], [attendanceSummaryRaw]);
 
@@ -96,7 +104,7 @@ export const AttendanceScreen: React.FC = () => {
   const markBulkAttendanceMutation = useMarkBulkAttendance();
 
   useEffect(() => {
-    if (!isStudent && students && students.length > 0) {
+    if (canReadAllAttendance && students && students.length > 0) {
       const studentAttendanceData: StudentAttendanceData[] = students
         .filter(student => student && student.id && student.full_name && student.student_code)
         .map(student => {
@@ -115,22 +123,22 @@ export const AttendanceScreen: React.FC = () => {
     } else {
       setAttendanceData([]);
     }
-  }, [students, existingAttendance, dateString, isStudent]);
+  }, [students, existingAttendance, dateString, canReadAllAttendance]);
 
   const handleDateConfirm = useCallback((date: Date) => {
-    if (isStudent) return;
+    if (!canMarkAttendance) return;
     setSelectedDate(date);
     setHasChanges(true);
     setShowDatePicker(false);
-  }, [isStudent]);
+  }, [canMarkAttendance]);
 
   const handleDateCancel = useCallback(() => {
-    if (isStudent) return;
+    if (!canMarkAttendance) return;
     setShowDatePicker(false);
-  }, [isStudent]);
+  }, [canMarkAttendance]);
 
   const handleStatusChange = useCallback((studentId: string, status: AttendanceStatus) => {
-    if (isStudent) return;
+    if (!canMarkAttendance) return;
     setAttendanceData(prev => {
       const updated = prev.map(s => {
         if (s.studentId === studentId) {
@@ -142,11 +150,22 @@ export const AttendanceScreen: React.FC = () => {
       return updated;
     });
     setHasChanges(true);
-  }, [isStudent]);
+  }, [canMarkAttendance]);
 
   const handleSave = async () => {
     if (!selectedClass?.id || !effectiveSchoolCode || !profile?.auth_id) {
       Alert.alert('Error', 'Please select a class and ensure you are logged in');
+      return;
+    }
+
+    // Validate that all students are marked
+    const unmarkedStudents = attendanceData.filter(student => student.status === null);
+    if (unmarkedStudents.length > 0) {
+      Alert.alert(
+        'Incomplete Attendance',
+        `Please mark attendance for all students before saving.\n\n${unmarkedStudents.length} student${unmarkedStudents.length > 1 ? 's' : ''} still unmarked.`,
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -167,26 +186,65 @@ export const AttendanceScreen: React.FC = () => {
       return;
     }
 
+    // Double-check: all students should be marked at this point
+    if (records.length !== attendanceData.length) {
+      Alert.alert(
+        'Validation Error',
+        `Expected ${attendanceData.length} attendance records but only ${records.length} are valid. Please mark all students.`
+      );
+      return;
+    }
+
+    // Check for existing attendance conflicts
+    const existingRecords = existingAttendance || [];
+    const hasExistingAttendance = existingRecords.length > 0;
+    const existingMarkedBy = existingRecords.length > 0 ? existingRecords[0].marked_by : null;
+    const existingRole = existingRecords.length > 0 ? existingRecords[0].marked_by_role_code : null;
+    const existingCreatedAt = existingRecords.length > 0 && existingRecords[0].created_at 
+      ? new Date(existingRecords[0].created_at) 
+      : null;
+    const isMarkedByDifferentUser = hasExistingAttendance && existingMarkedBy !== profile.auth_id;
+
     const presentCount = records.filter(r => r.status === 'present').length;
     const absentCount = records.filter(r => r.status === 'absent').length;
 
+    // Build confirmation message
+    let confirmMessage = `Save attendance for ${selectedDate.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    })}?\n\n📊 All ${records.length} students marked\n✅ ${presentCount} Present\n❌ ${absentCount} Absent`;
+
+    if (hasExistingAttendance) {
+      const dateStr = existingCreatedAt 
+        ? existingCreatedAt.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: 'numeric', 
+            minute: '2-digit' 
+          })
+        : 'previously';
+      
+      if (isMarkedByDifferentUser) {
+        confirmMessage += `\n\n⚠️ WARNING: Attendance was already marked by ${existingRole || 'another user'} on ${dateStr}.\n\nThis will overwrite the existing attendance.`;
+      } else {
+        confirmMessage += `\n\nℹ️ Attendance was previously marked on ${dateStr}.\n\nThis will update the existing records.`;
+      }
+    }
+
     Alert.alert(
-      'Confirm Attendance',
-      `Save attendance for ${selectedDate.toLocaleDateString('en-US', { 
-        weekday: 'short', 
-        month: 'short', 
-        day: 'numeric' 
-      })}?\n\n📊 ${records.length} students marked\n✅ ${presentCount} Present\n❌ ${absentCount} Absent`,
+      hasExistingAttendance ? (isMarkedByDifferentUser ? 'Overwrite Attendance?' : 'Update Attendance?') : 'Confirm Attendance',
+      confirmMessage,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Save Attendance',
-          style: 'default',
+          text: hasExistingAttendance ? (isMarkedByDifferentUser ? 'Overwrite' : 'Update') : 'Save Attendance',
+          style: isMarkedByDifferentUser ? 'destructive' : 'default',
           onPress: async () => {
             try {
               await markAttendanceMutation.mutateAsync(records);
               setHasChanges(false);
-              Alert.alert('✅ Success', `Attendance saved successfully for ${records.length} students.`);
+              Alert.alert('✅ Success', `Attendance saved successfully for all ${records.length} students.`);
             } catch (error) {
               Alert.alert('Error', 'Failed to save attendance. Please check your connection and try again.');
             }
@@ -205,14 +263,43 @@ export const AttendanceScreen: React.FC = () => {
     const statusText = status === 'present' ? 'Present' : 'Absent';
     const studentCount = students.length;
 
+    // Check for existing attendance conflicts
+    const existingRecords = existingAttendance || [];
+    const hasExistingAttendance = existingRecords.length > 0;
+    const existingMarkedBy = existingRecords.length > 0 ? existingRecords[0].marked_by : null;
+    const existingRole = existingRecords.length > 0 ? existingRecords[0].marked_by_role_code : null;
+    const existingCreatedAt = existingRecords.length > 0 && existingRecords[0].created_at 
+      ? new Date(existingRecords[0].created_at) 
+      : null;
+    const isMarkedByDifferentUser = hasExistingAttendance && existingMarkedBy !== profile.auth_id;
+
+    let confirmMessage = `Are you sure you want to mark all ${studentCount} students as ${statusText.toLowerCase()}?`;
+
+    if (hasExistingAttendance) {
+      const dateStr = existingCreatedAt 
+        ? existingCreatedAt.toLocaleString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            hour: 'numeric', 
+            minute: '2-digit' 
+          })
+        : 'previously';
+      
+      if (isMarkedByDifferentUser) {
+        confirmMessage += `\n\n⚠️ WARNING: Attendance was already marked by ${existingRole || 'another user'} on ${dateStr}.\n\nThis will overwrite the existing attendance for all students.`;
+      } else {
+        confirmMessage += `\n\nℹ️ Attendance was previously marked on ${dateStr}.\n\nThis will update all existing records.`;
+      }
+    }
+
     Alert.alert(
-      `Mark All ${statusText}?`,
-      `Are you sure you want to mark all ${studentCount} students as ${statusText.toLowerCase()}?`,
+      hasExistingAttendance ? (isMarkedByDifferentUser ? `Overwrite All as ${statusText}?` : `Update All as ${statusText}?`) : `Mark All ${statusText}?`,
+      confirmMessage,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: `Yes, Mark All ${statusText}`,
-          style: status === 'present' ? 'default' : 'destructive',
+          text: hasExistingAttendance ? (isMarkedByDifferentUser ? `Overwrite All ${statusText}` : `Update All ${statusText}`) : `Yes, Mark All ${statusText}`,
+          style: isMarkedByDifferentUser ? 'destructive' : (status === 'present' ? 'default' : 'destructive'),
           onPress: async () => {
             try {
               setAttendanceData(prev => prev.map(student => ({ ...student, status })));
@@ -247,11 +334,60 @@ export const AttendanceScreen: React.FC = () => {
     );
   };
 
+  // Users who can only view their own attendance see the student view
+  if (canReadOwnAttendance) {
+    return <StudentAttendanceView />;
+  }
+
+  // Three-state handling for admin/teacher view
+  const isLoading = studentsLoading || attendanceLoading;
+  const hasError = studentsError || attendanceError;
+  const hasData = students && students.length > 0;
+
+  if (isLoading && !hasData) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary[600]} />
+        <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>
+          Loading attendance data...
+        </Text>
+      </View>
+    );
+  }
+
+  if (hasError && !isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: spacing.lg }]}>
+        <AlertCircle size={48} color={colors.error[600]} />
+        <Text style={{ marginTop: spacing.md, color: colors.error.main, textAlign: 'center' }}>
+          Failed to load attendance data
+        </Text>
+        <Text style={{ marginTop: spacing.sm, color: colors.text.secondary, textAlign: 'center', fontSize: typography.fontSize.sm }}>
+          {studentsError?.message || attendanceError?.message || 'Please check your connection and try again'}
+        </Text>
+      </View>
+    );
+  }
+
   if (!selectedClass) {
     return (
       <View style={styles.emptyContainer}>
         <Users size={48} color={colors.text.tertiary} />
         <Text style={styles.emptyText}>Please select a class to view attendance</Text>
+      </View>
+    );
+  }
+
+  if (!hasData && !isLoading && !hasError) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: spacing.lg }]}>
+        <Users size={48} color={colors.text.tertiary} />
+        <Text style={{ marginTop: spacing.md, color: colors.text.secondary, textAlign: 'center' }}>
+          No students found
+        </Text>
+        <Text style={{ marginTop: spacing.sm, color: colors.text.tertiary, textAlign: 'center', fontSize: typography.fontSize.sm }}>
+          Please select a class to mark attendance
+        </Text>
       </View>
     );
   }
@@ -268,7 +404,7 @@ export const AttendanceScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {!isStudent && (
+      {canReadAllAttendance && (
         <View style={styles.tabContainer}>
           <SegmentedButtons
             value={activeTab}
@@ -282,7 +418,7 @@ export const AttendanceScreen: React.FC = () => {
         </View>
       )}
 
-      {!isStudent && (
+      {canReadAllAttendance && (
         <View style={styles.filterSection}>
           {activeTab === 'mark' ? (
             <View style={styles.filterRow}>
@@ -408,11 +544,37 @@ export const AttendanceScreen: React.FC = () => {
                 {attendanceData?.filter(s => s.status === null).length || 0} unmarked
               </Text>
             </View>
-            {hasChanges && (
-              <View style={styles.changesBadge}>
-                <Text style={styles.changesBadgeText}>Unsaved</Text>
-              </View>
-            )}
+            <View style={styles.headerActions}>
+              {hasChanges && (
+                <View style={styles.changesBadge}>
+                  <Text style={styles.changesBadgeText}>Unsaved</Text>
+                </View>
+              )}
+              {canBulkMark && attendanceData.length > 0 && (
+                <View style={styles.bulkActions}>
+                  <TouchableOpacity
+                    style={[styles.bulkButton, styles.bulkButtonPresent]}
+                    onPress={() => handleBulkMark('present')}
+                    activeOpacity={0.7}
+                  >
+                    <CheckCircle size={16} color={colors.success[700]} />
+                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextPresent]}>
+                      All Present
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.bulkButton, styles.bulkButtonAbsent]}
+                    onPress={() => handleBulkMark('absent')}
+                    activeOpacity={0.7}
+                  >
+                    <XCircle size={16} color={colors.error[700]} />
+                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextAbsent]}>
+                      All Absent
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </View>
 
           <View style={styles.studentsList}>
@@ -484,7 +646,7 @@ export const AttendanceScreen: React.FC = () => {
                         <Text style={styles.studentCode}>{student.studentCode}</Text>
                       </View>
                       
-                      {canMark && (
+                      {canMarkAttendance && (
                         <View style={styles.statusButtons}>
                           <TouchableOpacity
                             style={[styles.statusButton, presentButtonStyle]}
@@ -539,7 +701,7 @@ export const AttendanceScreen: React.FC = () => {
         </View>
       ) : (
           <View style={styles.historyContainer}>
-            {isStudent ? (
+            {canReadOwnAttendance ? (
               <StudentAttendanceView />
             ) : (
               !selectedClass ? (
@@ -714,12 +876,21 @@ export const AttendanceScreen: React.FC = () => {
         title="Select End Date"
       />
 
-      {hasChanges && canMark && (
+      {hasChanges && canMarkAttendance && (
         <View style={styles.saveButtonContainer}>
+          {attendanceData.length > 0 && attendanceData.filter(s => s.status === null).length > 0 && (
+            <View style={styles.warningBanner}>
+              <AlertCircle size={16} color={colors.warning[700]} />
+              <Text style={styles.warningText}>
+                {attendanceData.filter(s => s.status === null).length} student{attendanceData.filter(s => s.status === null).length > 1 ? 's' : ''} unmarked
+              </Text>
+            </View>
+          )}
           <TouchableOpacity
             style={[
               styles.saveButton,
-              markAttendanceMutation.isPending && styles.saveButtonDisabled
+              markAttendanceMutation.isPending && styles.saveButtonDisabled,
+              attendanceData.length > 0 && attendanceData.filter(s => s.status === null).length > 0 && styles.saveButtonWarning
             ]}
             onPress={handleSave}
             disabled={markAttendanceMutation.isPending}
@@ -734,7 +905,7 @@ export const AttendanceScreen: React.FC = () => {
               <>
                 <Save size={20} color={colors.text.inverse} />
                 <Text style={styles.saveButtonText}>
-                  Save Attendance ({attendanceData.filter(s => s.status !== null).length})
+                  Save Attendance ({attendanceData.filter(s => s.status !== null).length}/{attendanceData.length})
                 </Text>
               </>
             )}
@@ -870,8 +1041,14 @@ const createStyles = (
   studentsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: spacing.md,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexShrink: 0,
   },
   studentsSubtitle: {
     fontSize: typography.fontSize.sm,
@@ -890,6 +1067,38 @@ const createStyles = (
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
     color: colors.warning[700],
+  },
+  bulkActions: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    alignItems: 'center',
+  },
+  bulkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs + 2,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1.5,
+    gap: spacing.xs,
+  },
+  bulkButtonPresent: {
+    backgroundColor: colors.success[50],
+    borderColor: colors.success[300],
+  },
+  bulkButtonAbsent: {
+    backgroundColor: colors.error[50],
+    borderColor: colors.error[300],
+  },
+  bulkButtonText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  bulkButtonTextPresent: {
+    color: colors.success[700],
+  },
+  bulkButtonTextAbsent: {
+    color: colors.error[700],
   },
   flatListContent: {
     paddingBottom: spacing.xl,
@@ -1030,6 +1239,24 @@ const createStyles = (
     borderTopColor: colors.border.light,
     ...shadows.lg,
   },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.warning[50],
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.warning[300],
+  },
+  warningText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.warning[700],
+  },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1040,6 +1267,9 @@ const createStyles = (
     borderRadius: borderRadius.xl,
     gap: spacing.sm,
     ...shadows.md,
+  },
+  saveButtonWarning: {
+    backgroundColor: colors.warning.main,
   },
   saveButtonDisabled: {
     opacity: 0.6,

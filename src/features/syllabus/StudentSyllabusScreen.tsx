@@ -174,13 +174,20 @@ export default function StudentSyllabusTab() {
     return subjects.find(s => s.id === selectedSubjectId)?.subject_name || 'Subject';
   }, [subjects, selectedSubjectId]);
 
+  // Three-state handling
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" color={colors.primary[600]} />
+        <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>
+          Loading syllabus...
+        </Text>
       </View>
     );
   }
+
+  // Error state would be handled by parent or in loadSyllabus catch block
+  // Empty state is handled below in the render
 
   return (
     <View style={styles.container}>

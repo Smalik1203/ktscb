@@ -130,6 +130,14 @@ export default function CalendarEventFormModal({
 
     setLoading(true);
     try {
+      // Format dates in local timezone to avoid date shifting
+      const formatDateLocal = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
       const eventData = {
         school_code: schoolCode,
         academic_year_id: academicYearId,
@@ -137,8 +145,8 @@ export default function CalendarEventFormModal({
         title: title.trim(),
         description: description.trim(),
         event_type: eventType,
-        start_date: startDate.toISOString().split('T')[0],
-        end_date: endDate ? endDate.toISOString().split('T')[0] : startDate.toISOString().split('T')[0],
+        start_date: formatDateLocal(startDate),
+        end_date: endDate ? formatDateLocal(endDate) : formatDateLocal(startDate),
         is_all_day: isAllDay,
         start_time: isAllDay ? null : startTime.toTimeString().split(' ')[0].substring(0, 5),
         end_time: isAllDay ? null : endTime.toTimeString().split(' ')[0].substring(0, 5),

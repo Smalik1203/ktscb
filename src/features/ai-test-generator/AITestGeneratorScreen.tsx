@@ -33,7 +33,7 @@ import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
 import { useCreateTest } from '../../hooks/tests';
 import { TestInput } from '../../types/test.types';
-import { supabase } from '../../lib/supabase';
+import { api } from '../../services/api';
 
 export default function AITestGeneratorScreen() {
   const router = useRouter();
@@ -187,13 +187,8 @@ export default function AITestGeneratorScreen() {
         order_index: index,
       }));
 
-      const { error: questionsError } = await supabase
-        .from('test_questions')
-        .insert(questionsToCreate);
-
-      if (questionsError) {
-        throw new Error(questionsError.message || 'Failed to create questions');
-      }
+      // Create questions via service (capability assertion happens there)
+      await api.testQuestions.createBulk(questionsToCreate);
 
       Alert.alert(
         '🎉 Success!',

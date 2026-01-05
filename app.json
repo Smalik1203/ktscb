@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "default",
     "scheme": "kts",
-    "icon": "./assets/images/Image.png",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -15,9 +15,9 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kts.mobile",
+      "bundleIdentifier": "com.ktsboduppal",
       "jsEngine": "hermes",
-      "icon": "./assets/images/Image.png",
+      "icon": "./assets/images/icon.png",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -46,11 +46,12 @@
       "package": "com.ktsboduppal",
       "versionCode": 1,
       "jsEngine": "hermes",
+      "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/Image.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#6B3FA0"
       },
-      "icon": "./assets/images/Image.png",
+      "icon": "./assets/images/icon.png",
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE"

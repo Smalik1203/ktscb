@@ -8,7 +8,9 @@ export function initSentry() {
   const sentryDSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 
   if (!sentryDSN) {
-    console.log('Sentry DSN not configured - error tracking disabled');
+    if (__DEV__) {
+      console.log('Sentry DSN not configured - error tracking disabled');
+    }
     return;
   }
 
@@ -95,7 +97,7 @@ export function captureError(error: Error, context?: Record<string, any>) {
 export function captureMessage(message: string, level: Sentry.SeverityLevel = 'info') {
   if (!__DEV__) {
     Sentry.captureMessage(message, level);
-  } else {
+  } else if (__DEV__) {
     console.log(`[${level}]`, message);
   }
 }

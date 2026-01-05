@@ -165,7 +165,7 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = () => {
-    Alert.alert('Forgot Password', 'Password reset functionality will be implemented soon.');
+    router.push('/forgot-password');
   };
 
   // Card style using theme tokens

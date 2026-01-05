@@ -223,9 +223,11 @@ export function useDashboardStats(userId: string, classInstanceId?: string, role
       }
     },
     enabled: !!userId && !!classInstanceId,
-    staleTime: 2 * 60 * 1000, // 2 minutes - fresh data without aggressive polling
-    refetchOnWindowFocus: true, // ✅ Fresh data when user returns
-    refetchOnMount: true, // ✅ Fresh data on screen load
+    staleTime: 5 * 60 * 1000, // 5 minutes (was 2 minutes - too aggressive)
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false, // Don't refetch on every focus
+    refetchOnMount: true,
+    keepPreviousData: true // Keep old data while fetching
   });
 }
 

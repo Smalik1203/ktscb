@@ -9,6 +9,7 @@ import { spacing, borderRadius, typography, colors } from '../../../lib/design-s
 import { EmptyState } from '../../components/ui';
 // removed import/export UI
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
 import { computeProgress, fetchClassesForSchool, fetchProgress, fetchSubjectsForSchool, fetchSyllabusTree, ensureSyllabusId, addChapter, updateChapter, deleteChapter, addTopic, updateTopic, deleteTopic, type SyllabusTree } from '../../services/syllabus';
 import { AddChapterTopicModal } from '../../components/syllabus';
 
@@ -677,10 +678,12 @@ function TeacherSyllabusScreen() {
 }
 
 export default function SyllabusTab() {
-    const { profile } = useAuth();
-    const role = profile?.role || 'unknown';
-    const isStaff = role === 'teacher' || role === 'admin' || role === 'superadmin' || role === 'cb_admin';
-    if (!isStaff) {
+    const { can } = useCapabilities();
+    
+    // Capability-based check - show staff view if user can manage syllabus
+    const canManageSyllabus = can('syllabus.manage');
+    
+    if (!canManageSyllabus) {
         return <StudentSyllabusTab />;
     }
     return <TeacherSyllabusScreen />;

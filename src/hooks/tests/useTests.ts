@@ -2,11 +2,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../services/api';
 import { TestInput, TestWithDetails } from '../../types/test.types';
 
-export function useTests(schoolCode: string, classInstanceId?: string) {
+export function useTests(schoolCode: string, classInstanceId?: string, options?: { limit?: number; offset?: number; test_mode?: 'online' | 'offline' }) {
   return useQuery({
-    queryKey: ['tests', schoolCode, classInstanceId],
+    queryKey: ['tests', schoolCode, classInstanceId, options?.limit, options?.offset, options?.test_mode],
     queryFn: async () => {
-      const tests = await api.tests.getWithStats(schoolCode, classInstanceId);
+      const tests = await api.tests.getWithStats(schoolCode, classInstanceId, options);
       return tests as TestWithDetails[];
     },
     enabled: !!schoolCode,

@@ -4,6 +4,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import type { SuperAdminAnalytics, StudentAnalytics, TimePeriod, DateRange } from '../../components/analytics/types';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../useCapabilities';
 import { getDateRangeForPeriod } from '../../components/analytics/types';
 import { useActiveAcademicYear } from '../useAcademicYears';
 import { supabase } from '../../lib/supabase';
@@ -183,7 +184,8 @@ async function fetchAcademicsData(
   endDate: string,
   classInstanceId?: string
 ) {
-  // Get tests in the date range - use test_date if available, otherwise created_at
+  // OPTIMIZED: Filter by date range in SQL, not JavaScript
+  // Use test_date if available, otherwise created_at
   let testsQuery = supabase
     .from('tests')
     .select(`
@@ -197,20 +199,15 @@ async function fetchAcademicsData(
       class_instances!inner(school_code, academic_year_id)
     `)
     .eq('class_instances.school_code', schoolCode)
-    .eq('class_instances.academic_year_id', academicYearId);
+    .eq('class_instances.academic_year_id', academicYearId)
+    // Filter: (test_date in range) OR (test_date is null AND created_at in range)
+    .or(`and(test_date.gte.${startDate},test_date.lte.${endDate}),and(test_date.is.null,created_at.gte.${startDate},created_at.lte.${endDate})`);
 
   if (classInstanceId) {
     testsQuery = testsQuery.eq('class_instance_id', classInstanceId);
   }
 
-  const { data: allTests } = await testsQuery;
-
-  // Filter tests by date range (using test_date if available, otherwise created_at)
-  const tests = (allTests || []).filter((t: any) => {
-    const testDateStr = t.test_date || t.created_at?.split('T')[0];
-    if (!testDateStr) return true; // Include if no date
-    return testDateStr >= startDate && testDateStr <= endDate;
-  });
+  const { data: tests } = await testsQuery;
 
   if (!tests || tests.length === 0) {
     return {
@@ -403,18 +400,20 @@ async function fetchSyllabusData(
 export function useSuperAdminAnalytics(options: UseAggregatedAnalyticsOptions) {
   const { timePeriod, classInstanceId, customDateRange } = options;
   const { profile } = useAuth();
+  const { can } = useCapabilities();
 
   const { startDate, endDate } = getDateRangeForPeriod(timePeriod, customDateRange);
 
   const schoolCode = profile?.school_code || null;
-  const hasValidRole = profile?.role === 'superadmin' || profile?.role === 'cb_admin' || profile?.role === 'admin';
+  // Capability-based access check - user must be able to view school analytics
+  const canViewSchoolAnalytics = can('analytics.read_school');
 
   // Fetch active academic year
   const activeAcademicYearQuery = useActiveAcademicYear(schoolCode);
   const academicYearId = activeAcademicYearQuery.data?.id || null;
 
   const hasValidParams = !!schoolCode && !!academicYearId;
-  const enabled = hasValidParams && hasValidRole && activeAcademicYearQuery.isSuccess;
+  const enabled = hasValidParams && canViewSchoolAnalytics && activeAcademicYearQuery.isSuccess;
 
   return useQuery({
     // Include timePeriod in queryKey to ensure refetch when it changes
@@ -713,7 +712,7 @@ async function fetchStudentFeesData(
 ) {
   const { data: feeSummary } = await supabase
     .from('student_fee_summary')
-    .select('*')
+    .select('student_id, class_instance_id, component_code, base_paise, collected_amount_inr, collection_percentage, balance_paise')
     .eq('student_id', studentId)
     .single();
 
@@ -888,18 +887,23 @@ async function fetchStudentSyllabusProgress(
 export function useStudentAggregatedAnalytics(options: UseAggregatedAnalyticsOptions) {
   const { timePeriod, customDateRange } = options;
   const { profile } = useAuth();
+  const { can } = useCapabilities();
 
   const { startDate, endDate } = getDateRangeForPeriod(timePeriod, customDateRange);
 
   const schoolCode = profile?.school_code || null;
   const studentId = profile?.auth_id || null;
-  const isStudent = profile?.role === 'student';
+  // Capability-based access check - user must be able to view their own analytics
+  const canViewOwnAnalytics = can('analytics.read_own');
+  const canViewSchoolAnalytics = can('analytics.read_school');
+  // Only enable for users who can view own but NOT school analytics (students)
+  const isStudentView = canViewOwnAnalytics && !canViewSchoolAnalytics;
 
   const activeAcademicYearQuery = useActiveAcademicYear(schoolCode);
   const academicYearId = activeAcademicYearQuery.data?.id || null;
 
   const hasValidParams = !!schoolCode && !!studentId && !!academicYearId;
-  const enabled = hasValidParams && isStudent && activeAcademicYearQuery.isSuccess;
+  const enabled = hasValidParams && isStudentView && activeAcademicYearQuery.isSuccess;
 
   return useQuery({
     // Include timePeriod in queryKey for proper refetching

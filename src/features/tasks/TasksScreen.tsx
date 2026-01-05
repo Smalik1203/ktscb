@@ -7,6 +7,8 @@ import { Stack } from 'expo-router';
 import { ClipboardList, Plus, Calendar, AlertCircle, CheckCircle, Clock, Edit, Trash2, MoreVertical, Users, BookOpen, AlertTriangle, X, BarChart3, FileCheck, FileText, Download } from 'lucide-react-native';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import { AccessDenied } from '../../components/common/AccessDenied';
 import { useTasks, useStudentTasks, useTaskStats, useCreateTask, useUpdateTask, useDeleteTask, Task, useTaskSubmissions, useSubmitTask, useUnsubmitTask } from '../../hooks/useTasks';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
@@ -326,7 +328,12 @@ function formatSubmissionStatus(status: string): string {
 export default function TasksScreen() {
   const { profile } = useAuth();
   const { colors, isDark, typography, spacing, borderRadius } = useTheme();
-  const isStudent = profile?.role === 'student';
+  const { can, isReady: capabilitiesReady } = useCapabilities();
+  
+  // Capability-based access control
+  const canViewOwnTasks = can('tasks.read_own');
+  const canManageTasks = can('tasks.manage');
+  
   const [searchQuery, setSearchQuery] = useState('');
   
   // Create dynamic styles based on theme
@@ -375,9 +382,9 @@ export default function TasksScreen() {
   const unsubmitTask = useUnsubmitTask();
   
   React.useEffect(() => {
-    if (isStudent && profile?.auth_id) {
-      // Fetch student ID from database
-      import('../../data/supabaseClient').then(({ supabase }) => {
+    if (canViewOwnTasks && !canManageTasks && profile?.auth_id) {
+      // Fetch student ID from database (only for students viewing their own tasks)
+      import('../../lib/supabase').then(({ supabase }) => {
         supabase
           .from('student')
           .select('id')
@@ -388,7 +395,7 @@ export default function TasksScreen() {
           });
       });
     }
-  }, [isStudent, profile?.auth_id]);
+  }, [canViewOwnTasks, canManageTasks, profile?.auth_id]);
 
   // Fetch data based on role
   const schoolCode = profile?.school_code || '';
@@ -398,7 +405,10 @@ export default function TasksScreen() {
   const { data: subjectsResult } = useSubjects(schoolCode);
   const subjects = subjectsResult?.data || [];
   
-  const { data: adminTasks, isLoading: adminLoading, refetch: refetchAdmin } = useTasks(
+  // Determine if this is a student-only view (can view own but can't manage)
+  const isStudentView = canViewOwnTasks && !canManageTasks;
+  
+  const { data: adminTasks, isLoading: adminLoading, error: adminError, refetch: refetchAdmin } = useTasks(
     schoolCode,
     { 
       classInstanceId: selectedClassId,
@@ -409,18 +419,19 @@ export default function TasksScreen() {
     }
   );
   
-  const { data: studentTasksData, isLoading: studentLoading, refetch: refetchStudent } = useStudentTasks(
+  const { data: studentTasksData, isLoading: studentLoading, error: studentError, refetch: refetchStudent } = useStudentTasks(
     studentId || ''
   );
   
-  const { data: adminStats, isLoading: statsLoading } = useTaskStats(schoolCode, selectedClassId);
+  const { data: adminStats, isLoading: statsLoading, error: statsError } = useTaskStats(schoolCode, selectedClassId);
   
-  const tasks = isStudent ? studentTasksData : adminTasks;
-  const isLoading = isStudent ? studentLoading : adminLoading;
+  const tasks = isStudentView ? studentTasksData : adminTasks;
+  const isLoading = isStudentView ? studentLoading : adminLoading;
+  const error = isStudentView ? studentError : adminError;
 
   // Calculate student stats from their tasks (only unsubmitted tasks count)
   const studentStats = useMemo(() => {
-    if (!isStudent || !studentTasksData) {
+    if (!isStudentView || !studentTasksData) {
       return null;
     }
 
@@ -448,10 +459,10 @@ export default function TasksScreen() {
       overdue,
       upcoming,
     };
-  }, [isStudent, studentTasksData]);
+  }, [isStudentView, studentTasksData]);
   
   // Use student stats if student, otherwise use admin stats
-  const stats = isStudent ? studentStats : adminStats;
+  const stats = isStudentView ? studentStats : adminStats;
   
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
@@ -461,8 +472,8 @@ export default function TasksScreen() {
   const [academicYearId, setAcademicYearId] = React.useState<string | undefined>(undefined);
   
   React.useEffect(() => {
-    if (schoolCode && !isStudent) {
-      import('../../data/supabaseClient').then(({ supabase }) => {
+    if (schoolCode && canManageTasks) {
+      import('../../lib/supabase').then(({ supabase }) => {
         supabase
           .from('academic_years')
           .select('id')
@@ -474,7 +485,7 @@ export default function TasksScreen() {
           });
       });
     }
-  }, [schoolCode, isStudent]);
+  }, [schoolCode, canManageTasks]);
 
   // Filter tasks (client-side filtering for students, server-side for admins)
   const filteredTasks = useMemo(() => {
@@ -557,7 +568,7 @@ export default function TasksScreen() {
   };
 
   const onRefresh = () => {
-    if (isStudent) {
+    if (isStudentView) {
       refetchStudent();
     } else {
       refetchAdmin();
@@ -687,11 +698,24 @@ export default function TasksScreen() {
     });
   };
 
+  // Show access denied if user has no task-related capabilities
+  if (capabilitiesReady && !canViewOwnTasks && !canManageTasks) {
+    return (
+      <>
+        <Stack.Screen options={{ title: 'Tasks', headerShown: true }} />
+        <AccessDenied 
+          message="You don't have permission to view tasks."
+          requiredCapability="tasks.read_own"
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <Stack.Screen 
         options={{ 
-          title: isStudent ? 'My Tasks' : 'Task Management',
+          title: isStudentView ? 'My Tasks' : 'Task Management',
           headerShown: true
         }} 
       />
@@ -746,7 +770,7 @@ export default function TasksScreen() {
                 </View>
               </TouchableOpacity>
 
-              {!isStudent && (
+              {canManageTasks && (
                 <>
                   {/* Divider */}
                   <View style={styles.filterDivider} />
@@ -812,28 +836,50 @@ export default function TasksScreen() {
             </View>
           )}
 
-          {/* Loading State - only show if no data loaded yet */}
-        {isLoading && !stats && !tasks?.length && (
+          {/* Loading State - show skeleton during initial load */}
+        {isLoading && !tasks && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary[600]} />
             <Text style={styles.loadingText}>Loading tasks...</Text>
           </View>
         )}
 
-        {/* Empty State */}
-        {!isLoading && filteredTasks.length === 0 && (
+        {/* Error State */}
+        {error && !isLoading && (
+          <View style={styles.errorContainer}>
+            <AlertCircle size={48} color={colors.error[600]} />
+            <Text style={styles.errorText}>Failed to load tasks</Text>
+            <Text style={styles.errorDetails}>{error.message || 'Please check your connection and try again'}</Text>
+            <Button
+              mode="contained"
+              onPress={() => {
+                if (isStudentView) {
+                  refetchStudent();
+                } else {
+                  refetchAdmin();
+                }
+              }}
+              style={styles.retryButton}
+            >
+              Retry
+            </Button>
+          </View>
+        )}
+
+        {/* Empty State - only show when not loading and no error */}
+        {!isLoading && !error && (!tasks || (Array.isArray(tasks) && filteredTasks.length === 0)) && (
           <EmptyStateIllustration
             type="tasks"
             title="No Tasks Found"
             description={
               searchQuery
                 ? 'Try adjusting your search or filters to find what you\'re looking for'
-                : isStudent
+                : isStudentView
                   ? 'You\'re all caught up! No tasks have been assigned yet.'
                   : 'Get started by creating your first task for your class'
             }
             action={
-              !isStudent && !searchQuery ? (
+              canManageTasks && !searchQuery ? (
                 <Button
                   mode="contained"
                   onPress={handleCreateTask}
@@ -868,7 +914,7 @@ export default function TasksScreen() {
               />
             </View>
 
-            {isStudent ? (
+            {isStudentView ? (
               // Student view: Separate submitted and unsubmitted tasks
               (() => {
                 const submittedTasks = filteredTasks.filter((task: any) => 
@@ -948,7 +994,7 @@ export default function TasksScreen() {
                       </View>
                     </View>
                     
-                    {!isStudent && (
+                    {canManageTasks && (
                       <View style={styles.taskHeaderRight}>
                         <Menu
                           visible={taskMenuVisible[task.id] || false}
@@ -1050,7 +1096,7 @@ export default function TasksScreen() {
                           </View>
                         </>
                       )}
-                      {!isStudent && task._count?.submissions !== undefined && (
+                      {canManageTasks && task._count?.submissions !== undefined && (
                         <>
                           <View style={styles.taskMetaDivider} />
                           <View style={styles.taskMetaItem}>
@@ -1167,7 +1213,7 @@ export default function TasksScreen() {
       </Modal>
 
       {/* Class Filter Modal - Bottom Sheet (Admin/Teacher only) */}
-      {!isStudent && (
+      {canManageTasks && (
         <Modal
           visible={showClassModal}
           transparent
@@ -1258,7 +1304,7 @@ export default function TasksScreen() {
       />
 
       {/* Task Submission Modal (Students Only) */}
-      {isStudent && studentId && (
+      {isStudentView && studentId && (
         <TaskSubmissionModal
           visible={submissionModalVisible}
           onDismiss={() => {
@@ -1441,7 +1487,7 @@ export default function TasksScreen() {
       </Portal>
 
         {/* Create Task FAB (Admin/Teacher only) */}
-        {!isStudent && (
+        {canManageTasks && (
           <View style={styles.fabContainer}>
             <TouchableOpacity
               style={styles.fab}
@@ -1585,6 +1631,30 @@ const createStyles = (colors: ThemeColors, isDark: boolean, typography: Typograp
     marginTop: spacing.md,
     fontSize: typography.fontSize.base,
     color: colors.text.secondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl * 2,
+    paddingHorizontal: spacing.lg,
+  },
+  errorText: {
+    marginTop: spacing.md,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.error.main,
+    textAlign: 'center',
+  },
+  errorDetails: {
+    marginTop: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  retryButton: {
+    marginTop: spacing.md,
   },
   emptyButton: {
     backgroundColor: colors.primary[600],

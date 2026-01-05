@@ -106,7 +106,12 @@ export function useCreateStudent(schoolCode: string | null | undefined) {
 
       log.info('Creating student', { email: input.email });
 
-      const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-student`;
+      // Runtime-safe: validate env var exists
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.trim() === '') {
+        throw new Error('Supabase configuration is missing. Please restart the app.');
+      }
+      const url = `${supabaseUrl}/functions/v1/create-student`;
       
       const response = await fetch(url, {
         method: 'POST',

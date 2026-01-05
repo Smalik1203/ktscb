@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Text as RNText } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Text as RNText, Platform } from 'react-native';
 import {
   CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound,
   LineChart, TrendingUp, Activity, CalendarDays,
@@ -21,12 +21,14 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 
-// Hooks (commented out - using hardcoded data)
-// import { useClass } from '../../hooks/useClasses';
-// import { 
-//   useDashboardStats, useRecentActivity, useUpcomingEvents, 
-//   useFeeOverview, useTaskOverview, useSyllabusOverview 
-// } from '../../hooks/useDashboard';
+// Hooks
+import {
+  useDashboardStats, useRecentActivity, useUpcomingEvents,
+  useFeeOverview, useTaskOverview, useSyllabusOverview,
+  type DashboardStats
+} from '../../hooks/useDashboard';
+import { useClass } from '../../hooks/useClasses';
+import { useCapabilities } from '../../hooks/useCapabilities';
 
 // UI Kit Components
 import {
@@ -312,177 +314,114 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { profile, loading: authLoading } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
   const [refreshing, setRefreshing] = React.useState(false);
 
-  const isStudent = profile?.role === 'student';
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin';
+  // Capability-based checks (NO role checks in UI)
+  const canViewOwnDataOnly = can('attendance.read_own') && !can('attendance.read');
+  const canViewAdminStats = can('dashboard.admin_stats');
+  const canManageStudents = can('students.manage');
+  const canViewFees = can('fees.read') || can('fees.read_own');
+  const canViewTasks = can('tasks.read') || can('tasks.read_own');
+  const canViewSyllabus = can('syllabus.read');
+  const canViewAnalytics = can('analytics.read') || can('analytics.read_own');
+  const canViewPayments = can('fees.record_payments');
+  const canViewManagement = can('management.view');
 
-  // Hardcoded class data for display
-  const classData = {
-    grade: '10',
-    section: 'A',
-  };
+  // ============================================================================
+  // DATA FETCHING WITH HOOKS
+  // ============================================================================
 
-  // Hardcoded data for dashboard
-  const stats = {
-    todaysClasses: 4,
-    attendancePercentage: 92,
-    weekAttendance: 88,
-    pendingAssignments: 3,
-    upcomingTests: 2,
-    achievements: 5,
-    totalStudents: 35,
-  };
-  const statsLoading = false;
-  const statsError: { message?: string } | null = null;
-  const refetchStats = async () => { };
+  // Fetch class instance details (grade, section)
+  const {
+    data: classInstance,
+    isLoading: classLoading
+  } = useClass(profile?.class_instance_id || undefined);
 
-  const recentActivity = [
-    {
-      id: '1',
-      type: 'attendance' as const,
-      title: 'Attendance marked',
-      subtitle: 'Today - Present',
-      timestamp: new Date().toISOString(),
-      icon: 'CheckSquare',
-      color: 'success',
-    },
-    {
-      id: '2',
-      type: 'assignment' as const,
-      title: 'Math Homework Assignment',
-      subtitle: 'Mathematics - Due Dec 25, 2024',
-      timestamp: new Date(Date.now() - 86400000).toISOString(),
-      icon: 'BookOpen',
-      color: 'info',
-    },
-    {
-      id: '3',
-      type: 'test' as const,
-      title: 'Test graded: Unit Test 3',
-      subtitle: 'Score: 85/100',
-      timestamp: new Date(Date.now() - 172800000).toISOString(),
-      icon: 'Award',
-      color: 'secondary',
-    },
-    {
-      id: '4',
-      type: 'attendance' as const,
-      title: 'Attendance marked',
-      subtitle: 'Dec 20, 2024 - Present',
-      timestamp: new Date(Date.now() - 259200000).toISOString(),
-      icon: 'CheckSquare',
-      color: 'success',
-    },
-    {
-      id: '5',
-      type: 'assignment' as const,
-      title: 'Science Project',
-      subtitle: 'Science - Due Dec 28, 2024',
-      timestamp: new Date(Date.now() - 345600000).toISOString(),
-      icon: 'BookOpen',
-      color: 'warning',
-    },
-  ];
-  const activityLoading = false;
-  const activityError: { message?: string } | null = null;
-  const refetchActivity = async () => { };
+  // Extract class display data from fetched instance
+  const classData = React.useMemo(() => {
+    if (!classInstance) return null;
+    return {
+      grade: classInstance.grade?.toString() || '',
+      section: classInstance.section || '',
+    };
+  }, [classInstance]);
 
-  const upcomingEvents = [
-    {
-      id: '1',
-      title: 'Annual Day Celebration',
-      date: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-      type: 'Event',
-      description: 'School annual day celebration',
-      color: '#6366f1',
-    },
-    {
-      id: '2',
-      title: 'Science Fair',
-      date: new Date(Date.now() + 86400000 * 10).toISOString().split('T')[0],
-      type: 'Competition',
-      description: 'Inter-school science fair',
-      color: '#10b981',
-    },
-    {
-      id: '3',
-      title: 'Parent-Teacher Meeting',
-      date: new Date(Date.now() + 86400000 * 15).toISOString().split('T')[0],
-      type: 'Meeting',
-      description: 'Quarterly PTM',
-      color: '#f59e0b',
-    },
-    {
-      id: '4',
-      title: 'Sports Day',
-      date: new Date(Date.now() + 86400000 * 20).toISOString().split('T')[0],
-      type: 'Event',
-      description: 'Annual sports day',
-      color: '#ef4444',
-    },
-  ];
-  const refetchEvents = async () => { };
+  // Dashboard stats
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    error: statsError,
+    refetch: refetchStats
+  } = useDashboardStats(
+    profile?.auth_id || '',
+    profile?.class_instance_id || undefined,
+    profile?.role
+  );
 
-  const feeOverview = isStudent ? {
-    totalFee: 50000,
-    paidAmount: 35000,
-    pendingAmount: 15000,
-    nextDueDate: new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0],
-  } : null;
-  const refetchFee = async () => { };
+  // Recent activity
+  const {
+    data: recentActivityData,
+    isLoading: activityLoading,
+    error: activityError,
+    refetch: refetchActivity
+  } = useRecentActivity(
+    profile?.auth_id || '',
+    profile?.class_instance_id || undefined
+  );
 
-  const taskOverview = isStudent ? {
-    total: 8,
-    completed: 5,
-    pending: 3,
-    overdue: 1,
-    dueThisWeek: 2,
-  } : null;
-  const refetchTask = async () => { };
+  // Upcoming events
+  const {
+    data: upcomingEventsData,
+    isLoading: eventsLoading,
+    error: eventsError,
+    refetch: refetchEvents
+  } = useUpcomingEvents(
+    profile?.school_code || '',
+    profile?.class_instance_id || undefined
+  );
 
-  const syllabusOverview = isStudent ? {
-    overallProgress: 68,
-    totalSubjects: 5,
-    subjectBreakdown: [
-      {
-        subjectId: '1',
-        subjectName: 'Mathematics',
-        progress: 75,
-        totalTopics: 20,
-        completedTopics: 15,
-      },
-      {
-        subjectId: '2',
-        subjectName: 'Science',
-        progress: 70,
-        totalTopics: 18,
-        completedTopics: 13,
-      },
-      {
-        subjectId: '3',
-        subjectName: 'English',
-        progress: 65,
-        totalTopics: 15,
-        completedTopics: 10,
-      },
-      {
-        subjectId: '4',
-        subjectName: 'Social Studies',
-        progress: 60,
-        totalTopics: 12,
-        completedTopics: 7,
-      },
-      {
-        subjectId: '5',
-        subjectName: 'Hindi',
-        progress: 55,
-        totalTopics: 10,
-        completedTopics: 6,
-      },
-    ],
-  } : null;
-  const refetchSyllabus = async () => { };
+  // Normalize data - ensure arrays are never undefined
+  const recentActivity = React.useMemo(() => {
+    const data = recentActivityData || [];
+    // Removed debug logging for production
+    return Array.isArray(data) ? data : [];
+  }, [recentActivityData, activityLoading, activityError]);
+
+  const upcomingEvents = React.useMemo(() => {
+    const data = upcomingEventsData || [];
+    // Removed debug logging for production
+    return Array.isArray(data) ? data : [];
+  }, [upcomingEventsData, eventsLoading, eventsError]);
+
+  // Fee overview (for users with read_own capability - typically students)
+  const {
+    data: feeOverview,
+    isLoading: feeLoading,
+    error: feeError,
+    refetch: refetchFee
+  } = useFeeOverview(canViewOwnDataOnly ? (profile?.auth_id || '') : '');
+
+  // Task overview (for users with read_own capability - typically students)
+  const {
+    data: taskOverview,
+    isLoading: taskLoading,
+    error: taskError,
+    refetch: refetchTask
+  } = useTaskOverview(
+    canViewOwnDataOnly ? (profile?.auth_id || '') : '',
+    profile?.class_instance_id || undefined
+  );
+
+  // Syllabus overview (for users with read_own capability - typically students)
+  const {
+    data: syllabusOverview,
+    isLoading: syllabusLoading,
+    error: syllabusError,
+    refetch: refetchSyllabus
+  } = useSyllabusOverview(
+    canViewOwnDataOnly && profile?.class_instance_id ? profile.class_instance_id : ''
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -495,14 +434,15 @@ export default function DashboardScreen() {
       if (profile?.school_code) {
         promises.push(refetchEvents());
       }
-      if (isStudent && profile?.auth_id) {
+      if (canViewOwnDataOnly && profile?.auth_id) {
         promises.push(refetchFee(), refetchTask());
       }
-      if (isStudent && profile?.class_instance_id) {
+      if (canViewOwnDataOnly && profile?.class_instance_id) {
         promises.push(refetchSyllabus());
       }
 
-      await Promise.all(promises);
+      // Wait for all refetches to complete
+      await Promise.allSettled(promises);
     } catch (err) {
       log.error('Refresh error:', err);
     } finally {
@@ -510,84 +450,88 @@ export default function DashboardScreen() {
     }
   };
 
-  // Quick actions data - all menu items filtered by role (excluding "Add" features)
-  const role = profile?.role;
+  // Quick actions data - filtered by capabilities (NOT roles)
   const quickActionsMap = [
-    { title: 'Timetable', icon: CalendarRange, color: colors.primary.main, bgColor: colors.primary[50], route: '/(tabs)/timetable' },
-    { title: 'Calendar', icon: CalendarDays, color: colors.info.main, bgColor: colors.info[50], route: '/(tabs)/calendar' },
-    { title: 'Resources', icon: FolderOpen, color: colors.accent.main, bgColor: colors.accent[50], route: '/(tabs)/resources' },
-    { title: 'Syllabus', icon: NotebookText, color: colors.secondary.main, bgColor: colors.secondary[50], route: role === 'student' ? '/(tabs)/syllabus-student' : '/(tabs)/syllabus', roles: ['admin', 'superadmin', 'cb_admin', 'teacher', 'student'] },
-    { title: 'Attendance', icon: UserCheck, color: colors.success.main, bgColor: colors.success[50], route: '/(tabs)/attendance', roles: ['admin', 'superadmin', 'cb_admin', 'student'] },
-    { title: 'Fees', icon: CreditCard, color: colors.warning.main, bgColor: colors.warning[50], route: role === 'student' ? '/(tabs)/fees-student' : '/(tabs)/fees', roles: ['admin', 'superadmin', 'cb_admin', 'student'] },
-    { title: 'Assessments', icon: GraduationCap, color: colors.error.main, bgColor: colors.error[50], route: '/(tabs)/assessments' },
-    { title: 'Tasks', icon: ClipboardList, color: colors.secondary.main, bgColor: colors.secondary[50], route: '/(tabs)/tasks', roles: ['admin', 'superadmin', 'cb_admin', 'student'] },
-    { title: 'Analytics', icon: LineChart, color: colors.info.main, bgColor: colors.info[50], route: '/(tabs)/analytics', roles: ['admin', 'superadmin', 'cb_admin', 'student'] },
-    { title: 'Payments', icon: ReceiptText, color: colors.warning.main, bgColor: colors.warning[50], route: '/(tabs)/payments', roles: ['admin', 'superadmin', 'cb_admin'] },
-    { title: 'Management', icon: Building2, color: colors.neutral[600], bgColor: colors.neutral[50], route: '/(tabs)/manage', roles: ['admin', 'superadmin', 'cb_admin'] },
+    { title: 'Timetable', icon: CalendarRange, color: colors.primary.main, bgColor: colors.primary[50], route: '/(tabs)/timetable', visible: can('timetable.read') },
+    { title: 'Calendar', icon: CalendarDays, color: colors.info.main, bgColor: colors.info[50], route: '/(tabs)/calendar', visible: can('calendar.read') },
+    { title: 'Resources', icon: FolderOpen, color: colors.accent.main, bgColor: colors.accent[50], route: '/(tabs)/resources', visible: can('resources.read') },
+    { title: 'Syllabus', icon: NotebookText, color: colors.secondary.main, bgColor: colors.secondary[50], route: canViewOwnDataOnly ? '/(tabs)/syllabus-student' : '/(tabs)/syllabus', visible: canViewSyllabus },
+    { title: 'Attendance', icon: UserCheck, color: colors.success.main, bgColor: colors.success[50], route: '/(tabs)/attendance', visible: can('attendance.read') || can('attendance.read_own') },
+    { title: 'Fees', icon: CreditCard, color: colors.warning.main, bgColor: colors.warning[50], route: canViewOwnDataOnly ? '/(tabs)/fees-student' : '/(tabs)/fees', visible: canViewFees },
+    { title: 'Assessments', icon: GraduationCap, color: colors.error.main, bgColor: colors.error[50], route: '/(tabs)/assessments', visible: can('assessments.read') || can('assessments.read_own') },
+    { title: 'Tasks', icon: ClipboardList, color: colors.secondary.main, bgColor: colors.secondary[50], route: '/(tabs)/tasks', visible: canViewTasks },
+    { title: 'Analytics', icon: LineChart, color: colors.info.main, bgColor: colors.info[50], route: '/(tabs)/analytics', visible: canViewAnalytics },
+    { title: 'Payments', icon: ReceiptText, color: colors.warning.main, bgColor: colors.warning[50], route: '/(tabs)/payments', visible: canViewPayments },
+    { title: 'Management', icon: Building2, color: colors.neutral[600], bgColor: colors.neutral[50], route: '/(tabs)/manage', visible: canViewManagement },
   ];
 
-  // Filter quick actions based on user role and exclude "Add" features
+  // Filter quick actions based on capabilities (NOT roles)
   const quickActions = quickActionsMap
     .filter(action => {
       // Exclude features that start with "Add"
       if (action.title.startsWith('Add')) return false;
-      // Filter by role
-      if (!action.roles) return true; // No role restriction
-      return action.roles.includes(role as any);
+      // Filter by capability visibility
+      return action.visible;
     })
     .sort((a, b) => a.title.localeCompare(b.title)); // Sort alphabetically A to Z
 
-  // Dashboard stats data
-  const dashboardStats = stats ? [
+  // Dashboard stats data - using capability-based display logic
+  // Type guard to ensure stats is a valid DashboardStats object
+  const typedStats = stats as DashboardStats | undefined;
+  const dashboardStats = typedStats ? [
     {
       title: "Today's Classes",
-      value: stats.todaysClasses.toString(),
-      change: stats.todaysClasses > 0 ? `${stats.todaysClasses} scheduled` : 'No classes',
+      value: typedStats.todaysClasses.toString(),
+      change: typedStats.todaysClasses > 0 ? `${typedStats.todaysClasses} scheduled` : 'No classes',
       icon: CalendarRange,
       color: colors.primary.main,
       bgColor: colors.primary[50],
       route: '/(tabs)/timetable',
     },
     {
-      title: isStudent ? 'Month Attendance' : 'Total Students',
-      value: isStudent ? `${stats.attendancePercentage}%` : (stats.totalStudents?.toString() || '0'),
-      change: isStudent
-        ? (stats.attendancePercentage >= 90 ? 'Excellent' : stats.attendancePercentage >= 80 ? 'Good' : stats.attendancePercentage >= 75 ? 'Fair' : 'Low')
+      title: canViewOwnDataOnly ? 'Month Attendance' : 'Total Students',
+      value: canViewOwnDataOnly ? `${typedStats.attendancePercentage}%` : (typedStats.totalStudents?.toString() || '0'),
+      change: canViewOwnDataOnly
+        ? (typedStats.attendancePercentage >= 90 ? 'Excellent' : typedStats.attendancePercentage >= 80 ? 'Good' : typedStats.attendancePercentage >= 75 ? 'Fair' : 'Low')
         : 'in class',
-      icon: isStudent ? TrendingUp : UsersRound,
-      color: isStudent
-        ? (stats.attendancePercentage >= 90 ? colors.success.main : stats.attendancePercentage >= 80 ? colors.info.main : stats.attendancePercentage >= 75 ? colors.warning.main : colors.error.main)
+      icon: canViewOwnDataOnly ? TrendingUp : UsersRound,
+      color: canViewOwnDataOnly
+        ? (typedStats.attendancePercentage >= 90 ? colors.success.main : typedStats.attendancePercentage >= 80 ? colors.info.main : typedStats.attendancePercentage >= 75 ? colors.warning.main : colors.error.main)
         : colors.info.main,
-      bgColor: isStudent
-        ? (stats.attendancePercentage >= 90 ? colors.success[50] : stats.attendancePercentage >= 80 ? colors.info[50] : stats.attendancePercentage >= 75 ? colors.warning[50] : colors.error[50])
+      bgColor: canViewOwnDataOnly
+        ? (typedStats.attendancePercentage >= 90 ? colors.success[50] : typedStats.attendancePercentage >= 80 ? colors.info[50] : typedStats.attendancePercentage >= 75 ? colors.warning[50] : colors.error[50])
         : colors.info[50],
-      route: isStudent ? '/(tabs)/attendance' : '/(tabs)/manage',
-      showProgress: isStudent,
-      progressValue: isStudent ? stats.attendancePercentage : undefined,
-      trend: isStudent ? (stats.attendancePercentage >= 75 ? 'up' as const : 'down' as const) : null,
+      route: canViewOwnDataOnly ? '/(tabs)/attendance' : '/(tabs)/manage',
+      showProgress: canViewOwnDataOnly,
+      progressValue: canViewOwnDataOnly ? typedStats.attendancePercentage : undefined,
+      trend: canViewOwnDataOnly ? (typedStats.attendancePercentage >= 75 ? 'up' as const : 'down' as const) : null,
     },
     {
       title: 'Tasks',
-      value: stats.pendingAssignments.toString(),
-      change: stats.pendingAssignments > 0 ? 'Pending' : 'All done',
+      value: typedStats.pendingAssignments.toString(),
+      change: typedStats.pendingAssignments > 0 ? 'Pending' : 'All done',
       icon: FileText,
-      color: stats.pendingAssignments > 0 ? colors.warning.main : colors.success.main,
-      bgColor: stats.pendingAssignments > 0 ? colors.warning[50] : colors.success[50],
+      color: typedStats.pendingAssignments > 0 ? colors.warning.main : colors.success.main,
+      bgColor: typedStats.pendingAssignments > 0 ? colors.warning[50] : colors.success[50],
       route: '/(tabs)/tasks',
     },
     {
       title: 'Upcoming Tests',
-      value: stats.upcomingTests.toString(),
-      change: stats.upcomingTests > 0 ? 'This week' : 'None',
+      value: typedStats.upcomingTests.toString(),
+      change: typedStats.upcomingTests > 0 ? 'This week' : 'None',
       icon: Target,
-      color: stats.upcomingTests > 0 ? colors.error.main : colors.success.main,
-      bgColor: stats.upcomingTests > 0 ? colors.error[50] : colors.success[50],
+      color: typedStats.upcomingTests > 0 ? colors.error.main : colors.success.main,
+      bgColor: typedStats.upcomingTests > 0 ? colors.error[50] : colors.success[50],
       route: '/(tabs)/assessments',
     },
   ] : [];
 
-  const viewState = (authLoading || statsLoading || activityLoading) ? 'loading'
-    : (statsError || activityError) ? 'error'
+  // Determine overall view state
+  const isLoading = authLoading || capabilitiesLoading || statsLoading || activityLoading || eventsLoading;
+  const hasError = statsError || activityError || eventsError;
+
+  const viewState = isLoading ? 'loading'
+    : hasError ? 'error'
       : !profile ? 'empty' : 'success';
 
   const hasIncompleteProfile = profile && (!profile.school_code || !profile.class_instance_id);
@@ -691,7 +635,7 @@ export default function DashboardScreen() {
         </View>
 
         {/* Quick Stats (Admin Only) - Modern Design */}
-        {isAdmin && (
+        {canViewAdminStats && (
           <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
               <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
@@ -712,7 +656,7 @@ export default function DashboardScreen() {
               borderColor: colors.border.light,
             }}>
               {[
-                { icon: UserCheck, label: 'Class Attendance', value: `${stats?.attendancePercentage || 0}% Today`, color: colors.success[600] },
+                { icon: UserCheck, label: 'Class Attendance', value: `${typedStats?.attendancePercentage || 0}% Today`, color: colors.success[600] },
                 { icon: FolderOpen, label: 'Resources Shared', value: 'View resources →', color: colors.info[600] },
                 { icon: LineChart, label: 'Class Performance', value: 'View analytics →', color: colors.secondary[600] },
               ].map((item, index, arr) => (
@@ -761,8 +705,8 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Task Overview (Students Only) - Modern Design */}
-        {isStudent && taskOverview && (
+        {/* Task Overview (for users viewing own data) - Modern Design */}
+        {canViewOwnDataOnly && taskOverview && (
           <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
               <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
@@ -843,8 +787,8 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Syllabus Progress (Students Only) - Modern Design */}
-        {isStudent && syllabusOverview && (
+        {/* Syllabus Progress (for users viewing own data) - Modern Design */}
+        {canViewOwnDataOnly && syllabusOverview && (
           <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
               <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
@@ -976,8 +920,8 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Fee Overview (Students Only) */}
-        {isStudent && feeOverview && (
+        {/* Fee Overview (for users viewing own data) */}
+        {canViewOwnDataOnly && feeOverview && (
           <SectionBlock title="Fee Overview" action={{ label: 'Details', onPress: () => router.push('/fees') }}>
             <Card variant="elevated">
               {feeOverview.totalFee > 0 ? (
@@ -1020,12 +964,26 @@ export default function DashboardScreen() {
 
         {/* Upcoming Events */}
         <SectionBlock title="Upcoming Events" action={{ label: 'View All', onPress: () => router.push('/calendar') }}>
-          <Card variant="elevated">
-            {upcomingEvents && Array.isArray(upcomingEvents) && upcomingEvents.length > 0 ? (
+          <Card variant="elevated" style={{ minHeight: 120 }}>
+            {eventsLoading ? (
+              <Stack spacing="sm" padding="md">
+                <Skeleton width="100%" height={20} variant="rounded" />
+                <Skeleton width="80%" height={16} variant="rounded" />
+                <Skeleton width="100%" height={20} variant="rounded" style={{ marginTop: spacing.sm }} />
+                <Skeleton width="75%" height={16} variant="rounded" />
+              </Stack>
+            ) : eventsError ? (
+              <Stack align="center" padding="lg">
+                <AlertCircle size={32} color={colors.error.main} />
+                <Body color="error" align="center" style={{ marginTop: spacing.sm }}>
+                  Failed to load events. Pull down to refresh.
+                </Body>
+              </Stack>
+            ) : Array.isArray(upcomingEvents) && upcomingEvents.length > 0 ? (
               <Stack spacing="none">
                 {upcomingEvents.map((event, index) => (
                   <Row
-                    key={event.id}
+                    key={event.id || `event-${index}`}
                     spacing="sm"
                     style={{
                       paddingVertical: spacing.sm,
@@ -1036,7 +994,7 @@ export default function DashboardScreen() {
                     <View style={{
                       width: 3,
                       borderRadius: borderRadius.sm,
-                      backgroundColor: event.color,
+                      backgroundColor: event.color || colors.primary.main,
                       alignSelf: 'stretch',
                     }} />
                     <Stack spacing="xs" flex>
@@ -1066,8 +1024,22 @@ export default function DashboardScreen() {
 
         {/* Recent Activity */}
         <SectionBlock title="Recent Activity">
-          <Card variant="elevated">
-            {recentActivity && recentActivity.length > 0 ? (
+          <Card variant="elevated" style={{ minHeight: 120 }}>
+            {activityLoading ? (
+              <Stack spacing="sm" padding="md">
+                <Skeleton width="100%" height={24} variant="rounded" />
+                <Skeleton width="70%" height={16} variant="rounded" />
+                <Skeleton width="100%" height={24} variant="rounded" style={{ marginTop: spacing.sm }} />
+                <Skeleton width="65%" height={16} variant="rounded" />
+              </Stack>
+            ) : activityError ? (
+              <Stack align="center" padding="lg">
+                <AlertCircle size={32} color={colors.error.main} />
+                <Body color="error" align="center" style={{ marginTop: spacing.sm }}>
+                  Failed to load activity. Pull down to refresh.
+                </Body>
+              </Stack>
+            ) : Array.isArray(recentActivity) && recentActivity.length > 0 ? (
               <Stack spacing="none">
                 {recentActivity.map((activity, index) => {
                   const getActivityIcon = (type: string) => {
@@ -1097,7 +1069,7 @@ export default function DashboardScreen() {
 
                   return (
                     <Row
-                      key={activity.id}
+                      key={activity.id || `activity-${index}`}
                       spacing="sm"
                       align="center"
                       style={{

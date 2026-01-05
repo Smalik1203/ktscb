@@ -1,15 +1,17 @@
 import React from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
 import { StudentTimetableScreen } from '../../components/timetable/StudentTimetableScreen';
 import { ModernTimetableScreen } from '../../components/timetable/ModernTimetableScreen';
 
 export default function TimetableScreen() {
   const { profile } = useAuth();
+  const { can } = useCapabilities();
   
-  // Show appropriate timetable screen based on user role
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'superadmin' || profile?.role === 'cb_admin';
+  // Capability-based check - show admin view if user can manage timetable
+  const canManageTimetable = can('timetable.manage');
   
-  if (isAdmin) {
+  if (canManageTimetable) {
     return <ModernTimetableScreen />;
   } else {
     return <StudentTimetableScreen />;

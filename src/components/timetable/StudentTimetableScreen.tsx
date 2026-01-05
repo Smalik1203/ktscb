@@ -8,7 +8,7 @@ import { spacing, borderRadius, shadows } from '../../theme/tokens';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
 import { format, isToday as isTodayFn } from 'date-fns';
-import { supabase } from '../../data/supabaseClient';
+import { supabase } from '../../lib/supabase';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 
 interface TimetableSlot {
@@ -264,6 +264,9 @@ export function StudentTimetableScreen() {
       </View>
     );
   }
+
+  // Three-state handling (duplicate check - already handled above)
+  // This section is redundant as loading and error states are already handled above
 
   return (
     <View style={styles.container}>

@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { X, Upload, FileText, Paperclip, Image as ImageIcon } from 'lucide-react-native';
 import { Task } from '../../hooks/useTasks';
-import { supabase } from '../../data/supabaseClient';
+import { supabase } from '../../lib/supabase';
 import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { SuccessAnimation } from '../ui/SuccessAnimation';
 
@@ -158,7 +158,11 @@ export function TaskSubmissionModal({
       }
 
       // Construct Supabase Storage upload URL
-      const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+      // Runtime-safe: use supabase client's URL (already validated at startup)
+      const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseProjectUrl || supabaseProjectUrl.trim() === '') {
+        throw new Error('Supabase configuration is missing. Please restart the app.');
+      }
       const uploadUrl = `${supabaseProjectUrl}/storage/v1/object/${STORAGE_BUCKET}/${filePath}`;
 
       // Use uploadAsync for streaming upload (no memory overhead)
@@ -173,8 +177,17 @@ export function TaskSubmissionModal({
       });
 
       if (uploadResult.status !== 200) {
-        const errorBody = uploadResult.body ? JSON.parse(uploadResult.body) : {};
-        throw new Error(`Upload failed with status ${uploadResult.status}: ${errorBody.message || 'Unknown error'}`);
+        let errorMessage = `Upload failed with status ${uploadResult.status}`;
+        if (uploadResult.body) {
+          try {
+            const errorBody = JSON.parse(uploadResult.body);
+            errorMessage = errorBody.message || errorMessage;
+          } catch (parseError) {
+            // Non-JSON error body - use raw text
+            errorMessage = `Upload failed: ${uploadResult.body.substring(0, 200)}`;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       // Get public URL

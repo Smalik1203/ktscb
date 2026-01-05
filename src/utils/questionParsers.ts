@@ -343,7 +343,19 @@ export async function parseJSON(fileContent: string): Promise<ParseResult> {
   const questions: ParsedQuestion[] = [];
 
   try {
-    const data = JSON.parse(fileContent);
+    // Validate fileContent is not empty
+    if (!fileContent || typeof fileContent !== 'string' || fileContent.trim().length === 0) {
+      errors.push('File is empty or invalid');
+      return { success: false, questions: [], errors };
+    }
+
+    let data;
+    try {
+      data = JSON.parse(fileContent);
+    } catch (parseError: any) {
+      errors.push(`Invalid JSON format: ${parseError?.message || 'Parse error'}`);
+      return { success: false, questions: [], errors };
+    }
 
     if (!data.questions || !Array.isArray(data.questions)) {
       errors.push('Invalid JSON format. Expected: { "questions": [...] }');

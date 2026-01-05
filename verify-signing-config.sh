@@ -102,13 +102,19 @@ echo "--------------------------------------"
 # Check for old package name references
 OLD_PACKAGE="com.kts.mobile"
 echo -n "Searching for '$OLD_PACKAGE' references... "
-OLD_REFS=$(grep -r "$OLD_PACKAGE" app.json android/ ios/ 2>/dev/null | grep -v ".git" | wc -l | tr -d ' ')
+
+# Build search paths dynamically based on what exists
+SEARCH_PATHS="app.json"
+[ -d "android" ] && SEARCH_PATHS="$SEARCH_PATHS android/"
+[ -d "ios" ] && SEARCH_PATHS="$SEARCH_PATHS ios/"
+
+OLD_REFS=$(grep -r "$OLD_PACKAGE" $SEARCH_PATHS 2>/dev/null | grep -v ".git" | wc -l | tr -d ' ')
 if [ "$OLD_REFS" -eq 0 ]; then
     echo -e "${GREEN}✓${NC} No old package references found"
 else
     echo -e "${YELLOW}⚠${NC} Found $OLD_REFS references to old package name"
     echo "   Locations:"
-    grep -r "$OLD_PACKAGE" app.json android/ ios/ 2>/dev/null | grep -v ".git" | sed 's/^/   - /'
+    grep -r "$OLD_PACKAGE" $SEARCH_PATHS 2>/dev/null | grep -v ".git" | sed 's/^/   - /'
     ((WARNINGS++))
 fi
 
@@ -136,3 +142,4 @@ else
     echo "Please fix the errors before proceeding with builds."
     exit 1
 fi
+

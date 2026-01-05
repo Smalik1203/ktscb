@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { LayoutDashboard, CalendarRange, UserCheck, CreditCard, LineChart, Settings2, CalendarDays, NotebookText, CheckCircle2, ReceiptText, FileText } from 'lucide-react-native';
+import { LayoutDashboard, CalendarRange, UserCheck, CreditCard, LineChart, Settings2, CalendarDays, NotebookText, CheckCircle2, FileText, TrendingUp, DollarSign, Package } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { AppNavbar } from '../../src/components/layout/AppNavbarExpo';
+import { useCapabilities } from '../../src/hooks/useCapabilities';
 
 export default function TabLayout() {
   const { profile, status, loading, bootstrapping } = useAuth();
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
   const router = useRouter();
 
   // Protect routes: redirect to login if no profile or not signed in
@@ -22,12 +24,18 @@ export default function TabLayout() {
   }, [status, profile, loading, bootstrapping, router]);
 
   // Don't render tabs if user doesn't have a profile or auth is still loading
-  if (loading || bootstrapping || status !== 'signedIn' || !profile) {
+  if (loading || bootstrapping || capabilitiesLoading || status !== 'signedIn' || !profile) {
     return null; // Will redirect via useEffect or show loading
   }
 
-  const showSuperAdminTabs = profile?.role === 'superadmin';
-  const showAdminTabs = profile?.role === 'admin' || profile?.role === 'superadmin';
+  // Capability-based tab visibility (NOT role-based!)
+  // Safe access: profile is guaranteed non-null here due to early return above
+  const canManageAdmins = can('admins.create');
+  const canManageClasses = can('classes.create');
+  const canManageSubjects = can('subjects.create');
+  const canManageStudents = can('students.create');
+  const canViewFinance = can('management.view') && (profile?.role === 'superadmin' ?? false); // Finance is super admin only - safe optional chaining
+  const canManageInventory = can('inventory.create');
 
   return (
     <Tabs
@@ -126,6 +134,14 @@ export default function TabLayout() {
       />
 
       <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'My Progress',
+          tabBarIcon: ({ size, color }) => <TrendingUp size={size} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
         name="fees"
         options={{
           title: 'Fees',
@@ -133,13 +149,6 @@ export default function TabLayout() {
         }}
       />
 
-      <Tabs.Screen
-        name="payments"
-        options={{
-          title: 'Payments',
-          tabBarIcon: ({ size, color }) => <ReceiptText size={size} color={color} />,
-        }}
-      />
 
       <Tabs.Screen
         name="analytics"
@@ -157,36 +166,59 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Super Admin Screens */}
+      {/* Finance Screen - Super Admin Only */}
+      <Tabs.Screen
+        name="finance"
+        options={{
+          title: 'Finance',
+          tabBarIcon: ({ size, color }) => <DollarSign size={size} color={color} />,
+          href: canViewFinance ? '/(tabs)/finance' : null,
+        }}
+      />
+
+      {/* Admin Management Screen - capability-gated */}
       <Tabs.Screen
         name="add-admin"
         options={{
           title: 'Add Admins',
-          href: showSuperAdminTabs ? '/(tabs)/add-admin' : null,
+          href: canManageAdmins ? '/(tabs)/add-admin' : null,
         }}
       />
 
+      {/* Class Management Screen - capability-gated */}
       <Tabs.Screen
         name="add-classes"
         options={{
           title: 'Add Classes',
-          href: showSuperAdminTabs ? '/(tabs)/add-classes' : null,
+          href: canManageClasses ? '/(tabs)/add-classes' : null,
         }}
       />
 
+      {/* Subject Management Screen - capability-gated */}
       <Tabs.Screen
         name="add-subjects"
         options={{
           title: 'Add Subjects',
-          href: showSuperAdminTabs ? '/(tabs)/add-subjects' : null,
+          href: canManageSubjects ? '/(tabs)/add-subjects' : null,
         }}
       />
 
+      {/* Student Management Screen - capability-gated */}
       <Tabs.Screen
         name="add-student"
         options={{
           title: 'Add Students',
-          href: showAdminTabs ? '/(tabs)/add-student' : null,
+          href: canManageStudents ? '/(tabs)/add-student' : null,
+        }}
+      />
+
+      {/* Inventory Management Screen - capability-gated */}
+      <Tabs.Screen
+        name="inventory"
+        options={{
+          title: 'Inventory',
+          tabBarIcon: ({ size, color }) => <Package size={size} color={color} />,
+          href: canManageInventory ? '/(tabs)/inventory' : null,
         }}
       />
     </Tabs>

@@ -11,7 +11,8 @@ import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
 import { Task } from '../../hooks/useTasks';
 import { DatePickerModal } from '../common/DatePickerModal';
-import { supabase } from '../../data/supabaseClient';
+import { supabase } from '../../lib/supabase'; // Kept for storage (reads) and auth session
+import { tasksService } from '../../services/tasks';
 
 interface TaskFormModalProps {
   visible: boolean;
@@ -158,7 +159,11 @@ export function TaskFormModal({
         }
 
         // Construct Supabase Storage upload URL
-        const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+        // Runtime-safe: validate env var exists
+        const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+        if (!supabaseProjectUrl || supabaseProjectUrl.trim() === '') {
+          throw new Error('Supabase configuration is missing. Please restart the app.');
+        }
         const uploadUrl = `${supabaseProjectUrl}/storage/v1/object/task-attachments/${filePath}`;
 
         // Use uploadAsync for streaming upload (no memory overhead)
@@ -173,8 +178,17 @@ export function TaskFormModal({
         });
 
         if (uploadResult.status !== 200) {
-          const errorBody = uploadResult.body ? JSON.parse(uploadResult.body) : {};
-          throw new Error(`Upload failed with status ${uploadResult.status}: ${errorBody.message || 'Unknown error'}`);
+          let errorMessage = `Upload failed with status ${uploadResult.status}`;
+          if (uploadResult.body) {
+            try {
+              const errorBody = JSON.parse(uploadResult.body);
+              errorMessage = errorBody.message || errorMessage;
+            } catch (parseError) {
+              // Non-JSON error body - use raw text
+              errorMessage = `Upload failed: ${uploadResult.body.substring(0, 200)}`;
+            }
+          }
+          throw new Error(errorMessage);
         }
 
         // Complete progress
@@ -261,23 +275,15 @@ export function TaskFormModal({
           
           uploadedAttachments = await Promise.all(uploadPromises) as any[];
 
-          // Update task with attachment URLs
-          const { error: updateError } = await supabase
-            .from('tasks')
-            .update({ 
-              attachments: uploadedAttachments,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', taskId)
-            .select();
-
-          if (updateError) {
+          // Update task with attachment URLs via service (capability assertion happens there)
+          try {
+            await tasksService.updateAttachments(taskId, uploadedAttachments);
+            Alert.alert('Success', `Task created with ${uploadedAttachments.length} file(s)!`);
+          } catch (updateError: any) {
             Alert.alert(
               'Warning', 
               `Task created but failed to save attachments: ${updateError.message}. Please try editing the task to add files.`
             );
-          } else {
-            Alert.alert('Success', `Task created with ${uploadedAttachments.length} file(s)!`);
           }
         } catch (uploadError: any) {
           console.error('Error uploading files:', uploadError);

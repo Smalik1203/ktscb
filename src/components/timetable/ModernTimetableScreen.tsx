@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration, Modal as RNModal, Text as RNText } from 'react-native';
-import { Text, Card, Button, Chip, Portal, Modal, TextInput, SegmentedButtons, Snackbar } from 'react-native-paper';
+import { Text, Card, Button, Chip, Portal, Modal, TextInput, SegmentedButtons, Snackbar, ActivityIndicator } from 'react-native-paper';
 import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo, X, AlertCircle } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEnhancedTimetable } from '../../hooks/useEnhancedTimetable';
@@ -352,7 +352,7 @@ function ModernTimetableSlotCard({
 
 export function ModernTimetableScreen() {
   const { profile } = useAuth();
-  const { colors, isDark, shadows } = useTheme();
+  const { colors, isDark, shadows, spacing, typography } = useTheme();
 
   // Create dynamic styles based on theme
   const styles = useMemo(() => createStyles(colors, isDark, shadows), [colors, isDark, shadows]);
@@ -461,6 +461,11 @@ export function ModernTimetableScreen() {
     dateStr,
     schoolCode
   );
+
+  // Normalize slots defensively
+  const normalizedSlots = React.useMemo(() => {
+    return Array.isArray(slots) ? slots : [];
+  }, [slots]);
 
   const { chaptersById, syllabusContentMap } = useSyllabusLoader(selectedClassId, schoolCode);
 
@@ -1114,6 +1119,21 @@ export function ModernTimetableScreen() {
       </View>
     );
   }
+
+  // Three-state handling
+  if (loading && normalizedSlots.length === 0) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary[600]} />
+        <Text style={{ marginTop: spacing.md, color: colors.text.secondary }}>
+          Loading timetable...
+        </Text>
+      </View>
+    );
+  }
+
+  // Note: Primary error handling is done above at lines 1108-1121
+  // Removed duplicate error block that was causing TypeScript type narrowing issues
 
   return (
     <View style={styles.container}>

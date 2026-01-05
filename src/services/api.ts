@@ -23,6 +23,45 @@ import {
   listSubjects,
   getActiveAcademicYear
 } from '../data/queries';
+import { assertCapability, type AuthorizableUser } from '../domain/auth/assert';
+import type { Capability } from '../domain/auth/capabilities';
+
+/**
+ * Get the current authenticated user context for service-level authorization.
+ * This fetches the user from Supabase auth and returns a minimal AuthorizableUser.
+ * 
+ * @returns AuthorizableUser with id and role, or null if not authenticated
+ */
+async function getCurrentAuthUser(): Promise<AuthorizableUser | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  
+  const { data: userData } = await supabase
+    .from('users')
+    .select('id, role')
+    .eq('id', user.id)
+    .maybeSingle();
+  
+  if (!userData) return null;
+  
+  return {
+    id: userData.id,
+    role: userData.role,
+  };
+}
+
+/**
+ * Assert that the current authenticated user has the required capability.
+ * Use this at the start of any mutation function.
+ * 
+ * @param capability - The required capability
+ * @throws AuthorizationError if user is not authenticated or lacks capability
+ */
+async function assertCurrentUserCapability(capability: Capability): Promise<AuthorizableUser> {
+  const user = await getCurrentAuthUser();
+  assertCapability(user, capability);
+  return user;
+}
 
 type Tables = Database['public']['Tables'];
 
@@ -170,7 +209,7 @@ export const api = {
         if (adminRows && adminRows.length > 0) {
           const { data: adminData } = await supabase
             .from('admin')
-            .select('*')
+            .select('id, user_id, auth_user_id, full_name, email, phone, role, school_code, created_at')
             .eq('id', adminRows[0].id)
             .maybeSingle();
 
@@ -316,6 +355,9 @@ export const api = {
     },
 
     async markAttendance(records: AttendanceInput[]): Promise<void> {
+      // Service-level authorization: require attendance.mark capability
+      await assertCurrentUserCapability('attendance.mark');
+      
       // Batch process for better performance
       const existingRecords: { [key: string]: string } = {};
       
@@ -342,17 +384,14 @@ export const api = {
       }
 
       // Separate records into updates and inserts
-      const updates: any[] = [];
+      const updates: Array<{ id: string; record: AttendanceInput }> = [];
       const inserts: AttendanceInput[] = [];
 
       records.forEach(record => {
         if (existingRecords[record.student_id]) {
           updates.push({
             id: existingRecords[record.student_id],
-            status: record.status,
-            marked_by: record.marked_by,
-            marked_by_role_code: record.marked_by_role_code,
-            updated_at: new Date().toISOString()
+            record: record
           });
         } else {
           inserts.push(record);
@@ -360,12 +399,31 @@ export const api = {
       });
 
       // Batch update existing records
+      // Note: We update individually to ensure RLS policies can validate each record
+      // with its school_code and class_instance_id
       if (updates.length > 0) {
-        const { error: updateError } = await supabase
-          .from('attendance')
-          .upsert(updates);
+        const updatePromises = updates.map(({ id, record }) =>
+          supabase
+            .from('attendance')
+            .update({
+              status: record.status,
+              marked_by: record.marked_by,
+              marked_by_role_code: record.marked_by_role_code,
+              school_code: record.school_code,
+              class_instance_id: record.class_instance_id,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+        );
         
-        if (updateError) throw updateError;
+        const updateResults = await Promise.all(updatePromises);
+        const updateErrors = updateResults
+          .map((result, index) => result.error ? { index, error: result.error } : null)
+          .filter(Boolean);
+        
+        if (updateErrors.length > 0) {
+          throw new Error(`Failed to update ${updateErrors.length} attendance record(s): ${updateErrors[0]?.error?.message}`);
+        }
       }
 
       // Batch insert new records
@@ -386,6 +444,9 @@ export const api = {
       markedByRoleCode: string,
       schoolCode: string
     ): Promise<void> {
+      // Service-level authorization: require attendance.mark capability
+      await assertCurrentUserCapability('attendance.mark');
+      
       // Get all students in the class
       const { data: students, error: studentsError } = await supabase
         .from('student')
@@ -500,7 +561,7 @@ export const api = {
     async getStudentPayments(studentId: string): Promise<FeePayment[]> {
       const { data, error } = await supabase
         .from('fee_payments')
-        .select('*')
+        .select('id, student_id, plan_id, component_type_id, payment_date, payment_method, transaction_id, receipt_number, remarks, school_code, created_by, created_at, updated_at, amount_inr')
         .eq('student_id', studentId)
         .order('payment_date', { ascending: false });
 
@@ -520,7 +581,7 @@ export const api = {
 
       const { data, error } = await supabase
         .from('fee_payments')
-        .select('*')
+        .select('id, student_id, plan_id, component_type_id, payment_date, payment_method, transaction_id, receipt_number, remarks, school_code, created_by, created_at, updated_at, amount_inr')
         .in('student_id', studentIds)
         .order('payment_date', { ascending: false });
 
@@ -540,7 +601,7 @@ export const api = {
 
       const { data, error } = await supabase
         .from('fee_payments')
-        .select('*')
+        .select('id, student_id, plan_id, component_type_id, payment_date, payment_method, transaction_id, receipt_number, remarks, school_code, created_by, created_at, updated_at, amount_inr')
         .in('student_id', studentIds)
         .order('payment_date', { ascending: false });
 
@@ -662,7 +723,7 @@ export const api = {
     async getPaginated(schoolCode: string, offset: number, limit: number): Promise<LearningResource[]> {
       const { data, error } = await supabase
         .from('learning_resources')
-        .select('*')
+        .select('id, title, description, resource_type, content_url, file_size, school_code, class_instance_id, subject_id, uploaded_by, created_at, updated_at')
         .eq('school_code', schoolCode)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
@@ -672,6 +733,9 @@ export const api = {
     },
 
     async create(resourceData: Omit<LearningResource, 'id' | 'created_at' | 'updated_at'>): Promise<LearningResource> {
+      // Service-level authorization: require resources.manage capability
+      await assertCurrentUserCapability('resources.manage');
+      
       // Ensure content_url is provided (required by database)
       if (!resourceData.content_url) {
         throw new Error('content_url is required');
@@ -690,6 +754,9 @@ export const api = {
     },
 
     async update(id: string, updates: Partial<LearningResource>): Promise<LearningResource> {
+      // Service-level authorization: require resources.manage capability
+      await assertCurrentUserCapability('resources.manage');
+      
       // Filter out null content_url if provided (database doesn't accept null)
       const updateData: Partial<DomainLearningResource> = { ...updates };
       if ('content_url' in updateData && updateData.content_url === null) {
@@ -707,6 +774,9 @@ export const api = {
     },
 
     async delete(id: string): Promise<void> {
+      // Service-level authorization: require resources.manage capability
+      await assertCurrentUserCapability('resources.manage');
+      
       const { error } = await supabase
         .from('learning_resources')
         .delete()
@@ -720,7 +790,7 @@ export const api = {
     async getByClass(classId: string): Promise<CalendarEvent[]> {
       const { data, error } = await supabase
         .from('school_calendar_events')
-        .select('*')
+        .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
         .eq('class_instance_id', classId)
         .order('start_date', { ascending: true });
 
@@ -731,7 +801,7 @@ export const api = {
     async getBySchool(schoolCode: string): Promise<CalendarEvent[]> {
       const { data, error } = await supabase
         .from('school_calendar_events')
-        .select('*')
+        .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
         .eq('school_code', schoolCode)
         .order('start_date', { ascending: true });
 
@@ -823,7 +893,10 @@ export const api = {
   // ==========================================
 
   tests: {
-    async getBySchool(schoolCode: string, classInstanceId?: string) {
+    async getBySchool(schoolCode: string, classInstanceId?: string, options?: { limit?: number; offset?: number; test_mode?: 'online' | 'offline' }) {
+      const limit = options?.limit ?? 50; // Default to 50 (was unlimited)
+      const offset = options?.offset ?? 0;
+      
       let query = supabase
         .from('tests')
         .select(`
@@ -840,10 +913,16 @@ export const api = {
           )
         `)
         .eq('school_code', schoolCode)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (classInstanceId) {
         query = query.eq('class_instance_id', classInstanceId);
+      }
+
+      // OPTIMIZED: Filter by test_mode in SQL, not JavaScript
+      if (options?.test_mode) {
+        query = query.eq('test_mode', options.test_mode);
       }
 
       const { data, error } = await query;
@@ -876,6 +955,9 @@ export const api = {
     },
 
     async create(testData: any) {
+      // Service-level authorization: require assessments.create capability
+      await assertCurrentUserCapability('assessments.create');
+      
       const { data, error } = await supabase
         .from('tests')
         .insert([testData])
@@ -887,6 +969,9 @@ export const api = {
     },
 
     async update(testId: string, testData: any) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { data, error } = await supabase
         .from('tests')
         .update(testData)
@@ -899,6 +984,9 @@ export const api = {
     },
 
     async delete(testId: string) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { error } = await supabase
         .from('tests')
         .delete()
@@ -908,8 +996,8 @@ export const api = {
       return true;
     },
 
-    async getWithStats(schoolCode: string, classInstanceId?: string) {
-      const tests = await this.getBySchool(schoolCode, classInstanceId);
+    async getWithStats(schoolCode: string, classInstanceId?: string, options?: { limit?: number; offset?: number; test_mode?: 'online' | 'offline' }) {
+      const tests = await this.getBySchool(schoolCode, classInstanceId, options);
 
       // Get question counts and marks info for each test
       const testsWithStats = await Promise.all(
@@ -969,7 +1057,7 @@ export const api = {
     async getByTest(testId: string) {
       const { data, error } = await supabase
         .from('test_questions')
-        .select('*')
+        .select('id, test_id, question_text, question_type, options, correct_index, correct_text, correct_answer, points, order_index, created_at')
         .eq('test_id', testId)
         .order('order_index', { ascending: true });
 
@@ -978,6 +1066,9 @@ export const api = {
     },
 
     async create(questionData: any) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { data, error } = await supabase
         .from('test_questions')
         .insert([questionData])
@@ -989,6 +1080,9 @@ export const api = {
     },
 
     async update(questionId: string, questionData: any) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { data, error } = await supabase
         .from('test_questions')
         .update(questionData)
@@ -1001,6 +1095,9 @@ export const api = {
     },
 
     async delete(questionId: string) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { error } = await supabase
         .from('test_questions')
         .delete()
@@ -1011,6 +1108,9 @@ export const api = {
     },
 
     async reorder(testId: string, questionIds: string[]) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       // Update order_index for each question
       const updates = questionIds.map((id, index) =>
         supabase
@@ -1021,6 +1121,25 @@ export const api = {
 
       await Promise.all(updates);
       return true;
+    },
+
+    /**
+     * Create multiple test questions in bulk.
+     * Requires: assessments.manage capability
+     */
+    async createBulk(questionsData: any[]): Promise<any[]> {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
+      if (questionsData.length === 0) return [];
+      
+      const { data, error } = await supabase
+        .from('test_questions')
+        .insert(questionsData)
+        .select();
+
+      if (error) throw error;
+      return data || [];
     },
   },
 
@@ -1065,6 +1184,9 @@ export const api = {
     },
 
     async create(markData: any) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { data, error } = await supabase
         .from('test_marks')
         .insert([markData])
@@ -1076,6 +1198,9 @@ export const api = {
     },
 
     async createBulk(marksData: any[]) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { data, error } = await supabase
         .from('test_marks')
         .upsert(marksData, {
@@ -1089,6 +1214,9 @@ export const api = {
     },
 
     async update(markId: string, markData: any) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { data, error } = await supabase
         .from('test_marks')
         .update(markData)
@@ -1101,6 +1229,9 @@ export const api = {
     },
 
     async delete(markId: string) {
+      // Service-level authorization: require assessments.manage capability
+      await assertCurrentUserCapability('assessments.manage');
+      
       const { error } = await supabase
         .from('test_marks')
         .delete()

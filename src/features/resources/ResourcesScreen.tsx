@@ -14,6 +14,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
 import { useAllResources } from '../../hooks/useResources';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
@@ -27,13 +28,16 @@ import { LearningResource } from '../../services/api';
 export default function ResourcesScreen() {
   const { profile } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
+  const { can } = useCapabilities();
   const queryClient = useQueryClient();
   const schoolCode = profile?.school_code ?? undefined;
   const { data: resources, isLoading, error } = useAllResources(schoolCode, 50);
   const { data: classes = [] } = useClasses(schoolCode);
   const { data: subjectsResult } = useSubjects(schoolCode);
   const subjects = subjectsResult?.data || [];
-  const canManage = profile?.role === 'admin' || profile?.role === 'superadmin' || profile?.role === 'cb_admin';
+  
+  // Capability-based check (NO role checks in UI)
+  const canManage = can('resources.manage');
   const [selectedResource, setSelectedResource] = useState<LearningResource | null>(null);
   const [viewerType, setViewerType] = useState<'video' | 'pdf' | null>(null);
   const [selectedClass, setSelectedClass] = useState<string>('all');

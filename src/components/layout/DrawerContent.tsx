@@ -29,15 +29,19 @@ import {
   UserPlus,
   List,
   Layers,
-  ReceiptText,
   FolderOpen,
   FileText,
   Moon,
-  Sun
+  Sun,
+  TrendingUp,
+  DollarSign,
+  Package
 } from 'lucide-react-native';
 import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import type { Capability } from '../../domain/auth/capabilities';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useClass } from '../../hooks/useClasses';
 
@@ -46,7 +50,10 @@ type MenuItem = {
   label: string;
   icon: any;
   route: string;
+  /** @deprecated Use requiredCapability instead for capability-based access control */
   roles?: ('superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student')[];
+  /** Capability required to see this menu item - preferred over roles */
+  requiredCapability?: Capability;
   section: 'Main' | 'Academic' | 'Learning' | 'Admin' | 'Settings' | 'CB Admin';
   badge?: number;
   isNew?: boolean;
@@ -93,7 +100,7 @@ const MENU: MenuItem[] = [
     label: 'Syllabus', 
     icon: NotebookText, 
     route: '/(tabs)/syllabus', 
-    roles: ['admin', 'superadmin', 'cb_admin', 'teacher'],
+    requiredCapability: 'syllabus.manage',
     section: 'Learning',
     description: 'Chapters and topics'
   },
@@ -102,7 +109,7 @@ const MENU: MenuItem[] = [
     label: 'Syllabus', 
     icon: NotebookText, 
     route: '/(tabs)/syllabus-student', 
-    roles: ['student'],
+    requiredCapability: 'syllabus.read',
     section: 'Learning',
     description: 'Your syllabus'
   },
@@ -111,7 +118,6 @@ const MENU: MenuItem[] = [
     label: 'Attendance', 
     icon: UserCheck, 
     route: '/(tabs)/attendance', 
-    roles: ['admin', 'superadmin', 'cb_admin', 'student'], 
     section: 'Academic',
     description: 'Track student attendance'
   },
@@ -120,7 +126,7 @@ const MENU: MenuItem[] = [
     label: 'Fees', 
     icon: CreditCard, 
     route: '/(tabs)/fees-student', 
-    roles: ['student'], 
+    requiredCapability: 'fees.read_own',
     section: 'Academic',
     description: 'Your fees'
   },
@@ -133,42 +139,29 @@ const MENU: MenuItem[] = [
     description: 'Tests and exams',
     isNew: true
   },
+  {
+    key: 'progress',
+    label: 'My Progress',
+    icon: TrendingUp,
+    route: '/(tabs)/progress',
+    section: 'Academic',
+    description: 'Track your performance',
+    isNew: true
+  },
   { 
     key: 'fees', 
     label: 'Fees', 
     icon: CreditCard, 
     route: '/(tabs)/fees', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
+    requiredCapability: 'fees.write',
     section: 'Academic',
-    description: 'Fee management',
-    hasSubMenu: true
-  },
-  { 
-    key: 'fees_payments', 
-    label: 'Payments', 
-    icon: ReceiptText, 
-    route: '/(tabs)/payments', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
-    section: 'Academic',
-    description: 'Payment history',
-    parent: 'fees'
-  },
-  { 
-    key: 'fees_components', 
-    label: 'Components', 
-    icon: Settings2, 
-    route: '/(tabs)/fees?tab=components', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
-    section: 'Academic',
-    description: 'Manage fee components',
-    parent: 'fees'
+    description: 'Invoice management'
   },
   { 
     key: 'analytics', 
     label: 'Analytics', 
     icon: LineChart, 
     route: '/(tabs)/analytics', 
-    roles: ['admin', 'superadmin', 'cb_admin', 'student'], 
     section: 'Academic',
     description: 'Performance insights'
   },
@@ -177,7 +170,6 @@ const MENU: MenuItem[] = [
     label: 'Tasks', 
     icon: CheckCircle2, 
     route: '/(tabs)/tasks', 
-    roles: ['admin', 'superadmin', 'cb_admin', 'student'], 
     section: 'Academic',
     description: 'Homework and assignments',
     isNew: true
@@ -187,7 +179,7 @@ const MENU: MenuItem[] = [
     label: 'Management', 
     icon: Settings2, 
     route: '/(tabs)/manage', 
-    roles: ['admin', 'superadmin', 'cb_admin'], 
+    requiredCapability: 'management.view',
     section: 'Academic',
     description: 'Class administration'
   },
@@ -196,7 +188,7 @@ const MENU: MenuItem[] = [
     label: 'Add Admins',
     icon: UserPlus,
     route: '/(tabs)/add-admin',
-    roles: ['superadmin'],
+    requiredCapability: 'admins.create',
     section: 'Admin',
     description: 'Create and manage administrators'
   },
@@ -205,7 +197,7 @@ const MENU: MenuItem[] = [
     label: 'Add Classes',
     icon: List,
     route: '/(tabs)/add-classes',
-    roles: ['superadmin'],
+    requiredCapability: 'classes.manage',
     section: 'Admin',
     description: 'Manage academic years and classes'
   },
@@ -214,7 +206,7 @@ const MENU: MenuItem[] = [
     label: 'Add Subjects',
     icon: Layers,
     route: '/(tabs)/add-subjects',
-    roles: ['superadmin'],
+    requiredCapability: 'subjects.manage',
     section: 'Admin',
     description: 'Manage school subjects'
   },
@@ -223,9 +215,28 @@ const MENU: MenuItem[] = [
     label: 'Add Students',
     icon: UsersRound,
     route: '/(tabs)/add-student',
-    roles: ['admin', 'superadmin'],
+    requiredCapability: 'students.create',
     section: 'Admin',
     description: 'Create and manage students'
+  },
+  {
+    key: 'inventory',
+    label: 'Inventory',
+    icon: Package,
+    route: '/(tabs)/inventory',
+    requiredCapability: 'inventory.create',
+    section: 'Admin',
+    description: 'Manage inventory items and policies'
+  },
+  { 
+    key: 'finance', 
+    label: 'Finance', 
+    icon: DollarSign, 
+    route: '/(tabs)/finance', 
+    requiredCapability: 'management.view',
+    roles: ['superadmin'], // Finance is super admin only
+    section: 'Admin',
+    description: 'Income and expense tracking'
   },
 ];
 
@@ -233,13 +244,13 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const router = useRouter();
   const { profile, signOut } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
-  const role = profile?.role as MenuItem['roles'] extends (infer U)[] ? U : never;
+  const { can, role } = useCapabilities();
   const [activeItem, setActiveItem] = React.useState<string>('home');
-  const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set(['fees']));
+  const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
   
   // Fetch class information for students
-  const isStudent = role === 'student';
+  const canViewOwnOnly = can('fees.read_own') && !can('fees.write'); // Student-like view
   const { data: classData } = useClass(profile?.class_instance_id || undefined);
   
   // Dynamic styles based on theme
@@ -355,11 +366,11 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   
   // Format class name for display
   const displayText = useMemo(() => {
-    if (isStudent && classData) {
+    if (canViewOwnOnly && classData) {
       return `Grade ${classData.grade}${classData.section ? `-${classData.section}` : ''}`;
     }
-    return (profile?.role || 'UNKNOWN').toUpperCase();
-  }, [isStudent, classData, profile?.role]);
+    return (role || 'UNKNOWN').toUpperCase();
+  }, [canViewOwnOnly, classData, role]);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -367,14 +378,40 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   const grouped = useMemo(() => {
-    const allowed = MENU.filter(item => !item.roles || item.roles.includes(role));
+    // Filter menu items based on capabilities and roles
+    const allowed = MENU.filter(item => {
+      // Check role-based access (if specified)
+      if (item.roles && item.roles.length > 0) {
+        if (!profile?.role || !item.roles.includes(profile.role as any)) {
+          return false;
+        }
+      }
+      
+      // If no capability requirement, show to everyone (if role check passed)
+      if (!item.requiredCapability) return true;
+      // Check if user has the required capability
+      return can(item.requiredCapability);
+    });
+    
+    // Handle special case: syllabus - show only one based on capabilities
+    // If user can manage syllabus, filter out student syllabus view
+    // If user can only read syllabus (student), filter out staff syllabus view
+    const filteredAllowed = allowed.filter(item => {
+      if (item.key === 'syllabus_staff' && !can('syllabus.manage')) return false;
+      if (item.key === 'syllabus_student' && can('syllabus.manage')) return false;
+      // Similarly for fees
+      if (item.key === 'fees_student' && can('fees.write')) return false;
+      if (item.key === 'fees' && !can('fees.write')) return false;
+      return true;
+    });
+    
     const sections: Record<string, MenuItem[]> = {};
-    for (const item of allowed) {
+    for (const item of filteredAllowed) {
       sections[item.section] = sections[item.section] || [];
       sections[item.section].push(item);
     }
     return sections;
-  }, [role]);
+  }, [can, profile?.role]);
 
   // Animation effects
   useEffect(() => {

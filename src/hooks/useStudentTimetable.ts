@@ -18,7 +18,7 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
     queryFn: async ({ signal }) => {
       if (!classInstanceId || !dateStr) return { slots: [], taughtSlotIds: new Set<string>() };
 
-      // Fetch timetable slots for the selected date
+      // OPTIMIZED: Single query with joins - eliminates N+1 pattern (3 queries → 1 query)
       const { data: slotsData, error: slotsError } = await supabase
         .from('timetable_slots')
         .select(`
@@ -33,7 +33,9 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
           teacher_id,
           plan_text,
           syllabus_chapter_id,
-          syllabus_topic_id
+          syllabus_topic_id,
+          subject:subject_id(id, subject_name),
+          teacher:teacher_id(id, full_name)
         `)
         .eq('class_instance_id', classInstanceId)
         .eq('class_date', dateStr)
@@ -42,27 +44,6 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
 
       if (slotsError) throw slotsError;
       if (!slotsData || slotsData.length === 0) return { slots: [], taughtSlotIds: new Set<string>() };
-
-      // Get unique subject and teacher IDs
-      const subjectIds = [...new Set(slotsData.map(slot => slot.subject_id).filter((id): id is string => Boolean(id)))];
-      const teacherIds = [...new Set(slotsData.map(slot => slot.teacher_id).filter((id): id is string => Boolean(id)))];
-
-      // Batch fetch subjects and teachers
-      const [subjectsResult, teachersResult] = await Promise.all([
-        subjectIds.length > 0 ? supabase
-          .from('subjects')
-          .select('id, subject_name')
-          .in('id', subjectIds)
-          .abortSignal(signal) : Promise.resolve({ data: [] }),
-        teacherIds.length > 0 ? supabase
-          .from('admin')
-          .select('id, full_name')
-          .in('id', teacherIds)
-          .abortSignal(signal) : Promise.resolve({ data: [] })
-      ]);
-
-      const subjectsMap = new Map((subjectsResult.data || []).map(s => [s.id, s]));
-      const teachersMap = new Map((teachersResult.data || []).map(t => [t.id, t]));
 
       // Get taught slot IDs from syllabus_progress table
       const { data: progressData, error: progressError } = await supabase
@@ -79,24 +60,35 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
 
       const taughtSlotIds = new Set((progressData || []).map(p => p.timetable_slot_id).filter(Boolean));
 
-      // Combine slots with subject and teacher data
-      const enrichedSlots = slotsData.map(slot => ({
-        ...slot,
-        subject: slot.subject_id ? subjectsMap.get(slot.subject_id) : null,
-        teacher: slot.teacher_id ? teachersMap.get(slot.teacher_id) : null,
+      // Combine slots with subject and teacher data from joins
+      const enrichedSlots = slotsData.map((slot: any) => ({
+        id: slot.id,
+        class_date: slot.class_date,
+        period_number: slot.period_number,
+        slot_type: slot.slot_type,
+        name: slot.name,
+        start_time: slot.start_time,
+        end_time: slot.end_time,
+        subject_id: slot.subject_id,
+        teacher_id: slot.teacher_id,
+        plan_text: slot.plan_text,
+        syllabus_chapter_id: slot.syllabus_chapter_id,
+        syllabus_topic_id: slot.syllabus_topic_id,
+        subject: slot.subject || null,
+        teacher: slot.teacher || null,
       }));
 
       return { slots: enrichedSlots as unknown as TimetableSlot[], taughtSlotIds };
     },
     enabled: !!classInstanceId && !!dateStr,
-    staleTime: 30 * 1000, // ✅ 30 seconds (was 5 minutes - too long!)
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes (was 30 seconds - too aggressive)
+    gcTime: 10 * 60 * 1000, // 10 minutes
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: true, // ✅ Refetch when app comes to focus (was false!)
+    refetchOnWindowFocus: false, // Don't refetch on every focus
     refetchOnMount: true,
-    refetchInterval: 30 * 1000, // ✅ Auto-refetch every 30 seconds (NEW!)
-    refetchIntervalInBackground: false, // Don't refetch in background to save battery
+    refetchInterval: false, // Remove aggressive polling
+    refetchIntervalInBackground: false
   });
 
   // Compute displayPeriodNumber counting only period slots

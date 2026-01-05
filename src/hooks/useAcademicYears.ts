@@ -8,6 +8,8 @@ type AcademicYear = {
   school_name: string;
   year_start: number;
   year_end: number;
+  start_date?: string; // YYYY-MM-DD
+  end_date?: string; // YYYY-MM-DD
   is_active: boolean;
   created_at: string;
 };
@@ -15,6 +17,8 @@ type AcademicYear = {
 type CreateAcademicYearInput = {
   year_start: number;
   year_end: number;
+  start_date: string; // YYYY-MM-DD
+  end_date: string; // YYYY-MM-DD
   school_code: string;
   school_name: string;
 };
@@ -123,6 +127,8 @@ export function useCreateAcademicYear(schoolCode: string | null | undefined) {
           school_name: input.school_name,
           year_start: input.year_start,
           year_end: input.year_end,
+          start_date: input.start_date,
+          end_date: input.end_date,
           is_active: true,
         })
         .select()

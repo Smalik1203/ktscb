@@ -1,5 +1,37 @@
 import { supabase } from '../lib/supabase';
 import type { Database } from '../types/database.types';
+import { assertCapability, type AuthorizableUser } from '../domain/auth/assert';
+import type { Capability } from '../domain/auth/capabilities';
+
+/**
+ * Get the current authenticated user context for service-level authorization.
+ */
+async function getCurrentAuthUser(): Promise<AuthorizableUser | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  
+  const { data: userData } = await supabase
+    .from('users')
+    .select('id, role')
+    .eq('id', user.id)
+    .maybeSingle();
+  
+  if (!userData) return null;
+  
+  return {
+    id: userData.id,
+    role: userData.role,
+  };
+}
+
+/**
+ * Assert that the current authenticated user has the required capability.
+ */
+async function assertCurrentUserCapability(capability: Capability): Promise<AuthorizableUser> {
+  const user = await getCurrentAuthUser();
+  assertCapability(user, capability);
+  return user;
+}
 
 export type UUID = string;
 
@@ -149,6 +181,9 @@ export async function fetchProgress(classInstanceId: UUID, subjectId: UUID) {
 }
 
 export async function addChapter(syllabusId: UUID, payload: Pick<SyllabusChapter, 'title' | 'description'>) {
+	// Service-level authorization: require syllabus.manage capability
+	await assertCurrentUserCapability('syllabus.manage');
+	
 	const { data: existing } = await supabase
 		.from('syllabus_chapters')
 		.select('chapter_no')
@@ -168,6 +203,9 @@ export async function addChapter(syllabusId: UUID, payload: Pick<SyllabusChapter
 }
 
 export async function updateChapter(chapterId: UUID, payload: Partial<Pick<SyllabusChapter, 'title' | 'description'>>) {
+	// Service-level authorization: require syllabus.manage capability
+	await assertCurrentUserCapability('syllabus.manage');
+	
 	const { data, error } = await supabase
 		.from('syllabus_chapters')
 		.update({ title: payload.title, description: payload.description })
@@ -179,11 +217,17 @@ export async function updateChapter(chapterId: UUID, payload: Partial<Pick<Sylla
 }
 
 export async function deleteChapter(chapterId: UUID) {
+	// Service-level authorization: require syllabus.manage capability
+	await assertCurrentUserCapability('syllabus.manage');
+	
 	const { error } = await supabase.from('syllabus_chapters').delete().eq('id', chapterId);
 	if (error) throw error;
 }
 
 export async function addTopic(chapterId: UUID, payload: Pick<SyllabusTopic, 'title' | 'description'>) {
+	// Service-level authorization: require syllabus.manage capability
+	await assertCurrentUserCapability('syllabus.manage');
+	
 	const { data: existing } = await supabase
 		.from('syllabus_topics')
 		.select('topic_no')
@@ -203,6 +247,9 @@ export async function addTopic(chapterId: UUID, payload: Pick<SyllabusTopic, 'ti
 }
 
 export async function updateTopic(topicId: UUID, payload: Partial<Pick<SyllabusTopic, 'title' | 'description'>>) {
+	// Service-level authorization: require syllabus.manage capability
+	await assertCurrentUserCapability('syllabus.manage');
+	
 	const { data, error } = await supabase
 		.from('syllabus_topics')
 		.update({ title: payload.title, description: payload.description })
@@ -214,6 +261,9 @@ export async function updateTopic(topicId: UUID, payload: Partial<Pick<SyllabusT
 }
 
 export async function deleteTopic(topicId: UUID) {
+	// Service-level authorization: require syllabus.manage capability
+	await assertCurrentUserCapability('syllabus.manage');
+	
 	const { error } = await supabase.from('syllabus_topics').delete().eq('id', topicId);
 	if (error) throw error;
 }
@@ -228,6 +278,9 @@ export async function markTaught(args: {
 	syllabusChapterId?: UUID;
 	syllabusTopicId?: UUID;
 }) {
+	// Service-level authorization: require syllabus.manage capability
+	await assertCurrentUserCapability('syllabus.manage');
+	
 	const { error } = await supabase.rpc('mark_syllabus_taught', {
 		p_class_instance_id: args.classInstanceId,
 		p_date: args.dateISO,
@@ -242,6 +295,9 @@ export async function markTaught(args: {
 }
 
 export async function unmarkTaught(schoolCode: string, timetableSlotId: UUID) {
+	// Service-level authorization: require syllabus.manage capability
+	await assertCurrentUserCapability('syllabus.manage');
+	
 	const { error } = await supabase.rpc('unmark_syllabus_taught', {
 		p_school_code: schoolCode,
 		p_timetable_slot_id: timetableSlotId,

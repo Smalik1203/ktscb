@@ -83,7 +83,23 @@ export function QuestionBuilderScreen() {
   const importAIGeneratedQuestions = async () => {
     try {
       setImportingAI(true);
-      const aiQuestions = JSON.parse(aiGeneratedQuestionsParam!);
+      
+      // Runtime-safe: validate parameter exists and is valid JSON
+      if (!aiGeneratedQuestionsParam || aiGeneratedQuestionsParam.trim().length === 0) {
+        throw new Error('No AI-generated questions data available');
+      }
+      
+      let aiQuestions;
+      try {
+        aiQuestions = JSON.parse(aiGeneratedQuestionsParam);
+      } catch (parseError: any) {
+        throw new Error(`Invalid AI questions data: ${parseError?.message || 'Parse error'}`);
+      }
+      
+      // Validate parsed data structure
+      if (!Array.isArray(aiQuestions) || aiQuestions.length === 0) {
+        throw new Error('AI questions data is not a valid array or is empty');
+      }
 
       for (let i = 0; i < aiQuestions.length; i++) {
         const aiQ = aiQuestions[i];

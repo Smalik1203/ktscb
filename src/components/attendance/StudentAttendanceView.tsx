@@ -18,8 +18,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { typography, spacing, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { ThreeStateView } from '../common/ThreeStateView';
 import { DatePickerModal } from '../common/DatePickerModal';
-import { supabase } from '../../data/supabaseClient';
+import { supabase } from '../../lib/supabase'; // Kept for reads only
 import { format, subDays, addDays } from 'date-fns';
+import { useCapabilities } from '../../hooks/useCapabilities';
 
 interface AttendanceRecord {
   id: string;
@@ -33,6 +34,7 @@ export const StudentAttendanceView: React.FC = () => {
   const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
 
   const { profile } = useAuth();
+  const { can } = useCapabilities();
   const [refreshing, setRefreshing] = useState(false);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [loadingStudentId, setLoadingStudentId] = useState(true);
@@ -46,10 +48,14 @@ export const StudentAttendanceView: React.FC = () => {
   const [showHistoryStartDatePicker, setShowHistoryStartDatePicker] = useState(false);
   const [showHistoryEndDatePicker, setShowHistoryEndDatePicker] = useState(false);
 
+  // Check if user is viewing their own attendance (capability-based, not role-based)
+  const isViewingOwnAttendance = can('attendance.read_own') && !can('attendance.mark');
+
   // Get student ID from profile (matching V1 pattern with fallback logic)
   useEffect(() => {
     const fetchStudent = async () => {
-      if (!profile?.auth_id || profile?.role !== 'student') {
+      // Use capability check instead of role check
+      if (!profile?.auth_id || !isViewingOwnAttendance) {
         setLoadingStudentId(false);
         return;
       }
@@ -102,7 +108,7 @@ export const StudentAttendanceView: React.FC = () => {
     };
 
     fetchStudent();
-  }, [profile?.auth_id, profile?.role, profile?.school_code, profile?.email]);
+  }, [profile?.auth_id, isViewingOwnAttendance, profile?.school_code, profile?.email]);
 
   // Fetch student attendance data
   const { data: attendanceRecords = [], isLoading, error, refetch } = useStudentAttendance(studentId || undefined);

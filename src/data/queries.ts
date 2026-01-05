@@ -136,7 +136,7 @@ export async function getUserProfile(userId: string, options?: { signal?: AbortS
   try {
     const { data, error } = await supabase
       .from(DB.tables.users)
-      .select('*')
+      .select('id, full_name, email, phone, role, school_code, school_name, created_at, class_instance_id')
       .eq('id', userId)
       .maybeSingle();
     
@@ -169,7 +169,7 @@ export async function getActiveAcademicYear(schoolCode: string, options?: { sign
   try {
     const { data, error } = await supabase
       .from(DB.tables.academicYears)
-      .select('*')
+      .select('id, school_code, school_name, year_start, year_end, is_active')
       .eq(DB.columns.schoolCode, schoolCode)
       .eq('is_active', true)
       .maybeSingle();
@@ -201,7 +201,7 @@ export async function listAcademicYears(schoolCode: string, options?: { signal?:
   try {
     const { data, error } = await supabase
       .from(DB.tables.academicYears)
-      .select('*')
+      .select('id, school_code, school_name, year_start, year_end, is_active')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('year_start', { ascending: false })
       .range(options?.from ?? 0, options?.to ?? 99);
@@ -245,7 +245,7 @@ export async function listClasses(
   try {
     let query = supabase
       .from(DB.tables.classInstances)
-      .select('*')
+      .select('id, school_code, academic_year_id, class_id, class_teacher_id, grade, section, created_by, created_at')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('grade', { ascending: true })
       .order('section', { ascending: true });
@@ -276,7 +276,7 @@ export async function getClassDetails(classInstanceId: string, options?: { signa
   try {
     const { data, error } = await supabase
       .from(DB.tables.classInstances)
-      .select('*')
+      .select('id, school_code, academic_year_id, class_id, class_teacher_id, grade, section, created_by, created_at')
       .eq('id', classInstanceId)
       .maybeSingle();
     
@@ -311,7 +311,7 @@ export async function listAdmins(
   try {
     const { data, error } = await supabase
       .from(DB.tables.admin)
-      .select('*')
+      .select('id, admin_code, full_name, email, phone, role, school_code, school_name, auth_user_id, created_at')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('full_name');
 
@@ -343,16 +343,20 @@ export async function listAdmins(
 export async function listStudents(
   classInstanceId: string,
   schoolCode: string,
-  options?: { signal?: AbortSignal; from?: number; to?: number }
+  options?: { signal?: AbortSignal; from?: number; to?: number; limit?: number }
 ): Promise<QueryResult<StudentLite[]>> {
   try {
+    const limit = options?.limit ?? 50; // Default to 50 (was 499)
+    const from = options?.from ?? 0;
+    const to = from + limit - 1;
+    
     const { data, error } = await supabase
       .from(DB.tables.student)
       .select('id, student_code, full_name, email, phone, class_instance_id, school_code, created_at')
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.schoolCode, schoolCode)
       .order('full_name', { ascending: true })
-      .range(options?.from ?? 0, options?.to ?? 499);
+      .range(from, to);
     
     if (error) {
       return {
@@ -408,7 +412,7 @@ export async function getStudentDetails(studentId: string, options?: { signal?: 
   try {
     const { data, error } = await supabase
       .from(DB.tables.student)
-      .select('*')
+      .select('id, student_code, full_name, email, phone, parent_phone, school_code, school_name, class_instance_id, auth_user_id, role, created_at, created_by')
       .eq('id', studentId)
       .maybeSingle();
     
@@ -446,7 +450,7 @@ export async function getAttendanceForDate(
   try {
     const { data, error } = await supabase
       .from(DB.tables.attendance)
-      .select('*')
+      .select('id, student_id, class_instance_id, date, status, marked_by, marked_by_role_code, school_code, created_at')
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq('date', date)
       .eq(DB.columns.schoolCode, schoolCode)
@@ -456,6 +460,14 @@ export async function getAttendanceForDate(
       return {
         data: null,
         error: mapError(error, { queryName: 'getAttendanceForDate', table: 'attendance' }),
+      };
+    }
+    
+    // Type guard to ensure data is an array
+    if (!Array.isArray(data)) {
+      return {
+        data: null,
+        error: mapError(new Error('Invalid data format'), { queryName: 'getAttendanceForDate' }),
       };
     }
     
@@ -471,10 +483,14 @@ export async function getAttendanceOverview(
   classInstanceId: string,
   dateRange: [string, string],
   schoolCode: string,
-  options?: { signal?: AbortSignal; from?: number; to?: number }
+  options?: { signal?: AbortSignal; from?: number; to?: number; limit?: number }
 ): Promise<QueryResult<DomainAttendance[]>> {
   try {
     const [startDate, endDate] = dateRange;
+    const limit = options?.limit ?? 50; // Default to 50 (was 999)
+    const from = options?.from ?? 0;
+    const to = from + limit - 1;
+    
     const { data, error } = await supabase
       .from(DB.tables.attendance)
       .select('*')
@@ -483,7 +499,7 @@ export async function getAttendanceOverview(
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: false })
-      .range(options?.from ?? 0, options?.to ?? 999);
+      .range(from, to);
     
     if (error) {
       return {

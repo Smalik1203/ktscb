@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useCapabilities } from './useCapabilities';
 import { useSuperAdminAnalytics, useStudentAggregatedAnalytics } from './analytics';
 import type { TimePeriod, AnalyticsFeature, DateRange } from '../components/analytics/types';
 import { getDateRangeForPeriod } from '../components/analytics/types';
@@ -38,6 +39,7 @@ export interface UseAnalyticsScreenReturn {
  */
 export function useAnalyticsScreen(): UseAnalyticsScreenReturn {
   const { profile } = useAuth();
+  const { can } = useCapabilities();
   const [refreshing, setRefreshing] = useState(false);
   const [timePeriod, setTimePeriodState] = useState<TimePeriod>('week');
   const [selectedFeature, setSelectedFeature] = useState<AnalyticsFeature>('overview');
@@ -47,19 +49,23 @@ export function useAnalyticsScreen(): UseAnalyticsScreenReturn {
     getDateRangeForPeriod('week')
   );
 
-  // Computed values
-  const role = profile?.role;
+  // Capability-based computed values
+  const canViewSchoolAnalytics = can('analytics.read_school');
+  const canViewOwnAnalytics = can('analytics.read_own');
+  
   const canViewAnalytics = useMemo(
-    () => role === 'admin' || role === 'superadmin' || role === 'cb_admin' || role === 'student',
-    [role]
+    () => canViewSchoolAnalytics || canViewOwnAnalytics,
+    [canViewSchoolAnalytics, canViewOwnAnalytics]
   );
 
+  // isSuperAdmin = can view school-wide analytics
   const isSuperAdmin = useMemo(
-    () => role === 'superadmin' || role === 'cb_admin',
-    [role]
+    () => canViewSchoolAnalytics,
+    [canViewSchoolAnalytics]
   );
 
-  const isStudent = useMemo(() => role === 'student', [role]);
+  // isStudent = can only view own analytics (not school-wide)
+  const isStudent = useMemo(() => canViewOwnAnalytics && !canViewSchoolAnalytics, [canViewOwnAnalytics, canViewSchoolAnalytics]);
 
   // Calculate date range based on time period or custom range
   const dateRange = useMemo(() => {

@@ -6,6 +6,8 @@ import { Text, Portal, Modal } from 'react-native-paper';
 import { BookOpen, Edit, Trash2, X, Plus, Search } from 'lucide-react-native';
 import { Card, Button, Input, EmptyState, Badge } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import { AccessDenied } from '../../components/common/AccessDenied';
 import { useSubjects } from '../../hooks/useSubjects';
 import { ThreeStateView } from '../../components/common/ThreeStateView';
 import { Pagination } from '../../components/common/Pagination';
@@ -42,8 +44,9 @@ export default function AddSubjectsScreen() {
   const [editingSubject, setEditingSubject] = useState<any>(null);
   const [editSubjectName, setEditSubjectName] = useState('');
 
-  // Role check
-  const isSuperAdmin = profile?.role === 'superadmin';
+  // Capability-based access control
+  const { can, isReady: capabilitiesReady } = useCapabilities();
+  const canManageSubjects = can('subjects.manage');
 
   // Normalization function to match backend logic
   const normalize = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -62,14 +65,12 @@ export default function AddSubjectsScreen() {
     return set;
   }, [subjects]);
 
-  if (!isSuperAdmin) {
+  if (capabilitiesReady && !canManageSubjects) {
     return (
-      <View style={styles.container}>
-        <EmptyState
-          title="Access Denied"
-          message="Only Super Admins can manage subjects"
-        />
-      </View>
+      <AccessDenied 
+        message="You don't have permission to manage subjects."
+        requiredCapability="subjects.manage"
+      />
     );
   }
 

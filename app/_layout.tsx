@@ -83,6 +83,8 @@ function RootStack() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="login" />
+      <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="reset-password" />
       {/* Hide authenticated routes from auth stack */}
       <Stack.Screen 
         name="(tabs)" 

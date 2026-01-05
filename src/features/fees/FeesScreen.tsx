@@ -1,127 +1,213 @@
 /**
- * FeesScreen
+ * FeesScreen - Main fees screen (Invoice-First)
  * 
- * Refactored to use centralized design system with dynamic theming.
- * All styling uses theme tokens via useTheme hook.
+ * Admin: Shows class selector + invoice list + generate button
+ * Student: Shows their invoices directly
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { useClassSelection } from '../../contexts/ClassSelectionContext';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from 'react-native-paper';
+import { Users, Plus, ChevronDown } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
-import { FeeComponents, FeePlans, StudentFeesView } from '../../components/fees';
-import { Settings, CreditCard } from 'lucide-react-native';
+import { useClassSelection } from '../../contexts/ClassSelectionContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import type { ThemeColors } from '../../theme/types';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import { useClasses } from '../../hooks/useClasses';
+import { InvoiceList, StudentFeesView, GenerateFeesModal } from '../../components/fees';
+import { ClassSelectorModal } from '../../components/fees/ClassSelectorModal';
 
 export default function FeesScreen() {
   const { profile } = useAuth();
-  const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
-  const { scope } = useClassSelection();
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
-  const [activeTab, setActiveTab] = useState<'components' | 'plans'>('components');
+  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const { selectedClass, setSelectedClass, scope } = useClassSelection();
+  const { can } = useCapabilities();
+  const { data: classes = [] } = useClasses(scope.school_code ?? undefined);
+  const queryClient = useQueryClient();
   
-  // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark), 
-    [colors, spacing, borderRadius, typography, shadows, isDark]);
+  const styles = useMemo(
+    () => createStyles(colors, typography, spacing, borderRadius, shadows),
+    [colors, typography, spacing, borderRadius, shadows]
+  );
 
-  const isStudent = profile?.role === 'student';
+  const [showClassSelector, setShowClassSelector] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
-    if (!isStudent) {
-      if (tab === 'components' || tab === 'plans') {
-        setActiveTab(tab);
-      } else {
-        setActiveTab('components');
-      }
-    }
-  }, [tab, isStudent]);
+  // Check capabilities
+  const canManageFees = can('fees.write');
+  const isStudentView = can('fees.read_own') && !can('fees.read');
 
-  // Show student view if user is a student
-  if (isStudent) {
+  const handleGenerated = useCallback(() => {
+    // Invalidate invoice queries to trigger refetch
+    queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    setRefreshKey(k => k + 1);
+    setShowGenerateModal(false);
+  }, [queryClient]);
+
+  // Student view
+  if (isStudentView) {
     return <StudentFeesView />;
   }
 
+  // Admin view - needs class selection
   return (
-      <View style={styles.container}>
-        {/* Segmented Control Tab Navigation */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'components' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('components')}
-          >
-          <Settings size={18} color={activeTab === 'components' ? colors.primary.main : colors.text.secondary} />
-            <Text style={[styles.tabText, activeTab === 'components' && styles.tabTextActive]}>
-              Components
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'plans' && styles.tabButtonActive]}
-            onPress={() => setActiveTab('plans')}
-          >
-          <CreditCard size={18} color={activeTab === 'plans' ? colors.primary.main : colors.text.secondary} />
-            <Text style={[styles.tabText, activeTab === 'plans' && styles.tabTextActive]}>
-              Fee Plans
-            </Text>
-          </TouchableOpacity>
-        </View>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.classSelector}
+          onPress={() => setShowClassSelector(true)}
+        >
+          <Users size={20} color={colors.primary[600]} />
+          <Text style={styles.classSelectorText}>
+            {selectedClass ? `Grade ${selectedClass.grade} ${selectedClass.section}` : 'Select Class'}
+          </Text>
+          <ChevronDown size={18} color={colors.text.tertiary} />
+        </TouchableOpacity>
 
-      {/* Content */}
-        {activeTab === 'components' && (
-          <FeeComponents schoolCode={scope.school_code || ''} />
-        )}
-        {activeTab === 'plans' && (
-        <FeePlans />
+        {selectedClass && canManageFees && (
+          <TouchableOpacity
+            style={styles.generateBtn}
+            onPress={() => setShowGenerateModal(true)}
+          >
+            <Plus size={18} color="#fff" />
+            <Text style={styles.generateBtnText}>Generate</Text>
+          </TouchableOpacity>
         )}
       </View>
+
+      {/* Content */}
+      {selectedClass ? (
+        <InvoiceList
+          key={`${selectedClass.id}-${refreshKey}`}
+          classInstanceId={selectedClass.id}
+          schoolCode={scope.school_code || ''}
+        />
+      ) : (
+        <View style={styles.emptyState}>
+          <Users size={64} color={colors.neutral[300]} />
+          <Text style={styles.emptyTitle}>Select a Class</Text>
+          <Text style={styles.emptyText}>
+            Choose a class to view and manage fee invoices.
+          </Text>
+          <TouchableOpacity
+            style={styles.selectBtn}
+            onPress={() => setShowClassSelector(true)}
+          >
+            <Text style={styles.selectBtnText}>Select Class</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Class Selector Modal */}
+      <ClassSelectorModal
+        visible={showClassSelector}
+        onClose={() => setShowClassSelector(false)}
+        classes={classes}
+        selectedClass={selectedClass}
+        onSelect={(cls) => {
+          setSelectedClass(cls);
+          setShowClassSelector(false);
+        }}
+      />
+
+      {/* Generate Fees Modal */}
+      {selectedClass && (
+        <GenerateFeesModal
+          visible={showGenerateModal}
+          onClose={() => setShowGenerateModal(false)}
+          onGenerated={handleGenerated}
+          classInstanceId={selectedClass.id}
+          className={`Grade ${selectedClass.grade} ${selectedClass.section}`}
+          schoolCode={scope.school_code || ''}
+        />
+      )}
+    </View>
   );
 }
 
 const createStyles = (
   colors: ThemeColors,
+  typography: any,
   spacing: any,
   borderRadius: any,
-  typography: any,
-  shadows: any,
-  isDark: boolean
+  shadows: any
 ) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,
   },
-  tabContainer: {
+  header: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
     backgroundColor: colors.surface.primary,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    borderRadius: borderRadius.lg,
-    padding: spacing.xs,
-    ...shadows.sm,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: colors.border.DEFAULT,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
-  tabButton: {
+  classSelector: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
+    backgroundColor: colors.background.secondary,
     paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
+    marginRight: spacing.sm,
+  },
+  classSelectorText: {
+    flex: 1,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginLeft: spacing.sm,
+  },
+  generateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.lg,
     gap: spacing.xs,
   },
-  tabButtonActive: {
-    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
-  },
-  tabText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-  },
-  tabTextActive: {
-    color: colors.primary.main,
+  generateBtnText: {
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
+    color: '#fff',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  emptyTitle: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    marginTop: spacing.lg,
+  },
+  emptyText: {
+    fontSize: typography.fontSize.base,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  selectBtn: {
+    backgroundColor: colors.primary[600],
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  selectBtnText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#fff',
   },
 });

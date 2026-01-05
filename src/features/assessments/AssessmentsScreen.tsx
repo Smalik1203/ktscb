@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTests, useCreateTest, useUpdateTest, useDeleteTest, useStudentAttempts, useStudentMarks } from '../../hooks/tests';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
 import { TestInput, TestWithDetails } from '../../types/test.types';
@@ -19,9 +20,17 @@ import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustrati
 export default function AssessmentsScreen() {
   const { profile, user } = useAuth();
   const { colors, isDark } = useTheme();
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  
+  // Capability-based checks (NO role checks in UI)
+  const canCreateTest = can('assessments.create');
+  const canManageTests = can('assessments.manage');
+  const canTakeTest = can('assessments.take_test');
+  const canViewOwnAssessments = can('assessments.read_own') && !can('assessments.read');
+  const canUploadMarks = can('assessments.upload_marks');
   
   // Create dynamic styles based on theme
   const styles = React.useMemo(() => createStyles(colors, isDark), [colors, isDark]);
@@ -37,13 +46,13 @@ export default function AssessmentsScreen() {
   const modeSlideAnim = React.useRef(new Animated.Value(0)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
 
-  const isStudent = profile?.role === 'student';
-  const studentId = isStudent ? user?.id : undefined;
+  const studentId = canViewOwnAssessments ? user?.id : undefined;
 
-  // Fetch data
+  // OPTIMIZED: Filter by test_mode in SQL query, not JavaScript
   const { data: tests = [], isLoading: testsLoading, error: testsError } = useTests(
     profile?.school_code || '',
-    selectedClassId || (isStudent ? profile?.class_instance_id || undefined : undefined)
+    selectedClassId || (canViewOwnAssessments ? profile?.class_instance_id || undefined : undefined),
+    { test_mode: assessmentView } // Filter in query
   );
   const { data: classes = [] } = useClasses(profile?.school_code || '');
   const { data: subjectsResult } = useSubjects(profile?.school_code || '');
@@ -62,9 +71,22 @@ export default function AssessmentsScreen() {
       id: attempt.id,
       test_id: attempt.test_id,
       student_id: attempt.student_id,
-      answers: typeof attempt.answers === 'object' && attempt.answers !== null 
-        ? attempt.answers 
-        : (typeof attempt.answers === 'string' ? JSON.parse(attempt.answers || '{}') : {}),
+      answers: (() => {
+        // Runtime-safe JSON parsing with fallback
+        if (typeof attempt.answers === 'object' && attempt.answers !== null) {
+          return attempt.answers;
+        }
+        if (typeof attempt.answers === 'string' && attempt.answers.trim().length > 0) {
+          try {
+            return JSON.parse(attempt.answers);
+          } catch (parseError) {
+            // Invalid JSON - return empty object
+            console.warn('Failed to parse attempt answers JSON:', parseError);
+            return {};
+          }
+        }
+        return {};
+      })(),
       score: attempt.score,
       status: attempt.status,
       started_at: attempt.started_at,
@@ -89,10 +111,8 @@ export default function AssessmentsScreen() {
     }, {});
   }, [rawStudentMarks]);
 
-  // Filter tests based on online/offline selection
-  const filteredTests = React.useMemo(() => {
-    return tests.filter((test: TestWithDetails) => test.test_mode === assessmentView);
-  }, [tests, assessmentView]);
+  // Tests are already filtered by test_mode in the query
+  const filteredTests = tests;
 
   // Calculate test counts for header
   const onlineCount = React.useMemo(() => 
@@ -177,9 +197,6 @@ export default function AssessmentsScreen() {
   const createTest = useCreateTest();
   const updateTest = useUpdateTest();
   const deleteTest = useDeleteTest();
-
-  const canCreateTest = profile?.role === 'admin' || profile?.role === 'superadmin';
-  const canManageTests = canCreateTest;
 
   const handleCreateTest = async (testData: TestInput) => {
     try {
@@ -271,7 +288,12 @@ export default function AssessmentsScreen() {
     return selectedClass ? `${selectedClass.grade}-${selectedClass.section}` : 'All Classes';
   };
 
-  if (testsError) {
+  // Three-state handling
+  if (testsLoading && filteredTests.length === 0 && !tests) {
+    return <LoadingView message="Loading assessments..." />;
+  }
+
+  if (testsError && !testsLoading) {
     return <ErrorView message={testsError.message} />;
   }
 
@@ -373,7 +395,7 @@ export default function AssessmentsScreen() {
               onManageQuestions={canManageTests ? handleManageQuestions : undefined}
               onUploadMarks={canManageTests ? handleUploadMarks : undefined}
               showActions={canManageTests}
-              isStudentView={isStudent}
+              isStudentView={canViewOwnAssessments}
               studentAttempts={studentAttempts}
               studentMarks={studentMarks}
               filteredCount={filteredTests.length}
@@ -584,6 +606,7 @@ export default function AssessmentsScreen() {
           userId={user?.id || ''}
         />
       )}
+
     </View>
   );
 }

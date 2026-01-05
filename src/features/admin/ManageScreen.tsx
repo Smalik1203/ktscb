@@ -4,6 +4,8 @@ import { Text, Card, ActivityIndicator, Avatar } from 'react-native-paper';
 import { Users, Shield, Activity, AlertCircle, UserCheck, Clock, TrendingUp, Zap, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import { AccessDenied } from '../../components/common/AccessDenied';
 import { typography, spacing, borderRadius } from '../../../lib/design-system';
 import { useUserActivityStats } from '../../hooks/useUserActivityStats';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -14,12 +16,13 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export default function ManageScreen() {
   const { profile } = useAuth();
   const { colors, isDark } = useTheme();
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
   const [refreshing, setRefreshing] = useState(false);
   
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
-  const role = profile?.role;
-  const canManage = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
+  // Capability-based check (NO role checks in UI)
+  const canManage = can('management.view');
 
   const { 
     data: activityStats, 
@@ -28,19 +31,13 @@ export default function ManageScreen() {
     refetch: refetchActivity 
   } = useUserActivityStats(profile?.school_code);
 
-  if (!canManage) {
+  if (!canManage && !capabilitiesLoading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.restrictedContainer}>
-          <View style={styles.restrictedIcon}>
-            <Shield size={48} color={colors.error[400]} />
-          </View>
-          <Text style={styles.restrictedTitle}>Access Restricted</Text>
-          <Text style={styles.restrictedMessage}>
-            Management features are only available to administrators.
-          </Text>
-        </View>
-      </View>
+      <AccessDenied 
+        capability="management.view"
+        title="Access Restricted"
+        message="Management features are only available to administrators."
+      />
     );
   }
 

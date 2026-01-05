@@ -1,4 +1,11 @@
-const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+// Runtime-safe environment variable access
+const OPENAI_API_KEY = (() => {
+  const key = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
+  if (!key || key === 'your_openai_api_key_here' || key.trim() === '') {
+    return null;
+  }
+  return key;
+})();
 
 export interface GeneratedQuestion {
   question_text: string;
@@ -57,7 +64,7 @@ export async function generateQuestionsFromImage(
   onProgress?: (text: string) => void
 ): Promise<AITestGenerationResult> {
   try {
-    if (!OPENAI_API_KEY || OPENAI_API_KEY === 'your_openai_api_key_here') {
+    if (!OPENAI_API_KEY) {
       throw new Error('OpenAI API key not configured. Please add your key to the .env file.');
     }
 

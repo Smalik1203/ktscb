@@ -55,12 +55,27 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   private logErrorToService = (error: Error, errorInfo: ErrorInfo) => {
+    // Always log in dev
     if (__DEV__) {
       console.error('Error Boundary caught error:', {
         message: error.message,
         stack: error.stack,
         componentStack: errorInfo.componentStack,
       });
+    }
+    
+    // Log to Sentry in production (non-blocking)
+    if (!__DEV__) {
+      try {
+        const { captureError } = require('../lib/sentry');
+        captureError(error, {
+          componentStack: errorInfo.componentStack,
+          errorBoundary: true,
+        });
+      } catch (sentryError) {
+        // Sentry logging failed - don't crash the app
+        console.error('Failed to log error to Sentry:', sentryError);
+      }
     }
   };
 

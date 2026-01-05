@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from './AuthContext';
+import { useCapabilities } from '../hooks/useCapabilities';
 import { useClasses } from '../hooks/useClasses';
 import { getActiveAcademicYear } from '../data/queries';
 
@@ -23,7 +24,10 @@ interface ClassSelectionContextType {
   classes: ClassListItem[];
   isLoading: boolean;
   error: Error | null;
+  /** @deprecated Use canManageAllClasses from useCapabilities instead */
   isSuperAdmin: boolean;
+  /** Whether the user can select between multiple classes */
+  canSelectClass: boolean;
   shouldShowClassSelector: boolean;
   // Academic year scope
   academicYearId: string | null;
@@ -43,6 +47,7 @@ const ClassSelectionContext = createContext<ClassSelectionContextType>({
   isLoading: false,
   error: null,
   isSuperAdmin: false,
+  canSelectClass: false,
   shouldShowClassSelector: false,
   academicYearId: null,
   setAcademicYearId: async () => {},
@@ -63,13 +68,19 @@ export const useClassSelection = () => {
 
 export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { profile } = useAuth();
+  const { can } = useCapabilities();
   const [selectedClass, setSelectedClass] = useState<ClassListItem | null>(null);
   const [academicYearId, setAcademicYearIdState] = useState<string | null>(null);
   const [scopeLoading, setScopeLoading] = useState(true);
   
-  const isSuperAdmin = profile?.role === 'superadmin' || profile?.role === 'cb_admin';
-  // Show for superadmins/cb_admin and admins managing multiple classes
-  const shouldShowClassSelector = isSuperAdmin || profile?.role === 'admin';
+  // Capability-based access control for class selection
+  const canManageAllClasses = can('classes.manage');
+  const canSelectClass = canManageAllClasses || can('attendance.mark');
+  
+  // Backward compatibility - isSuperAdmin is deprecated but kept for existing usage
+  const isSuperAdmin = canManageAllClasses;
+  // Show class selector for users who can manage classes or have admin capabilities
+  const shouldShowClassSelector = canSelectClass;
   
   const { data: classes = [], isLoading, error } = useClasses(profile?.school_code || undefined);
 
@@ -79,8 +90,17 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
       try {
         const stored = await AsyncStorage.getItem(SCOPE_STORAGE_KEY);
         if (stored) {
-          const parsedScope = JSON.parse(stored);
-          setAcademicYearIdState(parsedScope.academic_year_id);
+          try {
+            const parsedScope = JSON.parse(stored);
+            // Validate parsed data structure before using
+            if (parsedScope && typeof parsedScope === 'object' && 'academic_year_id' in parsedScope) {
+              setAcademicYearIdState(parsedScope.academic_year_id || null);
+            }
+          } catch (parseError) {
+            // Corrupted JSON - clear it
+            console.warn('Corrupted scope data in storage, clearing:', parseError);
+            await AsyncStorage.removeItem(SCOPE_STORAGE_KEY);
+          }
         }
       } catch (_error) {
         // Ignore storage errors
@@ -122,22 +142,22 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
     initializeAcademicYear();
   }, [profile, academicYearId, selectedClass?.id]);
 
-  // Auto-select first class for super admin if none selected
+  // Auto-select first class for users who can manage all classes if none selected
   useEffect(() => {
-    if (isSuperAdmin && classes.length > 0 && !selectedClass) {
+    if (canManageAllClasses && classes.length > 0 && !selectedClass) {
       setSelectedClass(classes[0]);
     }
-  }, [isSuperAdmin, classes, selectedClass]);
+  }, [canManageAllClasses, classes, selectedClass]);
 
-  // For admins/students, if only one class, auto-select it
+  // For users with limited class access, auto-select their assigned class
   useEffect(() => {
-    if (!isSuperAdmin && classes.length === 1 && !selectedClass) {
+    if (!canManageAllClasses && classes.length === 1 && !selectedClass) {
       setSelectedClass(classes[0]);
-    } else if (!isSuperAdmin && profile?.class_instance_id && classes.length > 0) {
+    } else if (!canManageAllClasses && profile?.class_instance_id && classes.length > 0) {
       const userClass = classes.find(cls => cls.id === profile.class_instance_id);
       if (userClass) setSelectedClass(userClass);
     }
-  }, [isSuperAdmin, profile?.class_instance_id, classes, selectedClass]);
+  }, [canManageAllClasses, profile?.class_instance_id, classes, selectedClass]);
 
   // Update AsyncStorage when scope changes
   useEffect(() => {
@@ -171,6 +191,7 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
     isLoading: isLoading || scopeLoading,
     error,
     isSuperAdmin,
+    canSelectClass,
     shouldShowClassSelector,
     academicYearId,
     setAcademicYearId,

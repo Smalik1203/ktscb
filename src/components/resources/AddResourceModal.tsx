@@ -11,7 +11,8 @@ import { typography, spacing, borderRadius, colors } from '../../../lib/design-s
 import { useAuth } from '../../contexts/AuthContext';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase'; // Kept for storage and auth only
+import { api } from '../../services/api';
 
 interface AddResourceModalProps {
   visible: boolean;
@@ -61,7 +62,11 @@ const uploadToSupabase = async (
     }
 
     // Get Supabase project URL and construct upload endpoint
-    const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+    // Runtime-safe: validate env var exists
+    const supabaseProjectUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+    if (!supabaseProjectUrl || supabaseProjectUrl.trim() === '') {
+      throw new Error('Supabase configuration is missing. Please restart the app.');
+    }
     const uploadUrl = `${supabaseProjectUrl}/storage/v1/object/${STORAGE_BUCKET}/${filePath}`;
 
     // Use uploadAsync - streams file directly without loading into memory
@@ -267,23 +272,12 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
       };
 
       if (editingResource) {
-        // Update existing resource
-        const { error } = await supabase
-          .from('learning_resources')
-          .update(resourceData)
-          .eq('id', editingResource.id)
-          .select();
-
-        if (error) throw error;
+        // Update existing resource via service (capability assertion happens there)
+        await api.resources.update(editingResource.id, resourceData);
         Alert.alert('Success', 'Resource updated successfully');
       } else {
-        // Create new resource
-        const { error } = await supabase
-          .from('learning_resources')
-          .insert([resourceData])
-          .select();
-
-        if (error) throw error;
+        // Create new resource via service (capability assertion happens there)
+        await api.resources.create(resourceData as any);
         Alert.alert('Success', 'Resource created successfully');
       }
 

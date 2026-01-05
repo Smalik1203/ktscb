@@ -46,7 +46,21 @@ export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
   // Handle messages from WebView
   const handleMessage = (event: any) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data);
+      // Validate event data exists and is a string
+      const eventData = event?.nativeEvent?.data;
+      if (!eventData || typeof eventData !== 'string' || eventData.trim().length === 0) {
+        return; // Ignore invalid messages
+      }
+      
+      let data;
+      try {
+        data = JSON.parse(eventData);
+      } catch (parseError) {
+        // Invalid JSON - ignore message
+        console.warn('Invalid JSON in PDF viewer message:', parseError);
+        return;
+      }
+      
       if (data.type === 'progress') {
         setProgress({ page: data.page, total: data.total });
         if (data.page === 1) setState('ready'); // Show as soon as first page renders

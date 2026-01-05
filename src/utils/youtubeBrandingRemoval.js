@@ -47,7 +47,7 @@ export const removeYouTubeBranding = `
         setTimeout(applyYouTubeStyles, 100);
       }
     } catch (error) {
-      console.log('YouTube styling error:', error);
+      // Silently fail - styling is non-critical
     }
   }
   

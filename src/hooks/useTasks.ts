@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../data/supabaseClient';
+import { supabase } from '../lib/supabase';
 
 export interface Task {
   id: string;
@@ -437,11 +437,14 @@ export function useUnsubmitTask() {
 
 /**
  * Get submissions for a task (teacher view)
- * Fetches ALL students in the task's class with their submission status
+ * Fetches students in the task's class with their submission status (paginated)
  */
-export function useTaskSubmissions(taskId: string) {
+export function useTaskSubmissions(taskId: string, options?: { limit?: number; offset?: number }) {
+  const limit = options?.limit ?? 50; // Default to 50 (was unlimited)
+  const offset = options?.offset ?? 0;
+  
   return useQuery({
-    queryKey: ['task-submissions', taskId],
+    queryKey: ['task-submissions', taskId, limit, offset],
     queryFn: async () => {
       // First, get the task to find the class_instance_id
       const { data: task, error: taskError } = await supabase
@@ -457,23 +460,30 @@ export function useTaskSubmissions(taskId: string) {
         return [];
       }
 
-      // Get all students in the class with their submission status
-      // Using RPC or raw SQL would be better, but we'll use two queries
+      // Get paginated students in the class with their submission status
       const { data: students, error: studentsError } = await supabase
         .from('student')
         .select('id, full_name, student_code')
         .eq('class_instance_id', task.class_instance_id)
-        .order('full_name');
+        .order('full_name')
+        .range(offset, offset + limit - 1);
 
       if (studentsError) throw studentsError;
 
-      // Get all submissions for this task
-      const { data: submissions, error: submissionsError } = await supabase
-        .from('task_submissions')
-        .select('*')
-        .eq('task_id', taskId);
+      // Get all submissions for this task (for the paginated students)
+      const studentIds = students?.map(s => s.id) || [];
+      let submissions: any[] = [];
+      
+      if (studentIds.length > 0) {
+        const { data: submissionsData, error: submissionsError } = await supabase
+          .from('task_submissions')
+          .select('*')
+          .eq('task_id', taskId)
+          .in('student_id', studentIds);
 
-      if (submissionsError) throw submissionsError;
+        if (submissionsError) throw submissionsError;
+        submissions = submissionsData || [];
+      }
 
       // Create a map of submissions by student_id
       const submissionMap = new Map(

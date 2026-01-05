@@ -6,16 +6,19 @@
  */
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, RefreshControl, ActivityIndicator } from 'react-native';
 import { Text, Card, Button } from 'react-native-paper';
 import { 
   Plus, 
   ListTodo,
   Calendar as CalendarIcon,
   Users,
+  Clock,
+  ChevronRight,
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
 import {
   useCalendarEvents,
   useCreateCalendarEvent,
@@ -35,6 +38,12 @@ import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustrati
 export default function CalendarScreen() {
   const { profile } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
+  
+  // Capability-based checks (NO role checks in UI)
+  const canManageEvents = can('calendar.manage');
+  const canReadAllCalendar = can('calendar.read') && !can('attendance.read_own');
+  const canReadOwnCalendar = can('calendar.read') && can('attendance.read_own') && !can('attendance.read');
   
   // Create dynamic styles based on theme
   const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark), 
@@ -54,14 +63,11 @@ export default function CalendarScreen() {
   const [monthPickerYear, setMonthPickerYear] = useState<number>(new Date().getFullYear());
   const [refreshing, setRefreshing] = useState(false);
 
-  const role = profile?.role;
-  const isStudent = role === 'student';
-  const canManageEvents = role === 'admin' || role === 'superadmin' || role === 'cb_admin';
   const schoolCode = profile?.school_code || '';
-  const studentClassId = isStudent ? profile?.class_instance_id || undefined : undefined;
+  const studentClassId = canReadOwnCalendar ? profile?.class_instance_id || undefined : undefined;
 
   const fetchClasses = useCallback(async () => {
-    if (!schoolCode || isStudent) return;
+    if (!schoolCode || canReadOwnCalendar) return;
     
     setLoadingClasses(true);
     try {
@@ -79,7 +85,7 @@ export default function CalendarScreen() {
     } finally {
       setLoadingClasses(false);
     }
-  }, [schoolCode, isStudent]);
+  }, [schoolCode, canReadOwnCalendar]);
 
   useEffect(() => {
     fetchClasses();
@@ -94,7 +100,7 @@ export default function CalendarScreen() {
     };
   }, [currentDate]);
 
-  const effectiveClassId = isStudent ? studentClassId : (selectedClassId || undefined);
+  const effectiveClassId = canReadOwnCalendar ? studentClassId : (selectedClassId || undefined);
 
   const { data: events = [], isLoading, error, refetch } = useCalendarEvents(
     schoolCode,
@@ -237,8 +243,10 @@ export default function CalendarScreen() {
   };
 
   const renderListView = () => {
+    // Group events by date - fix timezone issues by parsing date correctly
     const groupedEvents: { [key: string]: CalendarEvent[] } = {};
     events.forEach((event) => {
+      // Parse date string correctly (YYYY-MM-DD format)
       const dateKey = event.start_date;
       if (!groupedEvents[dateKey]) {
         groupedEvents[dateKey] = [];
@@ -246,12 +254,14 @@ export default function CalendarScreen() {
       groupedEvents[dateKey].push(event);
     });
 
-    const sortedDates = Object.keys(groupedEvents).sort();
+    // Sort dates ascending (oldest first) for Outlook-like view
+    const sortedDates = Object.keys(groupedEvents).sort((a, b) => a.localeCompare(b));
 
     return (
       <ScrollView 
-        style={styles.content} 
+        style={styles.outlookContainer} 
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContentContainer}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -263,76 +273,123 @@ export default function CalendarScreen() {
       >
         {isLoading ? (
           <View style={styles.centerContainer}>
-            <Text>Loading events...</Text>
+            <ActivityIndicator size="large" color={colors.primary.main} />
+            <Text style={styles.loadingText}>Loading events...</Text>
           </View>
         ) : error ? (
           <View style={styles.centerContainer}>
             <Text style={styles.errorText}>Failed to load events</Text>
-            <Button onPress={() => refetch()}>Retry</Button>
+            <Button mode="contained" onPress={() => refetch()} style={{ marginTop: spacing.md }}>
+              Retry
+            </Button>
           </View>
         ) : events.length > 0 ? (
-          <View style={styles.eventsList}>
-            {sortedDates.map((dateKey) => {
+          <View style={styles.outlookList}>
+            {sortedDates.map((dateKey, dateIndex) => {
               const dateEvents = groupedEvents[dateKey];
-              const date = new Date(dateKey);
+              // Parse date correctly - use UTC to avoid timezone shifts
+              const [year, month, day] = dateKey.split('-').map(Number);
+              const date = new Date(Date.UTC(year, month - 1, day));
+              const today = new Date();
+              const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+              const isToday = dateKey === todayKey;
+              const isLastDate = dateIndex === sortedDates.length - 1;
+              
+              // Sort events by time (all-day first, then by start time)
+              const sortedEvents = [...dateEvents].sort((a, b) => {
+                if (a.is_all_day && !b.is_all_day) return -1;
+                if (!a.is_all_day && b.is_all_day) return 1;
+                if (a.is_all_day && b.is_all_day) return 0;
+                return (a.start_time || '').localeCompare(b.start_time || '');
+              });
               
               return (
-                <View key={dateKey} style={styles.dateGroup}>
-                  <View style={styles.dateGroupHeader}>
-                    <View style={styles.dateGroupDateBox}>
-                      <Text style={styles.dateGroupDay}>{date.getDate()}</Text>
-                      <Text style={styles.dateGroupMonth}>
-                        {date.toLocaleDateString('en-US', { month: 'short' })}
-                      </Text>
-                    </View>
-                    <View style={styles.dateGroupInfo}>
-                      <Text style={styles.dateGroupWeekday}>
-                        {date.toLocaleDateString('en-US', { weekday: 'long' })}
-                      </Text>
-                      <Text style={styles.dateGroupCount}>
-                        {dateEvents.length} {dateEvents.length === 1 ? 'event' : 'events'}
-                      </Text>
-                    </View>
+                <View key={dateKey} style={styles.outlookDateGroup}>
+                  {/* Outlook-style Date Sidebar */}
+                  <View style={styles.outlookDateColumn}>
+                    {isToday && (
+                      <View style={styles.outlookTodayIndicator} />
+                    )}
+                    <Text style={[
+                      styles.outlookDateDay,
+                      isToday && styles.outlookDateDayToday
+                    ]}>
+                      {day}
+                    </Text>
+                    <Text style={[
+                      styles.outlookDateMonth,
+                      isToday && styles.outlookDateMonthToday
+                    ]}>
+                      {date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
+                    </Text>
+                    <Text style={[
+                      styles.outlookDateWeekday,
+                      isToday && styles.outlookDateWeekdayToday
+                    ]}>
+                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                    </Text>
                   </View>
 
-                  {dateEvents.map((event) => (
-                    <TouchableOpacity key={event.id} onPress={() => handleEventClick(event)}>
-                      <View style={styles.eventCardList}>
-                        <View
+                  {/* Events Column */}
+                  <View style={styles.outlookEventsColumn}>
+                    {sortedEvents.map((event, eventIndex) => {
+                      const eventColor = event.color || getEventTypeColor(event.event_type);
+                      
+                      return (
+                        <TouchableOpacity 
+                          key={event.id} 
+                          onPress={() => handleEventClick(event)}
+                          activeOpacity={0.6}
                           style={[
-                            styles.eventColorStrip,
-                            { backgroundColor: event.color || getEventTypeColor(event.event_type) },
+                            styles.outlookEventRow, 
+                            { 
+                              borderLeftColor: eventColor,
+                              backgroundColor: isDark ? colors.surface.secondary : colors.neutral[50],
+                            }
                           ]}
-                        />
-                        <View style={styles.eventCardContent}>
-                          <View style={styles.eventCardHeader}>
-                            <Text style={styles.eventCardTitle}>{event.title}</Text>
-                            <View
-                              style={[
-                                styles.eventTypeBadge,
-                                { backgroundColor: event.color || getEventTypeColor(event.event_type) },
-                              ]}
-                            >
-                              <Text style={styles.eventTypeBadgeText}>{event.event_type}</Text>
+                        >
+                          <View style={styles.outlookEventContent}>
+                            {/* Event Details */}
+                            <View style={styles.outlookEventDetails}>
+                              <View style={styles.outlookEventHeader}>
+                                <View style={[styles.outlookEventDot, { backgroundColor: eventColor }]} />
+                                <View style={styles.outlookEventTitleContainer}>
+                                  <View style={styles.outlookEventTitleRow}>
+                                    <Text style={styles.outlookEventTitle} numberOfLines={1}>
+                                      {event.title}
+                                    </Text>
+                                    {event.is_all_day ? (
+                                      <View style={styles.outlookAllDayBadge}>
+                                        <Text style={styles.outlookAllDayText}>All day</Text>
+                                      </View>
+                                    ) : event.start_time ? (
+                                      <View style={styles.outlookTimeBadge}>
+                                        <Text style={styles.outlookEventTime}>
+                                          {formatTime(event.start_time)}
+                                        </Text>
+                                      </View>
+                                    ) : null}
+                                  </View>
+                                  <View style={styles.outlookEventTypeBadgeContainer}>
+                                    <View style={[styles.outlookEventTypeBadge, { backgroundColor: `${eventColor}20` }]}>
+                                      <Text style={[styles.outlookEventTypeText, { color: eventColor }]}>
+                                        {event.event_type}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                </View>
+                              </View>
+                              {event.description && (
+                                <Text style={styles.outlookEventDescription} numberOfLines={2}>
+                                  {event.description}
+                                </Text>
+                              )}
                             </View>
                           </View>
-
-                          {!event.is_all_day && event.start_time && (
-                            <Text style={styles.eventCardTime}>
-                              🕐 {formatTime(event.start_time)}
-                              {event.end_time && ` - ${formatTime(event.end_time)}`}
-                            </Text>
-                          )}
-
-                          {event.description && (
-                            <Text style={styles.eventCardDescription} numberOfLines={2}>
-                              {event.description}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
               );
             })}
@@ -359,7 +416,7 @@ export default function CalendarScreen() {
     <View style={styles.container}>
       {/* Filter Bar */}
       <View style={styles.filterBar}>
-        {!isStudent && (
+        {!canReadOwnCalendar && (
           <TouchableOpacity style={styles.filterItem} onPress={() => setShowClassDropdown(true)}>
             <View style={styles.filterIcon}>
               <Users size={16} color={colors.text.inverse} />
@@ -427,20 +484,36 @@ export default function CalendarScreen() {
 
       {/* Content */}
       {viewMode === 'month' && (
-        <CalendarMonthView
-          currentDate={currentDate}
-          events={events}
-          onDateClick={handleDateClick}
-          onEventClick={handleEventClick}
-          refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={handleRefresh}
-              tintColor={colors.primary.main}
-              colors={[colors.primary.main]}
+        <>
+          {isLoading && events.length === 0 ? (
+            <View style={styles.centerContainer}>
+              <ActivityIndicator size="large" color={colors.primary.main} />
+              <Text style={styles.loadingText}>Loading events...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.centerContainer}>
+              <Text style={styles.errorText}>Failed to load events</Text>
+              <Button onPress={() => refetch()} style={{ marginTop: spacing.md }}>
+                Retry
+              </Button>
+            </View>
+          ) : (
+            <CalendarMonthView
+              currentDate={currentDate}
+              events={events}
+              onDateClick={handleDateClick}
+              onEventClick={handleEventClick}
+              refreshControl={
+                <RefreshControl 
+                  refreshing={refreshing} 
+                  onRefresh={handleRefresh}
+                  tintColor={colors.primary.main}
+                  colors={[colors.primary.main]}
+                />
+              }
             />
-          }
-        />
+          )}
+        </>
       )}
 
       {viewMode === 'list' && renderListView()}
@@ -610,103 +683,217 @@ const createStyles = (
     color: colors.error.main,
     marginBottom: spacing.md,
   },
-  eventsList: {
-    gap: spacing.lg,
+  loadingText: {
+    marginTop: spacing.md,
+    fontSize: typography.fontSize.base,
+    color: colors.text.secondary,
   },
-  dateGroup: {
-    marginBottom: spacing.lg,
+  listContentContainer: {
+    paddingBottom: spacing.xl * 2,
   },
-  dateGroupHeader: {
+  // Outlook-style calendar list
+  outlookContainer: {
+    flex: 1,
+    backgroundColor: colors.background.app,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.sm,
+  },
+  outlookList: {
+    flexDirection: 'column',
+    gap: spacing.xs,
+  },
+  outlookDateGroup: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    paddingLeft: spacing.xs,
+    minHeight: 80,
+    backgroundColor: colors.surface.primary,
+    marginBottom: spacing.xs,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
-  dateGroupDateBox: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: colors.primary.main,
+  outlookDateColumn: {
+    minWidth: 70,
+    maxWidth: 90,
+    width: 70,
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.xs,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-    ...shadows.sm,
+    borderRightWidth: 1,
+    borderRightColor: colors.border.light,
+    position: 'relative',
+    backgroundColor: isDark ? colors.surface.secondary : colors.neutral[50],
+    flexShrink: 0,
   },
-  dateGroupDay: {
-    fontSize: 22,
+  outlookTodayIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: colors.primary.main,
+  },
+  outlookDateDay: {
+    fontSize: 24,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
+    color: colors.text.secondary,
+    lineHeight: 28,
+    letterSpacing: -0.5,
   },
-  dateGroupMonth: {
-    fontSize: 11,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
+  outlookDateDayToday: {
+    color: colors.primary.main,
+  },
+  outlookDateMonth: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.secondary,
+    letterSpacing: 1,
+    marginTop: -4,
+    textTransform: 'uppercase',
+  },
+  outlookDateMonthToday: {
+    color: colors.primary.main,
+  },
+  outlookDateWeekday: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.tertiary,
+    marginTop: 2,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  dateGroupInfo: {
+  outlookDateWeekdayToday: {
+    color: colors.primary.main,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  outlookEventsColumn: {
     flex: 1,
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.sm,
+    paddingLeft: spacing.xs,
+    minWidth: 0,
   },
-  dateGroupWeekday: {
-    fontSize: 16,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  dateGroupCount: {
-    fontSize: 13,
-    color: colors.text.secondary,
-  },
-  eventCardList: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface.primary,
-    borderRadius: 12,
-    marginBottom: spacing.sm,
-    overflow: 'hidden',
-    ...shadows.sm,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  eventColorStrip: {
-    width: 4,
-  },
-  eventCardContent: {
-    flex: 1,
-    padding: spacing.md,
-  },
-  eventCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  outlookEventRow: {
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.sm,
+    paddingRight: spacing.xs,
     marginBottom: spacing.xs,
+    borderRadius: borderRadius.sm,
+    borderLeftWidth: 4,
+    borderLeftColor: 'transparent',
   },
-  eventCardTitle: {
-    fontSize: 15,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    flex: 1,
-    marginRight: spacing.sm,
+  outlookEventContent: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+    flexShrink: 1,
   },
-  eventTypeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  outlookTimeBadge: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    backgroundColor: colors.neutral[100],
+    flexShrink: 0,
   },
-  eventTypeBadgeText: {
+  outlookEventTime: {
     fontSize: 11,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-    textTransform: 'capitalize',
-  },
-  eventCardTime: {
-    fontSize: 13,
     color: colors.text.secondary,
+    letterSpacing: 0.2,
+  },
+  outlookEventDetails: {
+    flex: 1,
+    minWidth: 0,
+  },
+  outlookEventHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
     marginBottom: spacing.xs,
+    flexWrap: 'wrap',
   },
-  eventCardDescription: {
-    fontSize: 13,
+  outlookEventDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary.main,
+    borderWidth: 2,
+    borderColor: isDark ? colors.surface.primary : colors.background.app,
+    marginTop: 6,
+    flexShrink: 0,
+  },
+  outlookEventTitleContainer: {
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  outlookEventTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs / 2,
+  },
+  outlookEventTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    lineHeight: 20,
+    letterSpacing: -0.2,
+    minWidth: 0,
+  },
+  outlookEventTypeBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  outlookEventTypeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.xs,
+    alignSelf: 'flex-start',
+    flexShrink: 0,
+  },
+  outlookEventTypeText: {
+    fontSize: 9,
+    fontWeight: typography.fontWeight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  outlookAllDayBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: borderRadius.xs,
+    backgroundColor: colors.primary[100],
+    flexShrink: 0,
+  },
+  outlookAllDayText: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primary.main,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  outlookEventDescription: {
+    fontSize: 12,
     color: colors.text.secondary,
-    lineHeight: 18,
+    lineHeight: 16,
+    marginTop: spacing.xs,
+    letterSpacing: 0.1,
+  },
+  outlookEventEndTime: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    marginTop: spacing.xs,
+    fontWeight: typography.fontWeight.medium,
+  },
+  outlookDateSeparator: {
+    height: 1,
+    backgroundColor: colors.border.light,
+    marginLeft: spacing.md,
+    marginRight: spacing.md,
+    marginVertical: spacing.sm,
   },
   addEventButton: {
     marginTop: spacing.md,

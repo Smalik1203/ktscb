@@ -7,6 +7,8 @@ import { UserPlus, Trash2, Edit, X, Search } from 'lucide-react-native';
 import { spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
 import { Card, Button, Input, EmptyState } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import { AccessDenied } from '../../components/common/AccessDenied';
 import { sanitizeEmail, sanitizePhone, sanitizeCode, sanitizeName, validatePassword } from '../../utils/sanitize';
 import { useAdmins, useCreateAdmin, useUpdateAdmin, useDeleteAdmin } from '../../hooks/useAdmins';
 import { ThreeStateView } from '../../components/common/ThreeStateView';
@@ -69,17 +71,17 @@ export default function AddAdminScreen() {
   const [editPhone, setEditPhone] = useState('');
   const [editAdminCode, setEditAdminCode] = useState('');
 
-  // Role check
-  const isSuperAdmin = profile?.role === 'superadmin';
+  // Capability-based check (NO role checks in UI)
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
+  const canManageAdmins = can('admins.manage');
 
-  if (!isSuperAdmin) {
+  if (!canManageAdmins && !capabilitiesLoading) {
     return (
-      <View style={styles.container}>
-        <EmptyState
-          title="Access Denied"
-          message="Only Super Admins can manage administrators"
-        />
-      </View>
+      <AccessDenied
+        capability="admins.manage"
+        title="Access Denied"
+        message="Only Super Admins can manage administrators"
+      />
     );
   }
 

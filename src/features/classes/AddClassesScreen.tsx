@@ -7,6 +7,8 @@ import { Calendar, BookOpen, Edit, Trash2, X, Plus, Sparkles } from 'lucide-reac
 import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 import { Card, Button, Input, EmptyState } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import { AccessDenied } from '../../components/common/AccessDenied';
 import { useAcademicYears, useCreateAcademicYear, useUpdateAcademicYear, useDeleteAcademicYear } from '../../hooks/useAcademicYears';
 import { useClassInstances, useCreateClassInstance, useUpdateClassInstance, useDeleteClassInstance } from '../../hooks/useClassInstances';
 import { useAdmins } from '../../hooks/useAdmins';
@@ -40,9 +42,11 @@ export default function AddClassesScreen() {
   const updateClassMutation = useUpdateClassInstance(schoolCode);
   const deleteClassMutation = useDeleteClassInstance(schoolCode);
 
-  // Academic Year Form
-  const [yearStart, setYearStart] = useState('');
-  const [yearEnd, setYearEnd] = useState('');
+  // Academic Year Form - Date pickers
+  const [startMonth, setStartMonth] = useState(4); // April (0-indexed: 3, but we'll use 1-12)
+  const [startYear, setStartYear] = useState(new Date().getFullYear());
+  const [endMonth, setEndMonth] = useState(3); // March
+  const [endYear, setEndYear] = useState(new Date().getFullYear() + 1);
 
   // Class Form
   const [grade, setGrade] = useState('');
@@ -74,8 +78,9 @@ export default function AddClassesScreen() {
   const [gradeError, setGradeError] = useState('');
   const [sectionError, setSectionError] = useState('');
 
-  // Role check
-  const isSuperAdmin = profile?.role === 'superadmin';
+  // Capability-based access control
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
+  const canManageClasses = can('classes.manage');
 
   // Toast helper
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -89,47 +94,31 @@ export default function AddClassesScreen() {
     );
   };
 
-  // Auto-fill end year when start year changes
+  // Auto-set end year when start year changes
   useEffect(() => {
-    if (yearStart && yearStart.length === 4) {
-      const start = parseInt(yearStart);
-      if (!isNaN(start)) {
-        setYearEnd((start + 1).toString());
-        setYearStartError('');
+    if (startYear) {
+      // If start month is Apr-Dec, end year is same year + 1
+      // If start month is Jan-Mar, end year is same year
+      if (startMonth >= 4) {
+        setEndYear(startYear + 1);
+      } else {
+        setEndYear(startYear);
       }
     }
-  }, [yearStart]);
+  }, [startYear, startMonth]);
 
-  // Real-time validation
-  const validateYearStart = (value: string) => {
-    if (!value) {
-      setYearStartError('Start year is required');
+  // Validation
+  const validateAcademicYearDates = () => {
+    const startDate = new Date(startYear, startMonth - 1, 1);
+    const endDate = new Date(endYear, endMonth, 0); // Last day of end month
+    
+    if (endDate <= startDate) {
+      setYearStartError('End date must be after start date');
+      setYearEndError('End date must be after start date');
       return false;
     }
-    const year = parseInt(value);
-    if (isNaN(year) || year < 2000 || year > 2100) {
-      setYearStartError('Enter a valid year (2000-2100)');
-      return false;
-    }
+    
     setYearStartError('');
-    return true;
-  };
-
-  const validateYearEnd = (value: string) => {
-    if (!value) {
-      setYearEndError('End year is required');
-      return false;
-    }
-    const end = parseInt(value);
-    const start = parseInt(yearStart);
-    if (isNaN(end)) {
-      setYearEndError('Enter a valid year');
-      return false;
-    }
-    if (end !== start + 1) {
-      setYearEndError('Must be exactly one year after start');
-      return false;
-    }
     setYearEndError('');
     return true;
   };
@@ -161,43 +150,48 @@ export default function AddClassesScreen() {
     return true;
   };
 
-  if (!isSuperAdmin) {
+  if (!capabilitiesLoading && !canManageClasses) {
     return (
-      <View style={styles.container}>
-        <EmptyState
-          title="Access Denied"
-          message="Only Super Admins can manage classes"
-        />
-      </View>
+      <AccessDenied 
+        message="You don't have permission to manage classes."
+        capability="classes.manage"
+      />
     );
   }
 
   const handleCreateYear = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const isStartValid = validateYearStart(yearStart);
-    const isEndValid = validateYearEnd(yearEnd);
-
-    if (!isStartValid || !isEndValid) {
+    if (!validateAcademicYearDates()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       showToast('Please fix the errors in the form', 'error');
       return;
     }
 
-    const start = parseInt(yearStart);
-    const end = parseInt(yearEnd);
+    // Create dates: start is 1st of start month, end is last day of end month
+    const startDate = new Date(startYear, startMonth - 1, 1);
+    const endDate = new Date(endYear, endMonth, 0); // Last day of end month
+
+    // Extract year_start and year_end for backward compatibility
+    const yearStart = startDate.getFullYear();
+    const yearEnd = endDate.getFullYear();
 
     try {
       await createYearMutation.mutateAsync({
-        year_start: start,
-        year_end: end,
+        year_start: yearStart,
+        year_end: yearEnd,
+        start_date: startDate.toISOString().split('T')[0], // YYYY-MM-DD
+        end_date: endDate.toISOString().split('T')[0],
         school_code: schoolCode!,
         school_name: schoolName || schoolCode!,
       });
 
-      showToast(`Academic Year ${start}-${end} created successfully!`, 'success');
-      setYearStart('');
-      setYearEnd('');
+      showToast(`Academic Year created successfully!`, 'success');
+      // Reset form
+      setStartMonth(4);
+      setStartYear(new Date().getFullYear());
+      setEndMonth(3);
+      setEndYear(new Date().getFullYear() + 1);
     } catch (error: any) {
       showToast(error.message || 'Failed to create academic year', 'error');
     }
@@ -377,48 +371,113 @@ export default function AddClassesScreen() {
             </View>
 
             <View style={styles.form}>
+              <Text style={styles.sectionLabel}>Start Date</Text>
               <View style={styles.formRow}>
                 <View style={styles.formCol}>
-                  <Input
-                    label="Start Year"
-                    value={yearStart}
-                    onChangeText={(text) => {
-                      setYearStart(text);
-                      if (text) validateYearStart(text);
-                    }}
-                    placeholder="e.g., 2025"
-                    keyboardType="number-pad"
-                    maxLength={4}
-                    error={yearStartError}
-                  />
-                  {yearStartError ? (
-                    <Text style={styles.errorText}>{yearStartError}</Text>
-                  ) : null}
+                  <Text style={styles.pickerLabel}>Month</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={startMonth}
+                      onValueChange={(value) => {
+                        setStartMonth(value);
+                        validateAcademicYearDates();
+                      }}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="January" value={1} />
+                      <Picker.Item label="February" value={2} />
+                      <Picker.Item label="March" value={3} />
+                      <Picker.Item label="April" value={4} />
+                      <Picker.Item label="May" value={5} />
+                      <Picker.Item label="June" value={6} />
+                      <Picker.Item label="July" value={7} />
+                      <Picker.Item label="August" value={8} />
+                      <Picker.Item label="September" value={9} />
+                      <Picker.Item label="October" value={10} />
+                      <Picker.Item label="November" value={11} />
+                      <Picker.Item label="December" value={12} />
+                    </Picker>
+                  </View>
                 </View>
                 <View style={styles.formCol}>
-                  <Input
-                    label="End Year"
-                    value={yearEnd}
-                    onChangeText={(text) => {
-                      setYearEnd(text);
-                      if (text) validateYearEnd(text);
-                    }}
-                    placeholder="e.g., 2026"
-                    keyboardType="number-pad"
-                    maxLength={4}
-                    error={yearEndError}
-                  />
-                  {yearEndError ? (
-                    <Text style={styles.errorText}>{yearEndError}</Text>
-                  ) : null}
+                  <Text style={styles.pickerLabel}>Year</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={startYear}
+                      onValueChange={(value) => {
+                        setStartYear(value);
+                        validateAcademicYearDates();
+                      }}
+                      style={styles.picker}
+                    >
+                      {Array.from({ length: 11 }, (_, i) => {
+                        const year = new Date().getFullYear() - 5 + i;
+                        return <Picker.Item key={year} label={year.toString()} value={year} />;
+                      })}
+                    </Picker>
+                  </View>
                 </View>
               </View>
+              {yearStartError ? (
+                <Text style={styles.errorText}>{yearStartError}</Text>
+              ) : null}
+
+              <Text style={[styles.sectionLabel, { marginTop: spacing.md }]}>End Date</Text>
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Text style={styles.pickerLabel}>Month</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={endMonth}
+                      onValueChange={(value) => {
+                        setEndMonth(value);
+                        validateAcademicYearDates();
+                      }}
+                      style={styles.picker}
+                    >
+                      <Picker.Item label="January" value={1} />
+                      <Picker.Item label="February" value={2} />
+                      <Picker.Item label="March" value={3} />
+                      <Picker.Item label="April" value={4} />
+                      <Picker.Item label="May" value={5} />
+                      <Picker.Item label="June" value={6} />
+                      <Picker.Item label="July" value={7} />
+                      <Picker.Item label="August" value={8} />
+                      <Picker.Item label="September" value={9} />
+                      <Picker.Item label="October" value={10} />
+                      <Picker.Item label="November" value={11} />
+                      <Picker.Item label="December" value={12} />
+                    </Picker>
+                  </View>
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.pickerLabel}>Year</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={endYear}
+                      onValueChange={(value) => {
+                        setEndYear(value);
+                        validateAcademicYearDates();
+                      }}
+                      style={styles.picker}
+                    >
+                      {Array.from({ length: 11 }, (_, i) => {
+                        const year = new Date().getFullYear() - 5 + i;
+                        return <Picker.Item key={year} label={year.toString()} value={year} />;
+                      })}
+                    </Picker>
+                  </View>
+                </View>
+              </View>
+              {yearEndError ? (
+                <Text style={styles.errorText}>{yearEndError}</Text>
+              ) : null}
 
               <Button
                 title={createYearMutation.isPending ? 'Creating...' : 'Create Academic Year'}
                 onPress={handleCreateYear}
                 loading={createYearMutation.isPending}
-                disabled={createYearMutation.isPending || !yearStart || !yearEnd}
+                disabled={createYearMutation.isPending || !startYear || !endYear || !!yearStartError || !!yearEndError}
                 icon={<Plus size={20} color={colors.surface.primary} />}
                 style={styles.submitButton}
               />
@@ -445,7 +504,10 @@ export default function AddClassesScreen() {
                     <View style={styles.listItemContent}>
                       <View style={styles.listItemInfo}>
                         <Text style={styles.listItemTitle}>
-                          {year.year_start} - {year.year_end}
+                          {year.start_date && year.end_date
+                            ? `${new Date(year.start_date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })} - ${new Date(year.end_date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`
+                            : `${year.year_start} - ${year.year_end}`
+                          }
                         </Text>
                         <View style={styles.listItemMeta}>
                           <View style={[styles.statusBadge, { backgroundColor: year.is_active ? colors.success[100] : colors.neutral[100] }]}>
@@ -917,6 +979,18 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   picker: {
     height: 50,
     color: colors.text.primary,
+  },
+  pickerLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium as any,
+    color: colors.text.secondary,
+    marginBottom: spacing.xs,
+  },
+  sectionLabel: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
   },
   formRow: {
     flexDirection: 'row',

@@ -193,7 +193,12 @@ export function useCreateAdmin(schoolCode: string | null | undefined) {
         userEmail: session.user?.email,
       });
 
-      const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/create-admin`;
+      // Runtime-safe: validate env var exists
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.trim() === '') {
+        throw new Error('Supabase configuration is missing. Please restart the app.');
+      }
+      const url = `${supabaseUrl}/functions/v1/create-admin`;
       const requestBody = {
         full_name: input.full_name,
         email: input.email,
@@ -233,6 +238,11 @@ export function useCreateAdmin(schoolCode: string | null | undefined) {
       try {
         const responseText = await response.text();
         log.debug('Parsing admin creation response', { responseLength: responseText.length });
+        
+        // Validate response is not empty before parsing
+        if (!responseText || responseText.trim().length === 0) {
+          throw new Error('Empty response from server');
+        }
         
         result = JSON.parse(responseText);
       } catch (parseError: any) {
@@ -338,8 +348,14 @@ export function useDeleteAdmin(schoolCode: string | null | undefined) {
 
       log.info('Deleting admin', { userId });
 
+      // Runtime-safe: validate env var exists
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.trim() === '') {
+        throw new Error('Supabase configuration is missing. Please restart the app.');
+      }
+
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-admin`,
+        `${supabaseUrl}/functions/v1/delete-admin`,
         {
           method: 'POST',
           headers: {

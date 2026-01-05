@@ -13,6 +13,7 @@ import {
   Bell,
   Inbox,
   Search,
+  Package,
 } from 'lucide-react-native';
 
 interface EmptyStateIllustrationProps {
@@ -26,6 +27,7 @@ interface EmptyStateIllustrationProps {
     | 'resources'
     | 'analytics'
     | 'search'
+    | 'inventory'
     | 'general';
   title: string;
   description: string;
@@ -42,6 +44,7 @@ const iconMap = {
   resources: Inbox,
   analytics: TrendingUp,
   search: Search,
+  inventory: Package,
   general: Award,
 };
 

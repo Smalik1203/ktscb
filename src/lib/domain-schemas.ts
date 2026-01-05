@@ -534,3 +534,191 @@ export function parseOrThrow<T extends z.ZodTypeAny>(
 
   return result.data;
 }
+
+// ==================== INVENTORY ITEM SCHEMAS ====================
+
+/**
+ * Inventory Item base object schema (before refinements)
+ * Business rules:
+ * - name, category, school_code, created_by are required
+ * - Fee-related fields are conditional based on is_chargeable
+ * - Issuance fields are conditional based on can_be_issued
+ */
+const InventoryItemBaseSchema = z.object({
+  id: uuidSchema,
+  school_code: nonEmptyStringSchema,
+  
+  // Step 1: Basic Information
+  name: nonEmptyStringSchema,
+  category: nonEmptyStringSchema, // User-defined category (free text)
+  description: z.string().nullable(),
+  
+  // Step 2: Tracking Rules
+  track_quantity: z.boolean(),
+  current_quantity: z.number().int().nonnegative().nullable(),
+  low_stock_threshold: z.number().int().nonnegative().nullable(),
+  track_serially: z.boolean(),
+  
+  // Step 3: Issuance Rules
+  can_be_issued: z.boolean(),
+  issue_to: z.enum(['student', 'staff', 'both']).nullable(),
+  must_be_returned: z.boolean(),
+  return_duration_days: z.number().int().positive().nullable(),
+  
+  // Step 4: Fee Rules
+  is_chargeable: z.boolean(),
+  charge_type: z.enum(['one_time', 'deposit']).nullable(),
+  charge_amount: z.number().nonnegative().nullable(),
+  auto_add_to_fees: z.boolean(),
+  fee_category: z.enum(['books', 'uniform', 'misc']).nullable(),
+  
+  // Step 5: Internal Controls
+  unit_cost: z.number().nonnegative().nullable(),
+  allow_price_override: z.boolean(),
+  internal_notes: z.string().nullable(),
+  
+  // Metadata
+  is_active: z.boolean(),
+  created_at: Timestamp,
+  updated_at: OptionalTimestamp,
+  created_by: nonEmptyStringSchema,
+});
+
+/**
+ * Inventory Item Input schema (for creation) - created before refinements
+ * This schema is used for input validation and should have the same business rules
+ */
+export const InventoryItemInputSchema = InventoryItemBaseSchema.omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+}).refine(
+  (data) => {
+    // If can_be_issued is true, issue_to must be set
+    if (data.can_be_issued && !data.issue_to) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'issue_to is required when can_be_issued is true', path: ['issue_to'] }
+).refine(
+  (data) => {
+    // If must_be_returned is true, return_duration_days must be set
+    if (data.must_be_returned && !data.return_duration_days) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'return_duration_days is required when must_be_returned is true', path: ['return_duration_days'] }
+).refine(
+  (data) => {
+    // If is_chargeable is true, charge_type and charge_amount must be set
+    if (data.is_chargeable && (!data.charge_type || data.charge_amount === null)) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'charge_type and charge_amount are required when is_chargeable is true', path: ['charge_type'] }
+).refine(
+  (data) => {
+    // If auto_add_to_fees is true, fee_category must be set
+    if (data.auto_add_to_fees && !data.fee_category) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'fee_category is required when auto_add_to_fees is true', path: ['fee_category'] }
+).refine(
+  (data) => {
+    // If track_serially is true, track_quantity must also be true
+    if (data.track_serially && !data.track_quantity) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'track_quantity must be true when track_serially is true', path: ['track_quantity'] }
+);
+
+export type InventoryItemInput = z.infer<typeof InventoryItemInputSchema>;
+
+/**
+ * Inventory Item domain schema with business rule validations
+ */
+export const InventoryItemSchema = InventoryItemBaseSchema.refine(
+  (data) => {
+    // If can_be_issued is true, issue_to must be set
+    if (data.can_be_issued && !data.issue_to) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'issue_to is required when can_be_issued is true', path: ['issue_to'] }
+).refine(
+  (data) => {
+    // If must_be_returned is true, return_duration_days must be set
+    if (data.must_be_returned && !data.return_duration_days) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'return_duration_days is required when must_be_returned is true', path: ['return_duration_days'] }
+).refine(
+  (data) => {
+    // If is_chargeable is true, charge_type and charge_amount must be set
+    if (data.is_chargeable && (!data.charge_type || data.charge_amount === null)) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'charge_type and charge_amount are required when is_chargeable is true', path: ['charge_type'] }
+).refine(
+  (data) => {
+    // If auto_add_to_fees is true, fee_category must be set
+    if (data.auto_add_to_fees && !data.fee_category) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'fee_category is required when auto_add_to_fees is true', path: ['fee_category'] }
+).refine(
+  (data) => {
+    // If track_serially is true, track_quantity must also be true
+    if (data.track_serially && !data.track_quantity) {
+      return false;
+    }
+    return true;
+  },
+  { message: 'track_quantity must be true when track_serially is true', path: ['track_quantity'] }
+);
+
+export type DomainInventoryItem = z.infer<typeof InventoryItemSchema>;
+
+// ==================== INVOICE & FEES SCHEMAS ====================
+
+/**
+ * Invoice domain schemas
+ * Re-exported from domain/fees/types for convenience
+ */
+export {
+  InvoiceSchema,
+  InvoiceItemSchema,
+  InvoicePaymentSchema,
+  InvoiceDetailSchema,
+  CreateInvoiceInputSchema,
+  RecordPaymentInputSchema,
+  UpdateInvoiceItemInputSchema,
+  CreateInvoiceItemInputSchema,
+  calculateInvoiceStatus,
+  validatePaymentAmount,
+  calculateInvoiceTotal,
+  type DomainInvoice,
+  type DomainInvoiceItem,
+  type DomainInvoicePayment,
+  type DomainInvoiceDetail,
+  type CreateInvoiceInput,
+  type RecordPaymentInput,
+  type UpdateInvoiceItemInput,
+  type CreateInvoiceItemInput,
+  type InvoiceStatus,
+  type PaymentMethod,
+} from '../domain/fees/types';
