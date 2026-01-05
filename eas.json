@@ -8,7 +8,10 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
+        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "$EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "$EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_OPENAI_API_KEY": "$EXPO_PUBLIC_OPENAI_API_KEY"
       }
     },
     "preview": {
@@ -17,7 +20,10 @@
       },
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
+        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "$EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "$EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_OPENAI_API_KEY": "$EXPO_PUBLIC_OPENAI_API_KEY"
       }
     },
     "production": {
@@ -26,7 +32,10 @@
       },
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
+        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "$EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "$EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_OPENAI_API_KEY": "$EXPO_PUBLIC_OPENAI_API_KEY"
       }
     }
   },
