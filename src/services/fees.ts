@@ -547,10 +547,10 @@ export const invoiceService = {
 
       // Only create finance transaction if user is super admin
       // (finance module is super admin only)
-      if (authUser && authUser.role === 'superadmin') {
+      if (authUser && authUser.role === 'superadmin' && invoice.school_code) {
         // Get or create default accounts and fees category
-        const accounts = await financeService.ensureDefaultAccounts(invoice.school_code, authUser.id);
-        const feesCategoryId = await financeService.ensureFeesCategory(invoice.school_code, authUser.id);
+        const accounts = await financeService.ensureDefaultAccounts(invoice.school_code, authUser.id!);
+        const feesCategoryId = await financeService.ensureFeesCategory(invoice.school_code, authUser.id!);
 
         // Map payment method to account
         const accountType = financeService.mapPaymentMethodToAccount(validatedInput.method);

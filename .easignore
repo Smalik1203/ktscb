@@ -120,10 +120,13 @@ coverage/
 
 # Cache and temporary files
 .npm-cache/
+**/.npm-cache/
 .cache/
+**/.cache/
 .temp/
-tmp/
+**/tmp/
 *.cache
+supabase/.temp/
 
 # Other unnecessary files
 .eslintcache

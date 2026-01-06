@@ -172,7 +172,7 @@ async function logFinanceOperation(
       p_school_code: schoolCode,
       p_event_type: eventType,
       p_resource_type: resourceType,
-      p_resource_id: resourceId || undefined,
+      p_resource_id: resourceId as string,
       p_user_id: userId,
       p_user_role: userRole,
       p_action_details: actionDetails || {},
@@ -405,7 +405,7 @@ export const financeService = {
         category_id: input.category_id,
         account_id: input.account_id,
         description: input.description || null,
-        created_by: user.id,
+        created_by: user.id!,
       })
       .select('id')
       .single();
@@ -438,8 +438,8 @@ export const financeService = {
       'create',
       'transaction',
       transaction.id,
-      user.id,
-      user.role,
+      user.id!,
+      user.role!,
       {
         amount: input.amount,
         type: input.type,
@@ -624,8 +624,8 @@ export const financeService = {
       'delete',
       'transaction',
       transactionId,
-      user.id,
-      user.role,
+      user.id!,
+      user.role!,
       { soft_delete: true }
     );
   },
@@ -657,8 +657,8 @@ export const financeService = {
 
     const { data, error } = await supabase.rpc('detect_finance_inconsistencies', {
       p_school_code: schoolCode,
-      p_start_date: startDate || null,
-      p_end_date: endDate || null,
+      p_start_date: startDate,
+      p_end_date: endDate,
     });
 
     if (error) throw error;

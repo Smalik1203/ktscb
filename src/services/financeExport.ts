@@ -31,7 +31,7 @@ async function logExportOperation(
       p_school_code: schoolCode,
       p_event_type: 'export',
       p_resource_type: 'report',
-      p_resource_id: undefined,
+      p_resource_id: null as unknown as string,
       p_user_id: userId,
       p_user_role: userRole,
       p_action_details: {
