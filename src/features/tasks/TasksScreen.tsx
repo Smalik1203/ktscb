@@ -4,7 +4,7 @@ import { Text, Card, Button, Chip, Checkbox, ActivityIndicator, Searchbar, Menu,
 import { File, Paths } from 'expo-file-system';
 import { WebView } from 'react-native-webview';
 import { Stack } from 'expo-router';
-import { ClipboardList, Plus, Calendar, AlertCircle, CheckCircle, Clock, Edit, Trash2, MoreVertical, Users, BookOpen, AlertTriangle, X, BarChart3, FileCheck, FileText, Download } from 'lucide-react-native';
+import { ClipboardList, Plus, Calendar, AlertCircle, CheckCircle, Clock, Edit, Trash2, MoreVertical, Users, BookOpen, AlertTriangle, X, BarChart3, FileCheck, FileText, Download, Sparkles, Mic } from 'lucide-react-native';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
@@ -15,6 +15,7 @@ import { useSubjects } from '../../hooks/useSubjects';
 import { TaskFormModal } from '../../components/tasks/TaskFormModal';
 import { TaskSubmissionModal } from '../../components/tasks/TaskSubmissionModal';
 import { StudentTaskCard } from '../../components/tasks/StudentTaskCard';
+import { VoiceTaskCreator } from '../../components/tasks/VoiceTaskCreator';
 import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
 import { PDFViewer } from '../../components/resources/PDFViewer';
 import type { Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
@@ -250,7 +251,7 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
 
           {/* Submissions List */}
           <Text style={styles.progressSectionTitle}>Student Submissions</Text>
-          
+
           {isLoading ? (
             <View style={styles.progressLoadingContainer}>
               <ActivityIndicator size="large" color={colors.primary[600]} />
@@ -278,7 +279,7 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
                       {formatSubmissionStatus(submission.status)}
                     </Chip>
                   </View>
-                  
+
                   {submission.submitted_at && (
                     <View style={styles.submissionMeta}>
                       <Clock size={12} color={colors.text.secondary} />
@@ -302,8 +303,8 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
             <View style={styles.progressEmptyState}>
               <AlertCircle size={48} color={colors.text.tertiary} />
               <Text style={styles.progressEmptyText}>
-                {task.class_instance_id 
-                  ? 'No students found in this class' 
+                {task.class_instance_id
+                  ? 'No students found in this class'
                   : 'This task is not assigned to a specific class'}
               </Text>
             </View>
@@ -329,13 +330,13 @@ export default function TasksScreen() {
   const { profile } = useAuth();
   const { colors, isDark, typography, spacing, borderRadius } = useTheme();
   const { can, isReady: capabilitiesReady } = useCapabilities();
-  
+
   // Capability-based access control
   const canViewOwnTasks = can('tasks.read_own');
   const canManageTasks = can('tasks.manage');
-  
+
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Create dynamic styles based on theme
   const styles = useMemo(() => createStyles(colors, isDark, typography, spacing, borderRadius), [colors, isDark, typography, spacing, borderRadius]);
   const [selectedPriority, setSelectedPriority] = useState<string | null>(null);
@@ -343,44 +344,48 @@ export default function TasksScreen() {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(undefined);
   const [startDate, setStartDate] = useState<string | undefined>(undefined);
   const [endDate, setEndDate] = useState<string | undefined>(undefined);
-  
+
   // Menu states
   const [showClassModal, setShowClassModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showPriorityModal, setShowPriorityModal] = useState(false);
   const [taskMenuVisible, setTaskMenuVisible] = useState<{ [key: string]: boolean }>({});
-  
+
   // Task form modal
   const [formModalVisible, setFormModalVisible] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  
+
   // Progress/Submissions modal
   const [progressModalVisible, setProgressModalVisible] = useState(false);
   const [selectedTaskForProgress, setSelectedTaskForProgress] = useState<Task | null>(null);
-  
+
   // Task Detail modal
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<Task | null>(null);
-  
+
   // Attachments modal
   const [attachmentsModalVisible, setAttachmentsModalVisible] = useState(false);
   const [selectedTaskForAttachments, setSelectedTaskForAttachments] = useState<Task | null>(null);
-  
+
   // File viewer modal
   const [fileViewerVisible, setFileViewerVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<{ url: string; name: string; type: string } | null>(null);
-  
+
   // Task submission modal (for students)
   const [submissionModalVisible, setSubmissionModalVisible] = useState(false);
   const [selectedTaskForSubmission, setSelectedTaskForSubmission] = useState<Task | null>(null);
-  
+
+  // Voice task creator modal (smart create with AI)
+  const [voiceCreatorVisible, setVoiceCreatorVisible] = useState(false);
+  const [fabMenuVisible, setFabMenuVisible] = useState(false);
+
   // Get student ID if student role
   const [studentId, setStudentId] = React.useState<string | null>(null);
-  
+
   // Task submission hooks
   const submitTask = useSubmitTask();
   const unsubmitTask = useUnsubmitTask();
-  
+
   React.useEffect(() => {
     if (canViewOwnTasks && !canManageTasks && profile?.auth_id) {
       // Fetch student ID from database (only for students viewing their own tasks)
@@ -399,18 +404,18 @@ export default function TasksScreen() {
 
   // Fetch data based on role
   const schoolCode = profile?.school_code || '';
-  
+
   // Fetch classes and subjects for filters
   const { data: classes } = useClasses(schoolCode);
   const { data: subjectsResult } = useSubjects(schoolCode);
   const subjects = subjectsResult?.data || [];
-  
+
   // Determine if this is a student-only view (can view own but can't manage)
   const isStudentView = canViewOwnTasks && !canManageTasks;
-  
+
   const { data: adminTasks, isLoading: adminLoading, error: adminError, refetch: refetchAdmin } = useTasks(
     schoolCode,
-    { 
+    {
       classInstanceId: selectedClassId,
       subjectId: selectedSubjectId,
       priority: selectedPriority || undefined,
@@ -418,13 +423,13 @@ export default function TasksScreen() {
       endDate,
     }
   );
-  
+
   const { data: studentTasksData, isLoading: studentLoading, error: studentError, refetch: refetchStudent } = useStudentTasks(
     studentId || ''
   );
-  
+
   const { data: adminStats, isLoading: statsLoading, error: statsError } = useTaskStats(schoolCode, selectedClassId);
-  
+
   const tasks = isStudentView ? studentTasksData : adminTasks;
   const isLoading = isStudentView ? studentLoading : adminLoading;
   const error = isStudentView ? studentError : adminError;
@@ -436,9 +441,9 @@ export default function TasksScreen() {
     }
 
     const today = new Date().toISOString().split('T')[0];
-    
+
     // Filter to only unsubmitted tasks
-    const unsubmittedTasks = studentTasksData.filter((task: any) => 
+    const unsubmittedTasks = studentTasksData.filter((task: any) =>
       !task.submission || (task.submission.status !== 'submitted' && task.submission.status !== 'graded')
     );
 
@@ -460,17 +465,17 @@ export default function TasksScreen() {
       upcoming,
     };
   }, [isStudentView, studentTasksData]);
-  
+
   // Use student stats if student, otherwise use admin stats
   const stats = isStudentView ? studentStats : adminStats;
-  
+
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
-  
+
   // Get first academic year for creating tasks
   const [academicYearId, setAcademicYearId] = React.useState<string | undefined>(undefined);
-  
+
   React.useEffect(() => {
     if (schoolCode && canManageTasks) {
       import('../../lib/supabase').then(({ supabase }) => {
@@ -490,16 +495,16 @@ export default function TasksScreen() {
   // Filter tasks (client-side filtering for students, server-side for admins)
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    
+
     return tasks.filter(task => {
-      const matchesSearch = !searchQuery || 
+      const matchesSearch = !searchQuery ||
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         task.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       const matchesPriority = !selectedPriority || task.priority === selectedPriority;
-      
+
       const matchesSubject = !selectedSubjectId || task.subject_id === selectedSubjectId;
-      
+
       return matchesSearch && matchesPriority && matchesSubject;
     });
   }, [tasks, searchQuery, selectedPriority, selectedSubjectId]);
@@ -508,7 +513,7 @@ export default function TasksScreen() {
   const getDueDateStatus = (dueDate: string) => {
     const today = new Date().toISOString().split('T')[0];
     const due = dueDate;
-    
+
     if (due < today) return { status: 'overdue', color: colors.error[500], text: 'Overdue' };
     if (due === today) return { status: 'today', color: colors.warning[500], text: 'Due Today' };
     const daysUntil = Math.ceil((new Date(due).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24));
@@ -528,7 +533,7 @@ export default function TasksScreen() {
     attachments: any[];
   }) => {
     if (!studentId) return;
-    
+
     try {
       await submitTask.mutateAsync({
         task_id: submissionData.task_id,
@@ -549,7 +554,7 @@ export default function TasksScreen() {
 
   const handleUnsubmitTask = async (taskId: string) => {
     if (!studentId) return;
-    
+
     try {
       await unsubmitTask.mutateAsync({
         taskId,
@@ -588,7 +593,7 @@ export default function TasksScreen() {
 
   const handleDeleteTask = (taskId: string) => {
     setTaskMenuVisible({ ...taskMenuVisible, [taskId]: false });
-    
+
     Alert.alert(
       'Delete Task',
       'Are you sure you want to delete this task? This action cannot be undone.',
@@ -630,7 +635,7 @@ export default function TasksScreen() {
   const handleDownloadAttachments = async (task: Task) => {
     setTaskMenuVisible({ ...taskMenuVisible, [task.id]: false });
     if (!task.attachments || task.attachments.length === 0) return;
-    
+
     try {
       Alert.alert(
         'Download Files',
@@ -703,7 +708,7 @@ export default function TasksScreen() {
     return (
       <>
         <Stack.Screen options={{ title: 'Tasks', headerShown: true }} />
-        <AccessDenied 
+        <AccessDenied
           message="You don't have permission to view tasks."
           requiredCapability="tasks.read_own"
         />
@@ -713,15 +718,15 @@ export default function TasksScreen() {
 
   return (
     <>
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           title: isStudentView ? 'My Tasks' : 'Task Management',
           headerShown: true
-        }} 
+        }}
       />
-      
+
       <View style={styles.container}>
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -753,7 +758,7 @@ export default function TasksScreen() {
               <View style={styles.filterDivider} />
 
               {/* Priority Filter */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.filterItem}
                 onPress={() => setShowPriorityModal(true)}
               >
@@ -762,7 +767,7 @@ export default function TasksScreen() {
                 </View>
                 <View style={styles.filterContent}>
                   <Text style={styles.filterValue} numberOfLines={1}>
-                    {selectedPriority 
+                    {selectedPriority
                       ? selectedPriority.charAt(0).toUpperCase() + selectedPriority.slice(1)
                       : 'Priority'
                     }
@@ -774,7 +779,7 @@ export default function TasksScreen() {
                 <>
                   {/* Divider */}
                   <View style={styles.filterDivider} />
-                  
+
                   {/* Class Filter */}
                   <TouchableOpacity
                     style={styles.filterItem}
@@ -785,7 +790,7 @@ export default function TasksScreen() {
                     </View>
                     <View style={styles.filterContent}>
                       <Text style={styles.filterValue} numberOfLines={1}>
-                        {selectedClassId 
+                        {selectedClassId
                           ? classes?.find(c => c.id === selectedClassId)
                             ? `${classes.find(c => c.id === selectedClassId)?.grade}-${classes.find(c => c.id === selectedClassId)?.section}`
                             : 'Class'
@@ -798,7 +803,7 @@ export default function TasksScreen() {
               )}
             </View>
           </View>
-          
+
           {/* Stats Cards - keep visible during refresh */}
           {stats && (
             <View style={[styles.statsSection, isLoading && styles.statsLoading]}>
@@ -837,666 +842,719 @@ export default function TasksScreen() {
           )}
 
           {/* Loading State - show skeleton during initial load */}
-        {isLoading && !tasks && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary[600]} />
-            <Text style={styles.loadingText}>Loading tasks...</Text>
-          </View>
-        )}
-
-        {/* Error State */}
-        {error && !isLoading && (
-          <View style={styles.errorContainer}>
-            <AlertCircle size={48} color={colors.error[600]} />
-            <Text style={styles.errorText}>Failed to load tasks</Text>
-            <Text style={styles.errorDetails}>{error.message || 'Please check your connection and try again'}</Text>
-            <Button
-              mode="contained"
-              onPress={() => {
-                if (isStudentView) {
-                  refetchStudent();
-                } else {
-                  refetchAdmin();
-                }
-              }}
-              style={styles.retryButton}
-            >
-              Retry
-            </Button>
-          </View>
-        )}
-
-        {/* Empty State - only show when not loading and no error */}
-        {!isLoading && !error && (!tasks || (Array.isArray(tasks) && filteredTasks.length === 0)) && (
-          <EmptyStateIllustration
-            type="tasks"
-            title="No Tasks Found"
-            description={
-              searchQuery
-                ? 'Try adjusting your search or filters to find what you\'re looking for'
-                : isStudentView
-                  ? 'You\'re all caught up! No tasks have been assigned yet.'
-                  : 'Get started by creating your first task for your class'
-            }
-            action={
-              canManageTasks && !searchQuery ? (
-                <Button
-                  mode="contained"
-                  onPress={handleCreateTask}
-                  style={styles.emptyButton}
-                  icon={() => <Plus size={20} color="white" />}
-                >
-                  Create First Task
-                </Button>
-              ) : undefined
-            }
-          />
-        )}
-
-        {/* Task List */}
-        {!isLoading && filteredTasks.length > 0 && (
-          <View style={styles.tasksListSection}>
-            <View style={styles.tasksHeader}>
-              <Text style={styles.sectionTitle}>Tasks</Text>
-              <Text style={styles.tasksCount}>
-                {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
-              </Text>
+          {isLoading && !tasks && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary[600]} />
+              <Text style={styles.loadingText}>Loading tasks...</Text>
             </View>
+          )}
 
-            {/* Search Bar */}
-            <View style={styles.searchSection}>
-              <Searchbar
-                placeholder="Search tasks..."
-                onChangeText={setSearchQuery}
-                value={searchQuery}
-                style={styles.searchBar}
-                iconColor={colors.primary[600]}
-              />
+          {/* Error State */}
+          {error && !isLoading && (
+            <View style={styles.errorContainer}>
+              <AlertCircle size={48} color={colors.error[600]} />
+              <Text style={styles.errorText}>Failed to load tasks</Text>
+              <Text style={styles.errorDetails}>{error.message || 'Please check your connection and try again'}</Text>
+              <Button
+                mode="contained"
+                onPress={() => {
+                  if (isStudentView) {
+                    refetchStudent();
+                  } else {
+                    refetchAdmin();
+                  }
+                }}
+                style={styles.retryButton}
+              >
+                Retry
+              </Button>
             </View>
+          )}
 
-            {isStudentView ? (
-              // Student view: Separate submitted and unsubmitted tasks
-              (() => {
-                const submittedTasks = filteredTasks.filter((task: any) => 
-                  task.submission && (task.submission.status === 'submitted' || task.submission.status === 'graded')
-                );
-                const unsubmittedTasks = filteredTasks.filter((task: any) => 
-                  !task.submission || (task.submission.status !== 'submitted' && task.submission.status !== 'graded')
-                );
+          {/* Empty State - only show when not loading and no error */}
+          {!isLoading && !error && (!tasks || (Array.isArray(tasks) && filteredTasks.length === 0)) && (
+            <EmptyStateIllustration
+              type="tasks"
+              title="No Tasks Found"
+              description={
+                searchQuery
+                  ? 'Try adjusting your search or filters to find what you\'re looking for'
+                  : isStudentView
+                    ? 'You\'re all caught up! No tasks have been assigned yet.'
+                    : 'Get started by creating your first task for your class'
+              }
+              action={
+                canManageTasks && !searchQuery ? (
+                  <Button
+                    mode="contained"
+                    onPress={handleCreateTask}
+                    style={styles.emptyButton}
+                    icon={() => <Plus size={20} color="white" />}
+                  >
+                    Create First Task
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
 
-                return (
-                  <>
-                    {/* Unsubmitted Tasks Section */}
-                    {unsubmittedTasks.length > 0 && (
-                      <>
-                        <View style={styles.sectionHeader}>
-                          <Text style={styles.subsectionTitle}>Assigned Tasks</Text>
-                          <Text style={styles.subsectionCount}>
-                            {unsubmittedTasks.length} {unsubmittedTasks.length === 1 ? 'task' : 'tasks'}
-                          </Text>
-                        </View>
-                        {unsubmittedTasks.map((task: any) => (
-                          <StudentTaskCard
-                            key={task.id}
-                            task={task}
-                            onViewDetail={() => handleViewTaskDetail(task)}
-                            onViewAttachments={() => handleViewStudentAttachments(task)}
-                            onSubmit={() => handleOpenSubmissionModal(task)}
-                            onUnsubmit={handleUnsubmitTask}
-                          />
-                        ))}
-                      </>
-                    )}
+          {/* Task List */}
+          {!isLoading && filteredTasks.length > 0 && (
+            <View style={styles.tasksListSection}>
+              <View style={styles.tasksHeader}>
+                <Text style={styles.sectionTitle}>Tasks</Text>
+                <Text style={styles.tasksCount}>
+                  {filteredTasks.length} {filteredTasks.length === 1 ? 'task' : 'tasks'}
+                </Text>
+              </View>
 
-                    {/* Submitted Tasks Section */}
-                    {submittedTasks.length > 0 && (
-                      <>
-                        <View style={styles.sectionHeader}>
-                          <Text style={styles.subsectionTitle}>Submitted Tasks</Text>
-                          <Text style={styles.subsectionCount}>
-                            {submittedTasks.length} {submittedTasks.length === 1 ? 'task' : 'tasks'}
-                          </Text>
-                        </View>
-                        {submittedTasks.map((task: any) => (
-                          <StudentTaskCard
-                            key={task.id}
-                            task={task}
-                            onViewDetail={() => handleViewTaskDetail(task)}
-                            onViewAttachments={() => handleViewStudentAttachments(task)}
-                            onSubmit={() => handleOpenSubmissionModal(task)}
-                            onUnsubmit={handleUnsubmitTask}
-                            isSubmitted={true}
-                          />
-                        ))}
-                      </>
-                    )}
-                  </>
-                );
-              })()
-            ) : (
-              // Admin/Teacher view: Show all tasks normally
-              filteredTasks.map((task: any) => {
-                const dueDateStatus = getDueDateStatus(task.due_date);
-                const isCompleted = task.submission?.status === 'submitted';
+              {/* Search Bar */}
+              <View style={styles.searchSection}>
+                <Searchbar
+                  placeholder="Search tasks..."
+                  onChangeText={setSearchQuery}
+                  value={searchQuery}
+                  style={styles.searchBar}
+                  iconColor={colors.primary[600]}
+                />
+              </View>
 
-                // Admin/Teacher view
-                return (
-                <View 
-                  key={task.id} 
-                  style={styles.taskCard}
-                >
-                  <View style={styles.taskCardHeader}>
-                    <View style={styles.taskHeaderLeft}>
-                      <View style={styles.taskInfo}>
-                        <Text style={styles.taskTitle} numberOfLines={2}>
-                          {task.title}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    {canManageTasks && (
-                      <View style={styles.taskHeaderRight}>
-                        <Menu
-                          visible={taskMenuVisible[task.id] || false}
-                          onDismiss={() => toggleTaskMenu(task.id)}
-                          anchor={
-                            <IconButton
-                              icon={() => <MoreVertical size={20} color={colors.text.secondary} />}
-                              size={20}
-                              onPress={() => {
-                                toggleTaskMenu(task.id);
-                              }}
-                              style={styles.menuButton}
+              {isStudentView ? (
+                // Student view: Separate submitted and unsubmitted tasks
+                (() => {
+                  const submittedTasks = filteredTasks.filter((task: any) =>
+                    task.submission && (task.submission.status === 'submitted' || task.submission.status === 'graded')
+                  );
+                  const unsubmittedTasks = filteredTasks.filter((task: any) =>
+                    !task.submission || (task.submission.status !== 'submitted' && task.submission.status !== 'graded')
+                  );
+
+                  return (
+                    <>
+                      {/* Unsubmitted Tasks Section */}
+                      {unsubmittedTasks.length > 0 && (
+                        <>
+                          <View style={styles.sectionHeader}>
+                            <Text style={styles.subsectionTitle}>Assigned Tasks</Text>
+                            <Text style={styles.subsectionCount}>
+                              {unsubmittedTasks.length} {unsubmittedTasks.length === 1 ? 'task' : 'tasks'}
+                            </Text>
+                          </View>
+                          {unsubmittedTasks.map((task: any) => (
+                            <StudentTaskCard
+                              key={task.id}
+                              task={task}
+                              onViewDetail={() => handleViewTaskDetail(task)}
+                              onViewAttachments={() => handleViewStudentAttachments(task)}
+                              onSubmit={() => handleOpenSubmissionModal(task)}
+                              onUnsubmit={handleUnsubmitTask}
                             />
-                          }
-                        >
-                          {task.attachments && task.attachments.length > 0 && (
+                          ))}
+                        </>
+                      )}
+
+                      {/* Submitted Tasks Section */}
+                      {submittedTasks.length > 0 && (
+                        <>
+                          <View style={styles.sectionHeader}>
+                            <Text style={styles.subsectionTitle}>Submitted Tasks</Text>
+                            <Text style={styles.subsectionCount}>
+                              {submittedTasks.length} {submittedTasks.length === 1 ? 'task' : 'tasks'}
+                            </Text>
+                          </View>
+                          {submittedTasks.map((task: any) => (
+                            <StudentTaskCard
+                              key={task.id}
+                              task={task}
+                              onViewDetail={() => handleViewTaskDetail(task)}
+                              onViewAttachments={() => handleViewStudentAttachments(task)}
+                              onSubmit={() => handleOpenSubmissionModal(task)}
+                              onUnsubmit={handleUnsubmitTask}
+                              isSubmitted={true}
+                            />
+                          ))}
+                        </>
+                      )}
+                    </>
+                  );
+                })()
+              ) : (
+                // Admin/Teacher view: Show all tasks normally
+                filteredTasks.map((task: any) => {
+                  const dueDateStatus = getDueDateStatus(task.due_date);
+                  const isCompleted = task.submission?.status === 'submitted';
+
+                  // Admin/Teacher view
+                  return (
+                    <View
+                      key={task.id}
+                      style={styles.taskCard}
+                    >
+                      <View style={styles.taskCardHeader}>
+                        <View style={styles.taskHeaderLeft}>
+                          <View style={styles.taskInfo}>
+                            <Text style={styles.taskTitle} numberOfLines={2}>
+                              {task.title}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {canManageTasks && (
+                          <View style={styles.taskHeaderRight}>
+                            <Menu
+                              visible={taskMenuVisible[task.id] || false}
+                              onDismiss={() => toggleTaskMenu(task.id)}
+                              anchor={
+                                <IconButton
+                                  icon={() => <MoreVertical size={20} color={colors.text.secondary} />}
+                                  size={20}
+                                  onPress={() => {
+                                    toggleTaskMenu(task.id);
+                                  }}
+                                  style={styles.menuButton}
+                                />
+                              }
+                            >
+                              {task.attachments && task.attachments.length > 0 && (
+                                <>
+                                  <Menu.Item
+                                    onPress={() => handleViewAttachments(task)}
+                                    title="View Attachments"
+                                    leadingIcon={() => <FileText size={16} color={colors.primary[600]} />}
+                                  />
+                                  <Menu.Item
+                                    onPress={() => handleDownloadAttachments(task)}
+                                    title="Download File(s)"
+                                    leadingIcon={() => <Download size={16} color={colors.primary[600]} />}
+                                  />
+                                </>
+                              )}
+                              <Menu.Item
+                                onPress={() => handleViewProgress(task)}
+                                title="View Progress"
+                                leadingIcon={() => <BarChart3 size={16} color={colors.primary[600]} />}
+                              />
+                              <Menu.Item
+                                onPress={() => handleEditTask(task)}
+                                title="Edit"
+                                leadingIcon={() => <Edit size={16} color={colors.text.primary} />}
+                              />
+                              <Menu.Item
+                                onPress={() => handleDeleteTask(task.id)}
+                                title="Delete"
+                                leadingIcon={() => <Trash2 size={16} color={colors.error[600]} />}
+                              />
+                            </Menu>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Enhanced Metadata Section */}
+                      <View style={styles.taskMetaSection}>
+                        {/* Row 1: Subject and Priority */}
+                        <View style={styles.taskMetaRow}>
+                          {task.subjects && (
+                            <View style={styles.taskMetaChip}>
+                              <BookOpen size={14} color={colors.primary[600]} />
+                              <Text style={styles.taskMetaChipText}>{task.subjects.subject_name}</Text>
+                            </View>
+                          )}
+                          <View style={[styles.taskMetaChip, { backgroundColor: getPriorityColor(task.priority) + '15' }]}>
+                            <AlertCircle size={14} color={getPriorityColor(task.priority)} />
+                            <Text style={[styles.taskMetaChipText, { color: getPriorityColor(task.priority) }]}>
+                              {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Row 2: Due Date and Additional Info */}
+                        <View style={styles.taskMetaRow}>
+                          <View style={styles.taskMetaItem}>
+                            <Clock size={14} color={dueDateStatus.status === 'overdue' ? colors.error[600] : colors.warning[600]} />
+                            <Text style={styles.taskMetaLabel}>Due:</Text>
+                            <Text style={[
+                              styles.taskMetaValue,
+                              dueDateStatus.status === 'overdue' && { color: colors.error[600], fontWeight: '600' }
+                            ]}>
+                              {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </Text>
+                          </View>
+                          {task.class_instances && (
                             <>
-                              <Menu.Item
-                                onPress={() => handleViewAttachments(task)}
-                                title="View Attachments"
-                                leadingIcon={() => <FileText size={16} color={colors.primary[600]} />}
-                              />
-                              <Menu.Item
-                                onPress={() => handleDownloadAttachments(task)}
-                                title="Download File(s)"
-                                leadingIcon={() => <Download size={16} color={colors.primary[600]} />}
-                              />
+                              <View style={styles.taskMetaDivider} />
+                              <View style={styles.taskMetaItem}>
+                                <Users size={14} color={colors.text.tertiary} />
+                                <Text style={styles.taskMetaValue}>
+                                  Grade {task.class_instances.grade}-{task.class_instances.section}
+                                </Text>
+                              </View>
                             </>
                           )}
-                          <Menu.Item
-                            onPress={() => handleViewProgress(task)}
-                            title="View Progress"
-                            leadingIcon={() => <BarChart3 size={16} color={colors.primary[600]} />}
-                          />
-                          <Menu.Item
-                            onPress={() => handleEditTask(task)}
-                            title="Edit"
-                            leadingIcon={() => <Edit size={16} color={colors.text.primary} />}
-                          />
-                          <Menu.Item
-                            onPress={() => handleDeleteTask(task.id)}
-                            title="Delete"
-                            leadingIcon={() => <Trash2 size={16} color={colors.error[600]} />}
-                          />
-                        </Menu>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* Enhanced Metadata Section */}
-                  <View style={styles.taskMetaSection}>
-                    {/* Row 1: Subject and Priority */}
-                    <View style={styles.taskMetaRow}>
-                      {task.subjects && (
-                        <View style={styles.taskMetaChip}>
-                          <BookOpen size={14} color={colors.primary[600]} />
-                          <Text style={styles.taskMetaChipText}>{task.subjects.subject_name}</Text>
+                          {task.attachments && task.attachments.length > 0 && (
+                            <>
+                              <View style={styles.taskMetaDivider} />
+                              <View style={styles.taskMetaItem}>
+                                <FileText size={14} color={colors.text.tertiary} />
+                                <Text style={styles.taskMetaValue}>
+                                  {task.attachments.length} {task.attachments.length === 1 ? 'file' : 'files'}
+                                </Text>
+                              </View>
+                            </>
+                          )}
+                          {canManageTasks && task._count?.submissions !== undefined && (
+                            <>
+                              <View style={styles.taskMetaDivider} />
+                              <View style={styles.taskMetaItem}>
+                                <FileCheck size={14} color={colors.success[600]} />
+                                <Text style={styles.taskMetaValue}>
+                                  {task._count.submissions} submitted
+                                </Text>
+                              </View>
+                            </>
+                          )}
                         </View>
-                      )}
-                      <View style={[styles.taskMetaChip, { backgroundColor: getPriorityColor(task.priority) + '15' }]}>
-                        <AlertCircle size={14} color={getPriorityColor(task.priority)} />
-                        <Text style={[styles.taskMetaChipText, { color: getPriorityColor(task.priority) }]}>
-                          {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
-                        </Text>
                       </View>
                     </View>
+                  );
+                })
+              )}
+            </View>
+          )}
+        </ScrollView>
 
-                    {/* Row 2: Due Date and Additional Info */}
-                    <View style={styles.taskMetaRow}>
-                      <View style={styles.taskMetaItem}>
-                        <Clock size={14} color={dueDateStatus.status === 'overdue' ? colors.error[600] : colors.warning[600]} />
-                        <Text style={styles.taskMetaLabel}>Due:</Text>
-                        <Text style={[
-                          styles.taskMetaValue,
-                          dueDateStatus.status === 'overdue' && { color: colors.error[600], fontWeight: '600' }
-                        ]}>
-                          {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </Text>
-                      </View>
-                      {task.class_instances && (
-                        <>
-                          <View style={styles.taskMetaDivider} />
-                          <View style={styles.taskMetaItem}>
-                            <Users size={14} color={colors.text.tertiary} />
-                            <Text style={styles.taskMetaValue}>
-                              Grade {task.class_instances.grade}-{task.class_instances.section}
-                            </Text>
-                          </View>
-                        </>
-                      )}
-                      {task.attachments && task.attachments.length > 0 && (
-                        <>
-                          <View style={styles.taskMetaDivider} />
-                          <View style={styles.taskMetaItem}>
-                            <FileText size={14} color={colors.text.tertiary} />
-                            <Text style={styles.taskMetaValue}>
-                              {task.attachments.length} {task.attachments.length === 1 ? 'file' : 'files'}
-                            </Text>
-                          </View>
-                        </>
-                      )}
-                      {canManageTasks && task._count?.submissions !== undefined && (
-                        <>
-                          <View style={styles.taskMetaDivider} />
-                          <View style={styles.taskMetaItem}>
-                            <FileCheck size={14} color={colors.success[600]} />
-                            <Text style={styles.taskMetaValue}>
-                              {task._count.submissions} submitted
-                            </Text>
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  </View>
-                </View>
-                );
-              })
-            )}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Filter Modals */}
-      {/* Subject Filter Modal - Bottom Sheet */}
-      <Modal
-        visible={showSubjectModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowSubjectModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setShowSubjectModal(false)}
-          />
-          <View style={styles.bottomSheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Select Subject</Text>
-            <ScrollView style={styles.sheetContent}>
-              <TouchableOpacity
-                style={[styles.sheetItem, !selectedSubjectId && styles.sheetItemActive]}
-                onPress={() => {
-                  setSelectedSubjectId(undefined);
-                  setShowSubjectModal(false);
-                }}
-              >
-                <Text style={[styles.sheetItemText, !selectedSubjectId && styles.sheetItemTextActive]}>
-                  All Subjects
-                </Text>
-                {!selectedSubjectId && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-              {subjects?.map(subject => (
-                <TouchableOpacity
-                  key={subject.id}
-                  style={[styles.sheetItem, selectedSubjectId === subject.id && styles.sheetItemActive]}
-                  onPress={() => {
-                    setSelectedSubjectId(subject.id);
-                    setShowSubjectModal(false);
-                  }}
-                >
-                  <Text style={[styles.sheetItemText, selectedSubjectId === subject.id && styles.sheetItemTextActive]}>
-                    {subject.subject_name}
-                  </Text>
-                  {selectedSubjectId === subject.id && <Text style={styles.checkmark}>✓</Text>}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Priority Filter Modal - Bottom Sheet */}
-      <Modal
-        visible={showPriorityModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPriorityModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={StyleSheet.absoluteFill}
-            activeOpacity={1}
-            onPress={() => setShowPriorityModal(false)}
-          />
-          <View style={styles.bottomSheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Select Priority</Text>
-            <ScrollView style={styles.sheetContent}>
-              {['all', 'urgent', 'high', 'medium', 'low'].map(priority => (
-                <TouchableOpacity
-                  key={priority}
-                  style={[
-                    styles.sheetItem,
-                    (priority === 'all' ? !selectedPriority : selectedPriority === priority) && styles.sheetItemActive
-                  ]}
-                  onPress={() => {
-                    setSelectedPriority(priority === 'all' ? null : priority);
-                    setShowPriorityModal(false);
-                  }}
-                >
-                  <Text style={[
-                    styles.sheetItemText,
-                    (priority === 'all' ? !selectedPriority : selectedPriority === priority) && styles.sheetItemTextActive
-                  ]}>
-                    {priority === 'all' ? 'All Priorities' : priority.charAt(0).toUpperCase() + priority.slice(1)}
-                  </Text>
-                  {(priority === 'all' ? !selectedPriority : selectedPriority === priority) && (
-                    <Text style={styles.checkmark}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Class Filter Modal - Bottom Sheet (Admin/Teacher only) */}
-      {canManageTasks && (
+        {/* Filter Modals */}
+        {/* Subject Filter Modal - Bottom Sheet */}
         <Modal
-          visible={showClassModal}
+          visible={showSubjectModal}
           transparent
           animationType="fade"
-          onRequestClose={() => setShowClassModal(false)}
+          onRequestClose={() => setShowSubjectModal(false)}
         >
           <View style={styles.modalOverlay}>
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
               activeOpacity={1}
-              onPress={() => setShowClassModal(false)}
+              onPress={() => setShowSubjectModal(false)}
             />
             <View style={styles.bottomSheet}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>Select Class</Text>
+              <Text style={styles.sheetTitle}>Select Subject</Text>
               <ScrollView style={styles.sheetContent}>
                 <TouchableOpacity
-                  style={[styles.sheetItem, !selectedClassId && styles.sheetItemActive]}
+                  style={[styles.sheetItem, !selectedSubjectId && styles.sheetItemActive]}
                   onPress={() => {
-                    setSelectedClassId(undefined);
-                    setShowClassModal(false);
+                    setSelectedSubjectId(undefined);
+                    setShowSubjectModal(false);
                   }}
                 >
-                  <Text style={[styles.sheetItemText, !selectedClassId && styles.sheetItemTextActive]}>
-                    All Classes
+                  <Text style={[styles.sheetItemText, !selectedSubjectId && styles.sheetItemTextActive]}>
+                    All Subjects
                   </Text>
-                  {!selectedClassId && <Text style={styles.checkmark}>✓</Text>}
+                  {!selectedSubjectId && <Text style={styles.checkmark}>✓</Text>}
                 </TouchableOpacity>
-                {classes?.map(cls => (
+                {subjects?.map(subject => (
                   <TouchableOpacity
-                    key={cls.id}
-                    style={[styles.sheetItem, selectedClassId === cls.id && styles.sheetItemActive]}
+                    key={subject.id}
+                    style={[styles.sheetItem, selectedSubjectId === subject.id && styles.sheetItemActive]}
                     onPress={() => {
-                      setSelectedClassId(cls.id);
-                      setShowClassModal(false);
+                      setSelectedSubjectId(subject.id);
+                      setShowSubjectModal(false);
                     }}
                   >
-                    <Text style={[styles.sheetItemText, selectedClassId === cls.id && styles.sheetItemTextActive]}>
-                      Grade {cls.grade} - Section {cls.section}
+                    <Text style={[styles.sheetItemText, selectedSubjectId === subject.id && styles.sheetItemTextActive]}>
+                      {subject.subject_name}
                     </Text>
-                    {selectedClassId === cls.id && <Text style={styles.checkmark}>✓</Text>}
+                    {selectedSubjectId === subject.id && <Text style={styles.checkmark}>✓</Text>}
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
           </View>
         </Modal>
-      )}
 
-      {/* Task Form Modal */}
-      <TaskFormModal
-        visible={formModalVisible}
-        onDismiss={() => {
-          setFormModalVisible(false);
-          setEditingTask(null);
-        }}
-        onSubmit={handleSubmitTask}
-        task={editingTask}
-        schoolCode={schoolCode}
-        userId={profile?.auth_id || ''}
-        academicYearId={academicYearId || ''}
-      />
-
-      {/* Progress/Submissions Modal */}
-      <TaskProgressModal
-        visible={progressModalVisible}
-        onDismiss={() => {
-          setProgressModalVisible(false);
-          setSelectedTaskForProgress(null);
-        }}
-        task={selectedTaskForProgress}
-        colors={colors}
-        styles={styles}
-      />
-
-      {/* Task Detail Modal */}
-      <TaskDetailModal
-        visible={detailModalVisible}
-        onDismiss={() => {
-          setDetailModalVisible(false);
-          setSelectedTaskForDetail(null);
-        }}
-        task={selectedTaskForDetail}
-        classes={classes}
-        subjects={subjects}
-        colors={colors}
-        styles={styles}
-      />
-
-      {/* Task Submission Modal (Students Only) */}
-      {isStudentView && studentId && (
-        <TaskSubmissionModal
-          visible={submissionModalVisible}
-          onDismiss={() => {
-            setSubmissionModalVisible(false);
-            setSelectedTaskForSubmission(null);
-          }}
-          onSubmit={handleSubmitTaskSubmission}
-          task={selectedTaskForSubmission}
-          studentId={studentId}
-          existingSubmission={selectedTaskForSubmission ? 
-            (filteredTasks as any[]).find((t: any) => t.id === selectedTaskForSubmission.id)?.submission 
-            : undefined
-          }
-        />
-      )}
-
-      {/* Simple Attachments Modal */}
-      <Portal>
-        <PaperModal
-          visible={attachmentsModalVisible}
-          onDismiss={() => {
-            setAttachmentsModalVisible(false);
-            setSelectedTaskForAttachments(null);
-          }}
-          contentContainerStyle={styles.simpleAttachmentsModal}
+        {/* Priority Filter Modal - Bottom Sheet */}
+        <Modal
+          visible={showPriorityModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowPriorityModal(false)}
         >
-          {selectedTaskForAttachments?.attachments && selectedTaskForAttachments.attachments.length > 0 && (
-            selectedTaskForAttachments.attachments.map((attachment: any, index: number) => (
+          <View style={styles.modalOverlay}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => setShowPriorityModal(false)}
+            />
+            <View style={styles.bottomSheet}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.sheetTitle}>Select Priority</Text>
+              <ScrollView style={styles.sheetContent}>
+                {['all', 'urgent', 'high', 'medium', 'low'].map(priority => (
+                  <TouchableOpacity
+                    key={priority}
+                    style={[
+                      styles.sheetItem,
+                      (priority === 'all' ? !selectedPriority : selectedPriority === priority) && styles.sheetItemActive
+                    ]}
+                    onPress={() => {
+                      setSelectedPriority(priority === 'all' ? null : priority);
+                      setShowPriorityModal(false);
+                    }}
+                  >
+                    <Text style={[
+                      styles.sheetItemText,
+                      (priority === 'all' ? !selectedPriority : selectedPriority === priority) && styles.sheetItemTextActive
+                    ]}>
+                      {priority === 'all' ? 'All Priorities' : priority.charAt(0).toUpperCase() + priority.slice(1)}
+                    </Text>
+                    {(priority === 'all' ? !selectedPriority : selectedPriority === priority) && (
+                      <Text style={styles.checkmark}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Class Filter Modal - Bottom Sheet (Admin/Teacher only) */}
+        {canManageTasks && (
+          <Modal
+            visible={showClassModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowClassModal(false)}
+          >
+            <View style={styles.modalOverlay}>
               <TouchableOpacity
-                key={index}
-                style={[
-                  styles.simpleAttachmentItem,
-                  index === selectedTaskForAttachments.attachments.length - 1 && styles.lastAttachmentItem
-                ]}
-                onPress={async () => {
-                  if (attachment.url) {
-                    try {
-                      // For viewing attachments, open in WebView modal instead of downloading
-                      // This works for PDFs, images, and other viewable files
-                      const fileType = attachment.type || attachment.mimeType || 'application/octet-stream';
-                      const isViewable = 
-                        fileType.startsWith('image/') ||
-                        fileType === 'application/pdf' ||
-                        fileType.startsWith('text/');
-                      
-                      if (isViewable) {
-                        // Open in WebView for viewing
-                        setSelectedFile({
-                          url: attachment.url,
-                          name: attachment.name,
-                          type: fileType
-                        });
-                        setFileViewerVisible(true);
-                        setAttachmentsModalVisible(false);
-                      } else {
-                        // For non-viewable files, offer to open in external app
-                        Alert.alert(
-                          'Open File',
-                          `This file type cannot be viewed in-app. Would you like to open it in an external app?`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Open',
-                              onPress: async () => {
-                                try {
-                                  const canOpen = await Linking.canOpenURL(attachment.url);
-                                  if (canOpen) {
-                                    await Linking.openURL(attachment.url);
-                                  } else {
-                                    Alert.alert('Error', 'Cannot open this file type');
+                style={StyleSheet.absoluteFill}
+                activeOpacity={1}
+                onPress={() => setShowClassModal(false)}
+              />
+              <View style={styles.bottomSheet}>
+                <View style={styles.sheetHandle} />
+                <Text style={styles.sheetTitle}>Select Class</Text>
+                <ScrollView style={styles.sheetContent}>
+                  <TouchableOpacity
+                    style={[styles.sheetItem, !selectedClassId && styles.sheetItemActive]}
+                    onPress={() => {
+                      setSelectedClassId(undefined);
+                      setShowClassModal(false);
+                    }}
+                  >
+                    <Text style={[styles.sheetItemText, !selectedClassId && styles.sheetItemTextActive]}>
+                      All Classes
+                    </Text>
+                    {!selectedClassId && <Text style={styles.checkmark}>✓</Text>}
+                  </TouchableOpacity>
+                  {classes?.map(cls => (
+                    <TouchableOpacity
+                      key={cls.id}
+                      style={[styles.sheetItem, selectedClassId === cls.id && styles.sheetItemActive]}
+                      onPress={() => {
+                        setSelectedClassId(cls.id);
+                        setShowClassModal(false);
+                      }}
+                    >
+                      <Text style={[styles.sheetItemText, selectedClassId === cls.id && styles.sheetItemTextActive]}>
+                        Grade {cls.grade} - Section {cls.section}
+                      </Text>
+                      {selectedClassId === cls.id && <Text style={styles.checkmark}>✓</Text>}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {/* Task Form Modal */}
+        <TaskFormModal
+          visible={formModalVisible}
+          onDismiss={() => {
+            setFormModalVisible(false);
+            setEditingTask(null);
+          }}
+          onSubmit={handleSubmitTask}
+          task={editingTask}
+          schoolCode={schoolCode}
+          userId={profile?.auth_id || ''}
+          academicYearId={academicYearId || ''}
+        />
+
+        {/* Progress/Submissions Modal */}
+        <TaskProgressModal
+          visible={progressModalVisible}
+          onDismiss={() => {
+            setProgressModalVisible(false);
+            setSelectedTaskForProgress(null);
+          }}
+          task={selectedTaskForProgress}
+          colors={colors}
+          styles={styles}
+        />
+
+        {/* Task Detail Modal */}
+        <TaskDetailModal
+          visible={detailModalVisible}
+          onDismiss={() => {
+            setDetailModalVisible(false);
+            setSelectedTaskForDetail(null);
+          }}
+          task={selectedTaskForDetail}
+          classes={classes}
+          subjects={subjects}
+          colors={colors}
+          styles={styles}
+        />
+
+        {/* Task Submission Modal (Students Only) */}
+        {isStudentView && studentId && (
+          <TaskSubmissionModal
+            visible={submissionModalVisible}
+            onDismiss={() => {
+              setSubmissionModalVisible(false);
+              setSelectedTaskForSubmission(null);
+            }}
+            onSubmit={handleSubmitTaskSubmission}
+            task={selectedTaskForSubmission}
+            studentId={studentId}
+            existingSubmission={selectedTaskForSubmission ?
+              (filteredTasks as any[]).find((t: any) => t.id === selectedTaskForSubmission.id)?.submission
+              : undefined
+            }
+          />
+        )}
+
+        {/* Simple Attachments Modal */}
+        <Portal>
+          <PaperModal
+            visible={attachmentsModalVisible}
+            onDismiss={() => {
+              setAttachmentsModalVisible(false);
+              setSelectedTaskForAttachments(null);
+            }}
+            contentContainerStyle={styles.simpleAttachmentsModal}
+          >
+            {selectedTaskForAttachments?.attachments && selectedTaskForAttachments.attachments.length > 0 && (
+              selectedTaskForAttachments.attachments.map((attachment: any, index: number) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.simpleAttachmentItem,
+                    index === selectedTaskForAttachments.attachments.length - 1 && styles.lastAttachmentItem
+                  ]}
+                  onPress={async () => {
+                    if (attachment.url) {
+                      try {
+                        // For viewing attachments, open in WebView modal instead of downloading
+                        // This works for PDFs, images, and other viewable files
+                        const fileType = attachment.type || attachment.mimeType || 'application/octet-stream';
+                        const isViewable =
+                          fileType.startsWith('image/') ||
+                          fileType === 'application/pdf' ||
+                          fileType.startsWith('text/');
+
+                        if (isViewable) {
+                          // Open in WebView for viewing
+                          setSelectedFile({
+                            url: attachment.url,
+                            name: attachment.name,
+                            type: fileType
+                          });
+                          setFileViewerVisible(true);
+                          setAttachmentsModalVisible(false);
+                        } else {
+                          // For non-viewable files, offer to open in external app
+                          Alert.alert(
+                            'Open File',
+                            `This file type cannot be viewed in-app. Would you like to open it in an external app?`,
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Open',
+                                onPress: async () => {
+                                  try {
+                                    const canOpen = await Linking.canOpenURL(attachment.url);
+                                    if (canOpen) {
+                                      await Linking.openURL(attachment.url);
+                                    } else {
+                                      Alert.alert('Error', 'Cannot open this file type');
+                                    }
+                                  } catch (error) {
+                                    Alert.alert('Error', 'Failed to open file');
                                   }
-                                } catch (error) {
-                                  Alert.alert('Error', 'Failed to open file');
                                 }
                               }
-                            }
-                          ]
-                        );
+                            ]
+                          );
+                        }
+                      } catch (error) {
+                        console.error('Error opening file:', error);
+                        Alert.alert('Error', 'Failed to open file. Please try again.');
                       }
-                    } catch (error) {
-                      console.error('Error opening file:', error);
-                      Alert.alert('Error', 'Failed to open file. Please try again.');
+                    } else {
+                      Alert.alert('Error', 'File URL not available');
                     }
-                  } else {
-                    Alert.alert('Error', 'File URL not available');
-                  }
-                }}
-              >
-                <View style={styles.attachmentIconContainer}>
-                  <FileText size={20} color={colors.primary[600]} />
-                </View>
-                <Text style={styles.simpleAttachmentName} numberOfLines={2}>
-                  {attachment.name}
-                </Text>
-              </TouchableOpacity>
-            ))
-          )}
-        </PaperModal>
-      </Portal>
-
-      {/* File Viewer Modal */}
-      <Portal>
-        <PaperModal
-          visible={fileViewerVisible}
-          onDismiss={() => {
-            setFileViewerVisible(false);
-            setSelectedFile(null);
-          }}
-          contentContainerStyle={styles.fileViewerModal}
-        >
-          <View style={styles.fileViewerHeader}>
-            <Text style={styles.fileViewerTitle} numberOfLines={1}>
-              {selectedFile?.name || 'File Preview'}
-            </Text>
-            <IconButton
-              icon={() => <X size={24} color={colors.text.primary} />}
-              onPress={() => {
-                setFileViewerVisible(false);
-                setSelectedFile(null);
-              }}
-              size={20}
-            />
-          </View>
-          {selectedFile && (
-            <View style={styles.fileViewerContent}>
-              {selectedFile.type === 'application/pdf' ? (
-                // Use PDFViewer component for consistent PDF handling
-                <PDFViewer
-                  uri={selectedFile.url}
-                  title={selectedFile.name}
-                  onClose={() => {
-                    setFileViewerVisible(false);
-                    setSelectedFile(null);
                   }}
-                />
-              ) : (
-                <WebView
-                  source={{ uri: selectedFile.url }}
-                  style={styles.webView}
-                  startInLoadingState={true}
-                  cacheEnabled={true}
-                  cacheMode="LOAD_CACHE_ELSE_NETWORK"
-                  renderLoading={() => (
-                    <View style={styles.webViewLoading}>
-                      <ActivityIndicator size="large" color={colors.primary[600]} />
-                      <Text style={styles.webViewLoadingText}>Loading file...</Text>
-                    </View>
-                  )}
-                  onError={(syntheticEvent) => {
-                    console.error('WebView error:', syntheticEvent.nativeEvent);
-                    Alert.alert(
-                      'Error',
-                      'Failed to load file. Would you like to open it in an external app?',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Open Externally',
-                          onPress: async () => {
-                            try {
-                              const canOpen = await Linking.canOpenURL(selectedFile.url);
-                              if (canOpen) {
-                                await Linking.openURL(selectedFile.url);
-                                setFileViewerVisible(false);
-                              } else {
-                                Alert.alert('Error', 'Cannot open this file type');
+                >
+                  <View style={styles.attachmentIconContainer}>
+                    <FileText size={20} color={colors.primary[600]} />
+                  </View>
+                  <Text style={styles.simpleAttachmentName} numberOfLines={2}>
+                    {attachment.name}
+                  </Text>
+                </TouchableOpacity>
+              ))
+            )}
+          </PaperModal>
+        </Portal>
+
+        {/* File Viewer Modal */}
+        <Portal>
+          <PaperModal
+            visible={fileViewerVisible}
+            onDismiss={() => {
+              setFileViewerVisible(false);
+              setSelectedFile(null);
+            }}
+            contentContainerStyle={styles.fileViewerModal}
+          >
+            <View style={styles.fileViewerHeader}>
+              <Text style={styles.fileViewerTitle} numberOfLines={1}>
+                {selectedFile?.name || 'File Preview'}
+              </Text>
+              <IconButton
+                icon={() => <X size={24} color={colors.text.primary} />}
+                onPress={() => {
+                  setFileViewerVisible(false);
+                  setSelectedFile(null);
+                }}
+                size={20}
+              />
+            </View>
+            {selectedFile && (
+              <View style={styles.fileViewerContent}>
+                {selectedFile.type === 'application/pdf' ? (
+                  // Use PDFViewer component for consistent PDF handling
+                  <PDFViewer
+                    uri={selectedFile.url}
+                    title={selectedFile.name}
+                    onClose={() => {
+                      setFileViewerVisible(false);
+                      setSelectedFile(null);
+                    }}
+                  />
+                ) : (
+                  <WebView
+                    source={{ uri: selectedFile.url }}
+                    style={styles.webView}
+                    startInLoadingState={true}
+                    cacheEnabled={true}
+                    cacheMode="LOAD_CACHE_ELSE_NETWORK"
+                    renderLoading={() => (
+                      <View style={styles.webViewLoading}>
+                        <ActivityIndicator size="large" color={colors.primary[600]} />
+                        <Text style={styles.webViewLoadingText}>Loading file...</Text>
+                      </View>
+                    )}
+                    onError={(syntheticEvent) => {
+                      console.error('WebView error:', syntheticEvent.nativeEvent);
+                      Alert.alert(
+                        'Error',
+                        'Failed to load file. Would you like to open it in an external app?',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Open Externally',
+                            onPress: async () => {
+                              try {
+                                const canOpen = await Linking.canOpenURL(selectedFile.url);
+                                if (canOpen) {
+                                  await Linking.openURL(selectedFile.url);
+                                  setFileViewerVisible(false);
+                                } else {
+                                  Alert.alert('Error', 'Cannot open this file type');
+                                }
+                              } catch (error) {
+                                Alert.alert('Error', 'Failed to open file');
                               }
-                            } catch (error) {
-                              Alert.alert('Error', 'Failed to open file');
                             }
                           }
-                        }
-                      ]
-                    );
-                  }}
-                />
-              )}
-            </View>
-          )}
-        </PaperModal>
-      </Portal>
+                        ]
+                      );
+                    }}
+                  />
+                )}
+              </View>
+            )}
+          </PaperModal>
+        </Portal>
 
         {/* Create Task FAB (Admin/Teacher only) */}
         {canManageTasks && (
           <View style={styles.fabContainer}>
+            {fabMenuVisible && (
+              <View style={styles.fabMenu}>
+                <TouchableOpacity
+                  style={styles.fabMenuItem}
+                  onPress={() => {
+                    setFabMenuVisible(false);
+                    setVoiceCreatorVisible(true);
+                  }}
+                >
+                  <View style={[styles.fabMenuIcon, { backgroundColor: colors.primary[100] }]}>
+                    <Sparkles size={20} color={colors.primary[600]} />
+                  </View>
+                  <Text style={styles.fabMenuText}>Sage ✨</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.fabMenuItem}
+                  onPress={() => {
+                    setFabMenuVisible(false);
+                    handleCreateTask();
+                  }}
+                >
+                  <View style={[styles.fabMenuIcon, { backgroundColor: colors.neutral[100] }]}>
+                    <Edit size={20} color={colors.neutral[700]} />
+                  </View>
+                  <Text style={styles.fabMenuText}>Traditional Form</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <TouchableOpacity
-              style={styles.fab}
-              onPress={handleCreateTask}
+              style={[styles.fab, fabMenuVisible && styles.fabActive]}
+              onPress={() => setFabMenuVisible(!fabMenuVisible)}
             >
-              <Plus size={24} color="white" />
+              {fabMenuVisible ? (
+                <X size={24} color="white" />
+              ) : (
+                <Plus size={24} color="white" />
+              )}
             </TouchableOpacity>
           </View>
         )}
+
+        {/* Voice Task Creator Modal */}
+        <VoiceTaskCreator
+          visible={voiceCreatorVisible}
+          onDismiss={() => setVoiceCreatorVisible(false)}
+          onTaskCreated={handleSubmitTask}
+          schoolCode={schoolCode}
+          academicYearId={academicYearId || ''}
+          userId={profile?.auth_id || ''}
+          availableClasses={(classes || []).map(c => ({
+            id: c.id,
+            label: `Grade ${c.grade} - ${c.section}`,
+            grade: c.grade?.toString(),
+            section: c.section || undefined,
+          }))}
+          availableSubjects={(subjects || []).map(s => ({
+            id: s.id,
+            name: s.subject_name,
+          }))}
+        />
       </View>
     </>
   );
@@ -1949,6 +2007,43 @@ const createStyles = (colors: ThemeColors, isDark: boolean, typography: Typograp
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
+  },
+  fabActive: {
+    backgroundColor: colors.neutral[600],
+  },
+  fabMenu: {
+    position: 'absolute',
+    bottom: 66,
+    right: 0,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    padding: spacing.sm,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    gap: spacing.xs,
+  },
+  fabMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    minWidth: 160,
+  },
+  fabMenuIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fabMenuText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium as any,
+    color: colors.text.primary,
   },
   // Progress Modal Styles
   progressModal: {

@@ -1,4 +1,14 @@
 pluginManagement {
+  repositories {
+    // Public repositories first (more reliable, checked before internal cache)
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+    maven { url 'https://www.jitpack.io' }
+    // EAS Build internal cache will be added automatically if available
+    // Public repos are checked first to avoid timeout issues
+  }
+  
   def reactNativeGradlePlugin = new File(
     providers.exec {
       workingDir(rootDir)

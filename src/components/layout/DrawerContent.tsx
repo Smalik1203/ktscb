@@ -35,7 +35,8 @@ import {
   Sun,
   TrendingUp,
   DollarSign,
-  Package
+  Package,
+  MessageSquare
 } from 'lucide-react-native';
 import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -63,69 +64,77 @@ type MenuItem = {
 };
 
 const MENU: MenuItem[] = [
-  { 
-    key: 'home', 
-    label: 'Dashboard', 
-    icon: LayoutDashboard, 
-    route: '/(tabs)', 
+  {
+    key: 'home',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    route: '/(tabs)',
     section: 'Main',
     description: 'Overview and quick stats'
   },
-  { 
-    key: 'calendar', 
-    label: 'Calendar', 
-    icon: CalendarDays, 
-    route: '/(tabs)/calendar', 
+  {
+    key: 'calendar',
+    label: 'Calendar',
+    icon: CalendarDays,
+    route: '/(tabs)/calendar',
     section: 'Main',
     description: 'Events and schedules'
   },
-  { 
-    key: 'timetable', 
-    label: 'Timetable', 
-    icon: CalendarRange, 
-    route: '/(tabs)/timetable', 
+  {
+    key: 'timetable',
+    label: 'Timetable',
+    icon: CalendarRange,
+    route: '/(tabs)/timetable',
     section: 'Main',
     description: 'Class schedules'
   },
-  { 
-    key: 'resources', 
-    label: 'Resources', 
-    icon: FolderOpen, 
-    route: '/(tabs)/resources', 
+  {
+    key: 'resources',
+    label: 'Resources',
+    icon: FolderOpen,
+    route: '/(tabs)/resources',
     section: 'Learning',
     description: 'Study materials'
   },
-  { 
-    key: 'syllabus_staff', 
-    label: 'Syllabus', 
-    icon: NotebookText, 
-    route: '/(tabs)/syllabus', 
+  {
+    key: 'announcements',
+    label: 'Announcements',
+    icon: MessageSquare,
+    route: '/(tabs)/announcements',
+    section: 'Main',
+    description: 'School updates and news'
+  },
+  {
+    key: 'syllabus_staff',
+    label: 'Syllabus',
+    icon: NotebookText,
+    route: '/(tabs)/syllabus',
     requiredCapability: 'syllabus.manage',
     section: 'Learning',
     description: 'Chapters and topics'
   },
-  { 
-    key: 'syllabus_student', 
-    label: 'Syllabus', 
-    icon: NotebookText, 
-    route: '/(tabs)/syllabus-student', 
+  {
+    key: 'syllabus_student',
+    label: 'Syllabus',
+    icon: NotebookText,
+    route: '/(tabs)/syllabus-student',
     requiredCapability: 'syllabus.read',
     section: 'Learning',
     description: 'Your syllabus'
   },
-  { 
-    key: 'attendance', 
-    label: 'Attendance', 
-    icon: UserCheck, 
-    route: '/(tabs)/attendance', 
+  {
+    key: 'attendance',
+    label: 'Attendance',
+    icon: UserCheck,
+    route: '/(tabs)/attendance',
     section: 'Academic',
     description: 'Track student attendance'
   },
-  { 
-    key: 'fees_student', 
-    label: 'Fees', 
-    icon: CreditCard, 
-    route: '/(tabs)/fees-student', 
+  {
+    key: 'fees_student',
+    label: 'Fees',
+    icon: CreditCard,
+    route: '/(tabs)/fees-student',
     requiredCapability: 'fees.read_own',
     section: 'Academic',
     description: 'Your fees'
@@ -148,37 +157,38 @@ const MENU: MenuItem[] = [
     description: 'Track your performance',
     isNew: true
   },
-  { 
-    key: 'fees', 
-    label: 'Fees', 
-    icon: CreditCard, 
-    route: '/(tabs)/fees', 
+  // Report Comments removed - now integrated into Progress tab
+  {
+    key: 'fees',
+    label: 'Fees',
+    icon: CreditCard,
+    route: '/(tabs)/fees',
     requiredCapability: 'fees.write',
     section: 'Academic',
     description: 'Invoice management'
   },
-  { 
-    key: 'analytics', 
-    label: 'Analytics', 
-    icon: LineChart, 
-    route: '/(tabs)/analytics', 
+  {
+    key: 'analytics',
+    label: 'Analytics',
+    icon: LineChart,
+    route: '/(tabs)/analytics',
     section: 'Academic',
     description: 'Performance insights'
   },
-  { 
-    key: 'tasks', 
-    label: 'Tasks', 
-    icon: CheckCircle2, 
-    route: '/(tabs)/tasks', 
+  {
+    key: 'tasks',
+    label: 'Tasks',
+    icon: CheckCircle2,
+    route: '/(tabs)/tasks',
     section: 'Academic',
     description: 'Homework and assignments',
     isNew: true
   },
-  { 
-    key: 'class_mgmt', 
-    label: 'Management', 
-    icon: Settings2, 
-    route: '/(tabs)/manage', 
+  {
+    key: 'class_mgmt',
+    label: 'Management',
+    icon: Settings2,
+    route: '/(tabs)/manage',
     requiredCapability: 'management.view',
     section: 'Academic',
     description: 'Class administration'
@@ -228,11 +238,11 @@ const MENU: MenuItem[] = [
     section: 'Admin',
     description: 'Manage inventory items and policies'
   },
-  { 
-    key: 'finance', 
-    label: 'Finance', 
-    icon: DollarSign, 
-    route: '/(tabs)/finance', 
+  {
+    key: 'finance',
+    label: 'Finance',
+    icon: DollarSign,
+    route: '/(tabs)/finance',
     requiredCapability: 'management.view',
     roles: ['superadmin'], // Finance is super admin only
     section: 'Admin',
@@ -248,11 +258,11 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const [activeItem, setActiveItem] = React.useState<string>('home');
   const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
-  
+
   // Fetch class information for students
   const canViewOwnOnly = can('fees.read_own') && !can('fees.write'); // Student-like view
   const { data: classData } = useClass(profile?.class_instance_id || undefined);
-  
+
   // Dynamic styles based on theme
   const dynamicStyles = useMemo(() => StyleSheet.create({
     container: {
@@ -363,7 +373,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
       color: colors.text.inverse,
     },
   }), [colors, isDark]);
-  
+
   // Format class name for display
   const displayText = useMemo(() => {
     if (canViewOwnOnly && classData) {
@@ -371,7 +381,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
     }
     return (role || 'UNKNOWN').toUpperCase();
   }, [canViewOwnOnly, classData, role]);
-  
+
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
@@ -386,13 +396,13 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           return false;
         }
       }
-      
+
       // If no capability requirement, show to everyone (if role check passed)
       if (!item.requiredCapability) return true;
       // Check if user has the required capability
       return can(item.requiredCapability);
     });
-    
+
     // Handle special case: syllabus - show only one based on capabilities
     // If user can manage syllabus, filter out student syllabus view
     // If user can only read syllabus (student), filter out staff syllabus view
@@ -404,7 +414,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
       if (item.key === 'fees' && !can('fees.write')) return false;
       return true;
     });
-    
+
     const sections: Record<string, MenuItem[]> = {};
     for (const item of filteredAllowed) {
       sections[item.section] = sections[item.section] || [];
@@ -463,15 +473,15 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         toggleSubMenu(item.key);
         return;
       }
-      
+
       setActiveItem(item.key);
       props.navigation.closeDrawer();
-      
+
       // Handle sub-menu items by setting parent as active too
       if (item.parent) {
         setActiveItem(item.parent);
       }
-      
+
       router.push(item.route as any);
     } catch (_error) {
       try {
@@ -495,7 +505,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
 
   // Gradient colors for header based on theme - KTS Brand (Purple to Orange)
   // Smooth gradient from Royal Purple to Golden Orange
-  const headerGradientColors = isDark 
+  const headerGradientColors = isDark
     ? [colors.primary[700], colors.primary[500], colors.secondary[400]] as const
     : [colors.primary.main, colors.primary[400], colors.secondary.main] as const;
 
@@ -552,7 +562,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         </LinearGradient>
       </Animated.View>
 
-      <Animated.View 
+      <Animated.View
         style={[
           styles.scrollView,
           {
@@ -571,29 +581,29 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                 {items.filter(item => !item.parent).map((item) => {
                   const isExpanded = expandedMenus.has(item.key);
                   const subItems = items.filter(i => i.parent === item.key);
-                  
+
                   return (
                     <View key={item.key}>
-                  <TouchableOpacity
-                    style={[
-                      styles.menuItem,
-                      activeItem === item.key && dynamicStyles.menuItemActive
-                    ]}
-                    onPress={() => handleItemPress(item)}
-                  >
-                    <item.icon
-                      size={21}
-                      color={activeItem === item.key ? colors.primary[600] : colors.text.secondary}
-                    />
-                    <Text style={[
-                      dynamicStyles.menuItemLabel,
-                      activeItem === item.key && dynamicStyles.menuItemLabelActive
-                    ]}>
-                      {item.label}
-                    </Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.menuItem,
+                          activeItem === item.key && dynamicStyles.menuItemActive
+                        ]}
+                        onPress={() => handleItemPress(item)}
+                      >
+                        <item.icon
+                          size={21}
+                          color={activeItem === item.key ? colors.primary[600] : colors.text.secondary}
+                        />
+                        <Text style={[
+                          dynamicStyles.menuItemLabel,
+                          activeItem === item.key && dynamicStyles.menuItemLabelActive
+                        ]}>
+                          {item.label}
+                        </Text>
                         {item.hasSubMenu && (
-                          <ChevronRight 
-                            size={16} 
+                          <ChevronRight
+                            size={16}
                             color={colors.text.secondary}
                             style={[
                               styles.chevron,
@@ -601,13 +611,13 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                             ]}
                           />
                         )}
-                    {item.badge && (
-                      <View style={dynamicStyles.badge}>
-                        <Text style={dynamicStyles.badgeText}>{item.badge}</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                      
+                        {item.badge && (
+                          <View style={dynamicStyles.badge}>
+                            <Text style={dynamicStyles.badgeText}>{item.badge}</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+
                       {/* Sub-items */}
                       {item.hasSubMenu && isExpanded && subItems.map((subItem) => {
                         const isSubItemActive = activeItem === subItem.key || activeItem === subItem.parent;
@@ -645,7 +655,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
       </Animated.View>
 
       {/* Theme Toggle & Logout Footer */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.footer,
           dynamicStyles.footerBorder,

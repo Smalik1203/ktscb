@@ -9,7 +9,7 @@
 import React, { useState } from 'react';
 import { View, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { TextInput, ActivityIndicator } from 'react-native-paper';
+import { ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
@@ -20,13 +20,14 @@ import { isRateLimited, getRemainingAttempts, getResetTime, clearRateLimit } fro
 import { sanitizeEmail } from '../src/utils/sanitize';
 import { LinearGradient } from 'expo-linear-gradient';
 import { log } from '../src/lib/logger';
-import { 
-  Container, 
-  Stack, 
-  Heading, 
-  Body, 
+import {
+  Container,
+  Stack,
+  Heading,
+  Body,
   Button,
   Center,
+  Input,
 } from '../src/ui';
 
 const { height } = Dimensions.get('window');
@@ -53,12 +54,12 @@ export default function LoginScreen() {
       auth.signOut().catch((err) => {
         log.error('Failed to sign out after access denied', err);
       });
-      
+
       Alert.alert(
         'Access Denied',
         auth.accessDeniedReason || 'No profile found in system. Please contact administrator.',
-        [{ 
-          text: 'OK', 
+        [{
+          text: 'OK',
           onPress: () => {
             setEmail('');
             setPassword('');
@@ -77,29 +78,19 @@ export default function LoginScreen() {
   }, [auth.status]);
 
   // Gradient colors based on theme - KTS brand (Purple & Orange)
-  const gradientColors = isDark 
+  const gradientColors = isDark
     ? [colors.background.primary, colors.background.secondary, colors.background.tertiary] as const
     : ['#FFFFFF', '#FAF8FC', '#F5F0FA'] as const;
-  
+
   const buttonGradientColors = isDark
     ? [colors.primary[700], colors.primary.main] as const
     : [colors.primary.main, colors.secondary.main] as const;
-  
+
   const disabledButtonColors = isDark
     ? [colors.neutral[600], colors.neutral[500]] as const
     : [colors.neutral[300], colors.neutral[400]] as const;
 
-  // Theme for TextInput
-  const inputTheme = {
-    colors: {
-      primary: colors.primary.main,
-      background: colors.surface.primary,
-      surface: colors.surface.primary,
-      outline: colors.border.DEFAULT,
-      onSurface: colors.text.primary,
-      placeholder: colors.text.tertiary,
-    },
-  };
+
 
   // Show loading screen while auth is loading
   if (auth.loading) {
@@ -200,8 +191,8 @@ export default function LoginScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
-          <Container 
-            scroll 
+          <Container
+            scroll
             showScrollIndicator={false}
             padding="lg"
             background="transparent"
@@ -223,14 +214,14 @@ export default function LoginScreen() {
                   />
                 </View>
 
-                <Heading 
-                  level={1} 
+                <Heading
+                  level={1}
                   color="accent"
                   style={{ textAlign: 'center', letterSpacing: -0.5 }}
                 >
                   Krishnaveni Talent School
                 </Heading>
-                
+
                 <Stack spacing="xs" style={{ alignItems: 'center' }}>
                   <Heading level={4} align="center" style={{ color: colors.secondary.main }}>Mentored for Life</Heading>
                   <View style={{
@@ -252,46 +243,37 @@ export default function LoginScreen() {
                     </Body>
 
                     {/* Email Input */}
-                    <TextInput
+                    <Input
                       label="Email Address"
                       value={email}
                       onChangeText={setEmail}
-                      mode="outlined"
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoComplete="email"
                       disabled={loading}
-                      left={<TextInput.Icon icon={() => <Mail size={20} color={colors.primary.main} />} />}
-                      style={{ backgroundColor: colors.surface.primary, marginBottom: spacing.md }}
-                      theme={inputTheme}
+                      leftIcon={<Mail size={20} color={colors.primary.main} />}
+                      containerStyle={{ marginBottom: spacing.xs }}
                     />
 
                     {/* Password Input */}
-                    <TextInput
+                    <Input
                       label="Password"
                       value={password}
                       onChangeText={setPassword}
-                      mode="outlined"
                       secureTextEntry={!showPassword}
                       autoComplete="password"
                       disabled={loading}
-                      left={<TextInput.Icon icon={() => <Lock size={20} color={colors.primary.main} />} />}
-                      right={
-                        <TextInput.Icon 
-                          icon={() => showPassword ? <EyeOff size={20} color={colors.text.tertiary} /> : <Eye size={20} color={colors.text.tertiary} />}
-                          onPress={() => setShowPassword(!showPassword)}
-                          disabled={loading}
-                        />
-                      }
-                      style={{ backgroundColor: colors.surface.primary, marginBottom: spacing.lg }}
+                      leftIcon={<Lock size={20} color={colors.primary.main} />}
+                      rightIcon={showPassword ? <EyeOff size={20} color={colors.text.tertiary} /> : <Eye size={20} color={colors.text.tertiary} />}
+                      onRightIconPress={() => setShowPassword(!showPassword)}
                       onSubmitEditing={handleLogin}
-                      theme={inputTheme}
+                      containerStyle={{ marginBottom: spacing.md }}
                     />
 
                     {/* Login Button */}
-                  <TouchableOpacity
-                    onPress={handleLogin}
-                    disabled={loading || !email || !password}
+                    <TouchableOpacity
+                      onPress={handleLogin}
+                      disabled={loading || !email || !password}
                       style={{
                         borderRadius: borderRadius.xl,
                         overflow: 'hidden',
@@ -299,10 +281,10 @@ export default function LoginScreen() {
                         opacity: (loading || !email || !password) ? 0.6 : 1,
                         ...shadows.md,
                       }}
-                    activeOpacity={0.8}
-                  >
-                    <LinearGradient
-                      colors={loading || !email || !password ? disabledButtonColors : buttonGradientColors}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={loading || !email || !password ? disabledButtonColors : buttonGradientColors}
                         style={{
                           paddingVertical: spacing.md,
                           paddingHorizontal: spacing.lg,
@@ -310,27 +292,27 @@ export default function LoginScreen() {
                           justifyContent: 'center',
                           minHeight: 52,
                         }}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                    >
-                      {loading ? (
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                      >
+                        {loading ? (
                           <ActivityIndicator color={colors.text.inverse} size="small" />
-                      ) : (
+                        ) : (
                           <Heading level={5} color="inverse" style={{ letterSpacing: 0.5 }}>
                             Sign In
                           </Heading>
-                      )}
-                    </LinearGradient>
-                  </TouchableOpacity>
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
 
                     {/* Forgot Password */}
-                  <TouchableOpacity
-                    onPress={handleForgotPassword}
+                    <TouchableOpacity
+                      onPress={handleForgotPassword}
                       style={{ alignItems: 'center', paddingVertical: spacing.xs }}
-                    disabled={loading}
-                  >
+                      disabled={loading}
+                    >
                       <Body color="accent" weight="semibold">Forgot Password?</Body>
-                  </TouchableOpacity>
+                    </TouchableOpacity>
                   </Stack>
                 </View>
               </View>

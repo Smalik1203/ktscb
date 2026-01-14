@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Animated, Modal } from 'react-native';
-import { Text, Card, SegmentedButtons, ActivityIndicator , Portal, Modal as PaperModal } from 'react-native-paper';
+import { Text, Card, SegmentedButtons, ActivityIndicator, Portal, Modal as PaperModal } from 'react-native-paper';
 import { Plus, Sparkles, FileText, X, Monitor, FileCheck, BookOpen, ChevronDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,14 +24,14 @@ export default function AssessmentsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
+
   // Capability-based checks (NO role checks in UI)
   const canCreateTest = can('assessments.create');
   const canManageTests = can('assessments.manage');
   const canTakeTest = can('assessments.take_test');
   const canViewOwnAssessments = can('assessments.read_own') && !can('assessments.read');
   const canUploadMarks = can('assessments.upload_marks');
-  
+
   // Create dynamic styles based on theme
   const styles = React.useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [editingTest, setEditingTest] = useState<TestWithDetails | undefined>(undefined);
@@ -40,7 +40,7 @@ export default function AssessmentsScreen() {
   const [showModePicker, setShowModePicker] = useState(false);
   const [assessmentView, setAssessmentView] = useState<'online' | 'offline'>('online');
   const [showCreateActionsModal, setShowCreateActionsModal] = useState(false);
-  
+
   // Animated values for bottom sheets
   const classSlideAnim = React.useRef(new Animated.Value(0)).current;
   const modeSlideAnim = React.useRef(new Animated.Value(0)).current;
@@ -60,10 +60,10 @@ export default function AssessmentsScreen() {
 
   // Fetch student attempts if user is a student (for online tests)
   const { data: rawStudentAttempts = [] } = useStudentAttempts(studentId || '', undefined);
-  
+
   // Fetch student marks if user is a student (for offline tests)
   const { data: rawStudentMarks = [] } = useStudentMarks(studentId || '');
-  
+
   // Map student attempts to match TestAttempt type
   const studentAttempts = React.useMemo(() => {
     if (!rawStudentAttempts || !Array.isArray(rawStudentAttempts)) return [];
@@ -115,11 +115,11 @@ export default function AssessmentsScreen() {
   const filteredTests = tests;
 
   // Calculate test counts for header
-  const onlineCount = React.useMemo(() => 
+  const onlineCount = React.useMemo(() =>
     tests.filter((test: TestWithDetails) => test.test_mode === 'online').length,
     [tests]
   );
-  const offlineCount = React.useMemo(() => 
+  const offlineCount = React.useMemo(() =>
     tests.filter((test: TestWithDetails) => test.test_mode === 'offline').length,
     [tests]
   );
@@ -129,7 +129,7 @@ export default function AssessmentsScreen() {
     if (showClassPicker) {
       classSlideAnim.setValue(0);
       overlayOpacity.setValue(0);
-      
+
       Animated.parallel([
         Animated.timing(overlayOpacity, {
           toValue: 1,
@@ -163,7 +163,7 @@ export default function AssessmentsScreen() {
     if (showModePicker) {
       modeSlideAnim.setValue(0);
       overlayOpacity.setValue(0);
-      
+
       Animated.parallel([
         Animated.timing(overlayOpacity, {
           toValue: 1,
@@ -424,14 +424,14 @@ export default function AssessmentsScreen() {
         >
           <View style={styles.actionsModalHeader}>
             <Text style={styles.actionsModalTitle}>Create Assessment</Text>
-            <TouchableOpacity 
-              onPress={() => setShowCreateActionsModal(false)} 
+            <TouchableOpacity
+              onPress={() => setShowCreateActionsModal(false)}
               style={styles.actionsModalCloseButton}
             >
               <X size={24} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.actionsList}>
             <TouchableOpacity
               style={styles.actionRow}
@@ -456,8 +456,8 @@ export default function AssessmentsScreen() {
                 <Sparkles size={20} color={colors.primary[600]} />
               </View>
               <View style={styles.actionContent}>
-                <Text style={styles.actionTitle}>Generate with AI</Text>
-                <Text style={styles.actionDescription}>Let AI create questions for you</Text>
+                <Text style={styles.actionTitle}>Generate with Sage</Text>
+                <Text style={styles.actionDescription}>Let Sage create questions for you</Text>
               </View>
             </TouchableOpacity>
           </View>
@@ -472,12 +472,12 @@ export default function AssessmentsScreen() {
         onRequestClose={() => setShowModePicker(false)}
       >
         <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.overlayTouchable}
             activeOpacity={1}
             onPress={() => setShowModePicker(false)}
           />
-          <Animated.View 
+          <Animated.View
             style={[
               styles.modalContent,
               {
@@ -538,12 +538,12 @@ export default function AssessmentsScreen() {
         onRequestClose={() => setShowClassPicker(false)}
       >
         <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.overlayTouchable}
             activeOpacity={1}
             onPress={() => setShowClassPicker(false)}
           />
-          <Animated.View 
+          <Animated.View
             style={[
               styles.modalContent,
               {

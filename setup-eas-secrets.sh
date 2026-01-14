@@ -15,7 +15,9 @@ fi
 echo "📋 This script will set up the following secrets:"
 echo "   1. EXPO_PUBLIC_SUPABASE_URL"
 echo "   2. EXPO_PUBLIC_SUPABASE_ANON_KEY"
-echo "   3. EXPO_PUBLIC_OPENAI_API_KEY (optional)"
+echo ""
+echo "📝 Note: OpenAI API key is now stored in Supabase secrets (server-side)"
+echo "   To set it up, run: supabase secrets set OPENAI_API_KEY=sk-..."
 echo ""
 
 # Check if user is logged in
@@ -39,8 +41,6 @@ if [ -z "$SUPABASE_ANON_KEY" ]; then
     exit 1
 fi
 
-read -p "Enter OpenAI API Key (optional, press Enter to skip): " OPENAI_API_KEY
-
 echo ""
 echo "🚀 Creating EAS secrets..."
 
@@ -52,19 +52,14 @@ eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value "$SUPA
 echo "Creating EXPO_PUBLIC_SUPABASE_ANON_KEY..."
 eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "$SUPABASE_ANON_KEY" --force 2>&1 | grep -v "password" || echo "✅ EXPO_PUBLIC_SUPABASE_ANON_KEY set"
 
-# Create OpenAI API Key secret if provided
-if [ -n "$OPENAI_API_KEY" ]; then
-    echo "Creating EXPO_PUBLIC_OPENAI_API_KEY..."
-    eas secret:create --scope project --name EXPO_PUBLIC_OPENAI_API_KEY --value "$OPENAI_API_KEY" --force 2>&1 | grep -v "password" || echo "✅ EXPO_PUBLIC_OPENAI_API_KEY set"
-else
-    echo "⏭️  Skipping OpenAI API Key (optional)"
-fi
-
 echo ""
 echo "✅ EAS secrets setup complete!"
 echo ""
 echo "📋 Verify secrets:"
 echo "   eas secret:list"
+echo ""
+echo "🔑 Don't forget to set the OpenAI key in Supabase:"
+echo "   supabase secrets set OPENAI_API_KEY=sk-your-key-here"
 echo ""
 echo "🚀 You can now build:"
 echo "   npm run build:android:apk"

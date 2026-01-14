@@ -46,8 +46,8 @@ const AuthContext = createContext<AuthContextValue>({
   profile: null,
   bootstrapping: false,
   sessionVersion: 'init',
-  refresh: async () => {},
-  signOut: async () => {},
+  refresh: async () => { },
+  signOut: async () => { },
   loading: true,
 });
 
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .eq('school_code', userProfile.school_code)
           .abortSignal(controller.signal)
           .maybeSingle();
-        
+
         schoolName = schoolData?.school_name || null;
       }
 
@@ -232,7 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const result = await Promise.race([sessionPromise, timeoutPromise]);
         const session = (result as { data: { session: Session | null } })?.data?.session ?? null;
-        
+
         if (!alive) return;
 
         // Only update if we got a session (onAuthStateChange will handle the rest)
@@ -274,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Handle invalid refresh token error
         else if (e?.message?.includes('Invalid Refresh Token') || e?.message?.includes('Refresh Token Not Found')) {
           log.warn('Invalid refresh token - clearing session');
-          supabase.auth.signOut().catch(() => {});
+          supabase.auth.signOut().catch(() => { });
         }
         else {
           log.warn('Initial session check failed (non-critical - onAuthStateChange will handle)', {
@@ -354,7 +354,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const result = await Promise.race([sessionPromise, timeoutPromise]);
         const session = (result as { data: { session: Session | null } })?.data?.session ?? null;
-        
+
         if (session) {
           const version = `${session.user.id}:${session.expires_at || Date.now()}`;
           setState((prev) => ({
@@ -388,17 +388,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function signOut() {
       try {
+        // Get current push token before signing out
+        const pushToken = await AsyncStorage.getItem('pushToken');
+
+        // Sign out from Supabase
         await supabase.auth.signOut();
+
+        // Remove push token from database (token hygiene)
+        if (pushToken) {
+          const { removePushToken } = await import('../services/notifications');
+          await removePushToken(pushToken);
+          await AsyncStorage.removeItem('pushToken');
+        }
       } finally {
-         setState((prev) => ({
-           ...prev,
-           status: 'signedOut',
-           session: null,
-           user: null,
-           profile: null,
-           bootstrapping: false,
-           sessionVersion: `${Date.now()}:${Math.random().toString(36).slice(2)}`,
-         }));
+        setState((prev) => ({
+          ...prev,
+          status: 'signedOut',
+          session: null,
+          user: null,
+          profile: null,
+          bootstrapping: false,
+          sessionVersion: `${Date.now()}:${Math.random().toString(36).slice(2)}`,
+        }));
       }
     }
 

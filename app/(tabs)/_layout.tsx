@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
-import { LayoutDashboard, CalendarRange, UserCheck, CreditCard, LineChart, Settings2, CalendarDays, NotebookText, CheckCircle2, FileText, TrendingUp, DollarSign, Package } from 'lucide-react-native';
+import { LayoutDashboard, CalendarRange, UserCheck, CreditCard, LineChart, Settings2, CalendarDays, NotebookText, CheckCircle2, FileText, TrendingUp, DollarSign, Package, MessageSquare } from 'lucide-react-native';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { AppNavbar } from '../../src/components/layout/AppNavbarExpo';
 import { useCapabilities } from '../../src/hooks/useCapabilities';
@@ -16,7 +16,7 @@ export default function TabLayout() {
     if (loading || bootstrapping) {
       return;
     }
-    
+
     if (status === 'signedOut' || status === 'accessDenied' || (status === 'signedIn' && !profile)) {
       // Only redirect if we're not already on login page
       router.replace('/login');
@@ -41,8 +41,8 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         header: ({ options }) => (
-          <AppNavbar 
-            title={options.title || 'KTS'} 
+          <AppNavbar
+            title={options.title || 'KTS'}
             showBackButton={false}
           />
         ),
@@ -79,6 +79,14 @@ export default function TabLayout() {
         options={{
           title: 'Resources',
           tabBarIcon: ({ size, color }) => <NotebookText size={size} color={color} />,
+        }}
+      />
+
+      <Tabs.Screen
+        name="announcements"
+        options={{
+          title: 'Announcements',
+          tabBarIcon: ({ size, color }) => <MessageSquare size={size} color={color} />,
         }}
       />
 

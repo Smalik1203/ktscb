@@ -15,7 +15,10 @@ import {
   Modal,
   TextInput,
   Animated,
+  Share,
+  Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Text, ActivityIndicator, Card, ProgressBar } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -40,6 +43,11 @@ import {
   Search,
   User,
   ArrowLeft,
+  Edit3,
+  RefreshCw,
+  MessageSquare,
+  Copy,
+  Share2,
 } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,6 +60,7 @@ import { useProgressReport, useProgressReportViewer } from '../../hooks/useProgr
 import { ProgressReportViewer } from '../../components/assessments/ProgressReportViewer';
 import { LoadingView, ErrorView } from '../../components/ui';
 import { spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
+import { useReportComment } from '../../hooks/useReportComment';
 
 export default function ProgressTrackingScreen() {
   const { colors, isDark } = useTheme();
@@ -62,21 +71,21 @@ export default function ProgressTrackingScreen() {
 
   // Check if user is admin (can view all students' progress)
   const isAdmin = can('students.read') && can('assessments.read');
-  
+
   // Admin state
   const [selectedClassId, setSelectedClassId] = useState<string | undefined>(undefined);
   const [selectedStudentId, setSelectedStudentId] = useState<string | undefined>(undefined);
   const [selectedStudentName, setSelectedStudentName] = useState<string>('');
   const [showClassPicker, setShowClassPicker] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
-  
+
   // Animation for class picker
   const classSlideAnim = React.useRef(new Animated.Value(0)).current;
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
 
   // Fetch classes for admin
   const { data: classes = [] } = useClasses(isAdmin ? profile?.school_code || '' : '');
-  
+
   // Fetch students for selected class
   const { data: studentsData, isLoading: studentsLoading } = useStudents(
     selectedClassId,
@@ -112,12 +121,26 @@ export default function ProgressTrackingScreen() {
   });
   const { isVisible: isReportVisible, reportData, showReport, hideReport } = useProgressReportViewer();
 
+  // Report Comment hook - for admin, use selected student's class - simplified to just show insights
+  const selectedStudent = students.find((s: any) => s.id === selectedStudentId);
+  const [showCommentModal, setShowCommentModal] = useState(false);
+  const {
+    comment: reportComment,
+    isGenerating: isCommentGenerating,
+    generateComment,
+    regenerate: regenerateComment,
+  } = useReportComment({
+    studentId: isAdmin ? selectedStudentId : profile?.id,
+    classInstanceId: isAdmin ? selectedStudent?.class_instance_id : undefined,
+    autoGenerate: false, // Don't auto-generate, user has to click
+  });
+
   // Animation effects for class picker
   useEffect(() => {
     if (showClassPicker) {
       classSlideAnim.setValue(0);
       overlayOpacity.setValue(0);
-      
+
       Animated.parallel([
         Animated.timing(overlayOpacity, {
           toValue: 1,
@@ -366,7 +389,7 @@ export default function ProgressTrackingScreen() {
   }
 
   // ==================== PROGRESS VIEW (Student or Admin with selected student) ====================
-  
+
   if (isLoading && !progressData) {
     return <LoadingView message="Loading progress..." />;
   }
@@ -421,7 +444,7 @@ export default function ProgressTrackingScreen() {
               {isAdmin ? `${student_name}'s Progress` : `Hello, ${student_name?.split(' ')[0]}! 👋`}
             </Text>
             <Text style={styles.heroSubtext}>
-              {class_info ? `Class ${class_info.grade}-${class_info.section}` : ''} 
+              {class_info ? `Class ${class_info.grade}-${class_info.section}` : ''}
               {academic_year ? ` • ${academic_year}` : ''}
             </Text>
           </View>
@@ -565,6 +588,157 @@ export default function ProgressTrackingScreen() {
           </Card>
         )}
 
+        {/* AI Insights Button - Compact */}
+        {isAdmin && selectedStudentId && (
+          <TouchableOpacity
+            style={styles.aiInsightsBtn}
+            onPress={() => {
+              if (!reportComment) {
+                generateComment();
+              }
+              setShowCommentModal(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.aiInsightsIcon, { backgroundColor: colors.primary[100] }]}>
+              <Sparkles size={18} color={colors.primary[600]} />
+            </View>
+            <View style={styles.aiInsightsContent}>
+              <Text style={styles.aiInsightsTitle}>Sage's Insight</Text>
+              <Text style={styles.aiInsightsSubtitle}>
+                {reportComment ? 'View generated comment' : 'Generate personalized comment'}
+              </Text>
+            </View>
+            {isCommentGenerating ? (
+              <ActivityIndicator size="small" color={colors.primary[600]} />
+            ) : (
+              <ChevronDown size={20} color={colors.primary[600]} style={{ transform: [{ rotate: '-90deg' }] }} />
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* AI Comment Modal */}
+        <Modal
+          visible={showCommentModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowCommentModal(false)}
+        >
+          <View style={styles.commentModalOverlay}>
+            <TouchableOpacity
+              style={styles.commentModalDismiss}
+              activeOpacity={1}
+              onPress={() => setShowCommentModal(false)}
+            />
+            <View style={styles.commentModalContent}>
+              <View style={styles.commentModalHandle} />
+
+              <View style={styles.commentModalHeader}>
+                <View style={[styles.commentModalIconBg, { backgroundColor: colors.primary[100] }]}>
+                  <Sparkles size={24} color={colors.primary[600]} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.commentModalTitle}>Sage's Insight</Text>
+                  <Text style={styles.commentModalSubtitle}>
+                    Personalized for {selectedStudentName || 'student'}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => setShowCommentModal(false)}>
+                  <X size={24} color={colors.text.secondary} />
+                </TouchableOpacity>
+              </View>
+
+              {isCommentGenerating ? (
+                <View style={styles.commentModalLoading}>
+                  <ActivityIndicator size="large" color={colors.primary[600]} />
+                  <Text style={styles.commentModalLoadingTitle}>✨ Generating...</Text>
+                  <Text style={styles.commentModalLoadingText}>
+                    Analyzing grades, attendance, and behavior
+                  </Text>
+                </View>
+              ) : reportComment ? (
+                <ScrollView style={styles.commentModalScroll} showsVerticalScrollIndicator={false}>
+                  <View style={styles.commentModalTextBox}>
+                    <Text style={styles.commentModalQuote}>"</Text>
+                    <Text style={styles.commentModalText}>
+                      {reportComment.generatedComment}
+                    </Text>
+                    <Text style={[styles.commentModalQuote, styles.commentModalQuoteEnd]}>"</Text>
+                  </View>
+
+                  <View style={styles.commentModalChips}>
+                    <View style={[styles.commentModalChip, { backgroundColor: colors.primary[50] }]}>
+                      <FileText size={12} color={colors.primary[600]} />
+                      <Text style={[styles.commentModalChipText, { color: colors.primary[700] }]}>
+                        {reportComment.wordCount} words
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.commentModalChip,
+                      { backgroundColor: reportComment.positivityScore >= 0.6 ? colors.success[50] : colors.warning[50] }
+                    ]}>
+                      <Text style={[
+                        styles.commentModalChipText,
+                        { color: reportComment.positivityScore >= 0.6 ? colors.success[700] : colors.warning[700] }
+                      ]}>
+                        {(reportComment.positivityScore * 100).toFixed(0)}% positive
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Action buttons row */}
+                  <View style={styles.commentModalActions}>
+                    <TouchableOpacity
+                      style={styles.commentModalActionBtn}
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(reportComment.generatedComment);
+                        Alert.alert('Copied!', 'Comment copied to clipboard');
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Copy size={18} color={colors.primary[600]} />
+                      <Text style={styles.commentModalActionText}>Copy</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.commentModalActionBtn}
+                      onPress={async () => {
+                        try {
+                          await Share.share({
+                            message: `${selectedStudentName}'s Report Comment:\n\n${reportComment.generatedComment}`,
+                          });
+                        } catch {
+                          // Share was cancelled or failed - no action needed
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Share2 size={18} color={colors.primary[600]} />
+                      <Text style={styles.commentModalActionText}>Share</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.commentModalActionBtn}
+                      onPress={regenerateComment}
+                      disabled={isCommentGenerating}
+                      activeOpacity={0.7}
+                    >
+                      <RefreshCw size={18} color={colors.primary[600]} />
+                      <Text style={styles.commentModalActionText}>Regenerate</Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              ) : (
+                <View style={styles.commentModalEmpty}>
+                  <Text style={styles.commentModalEmptyText}>
+                    Loading comment...
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+
         {/* Subject-wise Progress */}
         <View style={styles.sectionHeader}>
           <BookOpen size={20} color={colors.primary[600]} />
@@ -614,10 +788,10 @@ export default function ProgressTrackingScreen() {
                 <Card key={subj.subject_id} style={styles.syllabusCard}>
                   <View style={styles.syllabusHeader}>
                     <Text style={styles.syllabusSubjectName}>{subj.subject_name}</Text>
-                    <Text style={[styles.syllabusProgress, { 
-                      color: progressPct >= 75 ? colors.success[600] : 
-                             progressPct >= 50 ? colors.warning[600] : 
-                             colors.error[600] 
+                    <Text style={[styles.syllabusProgress, {
+                      color: progressPct >= 75 ? colors.success[600] :
+                        progressPct >= 50 ? colors.warning[600] :
+                          colors.error[600]
                     }]}>
                       {progressPct.toFixed(1)}%
                     </Text>
@@ -1108,6 +1282,178 @@ const createStyles = (colors: ThemeColors, isDark: boolean) =>
       gap: spacing.xs,
     },
     attendanceStatText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+    },
+    // AI Insights Button (Compact)
+    aiInsightsBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surface.primary,
+      padding: spacing.md,
+      borderRadius: borderRadius.lg,
+      marginBottom: spacing.lg,
+      borderWidth: 1,
+      borderColor: colors.primary[200],
+      ...shadows.sm,
+    },
+    aiInsightsIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: borderRadius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    aiInsightsContent: {
+      flex: 1,
+    },
+    aiInsightsTitle: {
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+    },
+    aiInsightsSubtitle: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    // Comment Modal
+    commentModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    commentModalDismiss: {
+      flex: 1,
+    },
+    commentModalContent: {
+      backgroundColor: colors.surface.primary,
+      borderTopLeftRadius: borderRadius.xl,
+      borderTopRightRadius: borderRadius.xl,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.xxl,
+      maxHeight: '70%',
+    },
+    commentModalHandle: {
+      width: 40,
+      height: 4,
+      backgroundColor: colors.neutral[300],
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginTop: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    commentModalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    commentModalIconBg: {
+      width: 48,
+      height: 48,
+      borderRadius: borderRadius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    commentModalTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    commentModalSubtitle: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+    },
+    commentModalLoading: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.xxl,
+    },
+    commentModalLoadingTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+      marginTop: spacing.md,
+    },
+    commentModalLoadingText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      marginTop: spacing.xs,
+    },
+    commentModalScroll: {
+      maxHeight: 400,
+    },
+    commentModalTextBox: {
+      backgroundColor: colors.background.secondary,
+      padding: spacing.lg,
+      borderRadius: borderRadius.lg,
+      marginBottom: spacing.md,
+      position: 'relative',
+    },
+    commentModalQuote: {
+      fontSize: 36,
+      color: colors.primary[300],
+      fontWeight: typography.fontWeight.bold,
+      lineHeight: 36,
+    },
+    commentModalQuoteEnd: {
+      textAlign: 'right',
+    },
+    commentModalText: {
+      fontSize: typography.fontSize.base,
+      color: colors.text.primary,
+      lineHeight: 24,
+      fontStyle: 'italic',
+      paddingVertical: spacing.sm,
+    },
+    commentModalChips: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.lg,
+    },
+    commentModalChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      borderRadius: borderRadius.full,
+    },
+    commentModalChipText: {
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.medium,
+    },
+    // Action buttons row
+    commentModalActions: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    commentModalActionBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.md,
+      backgroundColor: colors.background.secondary,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border.light,
+    },
+    commentModalActionText: {
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.medium,
+      color: colors.primary[600],
+    },
+    commentModalEmpty: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.xl,
+    },
+    commentModalEmptyText: {
       fontSize: typography.fontSize.sm,
       color: colors.text.secondary,
     },

@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { api, AttendanceInput } from '../services/api';
+import { supabase } from '../lib/supabase';
 
 type AttendanceRecord = Awaited<ReturnType<typeof api.attendance.getByClass>>[number];
 
 export function useClassAttendance(
-  classId?: string, 
+  classId?: string,
   date?: string,
   options?: Omit<UseQueryOptions<AttendanceRecord[]>, 'queryKey' | 'queryFn'>
 ) {
@@ -72,28 +73,43 @@ export function useClassAttendanceSummary(classId?: string, startDate?: string, 
   });
 }
 
+/**
+ * Mark attendance for students.
+ * Server-controlled: validates, writes to DB, and triggers notifications.
+ */
 export function useMarkAttendance() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (records: AttendanceInput[]) => api.attendance.markAttendance(records),
+    mutationFn: async (records: AttendanceInput[]) => {
+      // Call server-side Edge Function (Level 3: Server-Controlled)
+      const { data, error } = await supabase.functions.invoke('mark-attendance', {
+        body: { records }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to mark attendance');
+      }
+
+      return data;
+    },
     onSuccess: (data, variables) => {
       // Invalidate specific queries for better performance
       if (variables.length > 0) {
         const classId = variables[0]?.class_instance_id;
         const date = variables[0]?.date;
-        
-        queryClient.invalidateQueries({ 
-          queryKey: ['attendance', 'class', classId, date] 
+
+        queryClient.invalidateQueries({
+          queryKey: ['attendance', 'class', classId, date]
         });
-        queryClient.invalidateQueries({ 
-          queryKey: ['attendance', 'school'] 
+        queryClient.invalidateQueries({
+          queryKey: ['attendance', 'school']
         });
-        queryClient.invalidateQueries({ 
-          queryKey: ['attendance', 'student'] 
+        queryClient.invalidateQueries({
+          queryKey: ['attendance', 'student']
         });
-        queryClient.invalidateQueries({ 
-          queryKey: ['attendance', 'stats'] 
+        queryClient.invalidateQueries({
+          queryKey: ['attendance', 'stats']
         });
       }
     },
@@ -119,7 +135,7 @@ export function useMarkBulkAttendance() {
     }: {
       classId: string;
       date: string;
-        status: 'present' | 'absent';
+      status: 'present' | 'absent';
       markedBy: string;
       markedByRoleCode: string;
       schoolCode: string;
@@ -133,17 +149,17 @@ export function useMarkBulkAttendance() {
     ),
     onSuccess: (data, variables) => {
       // Invalidate relevant queries
-      queryClient.invalidateQueries({ 
-        queryKey: ['attendance', 'class', variables.classId, variables.date] 
+      queryClient.invalidateQueries({
+        queryKey: ['attendance', 'class', variables.classId, variables.date]
       });
-      queryClient.invalidateQueries({ 
-        queryKey: ['attendance', 'school'] 
+      queryClient.invalidateQueries({
+        queryKey: ['attendance', 'school']
       });
-      queryClient.invalidateQueries({ 
-        queryKey: ['attendance', 'student'] 
+      queryClient.invalidateQueries({
+        queryKey: ['attendance', 'student']
       });
-      queryClient.invalidateQueries({ 
-        queryKey: ['attendance', 'stats'] 
+      queryClient.invalidateQueries({
+        queryKey: ['attendance', 'stats']
       });
     },
     onError: (error) => {

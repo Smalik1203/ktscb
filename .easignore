@@ -17,7 +17,7 @@ build/
 # Native build artifacts
 android/app/build/
 android/build/
-android/.gradle/
+/android/.gradle
 android/local.properties
 ios/build/
 ios/Pods/

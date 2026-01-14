@@ -2,21 +2,31 @@
 
 buildscript {
   repositories {
+    // Public repositories first (more reliable)
+    // These are checked before EAS Build's internal cache
     google()
     mavenCentral()
+    maven { url 'https://www.jitpack.io' }
+    // EAS Build may add its internal cache repository here
+    // If it times out, Gradle will fall back to the public repos above
   }
   dependencies {
     classpath('com.android.tools.build:gradle')
     classpath('com.facebook.react:react-native-gradle-plugin')
     classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
+    // Note: JFrog build-info-extractor-gradle is injected by EAS Build
+    // It should resolve from Maven Central if internal cache fails
   }
 }
 
 allprojects {
   repositories {
+    // Public repositories first (more reliable)
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
+    // EAS Build internal cache (fallback only)
+    // This will be automatically added by EAS Build if available
   }
 }
 

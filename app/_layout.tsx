@@ -15,8 +15,10 @@ import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { useFrameworkReady } from '../hooks/useFrameworkReady';
 import ErrorBoundary from '../src/components/ErrorBoundary';
 import { NetworkStatus } from '../src/components/ui/NetworkStatus';
+import { ToastProvider } from '../src/components/common';
 import { DrawerContent } from '../src/components/layout/DrawerContent';
 import { initSentry } from '../src/lib/sentry';
+import { NotificationProvider } from '../src/contexts/NotificationContext';
 import { ActivityIndicator, View } from 'react-native';
 
 // Initialize Sentry error tracking
@@ -86,12 +88,12 @@ function RootStack() {
       <Stack.Screen name="forgot-password" />
       <Stack.Screen name="reset-password" />
       {/* Hide authenticated routes from auth stack */}
-      <Stack.Screen 
-        name="(tabs)" 
-        options={{ 
+      <Stack.Screen
+        name="(tabs)"
+        options={{
           presentation: 'transparentModal',
           animation: 'none',
-        }} 
+        }}
       />
     </Stack>
   );
@@ -100,7 +102,7 @@ function RootStack() {
 // Inner component that uses theme
 function AppContent() {
   const { colors, isDark } = useTheme();
-  
+
   // Update system UI background based on theme
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.background.app);
@@ -128,9 +130,13 @@ function AppContent() {
       <BottomSheetModalProvider>
         <AuthProvider>
           <ClassSelectionProvider>
-            <RootStack />
-            <StatusBar style={isDark ? 'light' : 'dark'} translucent={false} />
-            <NetworkStatus />
+            <NotificationProvider>
+              <ToastProvider>
+                <RootStack />
+                <StatusBar style={isDark ? 'light' : 'dark'} translucent={false} />
+                <NetworkStatus />
+              </ToastProvider>
+            </NotificationProvider>
           </ClassSelectionProvider>
         </AuthProvider>
       </BottomSheetModalProvider>

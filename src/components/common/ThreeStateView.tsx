@@ -1,9 +1,15 @@
-import React, { useMemo } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Button, ActivityIndicator } from 'react-native-paper';
-import { RefreshCw, AlertCircle, Inbox } from 'lucide-react-native';
-import { spacing, typography, colors } from '../../../lib/design-system';
+/**
+ * ThreeStateView Component
+ * 
+ * A unified loading/error/empty state handler using the UI Kit.
+ * Replaces React Native Paper components with custom themed components.
+ */
+
+import React, { useMemo, useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated, Easing } from 'react-native';
+import { RefreshCw, AlertCircle, Inbox, WifiOff } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
+import { Body, Heading, Caption, Button, Stack, Center } from '../../ui';
 
 export interface ThreeStateViewProps {
   state: 'loading' | 'error' | 'empty' | 'success';
@@ -11,6 +17,7 @@ export interface ThreeStateViewProps {
   errorMessage?: string;
   errorDetails?: string;
   emptyMessage?: string;
+  emptyIcon?: React.ReactNode;
   emptyAction?: {
     label: string;
     onPress: () => void;
@@ -20,19 +27,88 @@ export interface ThreeStateViewProps {
   timeout?: number; // in seconds
 }
 
+// Custom animated loading spinner using theme colors
+function LoadingSpinner({ color, size = 48 }: { color: string; size?: number }) {
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Spin animation
+    const spin = Animated.loop(
+      Animated.timing(spinAnim, {
+        toValue: 1,
+        duration: 1000,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+
+    // Subtle pulse animation
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    spin.start();
+    pulse.start();
+
+    return () => {
+      spin.stop();
+      pulse.stop();
+    };
+  }, [spinAnim, pulseAnim]);
+
+  const rotation = spinAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        transform: [{ rotate: rotation }, { scale: pulseAnim }],
+      }}
+    >
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderWidth: 3,
+          borderColor: color,
+          borderTopColor: 'transparent',
+        }}
+      />
+    </Animated.View>
+  );
+}
+
 export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
   state,
   loadingMessage = 'Loading...',
   errorMessage = 'Something went wrong',
   errorDetails,
   emptyMessage = 'No data available',
+  emptyIcon,
   emptyAction,
   onRetry,
   children,
   timeout = 6,
 }) => {
-  const { colors, isDark } = useTheme();
-  
+  const { colors, spacing, borderRadius, isDark } = useTheme();
+
   // Create dynamic styles based on theme
   const dynamicStyles = useMemo(() => StyleSheet.create({
     container: {
@@ -42,41 +118,34 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
       padding: spacing.lg,
       backgroundColor: colors.background.app,
     },
-    loadingText: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.medium,
-      color: colors.text.primary,
-      marginTop: spacing.md,
-      textAlign: 'center',
+    iconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.neutral[100],
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.md,
     },
-    timeoutText: {
-      fontSize: typography.fontSize.sm,
-      color: colors.text.secondary,
-      marginTop: spacing.sm,
-      textAlign: 'center',
+    errorIconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.error[50],
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.md,
     },
-    errorTitle: {
-      fontSize: typography.fontSize.lg,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.error[500],
-      marginTop: spacing.md,
-      textAlign: 'center',
+    emptyIconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.primary[50],
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.md,
     },
-    errorDetails: {
-      fontSize: typography.fontSize.sm,
-      color: colors.text.secondary,
-      marginTop: spacing.sm,
-      textAlign: 'center',
-      fontFamily: 'monospace',
-    },
-    emptyTitle: {
-      fontSize: typography.fontSize.lg,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.text.secondary,
-      marginTop: spacing.md,
-      textAlign: 'center',
-    },
-  }), [colors]);
+  }), [colors, spacing]);
 
   if (state === 'success' && children) {
     return <View style={{ flex: 1, backgroundColor: colors.background.app }}>{children}</View>;
@@ -86,53 +155,82 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
     switch (state) {
       case 'loading':
         return (
-          <View style={styles.centerContent}>
-            <ActivityIndicator size="large" color={colors.primary[500]} />
-            <Text style={dynamicStyles.loadingText}>{loadingMessage}</Text>
+          <Center style={{ padding: spacing.xl }}>
+            <LoadingSpinner color={colors.primary.main} size={48} />
+            <Body
+              color="primary"
+              weight="medium"
+              style={{ marginTop: spacing.lg, textAlign: 'center' }}
+            >
+              {loadingMessage}
+            </Body>
             {timeout > 0 && (
-              <Text style={dynamicStyles.timeoutText}>
+              <Caption
+                color="tertiary"
+                style={{ marginTop: spacing.sm, textAlign: 'center', maxWidth: 250 }}
+              >
                 Taking longer than expected? Check your connection.
-              </Text>
+              </Caption>
             )}
-          </View>
+          </Center>
         );
 
       case 'error':
         return (
-          <View style={styles.centerContent}>
-            <AlertCircle size={48} color={colors.error[500]} />
-            <Text style={dynamicStyles.errorTitle}>{errorMessage}</Text>
+          <Center style={{ padding: spacing.xl }}>
+            <View style={dynamicStyles.errorIconContainer}>
+              <AlertCircle size={40} color={colors.error.main} />
+            </View>
+            <Heading level={4} align="center" style={{ color: colors.error.main }}>
+              {errorMessage}
+            </Heading>
             {errorDetails && (
-              <Text style={dynamicStyles.errorDetails}>{errorDetails}</Text>
+              <Caption
+                color="secondary"
+                style={{
+                  marginTop: spacing.sm,
+                  textAlign: 'center',
+                  fontFamily: 'monospace',
+                  maxWidth: 280,
+                }}
+              >
+                {errorDetails}
+              </Caption>
             )}
             {onRetry && (
               <Button
-                mode="contained"
+                variant="primary"
+                size="md"
                 onPress={onRetry}
-                style={styles.retryButton}
-                icon={() => <RefreshCw size={16} color={isDark ? colors.text.inverse : colors.surface.primary} />}
+                icon={<RefreshCw size={16} color={colors.text.inverse} />}
+                style={{ marginTop: spacing.lg }}
               >
-                Retry
+                Try Again
               </Button>
             )}
-          </View>
+          </Center>
         );
 
       case 'empty':
         return (
-          <View style={styles.centerContent}>
-            <Inbox size={48} color={colors.text.secondary} />
-            <Text style={dynamicStyles.emptyTitle}>{emptyMessage}</Text>
+          <Center style={{ padding: spacing.xl }}>
+            <View style={dynamicStyles.emptyIconContainer}>
+              {emptyIcon || <Inbox size={40} color={colors.primary.main} />}
+            </View>
+            <Heading level={5} align="center" color="secondary">
+              {emptyMessage}
+            </Heading>
             {emptyAction && (
               <Button
-                mode="outlined"
+                variant="outline"
+                size="md"
                 onPress={emptyAction.onPress}
-                style={styles.emptyButton}
+                style={{ marginTop: spacing.lg }}
               >
                 {emptyAction.label}
               </Button>
             )}
-          </View>
+          </Center>
         );
 
       default:
@@ -146,17 +244,3 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
     </View>
   );
 };
-
-// Static styles that don't depend on theme
-const styles = StyleSheet.create({
-  centerContent: {
-    alignItems: 'center',
-    maxWidth: 300,
-  },
-  retryButton: {
-    marginTop: spacing.lg,
-  },
-  emptyButton: {
-    marginTop: spacing.lg,
-  },
-});
