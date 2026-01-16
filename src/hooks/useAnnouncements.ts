@@ -146,3 +146,27 @@ export function useTogglePin() {
         },
     });
 }
+
+/**
+ * Send reminder notification for an announcement
+ */
+export function useSendReminder() {
+    return useMutation({
+        mutationFn: async (announcementId: string) => {
+            const { data, error } = await supabase.functions.invoke('resend-announcement-notification', {
+                body: {
+                    announcement_id: announcementId,
+                },
+            });
+
+            if (error) {
+                throw new Error(error.message || 'Failed to send reminder');
+            }
+
+            return data;
+        },
+        onError: (error) => {
+            console.error('Failed to send reminder:', error);
+        },
+    });
+}

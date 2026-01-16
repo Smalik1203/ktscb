@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text as RNText, TouchableOpacity, Alert } from 'react-native';
-import { MessageSquare, Pin, Trash2, Users, GraduationCap } from 'lucide-react-native';
+import { MessageSquare, Pin, Trash2, Users, GraduationCap, Bell } from 'lucide-react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
 import type { Announcement } from '../../../hooks/useAnnouncements';
-import { useDeleteAnnouncement, useTogglePin } from '../../../hooks/useAnnouncements';
+import { useDeleteAnnouncement, useTogglePin, useSendReminder } from '../../../hooks/useAnnouncements';
 import { useAuth } from '../../../contexts/AuthContext';
 
 interface AnnouncementCardProps {
@@ -15,6 +15,7 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
     const { profile } = useAuth();
     const deleteMutation = useDeleteAnnouncement();
     const togglePinMutation = useTogglePin();
+    const sendReminderMutation = useSendReminder();
 
     const isCreator = profile?.auth_id === announcement.created_by;
     const canManage = profile?.role === 'admin' || profile?.role === 'superadmin';
@@ -71,6 +72,35 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
         });
     };
 
+    const handleSendReminder = () => {
+        Alert.alert(
+            'Send Reminder',
+            'This will resend the notification to all originally targeted users. Continue?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Send',
+                    onPress: () => {
+                        sendReminderMutation.mutate(announcement.id, {
+                            onSuccess: (data) => {
+                                Alert.alert(
+                                    'Reminder Sent',
+                                    data?.message || `Notification sent to ${data?.notified || 0} user(s)`
+                                );
+                            },
+                            onError: (error) => {
+                                Alert.alert(
+                                    'Failed to Send Reminder',
+                                    error instanceof Error ? error.message : 'An error occurred'
+                                );
+                            },
+                        });
+                    },
+                },
+            ]
+        );
+    };
+
     return (
         <View
             style={{
@@ -115,6 +145,18 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
                     <View style={{ flexDirection: 'row', gap: spacing.xs, marginLeft: spacing.sm }}>
                         {isCreator && (
                             <>
+                                <TouchableOpacity
+                                    onPress={handleSendReminder}
+                                    disabled={sendReminderMutation.isPending}
+                                    style={{
+                                        padding: spacing.xs,
+                                        borderRadius: borderRadius.md,
+                                        backgroundColor: colors.background.secondary,
+                                        opacity: sendReminderMutation.isPending ? 0.5 : 1,
+                                    }}
+                                >
+                                    <Bell size={18} color={colors.primary[600]} />
+                                </TouchableOpacity>
                                 <TouchableOpacity
                                     onPress={handleTogglePin}
                                     style={{

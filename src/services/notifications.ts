@@ -59,10 +59,11 @@ export async function registerForPushNotifications(): Promise<PushNotificationTo
         // Set up Android notification channel
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
-                name: 'Default',
+                name: 'KTS Notifications',
                 importance: Notifications.AndroidImportance.MAX,
                 vibrationPattern: [0, 250, 250, 250],
                 lightColor: '#6B3FA0',
+                description: 'Notifications from Krishnaveni Talent School',
             });
         }
 
@@ -90,30 +91,44 @@ export async function registerForPushNotifications(): Promise<PushNotificationTo
 export async function savePushToken(userId: string, tokenData: PushNotificationToken): Promise<boolean> {
     try {
         log.debug('[savePushToken] Attempting to save token via RPC', {
+            userId,
             tokenPreview: tokenData.token.substring(0, 30) + '...',
             deviceType: tokenData.deviceType
         });
 
+        console.log('[savePushToken] DEBUG - Starting RPC call for user:', userId);
+
         // Use RPC function to handle upsert securely (bypassing RLS for unique constraints)
-        const { error } = await supabase.rpc('register_push_token', {
+        const { data, error } = await supabase.rpc('register_push_token', {
             p_token: tokenData.token,
             p_device_type: tokenData.deviceType,
         });
+
+        console.log('[savePushToken] DEBUG - RPC result:', { data, error: error?.message });
 
         if (error) {
             console.error('[savePushToken] RPC error:', {
                 message: error.message,
                 code: error.code,
-                details: error.details
+                details: error.details,
+                hint: error.hint
             });
             log.error('Failed to save push token via RPC', { error });
+            // Show alert for debugging - REMOVE IN PRODUCTION
+            const { Alert } = require('react-native');
+            Alert.alert('Push Token Error', `Failed to register: ${error.message}`);
             return false;
         }
 
+        console.log('[savePushToken] DEBUG - Token saved successfully!');
         log.info('Push token saved successfully');
         return true;
     } catch (error) {
+        console.error('[savePushToken] Unexpected error:', error);
         log.error('Failed to save push token', { error });
+        // Show alert for debugging - REMOVE IN PRODUCTION
+        const { Alert } = require('react-native');
+        Alert.alert('Push Token Error', `Unexpected: ${(error as Error).message}`);
         return false;
     }
 }

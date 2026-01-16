@@ -8,8 +8,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, RefreshControl, ActivityIndicator } from 'react-native';
 import { Text, Card, Button } from 'react-native-paper';
-import { 
-  Plus, 
+import {
+  Plus,
   ListTodo,
   Calendar as CalendarIcon,
   Users,
@@ -39,16 +39,16 @@ export default function CalendarScreen() {
   const { profile } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
   const { can, isLoading: capabilitiesLoading } = useCapabilities();
-  
+
   // Capability-based checks (NO role checks in UI)
   const canManageEvents = can('calendar.manage');
   const canReadAllCalendar = can('calendar.read') && !can('attendance.read_own');
   const canReadOwnCalendar = can('calendar.read') && can('attendance.read_own') && !can('attendance.read');
-  
+
   // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark), 
+  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark),
     [colors, spacing, borderRadius, typography, shadows, isDark]);
-  
+
   // State
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'list'>('month');
@@ -68,7 +68,7 @@ export default function CalendarScreen() {
 
   const fetchClasses = useCallback(async () => {
     if (!schoolCode || canReadOwnCalendar) return;
-    
+
     setLoadingClasses(true);
     try {
       const { data, error } = await supabase
@@ -258,13 +258,13 @@ export default function CalendarScreen() {
     const sortedDates = Object.keys(groupedEvents).sort((a, b) => a.localeCompare(b));
 
     return (
-      <ScrollView 
-        style={styles.outlookContainer} 
+      <ScrollView
+        style={styles.outlookContainer}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContentContainer}
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={handleRefresh}
             tintColor={colors.primary.main}
             colors={[colors.primary.main]}
@@ -294,7 +294,7 @@ export default function CalendarScreen() {
               const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
               const isToday = dateKey === todayKey;
               const isLastDate = dateIndex === sortedDates.length - 1;
-              
+
               // Sort events by time (all-day first, then by start time)
               const sortedEvents = [...dateEvents].sort((a, b) => {
                 if (a.is_all_day && !b.is_all_day) return -1;
@@ -302,7 +302,7 @@ export default function CalendarScreen() {
                 if (a.is_all_day && b.is_all_day) return 0;
                 return (a.start_time || '').localeCompare(b.start_time || '');
               });
-              
+
               return (
                 <View key={dateKey} style={styles.outlookDateGroup}>
                   {/* Outlook-style Date Sidebar */}
@@ -334,15 +334,15 @@ export default function CalendarScreen() {
                   <View style={styles.outlookEventsColumn}>
                     {sortedEvents.map((event, eventIndex) => {
                       const eventColor = event.color || getEventTypeColor(event.event_type);
-                      
+
                       return (
-                        <TouchableOpacity 
-                          key={event.id} 
+                        <TouchableOpacity
+                          key={event.id}
                           onPress={() => handleEventClick(event)}
                           activeOpacity={0.6}
                           style={[
-                            styles.outlookEventRow, 
-                            { 
+                            styles.outlookEventRow,
+                            {
                               borderLeftColor: eventColor,
                               backgroundColor: isDark ? colors.surface.secondary : colors.neutral[50],
                             }
@@ -425,9 +425,8 @@ export default function CalendarScreen() {
               <Text style={styles.filterLabel}>Class</Text>
               <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
                 {selectedClassId
-                  ? `${classes.find((c) => c.id === selectedClassId)?.grade}-${
-                      classes.find((c) => c.id === selectedClassId)?.section || ''
-                    }`
+                  ? `${classes.find((c) => c.id === selectedClassId)?.grade}-${classes.find((c) => c.id === selectedClassId)?.section || ''
+                  }`
                   : 'All Classes'}
               </Text>
             </View>
@@ -504,8 +503,8 @@ export default function CalendarScreen() {
               onDateClick={handleDateClick}
               onEventClick={handleEventClick}
               refreshControl={
-                <RefreshControl 
-                  refreshing={refreshing} 
+                <RefreshControl
+                  refreshing={refreshing}
                   onRefresh={handleRefresh}
                   tintColor={colors.primary.main}
                   colors={[colors.primary.main]}

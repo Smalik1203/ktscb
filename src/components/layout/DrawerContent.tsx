@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import {
   DrawerContentScrollView,
   DrawerItemList,
@@ -42,6 +43,7 @@ import { spacing, borderRadius, typography, shadows, colors } from '../../../lib
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
+
 import type { Capability } from '../../domain/auth/capabilities';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useClass } from '../../hooks/useClasses';
@@ -255,6 +257,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const { profile, signOut } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
   const { can, role } = useCapabilities();
+
   const [activeItem, setActiveItem] = React.useState<string>('home');
   const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
@@ -665,6 +668,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           }
         ]}
       >
+
+
         {/* Theme Toggle */}
         <TouchableOpacity
           style={[
