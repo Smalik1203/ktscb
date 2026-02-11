@@ -3,8 +3,8 @@ import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput as RNTextInput } from 'react-native';
 import { Text, Portal, Modal } from 'react-native-paper';
-import { BookOpen, Edit, Trash2, X, Plus, Search } from 'lucide-react-native';
-import { Card, Button, Input, EmptyState, Badge } from '../../components/ui';
+import { BookOpen, Edit, Trash2, X, Plus } from 'lucide-react-native';
+import { Button, Input, EmptyState, Badge, SearchBar } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import { AccessDenied } from '../../components/common/AccessDenied';
@@ -210,7 +210,7 @@ export default function AddSubjectsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Create Subjects Form */}
-        <Card style={styles.card}>
+        <View style={styles.section}>
           <View style={styles.cardHeader}>
             <BookOpen size={24} color={colors.primary[600]} />
             <Text style={styles.cardTitle}>Add Subjects</Text>
@@ -258,31 +258,21 @@ export default function AddSubjectsScreen() {
               icon={<Plus size={20} color={colors.surface.primary} />}
             />
           </View>
-        </Card>
+        </View>
 
         {/* Subjects List */}
-        <Card style={styles.card}>
+        <View style={styles.section}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>All Subjects</Text>
             <Badge variant="success">{totalSubjects}</Badge>
           </View>
 
           {/* Search */}
-          <View style={styles.searchContainer}>
-            <Search size={20} color={colors.text.tertiary} />
-            <RNTextInput
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholder="Search subjects..."
-              placeholderTextColor={colors.text.tertiary}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <X size={20} color={colors.text.tertiary} />
-              </TouchableOpacity>
-            )}
-          </View>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search subjects..."
+          />
 
           <ThreeStateView
             state={isLoading ? 'loading' : error ? 'error' : filteredSubjects.length === 0 ? 'empty' : 'success'}
@@ -320,7 +310,7 @@ export default function AddSubjectsScreen() {
               onPageChange={setSubjectPage}
             />
           )}
-        </Card>
+        </View>
       </ScrollView>
 
       {/* Edit Modal */}
@@ -378,17 +368,16 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: spacing.md,
     paddingBottom: spacing.xl * 2,
   },
-  card: {
-    marginBottom: spacing.lg,
-    padding: spacing.lg,
+  section: {
+    marginBottom: spacing.md,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
     gap: spacing.sm,
   },
   cardTitle: {
@@ -398,12 +387,13 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     flex: 1,
   },
   form: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   hint: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     lineHeight: 20,
+    marginBottom: spacing.xs,
   },
   inputRow: {
     flexDirection: 'row',
@@ -412,30 +402,30 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   },
   textInput: {
     flex: 1,
-    height: 48,
+    height: 36,
     borderWidth: 1,
     borderColor: colors.border.light,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
     fontSize: typography.fontSize.base,
     color: colors.text.primary,
     backgroundColor: colors.surface.primary,
   },
   addButton: {
-    minWidth: 80,
+    minWidth: 70,
   },
   chipsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     backgroundColor: colors.primary[100],
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
   },
   chipText: {
@@ -443,34 +433,16 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     fontWeight: typography.fontWeight.medium as any,
     color: colors.primary[700],
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
   subjectList: {
-    gap: spacing.md,
+    gap: 0,
   },
   subjectCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border.light,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   subjectInfo: {
     flex: 1,
@@ -487,21 +459,20 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   actionButton: {
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.surface.primary,
-    ...shadows.sm,
+    backgroundColor: 'transparent',
   },
   modal: {
     backgroundColor: colors.surface.primary,
-    marginHorizontal: spacing.xl,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
     maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   modalTitle: {
     fontSize: typography.fontSize.xl,
@@ -509,12 +480,12 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     color: colors.text.primary,
   },
   modalContent: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   modalActions: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   modalButton: {
     flex: 1,

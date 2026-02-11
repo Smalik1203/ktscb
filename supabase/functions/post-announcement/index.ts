@@ -10,6 +10,7 @@ interface AnnouncementInput {
     target_role?: string;
     school_code: string;
     created_by: string;
+    image_url?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -41,8 +42,9 @@ Deno.serve(async (req: Request) => {
                 target_role: announcement.target_role,
                 school_code: announcement.school_code,
                 created_by: announcement.created_by,
+                image_url: announcement.image_url || null,
             })
-            .select()
+            .select('id, title, message, priority, target_type, class_instance_id, target_role, school_code, created_by, created_at, updated_at, pinned, likes_count, views_count, image_url')
             .single();
 
         if (insertError) {
@@ -88,9 +90,9 @@ Deno.serve(async (req: Request) => {
         }
 
         // 4. Trigger notifications (async, server-controlled)
+        // Use queue for large audiences (50+ users), direct send for small
         queueMicrotask(async () => {
             try {
-                const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
                 const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
 
                 // Choose emoji based on priority
@@ -114,26 +116,55 @@ Deno.serve(async (req: Request) => {
                         break;
                 }
 
-                await fetch(notificationUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': authHeader,
+                const notificationPayload = {
+                    event: 'announcement_posted',
+                    title: `${emoji} ${prefix}${announcement.title}`,
+                    body: `${announcement.message} 📣`,
+                    data: {
+                        type: 'announcement',
+                        announcement_id: insertedAnnouncement.id,
+                        priority: announcement.priority,
                     },
-                    body: JSON.stringify({
-                        event: 'announcement_posted',
-                        targets: { user_ids: userIds },
-                        payload: {
-                            title: `${emoji} ${prefix}${announcement.title}`,
-                            body: `${announcement.message} 📣`,
-                            data: {
-                                type: 'announcement',
-                                announcement_id: insertedAnnouncement.id,
-                                priority: announcement.priority,
-                            },
+                };
+
+                // Use queue for large audiences, direct send for small
+                if (userIds.length > 50) {
+                    // Queue for background processing
+                    const queueUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/queue-notification`;
+                    await fetch(queueUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': authHeader,
                         },
-                    }),
-                });
+                        body: JSON.stringify({
+                            ...notificationPayload,
+                            targets: { user_ids: userIds },
+                            priority: announcement.priority === 'urgent' ? 1 : 
+                                     announcement.priority === 'high' ? 3 : 5
+                        }),
+                    });
+                    console.log(`Queued notification for ${userIds.length} users`);
+                } else {
+                    // Direct send for small audiences
+                    const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
+                    await fetch(notificationUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': authHeader,
+                        },
+                        body: JSON.stringify({
+                            event: notificationPayload.event,
+                            targets: { user_ids: userIds },
+                            payload: {
+                                title: notificationPayload.title,
+                                body: notificationPayload.body,
+                                data: notificationPayload.data,
+                            },
+                        }),
+                    });
+                }
             } catch (err) {
                 console.error('Notification trigger failed:', err);
             }

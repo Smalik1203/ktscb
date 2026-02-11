@@ -63,6 +63,7 @@ export interface EnhancedTimetableResult {
   markSlotTaught: (slotId: string) => Promise<void>;
   unmarkSlotTaught: (slotId: string) => Promise<void>;
   updateSlotStatus: (slotId: string, status: 'planned' | 'done' | 'cancelled') => Promise<void>;
+  copyTimetable: (payload: { class_instance_id: string; school_code: string; source_date: string; selected_days: number[]; weeks_ahead: number; replace_existing: boolean }) => Promise<{ copiedCount: number; skippedDates: string[] }>;
   displayPeriodNumber: number;
   taughtSlotIds: Set<string>;
 
@@ -186,7 +187,7 @@ export function useEnhancedTimetable(
         class_date: slot.class_date,
         school_code: slot.school_code,
       }));
-      
+
       const periodNumber = calculatePeriodNumber(
         startParsed.formatted,
         conflictSlots
@@ -211,7 +212,7 @@ export function useEnhancedTimetable(
           class_date: slot.class_date,
           school_code: slot.school_code,
         }));
-        
+
         const conflictInfo = detectConflicts(
           startParsed.formatted,
           endParsed.formatted,
@@ -233,7 +234,7 @@ export function useEnhancedTimetable(
         p_period_number: periodNumber,
         p_user_id: String(userId),
       };
-      
+
       // Only include optional parameters if they have values
       if (payload.name) rpcParams.p_name = payload.name;
       if (payload.subject_id) rpcParams.p_subject_id = String(payload.subject_id);
@@ -248,7 +249,6 @@ export function useEnhancedTimetable(
       const { data, error } = await (supabase.rpc as any)('create_or_update_timetable_slot', rpcParams);
 
       if (error) {
-        console.error('RPC Error:', error);
         // If it's a constraint violation, the RPC should have handled it, but if it still comes through, handle it
         if (error.code === '23505' && (error.message?.includes('uq_tt_time_per_day') || error.details?.includes('class_instance_id, class_date, start_time, end_time'))) {
           // Try to get the existing slot and update it
@@ -363,7 +363,7 @@ export function useEnhancedTimetable(
         class_date: slot.class_date,
         school_code: slot.school_code,
       }));
-      
+
       const periodNumber = calculatePeriodNumber(
         startTime,
         conflictSlots,
@@ -388,7 +388,7 @@ export function useEnhancedTimetable(
           class_date: slot.class_date,
           school_code: slot.school_code,
         }));
-        
+
         const conflictInfo = detectConflicts(
           startTime,
           endTime,
@@ -412,7 +412,7 @@ export function useEnhancedTimetable(
         p_user_id: String(userId),
         p_slot_id: String(slotId), // Slot ID for update
       };
-      
+
       // Only include optional parameters if they have values
       if (payload.name !== undefined) rpcParams.p_name = payload.name;
       if (payload.subject_id !== undefined) rpcParams.p_subject_id = String(payload.subject_id);
@@ -427,7 +427,6 @@ export function useEnhancedTimetable(
       const { data, error } = await (supabase.rpc as any)('create_or_update_timetable_slot', rpcParams);
 
       if (error) {
-        console.error('RPC Error:', error);
         if (error.code === '23505' && (error.message?.includes('uq_tt_time_per_day') || error.details?.includes('class_instance_id, class_date, start_time, end_time'))) {
           return { success: false, reason: 'duplicate period' };
         }

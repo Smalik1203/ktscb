@@ -271,7 +271,7 @@ export function useCreateTask() {
       const { data, error } = await supabase
         .from('tasks')
         .insert([insertData])
-        .select()
+        .select('id, school_code, academic_year_id, class_instance_id, subject_id, title, description, priority, assigned_date, due_date, max_marks, instructions, attachments, is_active, created_by, created_at, updated_at')
         .single();
 
       if (error) throw error;
@@ -310,7 +310,7 @@ export function useUpdateTask() {
         .from('tasks')
         .update(sanitizedData)
         .eq('id', id)
-        .select()
+        .select('id, school_code, academic_year_id, class_instance_id, subject_id, title, description, priority, assigned_date, due_date, max_marks, instructions, attachments, is_active, created_by, created_at, updated_at')
         .single();
 
       if (error) throw error;
@@ -356,42 +356,25 @@ export function useSubmitTask() {
 
   return useMutation({
     mutationFn: async (submissionData: Omit<TaskSubmission, 'id' | 'created_at' | 'updated_at'>) => {
-      // Check if submission already exists
-      const { data: existing } = await supabase
+      const { data, error } = await supabase
         .from('task_submissions')
-        .select('id')
-        .eq('task_id', submissionData.task_id)
-        .eq('student_id', submissionData.student_id)
-        .maybeSingle();
-
-      if (existing) {
-        // Update existing submission
-        const { data, error } = await supabase
-          .from('task_submissions')
-          .update({
+        .upsert(
+          {
+            task_id: submissionData.task_id,
+            student_id: submissionData.student_id,
             submission_text: submissionData.submission_text,
             attachments: submissionData.attachments,
             status: submissionData.status,
             submitted_at: submissionData.submitted_at,
             updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id)
-          .select()
-          .single();
+          },
+          { onConflict: 'task_id,student_id' }
+        )
+        .select('id, task_id, student_id, submission_text, attachments, submitted_at, marks_obtained, max_marks, feedback, status, graded_by, graded_at, created_at, updated_at')
+        .single();
 
-        if (error) throw error;
-        return data;
-      } else {
-        // Create new submission
-        const { data, error } = await supabase
-          .from('task_submissions')
-          .insert([submissionData])
-          .select()
-          .single();
-
-        if (error) throw error;
-        return data;
-      }
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['student-tasks'] });
@@ -477,7 +460,7 @@ export function useTaskSubmissions(taskId: string, options?: { limit?: number; o
       if (studentIds.length > 0) {
         const { data: submissionsData, error: submissionsError } = await supabase
           .from('task_submissions')
-          .select('*')
+          .select('id, task_id, student_id, submission_text, submitted_at, marks_obtained, max_marks, feedback, status')
           .eq('task_id', taskId)
           .in('student_id', studentIds);
 

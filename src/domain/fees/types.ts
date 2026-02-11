@@ -139,6 +139,16 @@ export const UpdateInvoiceItemInputSchema = z.object({
 
 export type UpdateInvoiceItemInput = z.infer<typeof UpdateInvoiceItemInputSchema>;
 
+export const UpdateInvoiceInputSchema = z.object({
+  due_date: dateStringSchema.optional(),
+  notes: z.string().nullable().optional(),
+}).refine(
+  (data) => data.due_date !== undefined || data.notes !== undefined,
+  { message: 'At least one field (due_date or notes) must be provided' }
+);
+
+export type UpdateInvoiceInput = z.infer<typeof UpdateInvoiceInputSchema>;
+
 // ==================== BUSINESS RULE HELPERS ====================
 
 /**

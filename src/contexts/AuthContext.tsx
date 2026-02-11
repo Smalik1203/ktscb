@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { log } from '../lib/logger';
+import { setUserContext, clearUserContext } from '../lib/sentry';
 
 /** Auth state machine */
 type AuthStatus = 'checking' | 'signedIn' | 'signedOut' | 'accessDenied';
@@ -102,13 +103,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .abortSignal(controller.signal)
         .maybeSingle();
 
+      // Get the actual school_code - for superadmins, it might be in super_admin table
+      let actualSchoolCode = userProfile?.school_code;
+      
+      // For superadmins, fetch school_code from super_admin table if not in users table
+      if (userProfile?.role === 'superadmin' && !actualSchoolCode) {
+        const { data: superAdminData } = await supabase
+          .from('super_admin')
+          .select('school_code')
+          .eq('auth_user_id', user.id)
+          .abortSignal(controller.signal)
+          .maybeSingle();
+        
+        if (superAdminData?.school_code) {
+          actualSchoolCode = superAdminData.school_code;
+        }
+      }
+
       // Fetch school name if school_code exists
       let schoolName: string | null = null;
-      if (userProfile?.school_code && !profileError) {
+      if (actualSchoolCode && !profileError) {
         const { data: schoolData } = await supabase
           .from('schools')
           .select('school_name')
-          .eq('school_code', userProfile.school_code)
+          .eq('school_code', actualSchoolCode)
           .abortSignal(controller.signal)
           .maybeSingle();
 
@@ -183,7 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profile: Profile = {
         auth_id: user.id,
         role: userProfile.role,
-        school_code: userProfile.school_code,
+        school_code: actualSchoolCode,
         school_name: schoolName,
         class_instance_id: userProfile.class_instance_id,
         full_name: userProfile.full_name,
@@ -199,7 +217,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bootstrapping: false,
       }));
 
-      // Removed verbose session persistence logging
+      // Set Sentry user context so every crash/error is tied to this user
+      setUserContext({
+        id: user.id,
+        email: userProfile.email ?? user.email,
+        role: userProfile.role,
+        school_code: actualSchoolCode,
+      });
     } catch (e: any) {
       clearTimeout(timeout);
       if (e?.name === 'AbortError') {
@@ -295,6 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Handle SIGNED_OUT or no session
       if (event === 'SIGNED_OUT' || !session) {
+        clearUserContext();
         setState((prev) => ({
           ...prev,
           status: 'signedOut',
@@ -388,18 +413,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function signOut() {
       try {
-        // Get current push token before signing out
-        const pushToken = await AsyncStorage.getItem('pushToken');
+        // Clear Sentry user context so subsequent events are anonymous
+        clearUserContext();
 
-        // Sign out from Supabase
+        // Get current push token before signing out for cleanup
+        const pushToken = await AsyncStorage.getItem('push-token-v2');
+
+        // Sign out from Supabase first (invalidates session)
         await supabase.auth.signOut();
 
-        // Remove push token from database (token hygiene)
+        // Remove push token from database (token hygiene) via secure RPC
         if (pushToken) {
-          const { removePushToken } = await import('../services/notifications');
-          await removePushToken(pushToken);
-          await AsyncStorage.removeItem('pushToken');
+          const { removeTokenFromServer } = await import('../services/notifications');
+          await removeTokenFromServer(pushToken);
+          await AsyncStorage.removeItem('push-token-v2');
         }
+      } catch (error) {
+        log.error('Error during signOut cleanup', { error });
       } finally {
         setState((prev) => ({
           ...prev,

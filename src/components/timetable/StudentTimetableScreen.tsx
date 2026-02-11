@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Text as RNText, RefreshControl } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
-import { Calendar, Coffee, AlertCircle } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { Text, ActivityIndicator, Button } from 'react-native-paper';
+// Check, Clock, Calendar are standard icon names
+import { Calendar as CalendarIcon, Coffee, AlertCircle, Clock, BookOpen, User, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { spacing, borderRadius, shadows } from '../../theme/tokens';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
-import { format, isToday as isTodayFn } from 'date-fns';
+import { format, isToday as isTodayFn, addDays, subDays } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 
@@ -28,17 +28,44 @@ interface TimetableSlot {
   topic_title?: string;
 }
 
-// Period Card Component
-function PeriodCard({ 
-  slot, 
-  isTaught, 
-  colors, 
-  styles 
-}: { 
-  slot: TimetableSlot; 
+// Professional Palette - slightly more muted/sophisticated
+const getSubjectColor = (subjectName: string = '', colors: ThemeColors) => {
+  const palette = [
+    '#3B82F6', // Blue 500
+    '#10B981', // Emerald 500
+    '#F59E0B', // Amber 500
+    '#EF4444', // Red 500
+    '#8B5CF6', // Violet 500
+    '#EC4899', // Pink 500
+    '#06B6D4', // Cyan 500
+    '#6366F1', // Indigo 500
+    '#F97316', // Orange 500
+    '#14B8A6', // Teal 500
+  ];
+
+  let hash = 0;
+  for (let i = 0; i < subjectName.length; i++) {
+    hash = subjectName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const index = Math.abs(hash) % palette.length;
+  return palette[index];
+};
+
+function TimetableRow({
+  slot,
+  isTaught,
+  colors,
+  styles,
+  isDark,
+  isLast
+}: {
+  slot: TimetableSlot;
   isTaught: boolean;
   colors: ThemeColors;
   styles: ReturnType<typeof createStyles>;
+  isDark: boolean;
+  isLast: boolean;
 }) {
   const formatTime = (time24?: string | null) => {
     if (!time24) return '--:--';
@@ -52,62 +79,108 @@ function PeriodCard({
     return `${hour12}:${minutes} ${ampm}`;
   };
 
-  // Determine if period is current, upcoming, or past
   const now = new Date();
   const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-  const isToday = isTodayFn(new Date(slot.class_date));
-  const isCurrent = isToday && currentTime >= slot.start_time && currentTime <= slot.end_time;
-  const isUpcoming = isToday && slot.start_time > currentTime;
-  const isPast = isToday && slot.end_time < currentTime;
+  const isTodayDate = isTodayFn(new Date(slot.class_date));
+  const isCurrent = isTodayDate && currentTime >= slot.start_time && currentTime <= slot.end_time;
 
+  // 1. Break Slot
   if (slot.slot_type === 'break') {
     return (
-      <View style={styles.breakCard}>
-        <View style={styles.breakIcon}>
-          <Coffee size={18} color={colors.warning[700]} />
+      <View style={styles.breakRowContainer}>
+        {/* Time Column */}
+        <View style={styles.timeColumn}>
+          <Text style={styles.startTime} numberOfLines={1}>{formatTime(slot.start_time)}</Text>
+          <Text style={styles.duration} numberOfLines={1}>{formatTime(slot.end_time)}</Text>
         </View>
-        <View style={styles.breakContent}>
-          <Text style={styles.breakTitle}>{slot.name || 'Break'}</Text>
-          <Text style={styles.breakTime}>
-            {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-          </Text>
+
+        {/* Timeline Column */}
+        <View style={styles.timelineColumn}>
+          <View style={[styles.timelineLine, isLast && styles.timelineLineLast]} />
+          <View style={styles.timelineDotBreak}>
+            <Coffee size={12} color={colors.warning[600]} />
+          </View>
+        </View>
+
+        {/* Content Column */}
+        <View style={styles.breakContentColumn}>
+          <View style={styles.breakCard}>
+            <Text style={styles.breakTitle}>{slot.name || 'Break'}</Text>
+          </View>
         </View>
       </View>
     );
   }
 
+  // 2. Regular Class Slot
+  const subjectColor = getSubjectColor(slot.subject_name || 'Unassigned', colors);
+
   return (
-    <View
-      style={[
-        styles.periodCard,
-        isCurrent && styles.currentCard,
-        isUpcoming && styles.upcomingCard,
-        isPast && styles.pastCard,
-        isTaught ? styles.taughtCard : styles.pendingCard,
-      ]}
-    >
-      <View style={styles.periodContent}>
-        {/* Time */}
-        <RNText style={[styles.timeText, isTaught && styles.taughtText]}>
-          {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-        </RNText>
+    <View style={styles.rowContainer}>
+      {/* Time Column */}
+      <View style={styles.timeColumn}>
+        <Text style={[styles.startTime, isCurrent && { color: subjectColor }]} numberOfLines={1}>
+          {formatTime(slot.start_time)}
+        </Text>
+        <Text style={styles.duration} numberOfLines={1}>
+          {formatTime(slot.end_time)}
+        </Text>
+      </View>
 
-        {/* Subject */}
-        <RNText style={[styles.subjectText, isTaught && styles.taughtText]} numberOfLines={2}>
-          {slot.subject_name || 'Unassigned'}
-        </RNText>
+      {/* Timeline Column */}
+      <View style={styles.timelineColumn}>
+        <View style={[styles.timelineLine, isLast && styles.timelineLineLast]} />
+        <View
+          style={[
+            styles.timelineDot,
+            {
+              borderColor: subjectColor,
+              backgroundColor: isCurrent ? subjectColor : colors.background.app
+            }
+          ]}
+        />
+      </View>
 
-        {/* Topic */}
-        <RNText style={[styles.detailText, isTaught && styles.taughtDetailText]} numberOfLines={1}>
-          <RNText style={[styles.label, isTaught && styles.taughtLabel]}>Topic: </RNText>
-          {slot.topic_title || slot.plan_text || '—'}
-        </RNText>
+      {/* Content Column */}
+      <View style={styles.contentColumn}>
+        <View
+          style={[
+            styles.eventCard,
+            isCurrent && {
+              ...styles.currentCardShadow,
+              backgroundColor: colors.surface.elevated
+            },
+            { borderLeftColor: subjectColor, borderLeftWidth: 4 }
+          ]}
+        >
+          <View style={styles.cardContent}>
+            <View style={styles.eventHeader}>
+              <Text style={styles.subjectName} numberOfLines={1}>
+                {slot.subject_name || 'Unassigned'}
+              </Text>
+              {isTaught && (
+                <View style={styles.taughtBadge}>
+                  <Check size={12} color={colors.success[600]} />
+                </View>
+              )}
+            </View>
 
-        {/* Teacher */}
-        <RNText style={[styles.detailText, isTaught && styles.taughtDetailText]} numberOfLines={1}>
-          <RNText style={[styles.label, isTaught && styles.taughtLabel]}>Teacher: </RNText>
-          {slot.teacher_name || '—'}
-        </RNText>
+            <View style={styles.eventDetails}>
+              <View style={styles.detailItem}>
+                <BookOpen size={14} color={colors.text.tertiary} />
+                <Text style={styles.detailText} numberOfLines={1}>
+                  {slot.topic_title || slot.plan_text || 'No topic assigned'}
+                </Text>
+              </View>
+              <View style={styles.detailItem}>
+                <User size={14} color={colors.text.tertiary} />
+                <Text style={styles.detailText} numberOfLines={1}>
+                  {slot.teacher_name || 'No teacher'}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
       </View>
     </View>
   );
@@ -123,8 +196,7 @@ export function StudentTimetableScreen() {
   const [slots, setSlots] = useState<TimetableSlot[]>([]);
   const [taughtSlotIds, setTaughtSlotIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  
-  // Create dynamic styles based on theme
+
   const styles = useMemo(
     () => createStyles(colors, typography, themeSpacing, themeBorderRadius, themeShadows, isDark),
     [colors, typography, themeSpacing, themeBorderRadius, themeShadows, isDark]
@@ -132,7 +204,6 @@ export function StudentTimetableScreen() {
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-  // Fetch timetable and taught status
   const fetchTimetable = async (showLoading = true) => {
     if (!profile?.class_instance_id) {
       setLoading(false);
@@ -146,7 +217,7 @@ export function StudentTimetableScreen() {
       // 1. Fetch timetable slots
       const { data: slotsData, error: slotsError } = await supabase
         .from('timetable_slots')
-        .select('*')
+        .select('id, class_date, period_number, slot_type, name, start_time, end_time, subject_id, teacher_id, plan_text, syllabus_topic_id')
         .eq('class_instance_id', profile.class_instance_id)
         .eq('class_date', dateStr)
         .order('start_time', { ascending: true });
@@ -160,12 +231,12 @@ export function StudentTimetableScreen() {
         return;
       }
 
-      // 2. Get subject IDs and teacher IDs
-      const subjectIds = [...new Set(slotsData.map(s => s.subject_id).filter((id): id is string => Boolean(id)))];
-      const teacherIds = [...new Set(slotsData.map(s => s.teacher_id).filter((id): id is string => Boolean(id)))];
-      const topicIds = [...new Set(slotsData.map(s => s.syllabus_topic_id).filter((id): id is string => Boolean(id)))];
+      // 2. Get IDs
+      const subjectIds = [...new Set((slotsData as any[]).map(s => s.subject_id).filter(Boolean))];
+      const teacherIds = [...new Set((slotsData as any[]).map(s => s.teacher_id).filter(Boolean))];
+      const topicIds = [...new Set((slotsData as any[]).map(s => s.syllabus_topic_id).filter(Boolean))];
 
-      // 3. Fetch subjects, teachers, and topics in parallel
+      // 3. Fetch details
       const [subjectsRes, teachersRes, topicsRes] = await Promise.all([
         subjectIds.length > 0
           ? supabase.from('subjects').select('id, subject_name').in('id', subjectIds)
@@ -178,23 +249,23 @@ export function StudentTimetableScreen() {
           : Promise.resolve({ data: [] }),
       ]);
 
-      const subjectsMap = new Map((subjectsRes.data || []).map(s => [s.id, s.subject_name]));
-      const teachersMap = new Map((teachersRes.data || []).map(t => [t.id, t.full_name]));
-      const topicsMap = new Map((topicsRes.data || []).map(t => [t.id, t.title]));
+      const subjectsMap = new Map((subjectsRes.data as any[] || []).map(s => [s.id, s.subject_name]));
+      const teachersMap = new Map((teachersRes.data as any[] || []).map(t => [t.id, t.full_name]));
+      const topicsMap = new Map((topicsRes.data as any[] || []).map(t => [t.id, t.title]));
 
-      // 4. Fetch taught status from syllabus_progress
-      const { data: progressData, error: progressError } = await supabase
+      // 4. Fetch taught status
+      const { data: progressData } = await supabase
         .from('syllabus_progress')
         .select('timetable_slot_id')
         .eq('class_instance_id', profile.class_instance_id)
         .eq('date', dateStr);
 
       const taughtIds = new Set(
-        (progressData || []).map(p => p.timetable_slot_id).filter(Boolean)
+        (progressData as any[] || []).map(p => p.timetable_slot_id).filter(Boolean)
       );
 
-      // 5. Enrich slots with subject/teacher/topic names
-      const enrichedSlots = slotsData.map(slot => ({
+      // 5. Enrich slots
+      const enrichedSlots = (slotsData as any[]).map(slot => ({
         ...slot,
         slot_type: slot.slot_type as 'period' | 'break',
         subject_name: slot.subject_id ? subjectsMap.get(slot.subject_id) : undefined,
@@ -206,25 +277,26 @@ export function StudentTimetableScreen() {
       setTaughtSlotIds(taughtIds);
       setLoading(false);
     } catch (err: any) {
-      console.error('[StudentTimetable] Error:', err);
+      // Timetable fetch failed - error state set below
       setError(err.message);
       setLoading(false);
     }
   };
 
-  // Fetch on mount and when date changes
   useEffect(() => {
     fetchTimetable();
   }, [dateStr, profile?.class_instance_id]);
 
-  // Handle pull to refresh
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchTimetable(false);
     setRefreshing(false);
   };
 
-  // Loading state
+  const handlePrevDay = () => setSelectedDate(subDays(selectedDate, 1));
+  const handleNextDay = () => setSelectedDate(addDays(selectedDate, 1));
+  const handleToday = () => setSelectedDate(new Date());
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -236,59 +308,57 @@ export function StudentTimetableScreen() {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <View style={styles.container}>
         <View style={styles.centerContainer}>
           <AlertCircle size={48} color={colors.error[600]} />
-          <Text style={styles.errorTitle}>Failed to load timetable</Text>
+          <Text style={styles.errorTitle}>Failed to load</Text>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => fetchTimetable()}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+          <Button mode="contained" onPress={() => fetchTimetable()}>
+            Retry
+          </Button>
         </View>
       </View>
     );
   }
 
-  // No class assigned
   if (!profile?.class_instance_id) {
     return (
       <View style={styles.container}>
         <EmptyStateIllustration
           type="general"
           title="No Class Assigned"
-          description="Please contact your administrator to assign you to a class."
+          description="Contact administrator."
         />
       </View>
     );
   }
 
-  // Three-state handling (duplicate check - already handled above)
-  // This section is redundant as loading and error states are already handled above
-
   return (
     <View style={styles.container}>
-      {/* Date Filter */}
-      <View style={styles.filterSection}>
-        <View style={styles.filterRow}>
-          <TouchableOpacity style={styles.filterItem} onPress={() => setShowDatePicker(true)}>
-            <View style={styles.filterIcon}>
-              <Calendar size={16} color={colors.text.inverse} />
-            </View>
-            <View style={styles.filterContent}>
-              <Text style={styles.filterLabel}>Date</Text>
-              <Text style={styles.filterValue} numberOfLines={1}>
-                {format(selectedDate, 'MMM d, yyyy')}
-              </Text>
-            </View>
+      {/* Minimized Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handlePrevDay} style={styles.navButton}>
+          <ChevronLeft size={24} color={colors.text.secondary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
+          <Text style={styles.dateText}>{format(selectedDate, 'MMMM d')}</Text>
+          <Text style={styles.dayText}>{format(selectedDate, 'EEEE, yyyy')}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={handleNextDay} style={styles.navButton}>
+          <ChevronRight size={24} color={colors.text.secondary} />
+        </TouchableOpacity>
+
+        {!isTodayFn(selectedDate) && (
+          <TouchableOpacity onPress={handleToday} style={styles.todayButton}>
+            <Text style={styles.todayText}>Today</Text>
           </TouchableOpacity>
-        </View>
+        )}
       </View>
 
-
-      {/* Timetable List */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -302,27 +372,30 @@ export function StudentTimetableScreen() {
         }
       >
         {slots.length === 0 ? (
-          <EmptyStateIllustration
-            type="calendar"
-            title="No Classes Scheduled"
-            description={`No classes scheduled for ${format(selectedDate, 'MMMM d, yyyy')}`}
-          />
+          <View style={{ marginTop: themeSpacing['4xl'] }}>
+            <EmptyStateIllustration
+              type="calendar"
+              title="No Classes"
+              description="Enjoy your day off!"
+            />
+          </View>
         ) : (
-          <View style={styles.slotsContainer}>
-            {slots.map(slot => (
-              <PeriodCard
+          <View style={styles.listContainer}>
+            {slots.map((slot, index) => (
+              <TimetableRow
                 key={slot.id}
                 slot={slot}
                 isTaught={taughtSlotIds.has(slot.id)}
                 colors={colors}
                 styles={styles}
+                isDark={isDark}
+                isLast={index === slots.length - 1}
               />
             ))}
           </View>
         )}
       </ScrollView>
 
-      {/* Date Picker Modal */}
       <DatePickerModal
         visible={showDatePicker}
         initialDate={selectedDate}
@@ -331,8 +404,6 @@ export function StudentTimetableScreen() {
           setSelectedDate(date);
           setShowDatePicker(false);
         }}
-        minimumDate={new Date(2020, 0, 1)}
-        maximumDate={new Date(2030, 11, 31)}
         title="Select Date"
       />
     </View>
@@ -359,7 +430,7 @@ const createStyles = (
   },
   loadingText: {
     marginTop: spacing.md,
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
   },
   errorTitle: {
@@ -375,271 +446,224 @@ const createStyles = (
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
-  retryButton: {
-    backgroundColor: colors.primary[600],
-    paddingHorizontal: spacing.xl,
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-  },
-  retryButtonText: {
-    color: colors.text.inverse,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-  },
-
-  // Filter Section
-  filterSection: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    backgroundColor: colors.background.app,
-  },
-  filterRow: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    paddingHorizontal: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: isDark ? 0.3 : 0.1,
-    shadowRadius: 4,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: colors.border.DEFAULT,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+    zIndex: 10,
   },
-  filterItem: {
-    flex: 1,
-    flexDirection: 'row',
+  navButton: {
+    padding: spacing.sm,
+  },
+  dateSelector: {
     alignItems: 'center',
   },
-  filterIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary[600],
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
+  dateText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
   },
-  filterContent: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  filterLabel: {
+  dayText: {
     fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-    marginBottom: spacing.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  filterValue: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
+  todayButton: {
+    position: 'absolute',
+    right: spacing.md,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary[50], // Very subtle
   },
-
-  // Today's Classes Summary
-  todaysClassesSummary: {
-    backgroundColor: colors.surface.primary,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    ...shadows.sm,
-  },
-  todaysClassesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    gap: spacing.xs,
-  },
-  todaysClassesTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    flex: 1,
-  },
-  todaysClassesBadge: {
-    backgroundColor: colors.primary[100],
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    minWidth: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  todaysClassesBadgeText: {
+  todayText: {
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.bold,
     color: colors.primary[700],
   },
-  todaysClassesScroll: {
-    maxHeight: 80,
-  },
-  todaysClassesScrollContent: {
-    gap: spacing.xs,
-    paddingRight: spacing.xs,
-  },
-  todaysClassChip: {
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    marginRight: spacing.xs,
-    minWidth: 120,
-  },
-  todaysClassChipCurrent: {
-    backgroundColor: colors.success[50],
-    borderColor: colors.success[300],
-    borderWidth: 2,
-  },
-  todaysClassChipUpcoming: {
-    backgroundColor: colors.info[50],
-    borderColor: colors.info[300],
-  },
-  todaysClassChipSubject: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  todaysClassChipSubjectCurrent: {
-    color: colors.success[700],
-  },
-  todaysClassChipCount: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  todaysClassChipIndicator: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: colors.success[500],
-    borderRadius: borderRadius.full,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  todaysClassChipIndicatorText: {
-    fontSize: typography.fontSize.xs - 2,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
-  },
 
-  // Scrollable Content
+  // Scroll Content
   scrollView: {
     flex: 1,
   },
   scrollContent: {
+    paddingVertical: spacing.xl,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing['4xl'],
   },
-  slotsContainer: {
-    gap: spacing.sm,
+  listContainer: {
+    // No gap, contiguous flow
   },
 
-  // Period Card Styles
-  periodCard: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    borderLeftWidth: 4,
-    ...shadows.sm,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: colors.border.DEFAULT,
+  // Row Layout
+  rowContainer: {
+    flexDirection: 'row',
+    minHeight: 90,
   },
-  currentCard: {
-    borderWidth: 2,
-    borderColor: colors.info[600],
-    ...shadows.md,
+  breakRowContainer: {
+    flexDirection: 'row',
+    minHeight: 50,
   },
-  upcomingCard: {
-    borderWidth: 1,
-    borderColor: colors.info[400],
+  timeColumn: {
+    width: 72,
+    alignItems: 'flex-end',
+    paddingRight: spacing.sm,
+    paddingTop: 2, // Align with top of card
   },
-  pastCard: {
-    opacity: 0.85,
-  },
-  taughtCard: {
-    borderLeftColor: colors.success[600],
-    backgroundColor: isDark ? colors.success[100] : colors.success[50],
-  },
-  pendingCard: {
-    borderLeftColor: colors.primary[600],
-    backgroundColor: colors.surface.primary,
-  },
-  periodContent: {
-    gap: spacing.sm,
-  },
-  timeText: {
+  startTime: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-  },
-  subjectText: {
-    fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
-  detailText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-    lineHeight: 20,
-  },
-  label: {
+  duration: {
     fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
     color: colors.text.tertiary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginTop: 2,
   },
-  taughtText: {
-    color: colors.success[700],
-  },
-  taughtDetailText: {
-    color: colors.success[700],
-  },
-  taughtLabel: {
-    color: colors.success[600],
+  breakTimeText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.tertiary,
+    fontStyle: 'italic',
   },
 
-  // Break Card Styles
-  breakCard: {
-    backgroundColor: isDark ? colors.warning[100] : colors.warning[50],
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderLeftWidth: 4,
-    borderLeftColor: colors.warning[700],
-    ...shadows.xs,
-  },
-  breakIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.warning[100],
-    justifyContent: 'center',
+  // Timeline
+  timelineColumn: {
+    width: 20,
     alignItems: 'center',
     marginRight: spacing.md,
   },
-  breakContent: {
-    flex: 1,
+  timelineLine: {
+    position: 'absolute',
+    top: 12, // Start below dot center
+    bottom: -100, // Extend to next row
+    width: 2,
+    backgroundColor: isDark ? colors.border.light : '#E5E7EB', // Gray-200
   },
-  breakTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.warning[900],
+  timelineLineLast: {
+    bottom: 0,
+    display: 'none', // Or just end
+  },
+  timelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    backgroundColor: colors.background.app,
+    zIndex: 1,
+    marginTop: 6, // Optical alignment with time text
+  },
+  timelineDotBreak: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: colors.surface.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+    marginTop: 0,
+  },
+
+  // Content
+  contentColumn: {
+    flex: 1,
+    paddingBottom: spacing.md,
+  },
+  breakContentColumn: {
+    flex: 1,
+    paddingBottom: spacing.sm,
+  },
+
+  // Card
+  eventCard: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.sm,
+    // Removed border width and color
+    flexDirection: 'row',
+  },
+  currentCardShadow: {
+    ...shadows.md,
+  },
+  accentStrip: {
+    width: 4,
+    height: '100%',
+  },
+  cardContent: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  eventHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     marginBottom: spacing.xs,
   },
-  breakTime: {
+  subjectName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  taughtBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success[50],
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    gap: 4,
+  },
+  taughtText: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.success[700],
+    textTransform: 'uppercase',
+  },
+  eventDetails: {
+    gap: 6,
+    marginTop: spacing.xs,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailText: {
     fontSize: typography.fontSize.sm,
-    color: colors.warning[700],
+    color: colors.text.secondary,
+    flex: 1,
+  },
+
+  // Break Styles
+  breakCard: {
+    backgroundColor: isDark ? colors.surface.secondary : colors.neutral[50], // Keep neutral bg
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    // Removed border
+  },
+  breakTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+  },
+  breakDuration: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.tertiary,
   },
 });

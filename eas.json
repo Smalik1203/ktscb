@@ -28,6 +28,21 @@
       "env": {
         "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
       }
+    },
+
+    "kts:preview": {
+      "extends": "preview",
+      "env": {
+        "SCHOOL": "kts",
+        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
+      }
+    },
+    "kts:production": {
+      "extends": "production",
+      "env": {
+        "SCHOOL": "kts",
+        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
+      }
     }
   },
   "submit": {

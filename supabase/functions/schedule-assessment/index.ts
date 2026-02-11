@@ -42,7 +42,7 @@ Deno.serve(async (req: Request) => {
                 created_by: assessment.created_by,
                 school_code: assessment.school_code,
             })
-            .select()
+            .select('id')
             .single();
 
         if (insertError) {
@@ -66,72 +66,62 @@ Deno.serve(async (req: Request) => {
             );
         }
 
-        // 4. Trigger notifications (async, server-controlled)
-        queueMicrotask(async () => {
-            try {
-                const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
-                const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+        // 4. Send notifications (fire-and-forget)
+        const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+        const userIds = students.map(s => s.user_id).filter(Boolean) as string[];
 
-                const userIds = students.map(s => s.user_id).filter(Boolean);
+        if (userIds.length > 0) {
+            const assessmentDate = new Date(assessment.date);
+            const formattedDate = assessmentDate.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric'
+            });
 
-                if (userIds.length === 0) {
-                    console.warn('No valid user_ids found');
-                    return;
-                }
+            const daysUntil = Math.ceil((assessmentDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
 
-                // Format assessment date
-                const assessmentDate = new Date(assessment.date);
-                const formattedDate = assessmentDate.toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric'
-                });
-
-                // Calculate days until assessment
-                const daysUntil = Math.ceil((assessmentDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-
-                let emoji = '📊';
-                let encouragement = 'Good luck!';
-
-                if (daysUntil <= 1) {
-                    emoji = '🔥';
-                    encouragement = 'It\'s tomorrow! Final prep time!';
-                } else if (daysUntil <= 3) {
-                    emoji = '⏰';
-                    encouragement = 'Start preparing now!';
-                } else if (daysUntil <= 7) {
-                    emoji = '📚';
-                    encouragement = 'Time to start studying!';
-                }
-
-                await fetch(notificationUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': authHeader,
-                    },
-                    body: JSON.stringify({
-                        event: 'assessment_scheduled',
-                        targets: { user_ids: userIds },
-                        payload: {
-                            title: `${emoji} ${assessment.subject} Test Scheduled!`,
-                            body: `${assessment.title} on ${formattedDate} - ${encouragement} 💪`,
-                            data: {
-                                type: 'assessment',
-                                assessment_id: insertedAssessment.id,
-                                title: assessment.title,
-                                date: assessment.date,
-                                subject: assessment.subject,
-                            },
-                        },
-                    }),
-                });
-            } catch (err) {
-                console.error('Notification trigger failed:', err);
+            let emoji = '📊';
+            let encouragement = 'Good luck!';
+            if (daysUntil <= 1) {
+                emoji = '🔥';
+                encouragement = "It's tomorrow! Final prep time!";
+            } else if (daysUntil <= 3) {
+                emoji = '⏰';
+                encouragement = 'Start preparing now!';
+            } else if (daysUntil <= 7) {
+                emoji = '📚';
+                encouragement = 'Time to start studying!';
             }
-        });
 
-        // 5. Return immediately
+            const baseUrl = Deno.env.get('SUPABASE_URL');
+            const notifUrl = userIds.length > 50 
+                ? `${baseUrl}/functions/v1/queue-notification`
+                : `${baseUrl}/functions/v1/send-notification`;
+
+            fetch(notifUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+                body: JSON.stringify({
+                    event: 'assessment_scheduled',
+                    targets: { user_ids: userIds },
+                    payload: {
+                        title: `${emoji} ${assessment.subject} Test Scheduled!`,
+                        body: `${assessment.title} on ${formattedDate} - ${encouragement} 💪`,
+                        data: {
+                            type: 'assessment',
+                            assessment_id: insertedAssessment.id,
+                            title: assessment.title,
+                            date: assessment.date,
+                            subject: assessment.subject,
+                        },
+                    },
+                }),
+            }).catch(err => console.error('Assessment notification failed:', err));
+            
+            console.log(`Triggered assessment notification for ${userIds.length} users`);
+        }
+
+        // 5. Return
         return new Response(
             JSON.stringify({
                 success: true,

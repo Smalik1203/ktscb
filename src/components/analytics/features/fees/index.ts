@@ -1,2 +1,0 @@
-export { FeesDetailView } from './FeesDetailView';
-

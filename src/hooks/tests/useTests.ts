@@ -32,6 +32,32 @@ export function useCreateTest() {
   });
 }
 
+export function useCreateTestWithQuestions() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      testData,
+      questionsData,
+    }: {
+      testData: Omit<TestInput, 'school_code' | 'created_by'>;
+      questionsData: Array<{
+        question_text: string;
+        question_type: string;
+        options?: string[] | null;
+        correct_index?: number | null;
+        correct_text?: string | null;
+        correct_answer?: string | null;
+        points: number;
+        order_index: number;
+      }>;
+    }) => api.tests.createWithQuestions(testData, questionsData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tests'] });
+    },
+  });
+}
+
 export function useUpdateTest() {
   const queryClient = useQueryClient();
 

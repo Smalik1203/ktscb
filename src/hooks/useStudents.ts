@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listStudents } from '../data/queries';
-import { supabase } from '../lib/supabase';
+import { supabase as supabaseClient } from '../lib/supabase';
+const supabase = supabaseClient as any;
 import { log } from '../lib/logger';
 import { DB } from '../types/db.constants';
 
@@ -16,28 +17,29 @@ export interface StudentsPaginationResult {
 export function useStudents(
   classInstanceId?: string,
   schoolCode?: string,
-  options?: { page?: number; pageSize?: number }
+  options?: { page?: number; pageSize?: number; search?: string }
 ) {
   const usePagination = options !== undefined;
   const page = options?.page ?? 1;
   const pageSize = options?.pageSize ?? 25;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
-  
+  const search = options?.search?.trim();
+
   return useQuery<StudentsPaginationResult>({
-    queryKey: usePagination 
-      ? ['students', classInstanceId, schoolCode, page, pageSize]
+    queryKey: usePagination
+      ? ['students', classInstanceId, schoolCode, page, pageSize, search]
       : ['students', classInstanceId, schoolCode, 'all'],
     queryFn: async () => {
       if (!classInstanceId || !schoolCode) {
         return { data: [], total: 0, page: 1, pageSize: usePagination ? pageSize : 0 };
       }
-      
+
       if (!usePagination) {
         // Fetch all students without pagination
         const result = await listStudents(classInstanceId, schoolCode);
         if (result.error) throw result.error;
-        
+
         return {
           data: result.data || [],
           total: result.data?.length || 0,
@@ -45,20 +47,32 @@ export function useStudents(
           pageSize: 0, // 0 means all
         };
       }
-      
+
       // Get total count for pagination
-      const { count, error: countError } = await supabase
+      let countQuery = supabase
         .from(DB.tables.student)
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq(DB.columns.classInstanceId, classInstanceId)
         .eq(DB.columns.schoolCode, schoolCode);
-      
+
+      if (search) {
+        const filter = [
+          `full_name.ilike.%${search}%`,
+          `email.ilike.%${search}%`,
+          `student_code.ilike.%${search}%`,
+          `phone.ilike.%${search}%`,
+        ].join(',');
+        countQuery = countQuery.or(filter);
+      }
+
+      const { count, error: countError } = await countQuery;
+
       if (countError) throw countError;
-      
+
       // Get paginated data
-      const result = await listStudents(classInstanceId, schoolCode, { from, to });
+      const result = await listStudents(classInstanceId, schoolCode, { from, to, search });
       if (result.error) throw result.error;
-      
+
       return {
         data: result.data || [],
         total: count || 0,
@@ -93,11 +107,11 @@ export function useCreateStudent(schoolCode: string | null | undefined) {
       }
 
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError) {
         throw new Error('Failed to get session: ' + sessionError.message);
       }
-      
+
       const token = session?.access_token;
 
       if (!token) {
@@ -112,7 +126,7 @@ export function useCreateStudent(schoolCode: string | null | undefined) {
         throw new Error('Supabase configuration is missing. Please restart the app.');
       }
       const url = `${supabaseUrl}/functions/v1/create-student`;
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -146,6 +160,96 @@ export function useCreateStudent(schoolCode: string | null | undefined) {
     },
     onError: (error: any) => {
       log.error('Failed to create student', { error: error.message });
+    },
+  });
+}
+
+// Update Student Input Type
+export interface UpdateStudentInput {
+  id: string;
+  full_name: string;
+  phone: string;
+  student_code: string;
+}
+
+// Update Student Mutation
+export function useUpdateStudent(schoolCode: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateStudentInput) => {
+      log.info('Updating student', { studentId: input.id });
+
+      const { error } = await supabase
+        .from(DB.tables.student)
+        .update({
+          full_name: input.full_name,
+          phone: input.phone,
+          student_code: input.student_code,
+        })
+        .eq('id', input.id);
+
+      if (error) {
+        log.error('Failed to update student', error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+  });
+}
+
+// Delete Student Mutation
+export function useDeleteStudent(schoolCode: string | null | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (studentId: string) => {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error('Failed to get session: ' + sessionError.message);
+      }
+
+      const token = session?.access_token;
+
+      if (!token) {
+        throw new Error('Not authenticated. Please log in.');
+      }
+
+      log.info('Deleting student via Edge Function', { studentId });
+
+      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+      if (!supabaseUrl || supabaseUrl.trim() === '') {
+        throw new Error('Supabase configuration is missing. Please restart the app.');
+      }
+
+      const url = `${supabaseUrl}/functions/v1/delete-student`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ student_id: studentId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = result.error || result.details || 'Failed to delete student';
+        throw new Error(errorMessage);
+      }
+
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+    },
+    onError: (error: any) => {
+      log.error('Failed to delete student', { error: error.message });
     },
   });
 }

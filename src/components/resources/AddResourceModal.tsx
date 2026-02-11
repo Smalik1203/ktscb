@@ -1,4 +1,4 @@
-import React, { useState, useEffect , useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal as RNModal, Animated, ActivityIndicator } from 'react-native';
@@ -32,11 +32,10 @@ const pickFile = async () => {
     });
 
     if (result.canceled || !result.assets?.[0]) return null;
-    
+
     const file = result.assets[0];
     return file;
   } catch (error) {
-    console.error('Error picking file:', error);
     throw error;
   }
 };
@@ -111,7 +110,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
   const { data: classes = [] } = useClasses(profile?.school_code ?? undefined);
   const { data: subjectsResult } = useSubjects(profile?.school_code ?? undefined);
   const subjects = subjectsResult?.data || [];
-  
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -120,7 +119,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
     class_instance_id: '',
     content_url: ''
   });
-  
+
   const [useFileUpload, setUseFileUpload] = useState(false);
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
@@ -170,7 +169,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
         setFormData(prev => ({ ...prev, content_url: file.uri }));
       }
     } catch (error) {
-      console.error('Error picking file:', error);
       Alert.alert('Error', error.message || 'Failed to pick file');
     }
   };
@@ -188,7 +186,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
     // Reset progress
     setUploadProgress(0);
     setUploadingStatus('Preparing upload...');
-    
+
     // Simulate progress since Supabase doesn't expose upload progress
     const progressInterval = setInterval(() => {
       setUploadProgress((prev) => {
@@ -204,15 +202,15 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
       const pathPrefix = `${profile.school_code}/${formData.class_instance_id}/${formData.subject_id}`;
       setUploadingStatus('Uploading to cloud storage...');
       const url = await uploadToSupabase(file, pathPrefix);
-      
+
       // Complete progress
       clearInterval(progressInterval);
       setUploadProgress(100);
       setUploadingStatus('Upload complete!');
-      
+
       // Small delay to show completion
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
       return url;
     } catch (error) {
       clearInterval(progressInterval);
@@ -284,7 +282,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
       onSuccess();
       onDismiss();
     } catch (error) {
-      console.error('Error saving resource:', error);
       Alert.alert('Error', error.message || 'Failed to save resource');
     } finally {
       setUploading(false);
@@ -372,37 +369,41 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
 
             {/* Subject Selection */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Subject *</Text>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={() => setShowSubjectDropdown(true)}
-              >
-                <Text style={styles.dropdownText}>
-                  {formData.subject_id 
-                    ? subjects.find(s => s.id === formData.subject_id)?.subject_name || 'Select Subject'
-                    : 'Select Subject'
-                  }
-                </Text>
-                <Text style={styles.dropdownArrow}>▼</Text>
+              <TouchableOpacity onPress={() => setShowSubjectDropdown(true)}>
+                <TextInput
+                  label="Subject *"
+                  value={formData.subject_id
+                    ? subjects.find(s => s.id === formData.subject_id)?.subject_name
+                    : ''}
+                  placeholder="Select Subject"
+                  mode="outlined"
+                  dense
+                  editable={false}
+                  pointerEvents="none"
+                  style={styles.input}
+                  right={<TextInput.Icon icon="chevron-down" />}
+                />
               </TouchableOpacity>
             </View>
 
             {/* Class Selection */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Class *</Text>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={() => setShowClassDropdown(true)}
-              >
-                <Text style={styles.dropdownText}>
-                  {formData.class_instance_id 
-                    ? classes.find(c => c.id === formData.class_instance_id) 
-                        ? `Grade ${classes.find(c => c.id === formData.class_instance_id)?.grade} - ${classes.find(c => c.id === formData.class_instance_id)?.section}`
-                        : 'Select Class'
-                    : 'Select Class'
-                  }
-                </Text>
-                <Text style={styles.dropdownArrow}>▼</Text>
+              <TouchableOpacity onPress={() => setShowClassDropdown(true)}>
+                <TextInput
+                  label="Class *"
+                  value={formData.class_instance_id
+                    ? classes.find(c => c.id === formData.class_instance_id)
+                      ? `Grade ${classes.find(c => c.id === formData.class_instance_id)?.grade} - ${classes.find(c => c.id === formData.class_instance_id)?.section}`
+                      : ''
+                    : ''}
+                  placeholder="Select Class"
+                  mode="outlined"
+                  dense
+                  editable={false}
+                  pointerEvents="none"
+                  style={styles.input}
+                  right={<TextInput.Icon icon="chevron-down" />}
+                />
               </TouchableOpacity>
             </View>
 
@@ -435,8 +436,8 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
             ) : (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Upload File *</Text>
-                <TouchableOpacity 
-                  style={styles.fileUploadButton} 
+                <TouchableOpacity
+                  style={styles.fileUploadButton}
                   onPress={handleFilePick}
                   disabled={uploading}
                 >
@@ -448,7 +449,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
                 <Text style={styles.fileUploadHint}>
                   Supported: Videos (mp4, etc.), PDFs. Will be stored in Supabase Storage.
                 </Text>
-                
+
                 {/* Upload Progress Indicator */}
                 {uploading && (
                   <View style={styles.uploadProgressContainer}>
@@ -457,9 +458,9 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
                       <Text style={styles.uploadStatusText}>{uploadingStatus}</Text>
                       <Text style={styles.uploadProgressText}>{Math.round(uploadProgress)}%</Text>
                     </View>
-                    <ProgressBar 
-                      progress={uploadProgress / 100} 
-                      color={colors.primary[600]} 
+                    <ProgressBar
+                      progress={uploadProgress / 100}
+                      color={colors.primary[600]}
                       style={styles.progressBar}
                     />
                   </View>
@@ -565,174 +566,156 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
 
 const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
   StyleSheet.create({
-  modal: {
-    backgroundColor: colors.surface.primary,
-    margin: spacing.lg,
-    borderRadius: borderRadius.lg,
-    maxHeight: '90%',
-  },
-  scrollView: {
-    maxHeight: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  title: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  closeButton: {
-    padding: spacing.xs,
-  },
-  form: {
-    padding: spacing.lg,
-  },
-  inputGroup: {
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  input: {
-    backgroundColor: colors.surface.primary,
-  },
-  segmentedButtons: {
-    marginTop: spacing.xs,
-  },
-  dropdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  dropdownText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-    flex: 1,
-  },
-  dropdownArrow: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  fileUploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderStyle: 'dashed',
-  },
-  fileUploadText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-    marginLeft: spacing.sm,
-  },
-  fileUploadHint: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-  },
-  uploadProgressContainer: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.primary[50],
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.primary[200],
-  },
-  uploadProgressHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  uploadStatusText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-    flex: 1,
-    fontWeight: typography.fontWeight.medium,
-  },
-  uploadProgressText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.primary[700],
-    fontWeight: typography.fontWeight.bold,
-  },
-  progressBar: {
-    height: 6,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.primary[100],
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  cancelButton: {
-    flex: 1,
-  },
-  submitButton: {
-    flex: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.surface.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownModal: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    margin: spacing.lg,
-    maxHeight: '60%',
-    minWidth: 300,
-  },
-  dropdownTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  dropdownList: {
-    maxHeight: 200,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  dropdownItemText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-    flex: 1,
-  },
-  checkmark: {
-    fontSize: typography.fontSize.base,
-    color: colors.primary[600],
-    fontWeight: typography.fontWeight.bold,
-  },
-});
+    modal: {
+      backgroundColor: colors.surface.primary,
+      margin: spacing.lg,
+      borderRadius: borderRadius.lg,
+      maxHeight: '90%',
+    },
+    scrollView: {
+      maxHeight: '100%',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.light,
+    },
+    title: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    closeButton: {
+      padding: spacing.xs,
+    },
+    form: {
+      padding: spacing.lg,
+    },
+    inputGroup: {
+      marginBottom: spacing.lg,
+    },
+    label: {
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.medium,
+      color: colors.text.primary,
+      marginBottom: spacing.sm,
+    },
+    input: {
+      backgroundColor: colors.surface.primary,
+      height: 48, // Standard height
+      fontSize: typography.fontSize.sm,
+    },
+    segmentedButtons: {
+      marginTop: spacing.xs,
+    },
+    fileUploadButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.background.secondary,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border.DEFAULT,
+      borderStyle: 'dashed',
+    },
+    fileUploadText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.primary,
+      marginLeft: spacing.sm,
+    },
+    fileUploadHint: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.secondary,
+      marginTop: spacing.xs,
+    },
+    uploadProgressContainer: {
+      marginTop: spacing.md,
+      padding: spacing.md,
+      backgroundColor: colors.primary[50],
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.primary[200],
+    },
+    uploadProgressHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+      gap: spacing.sm,
+    },
+    uploadStatusText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.primary,
+      flex: 1,
+      fontWeight: typography.fontWeight.medium,
+    },
+    uploadProgressText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.primary[700],
+      fontWeight: typography.fontWeight.bold,
+    },
+    progressBar: {
+      height: 6,
+      borderRadius: borderRadius.sm,
+      backgroundColor: colors.primary[100],
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginTop: spacing.lg,
+    },
+    cancelButton: {
+      flex: 1,
+    },
+    submitButton: {
+      flex: 1,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors.surface.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    dropdownModal: {
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      padding: spacing.lg,
+      margin: spacing.lg,
+      maxHeight: '60%',
+      minWidth: 300,
+    },
+    dropdownTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+      marginBottom: spacing.md,
+      textAlign: 'center',
+    },
+    dropdownList: {
+      maxHeight: 200,
+    },
+    dropdownItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.light,
+    },
+    dropdownItemText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.primary,
+      flex: 1,
+    },
+    checkmark: {
+      fontSize: typography.fontSize.base,
+      color: colors.primary[600],
+      fontWeight: typography.fontWeight.bold,
+    },
+  });

@@ -63,7 +63,7 @@ export function Card({
   accessibilityLabel,
 }: CardProps) {
   const { colors, spacing, borderRadius, shadows, isDark, animation } = useTheme();
-  
+
   // Animation refs
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
@@ -214,7 +214,8 @@ export function Card({
 
 const styles = StyleSheet.create({
   card: {
-    overflow: 'hidden',
+    // Note: overflow 'hidden' removed to prevent shadow clipping on Surface components
+    // If content overflow clipping is needed, wrap inner content in a View with overflow: 'hidden'
   },
   disabled: {
     opacity: 0.6,

@@ -7,17 +7,21 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Dimensions } from 'react-native';
-import { Text, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
+import { Text, ActivityIndicator } from 'react-native-paper';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { 
-  Users, 
-  Calendar, 
-  CheckCircle, 
-  XCircle, 
-  Save, 
+import {
+  Users,
+  Calendar,
+  CheckCircle,
+  XCircle,
+  Save,
   ChevronDown,
   Circle,
-  AlertCircle
+  AlertCircle,
+  RotateCcw,
+  History as HistoryIcon,
+  X,
+  PartyPopper,
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
@@ -27,6 +31,7 @@ import { DatePickerModal } from '../common/DatePickerModal';
 import { useStudents } from '../../hooks/useStudents';
 import { useClasses } from '../../hooks/useClasses';
 import { useClassAttendance, useMarkAttendance, useMarkBulkAttendance, useClassAttendanceSummary } from '../../hooks/useAttendance';
+import { useHolidayCheck, useCreateCalendarEvent } from '../../hooks/useCalendarEvents';
 import { AttendanceInput } from '../../services/api';
 import { StudentAttendanceView } from './StudentAttendanceView';
 
@@ -39,18 +44,54 @@ interface StudentAttendanceData {
   status: AttendanceStatus;
 }
 
+// Helper to generate initials from name
+const getInitials = (name: string) => {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+// Helper to generate consistent color from string
+const getAvatarColor = (name: string, isDark: boolean) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const hue = Math.abs(hash % 360);
+  return isDark
+    ? `hsl(${hue}, 70%, 30%)`
+    : `hsl(${hue}, 70%, 90%)`;
+};
+
+// Helper for avatar text color
+const getAvatarTextColor = (name: string, isDark: boolean) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const hue = Math.abs(hash % 360);
+  return isDark
+    ? `hsl(${hue}, 80%, 90%)`
+    : `hsl(${hue}, 80%, 30%)`;
+};
+
 export const AttendanceScreen: React.FC = () => {
   const { profile } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
   const { selectedClass, scope, setSelectedClass } = useClassSelection();
   const { can, isLoading: capabilitiesLoading } = useCapabilities();
-  
+
   // Capability-based checks (NO role checks in UI)
   const canMarkAttendance = can('attendance.mark');
   const canBulkMark = can('attendance.bulk_mark');
   const canReadAllAttendance = can('attendance.read');
   const canReadOwnAttendance = can('attendance.read_own') && !canReadAllAttendance;
-  
+
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [attendanceData, setAttendanceData] = useState<StudentAttendanceData[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -66,12 +107,12 @@ export const AttendanceScreen: React.FC = () => {
   const [historyEndDate, setHistoryEndDate] = useState<Date>(new Date());
   const [showHistoryStartDatePicker, setShowHistoryStartDatePicker] = useState(false);
   const [showHistoryEndDatePicker, setShowHistoryEndDatePicker] = useState(false);
-  
+
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => ['75%'], []);
-  
+
   // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark), 
+  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark),
     [colors, spacing, borderRadius, typography, shadows, isDark]);
 
   const dateString = selectedDate.toISOString().split('T')[0];
@@ -102,6 +143,48 @@ export const AttendanceScreen: React.FC = () => {
 
   const markAttendanceMutation = useMarkAttendance();
   const markBulkAttendanceMutation = useMarkBulkAttendance();
+
+  // ── Holiday integration ──
+  const { data: holidayInfo, isLoading: holidayLoading } = useHolidayCheck(
+    effectiveSchoolCode || '',
+    dateString,
+    selectedClass?.id
+  );
+  const isHoliday = !!holidayInfo;
+  const createCalendarEvent = useCreateCalendarEvent();
+
+  const handleMarkHoliday = useCallback(() => {
+    if (!effectiveSchoolCode || !profile?.auth_id) return;
+
+    Alert.alert(
+      'Mark as Holiday',
+      `Mark ${selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })} as a school holiday?\n\nNo attendance will be required for this day.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark Holiday',
+          onPress: async () => {
+            try {
+              await createCalendarEvent.mutateAsync({
+                school_code: effectiveSchoolCode,
+                title: 'School Holiday',
+                event_type: 'holiday',
+                start_date: dateString,
+                end_date: dateString,
+                is_all_day: true,
+                is_active: true,
+                color: '#faad14',
+                created_by: profile.auth_id,
+              });
+              Alert.alert('Done', 'Day has been marked as a holiday.');
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to mark holiday.');
+            }
+          },
+        },
+      ]
+    );
+  }, [effectiveSchoolCode, profile?.auth_id, selectedDate, dateString, createCalendarEvent]);
 
   useEffect(() => {
     if (canReadAllAttendance && students && students.length > 0) {
@@ -177,7 +260,7 @@ export const AttendanceScreen: React.FC = () => {
         date: dateString,
         status: student.status as 'present' | 'absent',
         marked_by: profile.auth_id,
-        marked_by_role_code: profile.role || 'unknown',
+        marked_by_role_code: profile.role || 'admin',
         school_code: effectiveSchoolCode,
       }));
 
@@ -200,8 +283,8 @@ export const AttendanceScreen: React.FC = () => {
     const hasExistingAttendance = existingRecords.length > 0;
     const existingMarkedBy = existingRecords.length > 0 ? existingRecords[0].marked_by : null;
     const existingRole = existingRecords.length > 0 ? existingRecords[0].marked_by_role_code : null;
-    const existingCreatedAt = existingRecords.length > 0 && existingRecords[0].created_at 
-      ? new Date(existingRecords[0].created_at) 
+    const existingCreatedAt = existingRecords.length > 0 && existingRecords[0].created_at
+      ? new Date(existingRecords[0].created_at)
       : null;
     const isMarkedByDifferentUser = hasExistingAttendance && existingMarkedBy !== profile.auth_id;
 
@@ -209,22 +292,22 @@ export const AttendanceScreen: React.FC = () => {
     const absentCount = records.filter(r => r.status === 'absent').length;
 
     // Build confirmation message
-    let confirmMessage = `Save attendance for ${selectedDate.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
+    let confirmMessage = `Save attendance for ${selectedDate.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
     })}?\n\n📊 All ${records.length} students marked\n✅ ${presentCount} Present\n❌ ${absentCount} Absent`;
 
     if (hasExistingAttendance) {
-      const dateStr = existingCreatedAt 
-        ? existingCreatedAt.toLocaleString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            hour: 'numeric', 
-            minute: '2-digit' 
-          })
+      const dateStr = existingCreatedAt
+        ? existingCreatedAt.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        })
         : 'previously';
-      
+
       if (isMarkedByDifferentUser) {
         confirmMessage += `\n\n⚠️ WARNING: Attendance was already marked by ${existingRole || 'another user'} on ${dateStr}.\n\nThis will overwrite the existing attendance.`;
       } else {
@@ -242,9 +325,24 @@ export const AttendanceScreen: React.FC = () => {
           style: isMarkedByDifferentUser ? 'destructive' : 'default',
           onPress: async () => {
             try {
-              await markAttendanceMutation.mutateAsync(records);
+              const result = await markAttendanceMutation.mutateAsync(records);
               setHasChanges(false);
-              Alert.alert('✅ Success', `Attendance saved successfully for all ${records.length} students.`);
+              
+              // Build success message with notification status
+              let message = `Attendance saved for ${records.length} students.`;
+              
+              if (result?.notifications) {
+                if (result.notifications.sent) {
+                  const total = result.notifications.presentCount + result.notifications.absentCount;
+                  if (total > 0) {
+                    message += `\n\n📱 Notifications sent to ${total} student${total !== 1 ? 's' : ''}.`;
+                  }
+                } else if (result.notifications.error) {
+                  message += `\n\n⚠️ Notifications failed: ${result.notifications.error}`;
+                }
+              }
+              
+              Alert.alert('✅ Success', message);
             } catch (error) {
               Alert.alert('Error', 'Failed to save attendance. Please check your connection and try again.');
             }
@@ -254,7 +352,29 @@ export const AttendanceScreen: React.FC = () => {
     );
   };
 
-  const handleBulkMark = async (status: 'present' | 'absent') => {
+  const handleResetAll = useCallback(() => {
+    Alert.alert(
+      'Reset Attendance',
+      'Are you sure you want to clear all attendance marks for this session?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            const newAttendance = attendanceData.map(s => ({
+              ...s,
+              status: null as AttendanceStatus
+            }));
+            setAttendanceData(newAttendance);
+            setHasChanges(true);
+          }
+        }
+      ]
+    );
+  }, [attendanceData]);
+
+  const handleBulkMark = (status: 'present' | 'absent') => {
     if (!selectedClass?.id || !effectiveSchoolCode || !profile?.auth_id) {
       Alert.alert('Error', 'Please select a class and ensure you are logged in');
       return;
@@ -263,74 +383,14 @@ export const AttendanceScreen: React.FC = () => {
     const statusText = status === 'present' ? 'Present' : 'Absent';
     const studentCount = students.length;
 
-    // Check for existing attendance conflicts
-    const existingRecords = existingAttendance || [];
-    const hasExistingAttendance = existingRecords.length > 0;
-    const existingMarkedBy = existingRecords.length > 0 ? existingRecords[0].marked_by : null;
-    const existingRole = existingRecords.length > 0 ? existingRecords[0].marked_by_role_code : null;
-    const existingCreatedAt = existingRecords.length > 0 && existingRecords[0].created_at 
-      ? new Date(existingRecords[0].created_at) 
-      : null;
-    const isMarkedByDifferentUser = hasExistingAttendance && existingMarkedBy !== profile.auth_id;
+    // Simply update local state - user will submit via Save button
+    setAttendanceData(prev => prev.map(student => ({ ...student, status })));
+    setHasChanges(true);
 
-    let confirmMessage = `Are you sure you want to mark all ${studentCount} students as ${statusText.toLowerCase()}?`;
-
-    if (hasExistingAttendance) {
-      const dateStr = existingCreatedAt 
-        ? existingCreatedAt.toLocaleString('en-US', { 
-            month: 'short', 
-            day: 'numeric', 
-            hour: 'numeric', 
-            minute: '2-digit' 
-          })
-        : 'previously';
-      
-      if (isMarkedByDifferentUser) {
-        confirmMessage += `\n\n⚠️ WARNING: Attendance was already marked by ${existingRole || 'another user'} on ${dateStr}.\n\nThis will overwrite the existing attendance for all students.`;
-      } else {
-        confirmMessage += `\n\nℹ️ Attendance was previously marked on ${dateStr}.\n\nThis will update all existing records.`;
-      }
-    }
-
+    // Show a brief toast/feedback
     Alert.alert(
-      hasExistingAttendance ? (isMarkedByDifferentUser ? `Overwrite All as ${statusText}?` : `Update All as ${statusText}?`) : `Mark All ${statusText}?`,
-      confirmMessage,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: hasExistingAttendance ? (isMarkedByDifferentUser ? `Overwrite All ${statusText}` : `Update All ${statusText}`) : `Yes, Mark All ${statusText}`,
-          style: isMarkedByDifferentUser ? 'destructive' : (status === 'present' ? 'default' : 'destructive'),
-          onPress: async () => {
-            try {
-              setAttendanceData(prev => prev.map(student => ({ ...student, status })));
-              setHasChanges(true);
-
-              await markBulkAttendanceMutation.mutateAsync({
-                classId: selectedClass.id,
-                date: dateString,
-                status,
-                markedBy: profile.auth_id,
-                markedByRoleCode: profile.role || 'unknown',
-                schoolCode: effectiveSchoolCode,
-              });
-              
-              Alert.alert('✅ Success', `All ${studentCount} students have been marked as ${statusText.toLowerCase()}.`);
-            } catch (error) {
-              setAttendanceData(prev => {
-                return prev.map(student => {
-                  const existing = existingAttendance.find(a => a.student_id === student.studentId);
-                  const normalizedStatus: AttendanceStatus = existing?.status === 'present' || existing?.status === 'absent' 
-                    ? existing.status 
-                    : null;
-                  return { ...student, status: normalizedStatus };
-                });
-              });
-              setHasChanges(false);
-              Alert.alert('Error', 'Failed to mark bulk attendance. Please try again.');
-            }
-          }
-        }
-      ]
+      `✓ All ${statusText}`,
+      `Marked all ${studentCount} students as ${statusText.toLowerCase()}. Tap "Save Attendance" to submit.`
     );
   };
 
@@ -395,7 +455,7 @@ export const AttendanceScreen: React.FC = () => {
   const totalPresentDays = attendanceSummary.reduce((sum, s) => sum + s.presentDays, 0);
   const totalAbsentDays = attendanceSummary.reduce((sum, s) => sum + s.absentDays, 0);
   const totalDays = attendanceSummary.reduce((sum, s) => sum + s.totalDays, 0);
-  
+
   const historyStats = {
     total: attendanceSummary.length,
     averageAttendance: totalDays > 0 ? Math.round((totalPresentDays / totalDays) * 100) : 0,
@@ -404,173 +464,259 @@ export const AttendanceScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {canReadAllAttendance && (
-        <View style={styles.tabContainer}>
-          <SegmentedButtons
-            value={activeTab}
-            onValueChange={(value) => setActiveTab(value as 'mark' | 'history')}
-            buttons={[
-              { value: 'mark', label: 'Mark Attendance' },
-              { value: 'history', label: 'View History' },
-            ]}
-            style={styles.tabSwitcher}
-          />
-        </View>
-      )}
-
-      {canReadAllAttendance && (
-        <View style={styles.filterSection}>
-          {activeTab === 'mark' ? (
-            <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={styles.filterItem}
-              onPress={() => bottomSheetRef.current?.present()}
-            >
-              <View style={styles.filterIcon}>
-                <Users size={14} color={colors.primary[600]} />
-              </View>
-              <View style={styles.filterContent}>
-                <Text style={styles.filterLabel}>Class</Text>
-                <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                  {selectedClass ? `${selectedClass.grade} ${selectedClass.section}` : 'Select'}
+      {canReadAllAttendance ? (
+        <View style={styles.dashboardCard}>
+          {/* Single Header Row: Class | Date | Mode */}
+          <View style={styles.headerRow}>
+            {/* Unified Filter Bar */}
+            <View style={styles.filterBar}>
+              {/* Class Selector */}
+              <TouchableOpacity
+                style={styles.classSelector}
+                onPress={() => bottomSheetRef.current?.present()}
+                activeOpacity={0.7}
+              >
+                <Users size={16} color={colors.primary.main} />
+                <Text style={styles.classTitle} numberOfLines={1} ellipsizeMode="tail">
+                  {selectedClass ? `${selectedClass.grade} - ${selectedClass.section}` : 'Select Class'}
                 </Text>
-              </View>
-              <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
-            </TouchableOpacity>
+                <ChevronDown size={14} color={colors.text.tertiary} style={{ marginLeft: 4 }} />
+              </TouchableOpacity>
 
-            <View style={styles.filterDivider} />
+              <View style={styles.headerDivider} />
 
-            <TouchableOpacity 
-              style={styles.filterItem}
-                onPress={() => setShowDatePicker(true)}
-            >
-              <View style={styles.filterIcon}>
-              <Calendar size={14} color={colors.primary[600]} />
-              </View>
-              <View style={styles.filterContent}>
-                <Text style={styles.filterLabel}>Date</Text>
-                <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
+              {/* Date Selector */}
+              {activeTab === 'mark' ? (
+                <TouchableOpacity
+                  style={styles.dateSelector}
+                  onPress={() => setShowDatePicker(true)}
+                  activeOpacity={0.7}
+                >
+                  <Calendar size={16} color={colors.primary.main} />
+                  <Text style={styles.dateText}>
                     {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.filterRow}>
+                  </Text>
+                  <ChevronDown size={14} color={colors.text.tertiary} style={{ marginLeft: 4 }} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.dateSelector}>
+                  <TouchableOpacity
+                    onPress={() => setShowHistoryStartDatePicker(true)}
+                    activeOpacity={0.7}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
+                    <Calendar size={16} color={colors.primary.main} />
+                    <Text style={styles.dateText}>
+                      {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <Text style={{ color: colors.text.tertiary, fontSize: 12 }}>→</Text>
+
+                  <TouchableOpacity
+                    onPress={() => setShowHistoryEndDatePicker(true)}
+                    activeOpacity={0.7}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
+                    <Text style={styles.dateText}>
+                      {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                    <ChevronDown size={14} color={colors.text.tertiary} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* History Toggle (Outside the Bar) */}
             <TouchableOpacity
-              style={styles.filterItem}
-              onPress={() => bottomSheetRef.current?.present()}
+              style={styles.historyToggleButton}
+              onPress={() => setActiveTab(activeTab === 'mark' ? 'history' : 'mark')}
+              activeOpacity={0.7}
             >
-              <View style={styles.filterIcon}>
-                <Users size={14} color={colors.primary[600]} />
-              </View>
-              <View style={styles.filterContent}>
-                <Text style={styles.filterLabel}>Class</Text>
-                <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                  {selectedClass ? `${selectedClass.grade} ${selectedClass.section}` : 'Select'}
-                </Text>
-              </View>
-              <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
-            </TouchableOpacity>
-
-            <View style={styles.filterDivider} />
-
-            <TouchableOpacity 
-              style={styles.filterItem}
-              onPress={() => setShowHistoryStartDatePicker(true)}
-            >
-              <View style={styles.filterIcon}>
-              <Calendar size={14} color={colors.primary[600]} />
-              </View>
-              <View style={styles.filterContent}>
-                <Text style={styles.filterLabel}>Start</Text>
-                <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                    {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.filterDivider} />
-
-            <TouchableOpacity 
-              style={styles.filterItem}
-              onPress={() => setShowHistoryEndDatePicker(true)}
-            >
-              <View style={styles.filterIcon}>
-              <Calendar size={14} color={colors.primary[600]} />
-              </View>
-              <View style={styles.filterContent}>
-                <Text style={styles.filterLabel}>End</Text>
-                <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                    {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </Text>
-              </View>
+              {activeTab === 'mark' ? (
+                <HistoryIcon size={20} color={colors.primary.main} />
+              ) : (
+                <X size={20} color={colors.text.primary} />
+              )}
             </TouchableOpacity>
           </View>
-          )}
+
+          <View style={styles.headerSeparator} />
+
+          {/* Row 3: Stats */}
+          <View style={styles.dashboardStatsRow}>
+            <View style={styles.statBigContainer}>
+              <Text style={styles.statBigNumber}>
+                {activeTab === 'mark' ? (attendanceData?.length || 0) : historyStats.total}
+              </Text>
+              <Text style={styles.statBigLabel}>Total</Text>
+            </View>
+
+            <View style={styles.statGroup}>
+              <View style={styles.statItem}>
+                <View style={[styles.statCircle, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.2)' : '#ecfdf5' }]}>
+                  <Text style={[styles.statNumber, { color: colors.success[600] }]}>
+                    {activeTab === 'mark'
+                      ? (attendanceData?.filter(s => s.status === 'present').length || 0)
+                      : `${historyStats.averageAttendance}%`}
+                  </Text>
+                </View>
+                <Text style={styles.statLabel}>{activeTab === 'mark' ? 'Present' : 'Avg Present'}</Text>
+              </View>
+
+              <View style={styles.statItem}>
+                <View style={[styles.statCircle, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#fef2f2' }]}>
+                  <Text style={[styles.statNumber, { color: colors.error[600] }]}>
+                    {activeTab === 'mark'
+                      ? (attendanceData?.filter(s => s.status === 'absent').length || 0)
+                      : `${historyStats.averageAbsent}%`}
+                  </Text>
+                </View>
+                <Text style={styles.statLabel}>{activeTab === 'mark' ? 'Absent' : 'Avg Absent'}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.dashboardCard}>
+          <View style={styles.headerRow}>
+            {/* Unified Filter Bar (Read Only) */}
+            <View style={styles.filterBar}>
+              {/* Class Selector */}
+              <View style={styles.classSelector}>
+                <Users size={16} color={colors.text.secondary} />
+                <Text style={styles.classTitle} numberOfLines={1} ellipsizeMode="tail">
+                  {selectedClass ? `${selectedClass.grade} - ${selectedClass.section}` : 'Select Class'}
+                </Text>
+              </View>
+
+              <View style={styles.headerDivider} />
+
+              {/* Date Range Selector */}
+              {/* Date Range Selector */}
+              <View style={styles.dateSelector}>
+                <TouchableOpacity
+                  onPress={() => setShowHistoryStartDatePicker(true)}
+                  activeOpacity={0.7}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                >
+                  <Calendar size={16} color={colors.text.secondary} />
+                  <Text style={styles.dateText}>
+                    {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={{ color: colors.text.tertiary, fontSize: 12 }}>→</Text>
+
+                <TouchableOpacity
+                  onPress={() => setShowHistoryStartDatePicker(true)}
+                  activeOpacity={0.7}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                >
+                  {/* Note: In read-only mode, maybe we only allow changing start? Or maybe both? 
+                       The previous code only called setShowHistoryStartDatePicker. 
+                       I will stick to the previous behavior but split the UI, 
+                       OR enable end date picking if appropriate. 
+                       Actually, the read-only block had `setShowHistoryStartDatePicker` for the whole range.
+                       I will enable both for consistency since the modals exist.
+                   */}
+                  <Text style={styles.dateText}>
+                    {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.headerSeparator} />
         </View>
       )}
 
       {activeTab === 'mark' ? (
         <View style={styles.studentsSection}>
-          {/* Statistics Cards */}
-          <View style={styles.markStatsContainer}>
-            <View style={styles.markStatCard}>
-              <Text style={styles.markStatNumber}>{attendanceData?.length || 0}</Text>
-              <Text style={styles.markStatLabel}>Students</Text>
+          {/* Holiday banner — shown when selected date is a holiday */}
+          {isHoliday && (
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isDark ? 'rgba(250,173,20,0.1)' : '#fffbe6',
+              padding: spacing.md,
+              marginHorizontal: spacing.sm,
+              marginTop: spacing.sm,
+              borderRadius: borderRadius.lg,
+              borderWidth: 1,
+              borderColor: isDark ? 'rgba(250,173,20,0.2)' : '#ffe58f',
+              gap: spacing.sm,
+            }}>
+              <PartyPopper size={20} color="#d48806" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold, color: '#d48806' }}>
+                  Holiday — {holidayInfo?.title || 'School Holiday'}
+                </Text>
+                <Text style={{ fontSize: typography.fontSize.xs, color: colors.text.secondary, marginTop: 2 }}>
+                  No attendance required for this day
+                </Text>
+              </View>
             </View>
-            <View style={[styles.markStatCard, styles.markStatCardPresent]}>
-              <Text style={[styles.markStatNumber, { color: colors.success[600] }]}>
-                {attendanceData?.length > 0 
-                  ? Math.round((attendanceData.filter(s => s.status === 'present').length / attendanceData.length) * 100)
-                  : 0}%
-              </Text>
-              <Text style={styles.markStatLabel}>Present</Text>
-            </View>
-            <View style={[styles.markStatCard, styles.markStatCardAbsent]}>
-              <Text style={[styles.markStatNumber, { color: colors.error[600] }]}>
-                {attendanceData?.length > 0 
-                  ? Math.round((attendanceData.filter(s => s.status === 'absent').length / attendanceData.length) * 100)
-                  : 0}%
-              </Text>
-              <Text style={styles.markStatLabel}>Absent</Text>
-            </View>
-          </View>
+          )}
 
           <View style={styles.studentsHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>Students</Text>
-              <Text style={styles.studentsSubtitle}>
-                {attendanceData?.filter(s => s.status === null).length || 0} unmarked
-              </Text>
-            </View>
+            <Text style={styles.sectionTitle}>Students</Text>
             <View style={styles.headerActions}>
+              {/* Mark Holiday button — only for admin/superadmin when date is NOT already a holiday */}
+              {canMarkAttendance && !isHoliday && !holidayLoading && (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    backgroundColor: isDark ? 'rgba(250,173,20,0.1)' : '#fffbe6',
+                    paddingHorizontal: spacing.sm,
+                    paddingVertical: 4,
+                    borderRadius: borderRadius.full,
+                    borderWidth: 1,
+                    borderColor: isDark ? 'rgba(250,173,20,0.2)' : '#ffe58f',
+                  }}
+                  onPress={handleMarkHoliday}
+                  activeOpacity={0.7}
+                >
+                  <PartyPopper size={12} color="#d48806" />
+                  <Text style={{ fontSize: 11, fontWeight: typography.fontWeight.semibold, color: '#d48806' }}>
+                    Mark Holiday
+                  </Text>
+                </TouchableOpacity>
+              )}
               {hasChanges && (
                 <View style={styles.changesBadge}>
+                  <Circle size={6} color={colors.warning[600]} fill={colors.warning[600]} />
                   <Text style={styles.changesBadgeText}>Unsaved</Text>
                 </View>
               )}
-              {canBulkMark && attendanceData.length > 0 && (
+              {canBulkMark && attendanceData.length > 0 && !isHoliday && (
                 <View style={styles.bulkActions}>
                   <TouchableOpacity
                     style={[styles.bulkButton, styles.bulkButtonPresent]}
                     onPress={() => handleBulkMark('present')}
                     activeOpacity={0.7}
                   >
-                    <CheckCircle size={16} color={colors.success[700]} />
-                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextPresent]}>
-                      All Present
-                    </Text>
+                    <CheckCircle size={12} color={colors.success[700]} />
+                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextPresent]}>All Present</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.bulkButton, styles.bulkButtonAbsent]}
                     onPress={() => handleBulkMark('absent')}
                     activeOpacity={0.7}
                   >
-                    <XCircle size={16} color={colors.error[700]} />
-                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextAbsent]}>
-                      All Absent
-                    </Text>
+                    <XCircle size={12} color={colors.error[700]} />
+                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextAbsent]}>All Absent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.bulkButton, styles.bulkButtonReset]}
+                    onPress={handleResetAll}
+                    activeOpacity={0.7}
+                  >
+                    <RotateCcw size={12} color={colors.text.secondary} />
+                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextReset]}>Reset</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -595,94 +741,90 @@ export const AttendanceScreen: React.FC = () => {
             ) : (
               <FlatList
                 data={attendanceData}
-                renderItem={({ item: student }) => {
+                renderItem={({ item: student, index }) => {
                   const status = student.status;
                   const isPresent = status === 'present';
                   const isAbsent = status === 'absent';
                   const isMarked = status !== null;
-                  
-                  const cardStyle = isPresent 
-                    ? styles.studentCardPresent 
-                    : isAbsent 
-                    ? styles.studentCardAbsent 
-                    : styles.studentCardUnmarked;
-                  
-                  const presentButtonStyle = isPresent 
-                    ? styles.statusButtonActivePresent 
-                    : !isMarked 
-                    ? styles.statusButtonUnmarked 
-                    : null;
-                  
-                  const absentButtonStyle = isAbsent 
-                    ? styles.statusButtonActiveAbsent 
-                    : !isMarked 
-                    ? styles.statusButtonUnmarked 
-                    : null;
-                  
+
                   return (
-                    <View style={[styles.studentCard, cardStyle]}>
-                      <View style={styles.studentInfo}>
-                        <View style={styles.studentNameRow}>
-                          <Text style={styles.studentName}>{student.studentName}</Text>
-                          {isMarked && (
-                            <View style={[
-                              styles.statusBadge,
-                              isPresent ? styles.statusBadgePresent : styles.statusBadgeAbsent
-                            ]}>
-                              {isPresent ? (
-                                <CheckCircle size={12} color={colors.success[600]} />
-                              ) : (
-                                <XCircle size={12} color={colors.error[600]} />
-                              )}
-                              <Text style={[
-                                styles.statusBadgeText,
-                                isPresent ? styles.statusBadgeTextPresent : styles.statusBadgeTextAbsent
-                              ]}>
-                                {isPresent ? 'Present' : 'Absent'}
-                              </Text>
+                    <View style={styles.cardContainer}>
+                      {/* Avatar */}
+                      <View style={[
+                        styles.cardAvatar,
+                        { backgroundColor: getAvatarColor(student.studentName, isDark) }
+                      ]}>
+                        <Text style={[
+                          styles.cardAvatarText,
+                          { color: getAvatarTextColor(student.studentName, isDark) }
+                        ]}>
+                          {getInitials(student.studentName)}
+                        </Text>
+                      </View>
+
+                      {/* Info */}
+                      <View style={styles.cardInfo}>
+                        <Text style={styles.cardName} numberOfLines={1}>
+                          {student.studentName}
+                        </Text>
+                        <Text style={styles.cardId}>
+                          {student.studentCode}
+                        </Text>
+                      </View>
+
+                      {/* Actions */}
+                      {canMarkAttendance ? (
+                        <View style={styles.cardActions}>
+                          <TouchableOpacity
+                            style={[
+                              styles.actionButton,
+                              styles.actionButtonPresent,
+                              isPresent && styles.actionButtonPresentActive
+                            ]}
+                            onPress={() => handleStatusChange(student.studentId, 'present')}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[
+                              styles.actionText,
+                              isPresent && styles.actionTextActive
+                            ]}>Present</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[
+                              styles.actionButton,
+                              styles.actionButtonAbsent,
+                              isAbsent && styles.actionButtonAbsentActive
+                            ]}
+                            onPress={() => handleStatusChange(student.studentId, 'absent')}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[
+                              styles.actionText,
+                              isAbsent && styles.actionTextActive
+                            ]}>Absent</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={styles.cardStatusContainer}>
+                          {isPresent && (
+                            <View style={[styles.statusBadge, styles.statusBadgePresent]}>
+                              <CheckCircle size={14} color={colors.success[700]} />
+                              <Text style={[styles.statusBadgeText, { color: colors.success[700] }]}>Present</Text>
                             </View>
                           )}
-                        </View>
-                        <Text style={styles.studentCode}>{student.studentCode}</Text>
-                      </View>
-                      
-                      {canMarkAttendance && (
-                        <View style={styles.statusButtons}>
-                          <TouchableOpacity
-                            style={[styles.statusButton, presentButtonStyle]}
-                            onPress={() => handleStatusChange(student.studentId, 'present')}
-                            activeOpacity={0.6}
-                          >
-                            <CheckCircle 
-                              size={18} 
-                              color={isPresent ? colors.success[600] : colors.text.tertiary} 
-                            />
-                            <Text style={[
-                              styles.statusButtonText,
-                              isPresent && styles.statusButtonTextActivePresent,
-                              !isMarked && styles.statusButtonTextUnmarked
-                            ]}>
-                              Present
-                            </Text>
-                          </TouchableOpacity>
-                          
-                          <TouchableOpacity
-                            style={[styles.statusButton, absentButtonStyle]}
-                            onPress={() => handleStatusChange(student.studentId, 'absent')}
-                            activeOpacity={0.6}
-                          >
-                            <XCircle 
-                              size={18} 
-                              color={isAbsent ? colors.error[600] : colors.text.tertiary} 
-                            />
-                            <Text style={[
-                              styles.statusButtonText,
-                              isAbsent && styles.statusButtonTextActiveAbsent,
-                              !isMarked && styles.statusButtonTextUnmarked
-                            ]}>
-                              Absent
-                            </Text>
-                          </TouchableOpacity>
+                          {isAbsent && (
+                            <View style={[styles.statusBadge, styles.statusBadgeAbsent]}>
+                              <XCircle size={14} color={colors.error[700]} />
+                              <Text style={[styles.statusBadgeText, { color: colors.error[700] }]}>Absent</Text>
+                            </View>
+                          )}
+                          {!isMarked && (
+                            <View style={[styles.statusBadge, styles.statusBadgePending]}>
+                              <Circle size={14} color={colors.text.tertiary} />
+                              <Text style={[styles.statusBadgeText, { color: colors.text.tertiary }]}>Pending</Text>
+                            </View>
+                          )}
                         </View>
                       )}
                     </View>
@@ -690,9 +832,9 @@ export const AttendanceScreen: React.FC = () => {
                 }}
                 keyExtractor={(item) => item.studentId}
                 removeClippedSubviews={true}
-                initialNumToRender={15}
-                maxToRenderPerBatch={10}
-                windowSize={10}
+                initialNumToRender={20}
+                maxToRenderPerBatch={15}
+                windowSize={12}
                 contentContainerStyle={styles.flatListContent}
                 showsVerticalScrollIndicator={false}
               />
@@ -700,101 +842,73 @@ export const AttendanceScreen: React.FC = () => {
           </View>
         </View>
       ) : (
-          <View style={styles.historyContainer}>
-            {canReadOwnAttendance ? (
-              <StudentAttendanceView />
+        <View style={styles.historyContainer}>
+          {canReadOwnAttendance ? (
+            <StudentAttendanceView />
+          ) : (
+            !selectedClass ? (
+              <View style={styles.emptyContainer}>
+                <Users size={48} color={colors.text.tertiary} />
+                <Text style={styles.emptyText}>Please select a class to view attendance history</Text>
+              </View>
             ) : (
-              !selectedClass ? (
-                <View style={styles.emptyContainer}>
-                  <Users size={48} color={colors.text.tertiary} />
-                  <Text style={styles.emptyText}>Please select a class to view attendance history</Text>
-                </View>
-              ) : (
-                <>
-                  {/* Statistics Cards */}
-                  <View style={styles.historyStats}>
-                    <View style={styles.historyStatCard}>
-                      <Text style={styles.historyStatNumber}>{historyStats.total}</Text>
-                      <Text style={styles.historyStatLabel}>Students</Text>
-                    </View>
-                    <View style={[styles.historyStatCard, styles.historyStatCardPresent]}>
-                      <Text style={[styles.historyStatNumber, { color: colors.success[600] }]}>
-                        {historyStats.averageAttendance}%
-                      </Text>
-                      <Text style={styles.historyStatLabel}>Present</Text>
-                    </View>
-                    <View style={[styles.historyStatCard, styles.historyStatCardAbsent]}>
-                      <Text style={[styles.historyStatNumber, { color: colors.error[600] }]}>
-                        {historyStats.averageAbsent}%
-                      </Text>
-                      <Text style={styles.historyStatLabel}>Absent</Text>
-                    </View>
+              <View style={styles.summaryContainer}>
+                {summaryLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={colors.primary.main} />
+                    <Text style={styles.loadingText}>Loading history...</Text>
                   </View>
-
-                  {/* Date Range Display */}
-                  <View style={styles.dateRangeContainer}>
-                    <Text style={styles.dateRangeText}>
-                      {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </Text>
+                ) : attendanceSummary.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateText}>No attendance records found for this period</Text>
                   </View>
+                ) : (
+                  <FlatList
+                    data={attendanceSummary}
+                    renderItem={({ item: student }) => {
+                      const percentage = student.percentage;
+                      let statusColor = colors.success[600];
+                      let statusBg = isDark ? 'rgba(34, 197, 94, 0.1)' : colors.success[50];
 
-                  <View style={styles.summaryContainer}>
-                    <Text style={styles.summaryTitle}>Student Summary</Text>
-                    {summaryLoading ? (
-                      <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color={colors.primary.main} />
-                        <Text style={styles.loadingText}>Loading history...</Text>
-                      </View>
-                    ) : attendanceSummary.length === 0 ? (
-                      <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateText}>No attendance records found for this period</Text>
-                      </View>
-                    ) : (
-                      <FlatList
-                        data={attendanceSummary}
-                        renderItem={({ item: student }) => (
-                          <View style={styles.summaryItem}>
-                            <View style={styles.summaryStudentInfo}>
-                              <Text style={styles.summaryStudentName}>{student.studentName}</Text>
-                              <Text style={styles.summaryStudentCode}>{student.studentCode}</Text>
-                            </View>
-                            <View style={styles.summaryStats}>
-                              <Text style={styles.summaryStatText}>
-                                {student.presentDays} / {student.totalDays} ({student.percentage.toFixed(0)}%)
-                              </Text>
-                              <View style={[
-                                styles.summaryStatus,
-                                student.percentage >= 75 ? styles.summaryStatusGood :
-                                student.percentage >= 50 ? styles.summaryStatusFair :
-                                styles.summaryStatusLow
-                              ]}>
-                                <Text style={[
-                                  styles.summaryStatusText,
-                                  student.percentage >= 75 ? styles.summaryStatusTextGood :
-                                  student.percentage >= 50 ? styles.summaryStatusTextFair :
-                                  styles.summaryStatusTextLow
-                                ]}>
-                                  {student.percentage >= 75 ? 'Good' : student.percentage >= 50 ? 'Fair' : 'Low'}
-                                </Text>
-                              </View>
-                            </View>
+                      if (percentage < 50) {
+                        statusColor = colors.error[600];
+                        statusBg = isDark ? 'rgba(239, 68, 68, 0.1)' : colors.error[50];
+                      } else if (percentage < 75) {
+                        statusColor = colors.warning[600];
+                        statusBg = isDark ? 'rgba(234, 179, 8, 0.1)' : colors.warning[50];
+                      }
+
+                      return (
+                        <View style={styles.historyCard}>
+                          <View style={styles.historyInfo}>
+                            <Text style={styles.historyName}>{student.studentName}</Text>
+                            <Text style={styles.historyCode}>{student.studentCode}</Text>
                           </View>
-                        )}
-                        keyExtractor={(item) => item.studentId}
-                        removeClippedSubviews={true}
-                        initialNumToRender={15}
-                        maxToRenderPerBatch={10}
-                        windowSize={10}
-                        contentContainerStyle={styles.summaryList}
-                        showsVerticalScrollIndicator={false}
-                      />
-                    )}
-                  </View>
-                </>
-              )
-            )}
-          </View>
-        )}
+
+                          <View style={styles.historyStatsRight}>
+                            <View style={[styles.historyBadge, { backgroundColor: statusBg }]}>
+                              <Text style={[styles.historyPercentage, { color: statusColor }]}>
+                                {percentage.toFixed(0)}%
+                              </Text>
+                            </View>
+                            <Text style={styles.historyCountText}>
+                              {student.presentDays}/{student.totalDays} Days
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    }}
+                    keyExtractor={(item) => item.studentId}
+                    contentContainerStyle={styles.historyListContent}
+                    showsVerticalScrollIndicator={false}
+                  />
+                )}
+              </View>
+            )
+          )}
+        </View>
+      )}
+
 
       <BottomSheetModal
         ref={bottomSheetRef}
@@ -804,7 +918,7 @@ export const AttendanceScreen: React.FC = () => {
         backgroundStyle={styles.bottomSheetBackground}
         handleIndicatorStyle={styles.bottomSheetIndicator}
       >
-        <BottomSheetScrollView 
+        <BottomSheetScrollView
           contentContainerStyle={styles.bottomSheetContent}
           showsVerticalScrollIndicator={true}
         >
@@ -876,52 +990,54 @@ export const AttendanceScreen: React.FC = () => {
         title="Select End Date"
       />
 
-      {hasChanges && canMarkAttendance && (
-        <View style={styles.saveButtonContainer}>
-          {attendanceData.length > 0 && attendanceData.filter(s => s.status === null).length > 0 && (
-            <View style={styles.warningBanner}>
-              <AlertCircle size={16} color={colors.warning[700]} />
-              <Text style={styles.warningText}>
-                {attendanceData.filter(s => s.status === null).length} student{attendanceData.filter(s => s.status === null).length > 1 ? 's' : ''} unmarked
-              </Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              markAttendanceMutation.isPending && styles.saveButtonDisabled,
-              attendanceData.length > 0 && attendanceData.filter(s => s.status === null).length > 0 && styles.saveButtonWarning
-            ]}
-            onPress={handleSave}
-            disabled={markAttendanceMutation.isPending}
-            activeOpacity={0.8}
-          >
-            {markAttendanceMutation.isPending ? (
-              <>
-                <ActivityIndicator size="small" color={colors.text.inverse} />
-                <Text style={styles.saveButtonText}>Saving...</Text>
-              </>
-            ) : (
-              <>
-                <Save size={20} color={colors.text.inverse} />
-                <Text style={styles.saveButtonText}>
-                  Save Attendance ({attendanceData.filter(s => s.status !== null).length}/{attendanceData.length})
+      {
+        hasChanges && canMarkAttendance && (
+          <View style={styles.saveButtonContainer}>
+            {attendanceData.length > 0 && attendanceData.filter(s => s.status === null).length > 0 && (
+              <View style={styles.warningBanner}>
+                <AlertCircle size={12} color={colors.warning[700]} />
+                <Text style={styles.warningText}>
+                  {attendanceData.filter(s => s.status === null).length} unmarked
                 </Text>
-              </>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                markAttendanceMutation.isPending && styles.saveButtonDisabled,
+                attendanceData.length > 0 && attendanceData.filter(s => s.status === null).length > 0 && styles.saveButtonWarning
+              ]}
+              onPress={handleSave}
+              disabled={markAttendanceMutation.isPending}
+              activeOpacity={0.8}
+            >
+              {markAttendanceMutation.isPending ? (
+                <>
+                  <ActivityIndicator size="small" color={colors.text.inverse} />
+                  <Text style={styles.saveButtonText}>Saving...</Text>
+                </>
+              ) : (
+                <>
+                  <Save size={16} color={colors.text.inverse} />
+                  <Text style={styles.saveButtonText}>
+                    Save ({attendanceData.filter(s => s.status !== null).length}/{attendanceData.length})
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )
+      }
+    </View >
   );
 };
 
 const createStyles = (
-  colors: ThemeColors, 
-  spacing: any, 
-  borderRadius: any, 
-  typography: any, 
-  shadows: any, 
+  colors: ThemeColors,
+  spacing: any,
+  borderRadius: any,
+  typography: any,
+  shadows: any,
   isDark: boolean
 ) => StyleSheet.create({
   container: {
@@ -929,170 +1045,160 @@ const createStyles = (
     backgroundColor: colors.background.secondary,
   },
   tabContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
     backgroundColor: colors.surface.primary,
   },
   tabSwitcher: {
-    backgroundColor: colors.background.secondary,
+    flexDirection: 'row',
+    backgroundColor: colors.background.tertiary,
+    borderRadius: borderRadius.full,
+    padding: 2,
+    height: 32,
   },
-  filterSection: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+  tabButton: {
+    flex: 1,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
+  tabButtonActive: {
+    backgroundColor: colors.surface.primary,
+    ...shadows.xs,
+  },
+  tabButtonText: {
+    fontSize: 11,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.secondary,
+  },
+  tabButtonTextActive: {
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
-    marginBottom: spacing.md,
+  },
+
+  // Filter Styles
+  filterSection: {
+    paddingHorizontal: spacing.sm,
+    paddingBottom: spacing.sm,
+    backgroundColor: colors.surface.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   filterRow: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.sm,
-    paddingHorizontal: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.xs,
-    borderWidth: 0.5,
+    backgroundColor: colors.background.tertiary,
+    borderRadius: borderRadius.md,
+    padding: 2,
+    borderWidth: 1,
     borderColor: colors.border.light,
   },
   filterItem: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    minWidth: 0,
-    overflow: 'hidden',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    gap: 8,
   },
   filterIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.primary[50],
+    width: 24,
+    height: 24,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surface.secondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
-    flexShrink: 0,
   },
   filterContent: {
     flex: 1,
-    minWidth: 0,
-    alignItems: 'flex-start',
   },
   filterLabel: {
-    fontSize: typography.fontSize.xs,
+    fontSize: 9,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
     fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-    marginBottom: spacing.xs,
+    marginBottom: 1,
   },
   filterValue: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 12,
     color: colors.text.primary,
+    fontWeight: typography.fontWeight.semibold,
   },
   filterDivider: {
     width: 1,
-    height: 40,
-    backgroundColor: colors.border.DEFAULT,
-    marginHorizontal: spacing.sm,
-    flexShrink: 0,
+    height: 24,
+    backgroundColor: colors.border.light,
   },
+
+  // Students Header & List
   studentsSection: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
     flex: 1,
-  },
-  markStatsContainer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  markStatCard: {
-    flex: 1,
-    backgroundColor: colors.surface.primary,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    ...shadows.sm,
-    borderWidth: 0.5,
-    borderColor: colors.border.light,
-  },
-  markStatCardPresent: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.success[500],
-  },
-  markStatCardAbsent: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.error[500],
-  },
-  markStatNumber: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  markStatLabel: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-    textAlign: 'center',
   },
   studentsHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    flexShrink: 0,
-  },
-  studentsSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
+    gap: 8,
   },
   changesBadge: {
-    backgroundColor: colors.warning[50],
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: isDark ? 'rgba(234, 179, 8, 0.1)' : colors.warning[50],
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: borderRadius.full,
+    gap: 4,
     borderWidth: 1,
-    borderColor: colors.warning.main,
+    borderColor: isDark ? 'rgba(234, 179, 8, 0.2)' : colors.warning[200],
   },
   changesBadgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 10,
+    fontWeight: typography.fontWeight.medium,
     color: colors.warning[700],
   },
   bulkActions: {
     flexDirection: 'row',
-    gap: spacing.xs,
+    gap: 4,
     alignItems: 'center',
   },
   bulkButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: 1.5,
-    gap: spacing.xs,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    gap: 4,
   },
   bulkButtonPresent: {
-    backgroundColor: colors.success[50],
-    borderColor: colors.success[300],
+    backgroundColor: isDark ? 'rgba(34, 197, 94, 0.1)' : '#ecfdf5',
+    borderColor: colors.success[200],
   },
   bulkButtonAbsent: {
-    backgroundColor: colors.error[50],
-    borderColor: colors.error[300],
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
+    borderColor: colors.error[200],
+  },
+  bulkButtonReset: {
+    backgroundColor: isDark ? 'rgba(156, 163, 175, 0.1)' : colors.neutral[100],
+    borderColor: colors.neutral[200],
   },
   bulkButtonText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 11,
+    fontWeight: typography.fontWeight.medium,
   },
   bulkButtonTextPresent: {
     color: colors.success[700],
@@ -1100,131 +1206,279 @@ const createStyles = (
   bulkButtonTextAbsent: {
     color: colors.error[700],
   },
-  flatListContent: {
-    paddingBottom: spacing.xl,
+  bulkButtonTextReset: {
+    color: colors.text.secondary,
   },
-  studentsList: {
-    flex: 1,
-  },
-  studentCard: {
+
+  // Dashboard Header Styles
+  dashboardCard: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    marginHorizontal: spacing.sm,
+    ...shadows.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  // New Header Styles (Unified Filter Bar)
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  filterBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface.secondary,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    height: 44,
+    paddingHorizontal: 12,
+  },
+  classSelector: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: '100%',
+  },
+  classTitle: {
+    fontSize: 14,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    flexShrink: 1,
+  },
+
+  headerDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: colors.border.light,
+    marginHorizontal: 12,
+  },
+
+  dateSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: '100%',
+  },
+  dateText: {
+    fontSize: 13,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.primary,
+  },
+
+  historyToggleButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface.secondary,
+    borderRadius: borderRadius.full, // Circle button
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+
+  // History Card Styles
+  historyListContent: {
+    paddingBottom: 80,
+    paddingTop: 8,
+  },
+  historyCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    padding: 16,
+    marginBottom: 8,
+    ...shadows.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  historyInfo: {
+    flex: 1,
+    marginRight: 16,
+  },
+  historyName: {
+    fontSize: 16,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  historyCode: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: typography.fontWeight.medium,
+  },
+  historyStatsRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  historyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
+    marginBottom: 2,
+  },
+  historyPercentage: {
+    fontSize: 14,
+    fontWeight: typography.fontWeight.bold,
+  },
+  historyCountText: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
+  },
+
+  headerSeparator: {
+    height: 1,
+    backgroundColor: colors.border.light,
+    marginVertical: 12,
+    marginHorizontal: -16,
+  },
+
+  // Dashboard Stats
+  dashboardStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  statBigContainer: {
+    alignItems: 'center',
+    borderRightWidth: 1,
+    borderRightColor: colors.border.light,
+    paddingRight: 16,
+  },
+  statBigNumber: {
+    fontSize: 32,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+    lineHeight: 36,
+  },
+  statBigLabel: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  statNumber: {
+    fontSize: 16,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text.primary,
+  },
+  statLabel: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.medium,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+  },
+
+  // Student Card Styles
+  studentsList: {
+    flex: 1,
+    paddingHorizontal: spacing.sm,
+  },
+  cardContainer: {
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.sm,
-    minHeight: 72,
-    borderWidth: 0.5,
+    ...shadows.xs,
+    borderWidth: 1,
     borderColor: colors.border.light,
   },
-  studentCardUnmarked: {
-    backgroundColor: colors.surface.primary,
-    borderColor: colors.border.light,
+  cardAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  studentCardPresent: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.success[500],
-    backgroundColor: colors.surface.primary,
+  cardAvatarText: {
+    fontSize: 14,
+    fontWeight: typography.fontWeight.bold,
   },
-  studentCardAbsent: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.error[500],
-    backgroundColor: colors.surface.primary,
-  },
-  studentInfo: {
+  cardInfo: {
     flex: 1,
-    marginRight: spacing.md,
-    minWidth: 0,
-  },
-  studentNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-    gap: spacing.xs,
-    flexWrap: 'wrap',
-    flex: 1,
-  },
-  studentName: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    flexShrink: 1,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xs + 2,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    gap: 4,
-    flexShrink: 0,
-  },
-  statusBadgePresent: {
-    backgroundColor: colors.success[50],
-  },
-  statusBadgeAbsent: {
-    backgroundColor: colors.error[50],
-  },
-  statusBadgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  statusBadgeTextPresent: {
-    color: colors.success[700],
-  },
-  statusBadgeTextAbsent: {
-    color: colors.error[700],
-  },
-  studentCode: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    flexShrink: 1,
-  },
-  statusButtons: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    flexShrink: 0,
-  },
-  statusButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.xs + 2,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border.light,
-    backgroundColor: colors.surface.primary,
-    gap: spacing.xs,
-    minWidth: 80,
     justifyContent: 'center',
   },
-  statusButtonUnmarked: {
-    borderColor: colors.border.light,
-    backgroundColor: colors.background.secondary,
-  },
-  statusButtonActivePresent: {
-    backgroundColor: colors.success[50],
-    borderColor: colors.success[300],
-  },
-  statusButtonActiveAbsent: {
-    backgroundColor: colors.error[50],
-    borderColor: colors.error[300],
-  },
-  statusButtonText: {
-    fontSize: typography.fontSize.sm,
+  cardName: {
+    fontSize: 14,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
+    marginBottom: 2,
   },
-  statusButtonTextUnmarked: {
+  cardId: {
+    fontSize: 11,
     color: colors.text.tertiary,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 64,
+  },
+  actionButtonPresent: {
+    backgroundColor: colors.surface.secondary,
+    borderColor: colors.border.light,
+  },
+  actionButtonPresentActive: {
+    backgroundColor: colors.success[500],
+    borderColor: colors.success[600],
+  },
+  actionButtonAbsent: {
+    backgroundColor: colors.surface.secondary,
+    borderColor: colors.border.light,
+  },
+  actionButtonAbsentActive: {
+    backgroundColor: colors.error[500],
+    borderColor: colors.error[600],
+  },
+  actionText: {
+    fontSize: 12,
     fontWeight: typography.fontWeight.medium,
+    color: colors.text.tertiary,
   },
-  statusButtonTextActivePresent: {
-    color: colors.success[700],
+  actionTextActive: {
+    color: '#fff',
+    fontWeight: typography.fontWeight.semibold,
   },
-  statusButtonTextActiveAbsent: {
-    color: colors.error[700],
+
+  // Keep original styles needed for bottom sheet, etc.
+  flatListContent: {
+    paddingBottom: 100,
   },
   saveButtonContainer: {
     position: 'absolute',
@@ -1232,29 +1486,27 @@ const createStyles = (
     left: 0,
     right: 0,
     backgroundColor: colors.surface.primary,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: 12,
+    paddingBottom: 24, // Safety padding for bottom notch
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
-    ...shadows.lg,
+    ...shadows.sm,
   },
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.warning[50],
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.warning[300],
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 4,
+    marginBottom: 6,
+    gap: 4,
   },
   warningText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 10,
+    fontWeight: typography.fontWeight.medium,
     color: colors.warning[700],
   },
   saveButton: {
@@ -1262,11 +1514,10 @@ const createStyles = (
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary.main,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: borderRadius.xl,
-    gap: spacing.sm,
-    ...shadows.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    gap: 6,
   },
   saveButtonWarning: {
     backgroundColor: colors.warning.main,
@@ -1276,27 +1527,27 @@ const createStyles = (
     backgroundColor: colors.neutral[400],
   },
   saveButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: 13,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.inverse,
   },
   bottomSheetBackground: {
     backgroundColor: colors.surface.primary,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
   },
   bottomSheetIndicator: {
     backgroundColor: colors.border.DEFAULT,
-    width: 40,
+    width: 36,
     height: 4,
   },
   bottomSheetContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
     paddingTop: spacing.md,
   },
   bottomSheetTitle: {
-    fontSize: typography.fontSize.lg,
+    fontSize: 18,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
     marginBottom: spacing.md,
@@ -1306,166 +1557,165 @@ const createStyles = (
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: borderRadius.md,
+    marginBottom: 4, // Spacing between items
+    // Removed bottom border for cleaner look
   },
   bottomSheetItemSelected: {
     backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
-    borderRadius: borderRadius.md,
-    marginVertical: spacing.xs,
   },
   bottomSheetItemText: {
-    fontSize: typography.fontSize.base,
+    fontSize: 16, // Larger text
     color: colors.text.primary,
     flex: 1,
+    fontWeight: typography.fontWeight.medium,
   },
   bottomSheetItemTextSelected: {
     color: colors.primary.main,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: typography.fontWeight.bold,
   },
   bottomSheetItemCheck: {
-    fontSize: typography.fontSize.lg,
+    fontSize: 18,
     color: colors.primary.main,
     fontWeight: typography.fontWeight.bold,
   },
   emptyState: {
-    padding: spacing.lg,
+    padding: spacing.md,
     alignItems: 'center',
   },
   emptyStateText: {
-    fontSize: typography.fontSize.sm,
+    fontSize: typography.fontSize.xs,
     color: colors.text.secondary,
     textAlign: 'center',
   },
   historyContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingHorizontal: spacing.sm,
     flex: 1,
   },
   historyStats: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
+    gap: 6,
+    marginBottom: spacing.xs,
   },
   historyStatCard: {
     flex: 1,
     backgroundColor: colors.surface.primary,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: borderRadius.sm,
     alignItems: 'center',
-    ...shadows.sm,
-    borderWidth: 0.5,
+    justifyContent: 'center',
+    borderWidth: 1,
     borderColor: colors.border.light,
   },
   historyStatCardPresent: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.success[500],
+    backgroundColor: isDark ? 'rgba(34, 197, 94, 0.08)' : '#F0FDF4',
+    borderColor: isDark ? 'rgba(34, 197, 94, 0.2)' : '#BBF7D0',
   },
   historyStatCardAbsent: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.error[500],
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.08)' : '#FEF2F2',
+    borderColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#FECACA',
   },
   historyStatNumber: {
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.bold,
     color: colors.text.primary,
-    marginBottom: spacing.xs,
   },
   historyStatLabel: {
-    fontSize: typography.fontSize.xs,
+    fontSize: 9,
     fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
+    color: colors.text.tertiary,
     textAlign: 'center',
   },
   dateRangeContainer: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    borderRadius: borderRadius.sm,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
+    flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.xs,
-    borderWidth: 0.5,
+    justifyContent: 'center',
+    borderWidth: 1,
     borderColor: colors.border.light,
   },
   dateRangeText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
+    fontSize: 11,
+    color: colors.text.secondary,
     fontWeight: typography.fontWeight.medium,
   },
   summaryContainer: {
     flex: 1,
   },
   summaryTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
+    fontSize: 12,
+    fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
-    marginBottom: spacing.md,
+    marginBottom: 6,
+    paddingHorizontal: 2,
   },
   summaryList: {
-    gap: spacing.xs,
+    paddingBottom: 20,
   },
   summaryItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.md,
+    paddingVertical: 8,
     paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
-    ...shadows.xs,
-    borderWidth: 0.5,
-    borderColor: colors.border.light,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   summaryStudentInfo: {
     flex: 1,
     minWidth: 0,
   },
   summaryStudentName: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 13,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
-    marginBottom: 2,
   },
   summaryStudentCode: {
-    fontSize: typography.fontSize.sm,
+    fontSize: 10,
     color: colors.text.tertiary,
   },
   summaryStats: {
     alignItems: 'flex-end',
-    gap: spacing.xs,
-    marginLeft: spacing.sm,
+    gap: 3,
+    marginLeft: 8,
   },
   summaryStatText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 11,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
   },
   summaryStatus: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs + 1,
-    borderRadius: borderRadius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
   },
   summaryStatusGood: {
-    backgroundColor: colors.success[50],
+    backgroundColor: isDark ? 'rgba(34, 197, 94, 0.15)' : colors.success[100],
   },
   summaryStatusFair: {
-    backgroundColor: colors.warning[50],
+    backgroundColor: isDark ? 'rgba(234, 179, 8, 0.15)' : colors.warning[100],
   },
   summaryStatusLow: {
-    backgroundColor: colors.error[50],
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : colors.error[100],
   },
   summaryStatusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 9,
+    fontWeight: typography.fontWeight.bold,
+    textTransform: 'uppercase',
   },
   summaryStatusTextGood: {
     color: colors.success[700],
   },
   summaryStatusTextFair: {
-    color: colors.warning[700],
+    color: colors.warning[800],
   },
   summaryStatusTextLow: {
     color: colors.error[700],
@@ -1474,23 +1724,55 @@ const createStyles = (
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.xl,
   },
   emptyText: {
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
     textAlign: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingVertical: spacing.lg,
   },
   loadingText: {
-    fontSize: typography.fontSize.base,
+    fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
+  },
+  cardStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flex: 1,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    gap: 4,
+    borderWidth: 1,
+  },
+  statusBadgePresent: {
+    backgroundColor: isDark ? 'rgba(34, 197, 94, 0.1)' : '#ecfdf5',
+    borderColor: isDark ? 'rgba(34, 197, 94, 0.2)' : colors.success[200],
+  },
+  statusBadgeAbsent: {
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
+    borderColor: isDark ? 'rgba(239, 68, 68, 0.2)' : colors.error[200],
+  },
+  statusBadgePending: {
+    backgroundColor: colors.background.tertiary,
+    borderColor: colors.border.light,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: typography.fontWeight.medium,
   },
 });

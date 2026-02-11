@@ -102,13 +102,21 @@ export function captureMessage(message: string, level: Sentry.SeverityLevel = 'i
   }
 }
 
-// Helper to set user context
-export function setUserContext(user: { id: string; email?: string; role?: string }) {
+// Helper to set user context (called after successful login/bootstrap)
+export function setUserContext(user: {
+  id: string;
+  email?: string;
+  role?: string;
+  school_code?: string | null;
+}) {
   Sentry.setUser({
     id: user.id,
     email: user.email,
     username: user.role,
   });
+  // Tag every subsequent event with role and school for filtering in dashboard
+  if (user.role) Sentry.setTag('user.role', user.role);
+  if (user.school_code) Sentry.setTag('school_code', user.school_code);
 }
 
 // Helper to clear user context (on logout)

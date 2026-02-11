@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text as RNText, TouchableOpacity, Alert } from 'react-native';
-import { MessageSquare, Pin, Trash2, Users, GraduationCap, Bell } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View, Text as RNText, TouchableOpacity, Alert, Image, Dimensions, Modal, Pressable } from 'react-native';
+import { Pin, Trash2, Bell, MoreHorizontal, X, Edit3 } from 'lucide-react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
 import type { Announcement } from '../../../hooks/useAnnouncements';
 import { useDeleteAnnouncement, useTogglePin, useSendReminder } from '../../../hooks/useAnnouncements';
@@ -8,14 +8,19 @@ import { useAuth } from '../../../contexts/AuthContext';
 
 interface AnnouncementCardProps {
     announcement: Announcement;
+    onEdit?: (announcement: Announcement) => void;
 }
 
-export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
-    const { colors, spacing, borderRadius, typography, shadows } = useTheme();
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+export function AnnouncementCard({ announcement, onEdit }: AnnouncementCardProps) {
+    const { colors, spacing, borderRadius, shadows } = useTheme();
     const { profile } = useAuth();
     const deleteMutation = useDeleteAnnouncement();
     const togglePinMutation = useTogglePin();
     const sendReminderMutation = useSendReminder();
+    const [showMenu, setShowMenu] = useState(false);
+    const [showImageModal, setShowImageModal] = useState(false);
 
     const isCreator = profile?.auth_id === announcement.created_by;
     const canManage = profile?.role === 'admin' || profile?.role === 'superadmin';
@@ -24,13 +29,37 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
     const getPriorityConfig = () => {
         switch (announcement.priority) {
             case 'urgent':
-                return { emoji: '🚨', color: colors.error[600], bg: colors.error[50], label: 'URGENT' };
+                return { 
+                    emoji: '🚨', 
+                    color: colors.error[600], 
+                    bg: colors.error[50], 
+                    label: 'URGENT',
+                    borderColor: colors.error[400],
+                };
             case 'high':
-                return { emoji: '⚠️', color: colors.warning[600], bg: colors.warning[50], label: 'Important' };
+                return { 
+                    emoji: '⚠️', 
+                    color: colors.warning[600], 
+                    bg: colors.warning[50], 
+                    label: 'Important',
+                    borderColor: colors.warning[400],
+                };
             case 'medium':
-                return { emoji: '📢', color: colors.primary[600], bg: colors.primary[50], label: 'Announcement' };
+                return { 
+                    emoji: '📢', 
+                    color: colors.primary[600], 
+                    bg: colors.primary[50], 
+                    label: 'Announcement',
+                    borderColor: colors.primary[400],
+                };
             case 'low':
-                return { emoji: 'ℹ️', color: colors.text.tertiary, bg: colors.background.secondary, label: 'Info' };
+                return { 
+                    emoji: 'ℹ️', 
+                    color: colors.info[600], 
+                    bg: colors.info[50], 
+                    label: 'Info',
+                    borderColor: colors.info[400],
+                };
         }
     };
 
@@ -43,17 +72,25 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
         const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
         if (seconds < 60) return 'Just now';
-        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
 
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
+    const handleEdit = () => {
+        setShowMenu(false);
+        if (onEdit) {
+            onEdit(announcement);
+        }
+    };
+
     const handleDelete = () => {
+        setShowMenu(false);
         Alert.alert(
             'Delete Announcement',
-            'Are you sure you want to delete this announcement?',
+            'Are you sure you want to delete this announcement? This action cannot be undone.',
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
@@ -66,6 +103,7 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
     };
 
     const handleTogglePin = () => {
+        setShowMenu(false);
         togglePinMutation.mutate({
             id: announcement.id,
             pinned: !announcement.pinned,
@@ -73,6 +111,7 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
     };
 
     const handleSendReminder = () => {
+        setShowMenu(false);
         Alert.alert(
             'Send Reminder',
             'This will resend the notification to all originally targeted users. Continue?',
@@ -102,186 +141,288 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
     };
 
     return (
-        <View
-            style={{
-                backgroundColor: colors.background.primary,
-                borderRadius: borderRadius.lg,
-                padding: spacing.md,
-                marginBottom: spacing.md,
-                borderWidth: announcement.pinned ? 2 : 1,
-                borderColor: announcement.pinned ? colors.primary[500] : colors.border.primary,
-                ...shadows.sm,
-            }}
-        >
-            {/* Header */}
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm }}>
-                {/* Priority Badge */}
-                <View
-                    style={{
-                        backgroundColor: priorityConfig.bg,
-                        paddingHorizontal: spacing.sm,
-                        paddingVertical: spacing.xs,
-                        borderRadius: borderRadius.md,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: spacing.xs,
-                        flex: 1,
-                    }}
-                >
-                    <RNText style={{ fontSize: 16 }}>{priorityConfig.emoji}</RNText>
-                    <RNText
+        <>
+            <View
+                style={{
+                    backgroundColor: colors.surface.primary,
+                    paddingBottom: spacing.md,
+                }}
+            >
+                {/* Header */}
+                <View style={{ 
+                    flexDirection: 'row', 
+                    alignItems: 'center', 
+                    padding: spacing.md,
+                    paddingBottom: spacing.sm,
+                }}>
+                    {/* Profile Avatar */}
+                    <View
                         style={{
-                            fontSize: typography.fontSize.sm,
-                            fontWeight: typography.fontWeight.semibold,
-                            color: priorityConfig.color,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
+                            backgroundColor: priorityConfig.bg,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            borderWidth: 2,
+                            borderColor: announcement.pinned ? colors.primary[500] : 'transparent',
                         }}
                     >
-                        {priorityConfig.label}
+                        <RNText style={{ fontSize: 18, fontWeight: '700', color: priorityConfig.color }}>
+                            {announcement.creator?.full_name?.charAt(0)?.toUpperCase() || '?'}
+                        </RNText>
+                    </View>
+
+                    <View style={{ flex: 1, marginLeft: spacing.sm }}>
+                        {/* Name and pinned indicator */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <RNText style={{ 
+                                fontSize: 15, 
+                                fontWeight: '700', 
+                                color: colors.text.primary,
+                            }}>
+                                {announcement.creator?.full_name || 'Unknown'}
+                            </RNText>
+                            {announcement.pinned && (
+                                <Pin size={14} color={colors.primary[500]} fill={colors.primary[500]} />
+                            )}
+                        </View>
+
+                        {/* Target and time */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            {announcement.target_type === 'all' ? (
+                                <RNText style={{ fontSize: 13, color: colors.text.tertiary }}>
+                                    To everyone
+                                </RNText>
+                            ) : (
+                                <RNText style={{ fontSize: 13, color: colors.text.tertiary }}>
+                                    To {announcement.class ? `Class ${announcement.class.grade}-${announcement.class.section || ''}` : 'Class'}
+                                </RNText>
+                            )}
+                            <RNText style={{ fontSize: 13, color: colors.text.tertiary }}>•</RNText>
+                            <RNText style={{ fontSize: 13, color: colors.text.tertiary }}>
+                                {getTimeAgo(announcement.created_at)}
+                            </RNText>
+                        </View>
+                    </View>
+
+                    {/* Priority Badge - shows for all posts */}
+                    <View style={{
+                        backgroundColor: priorityConfig.bg,
+                        paddingVertical: 4,
+                        paddingHorizontal: spacing.sm,
+                        borderRadius: borderRadius.full,
+                        marginRight: spacing.sm,
+                    }}>
+                        <RNText style={{ 
+                            fontSize: 11, 
+                            fontWeight: '700', 
+                            color: priorityConfig.color,
+                            textTransform: 'uppercase',
+                        }}>
+                            {priorityConfig.emoji} {priorityConfig.label}
+                        </RNText>
+                    </View>
+
+                    {/* More options */}
+                    {canManage && isCreator && (
+                        <TouchableOpacity
+                            onPress={() => setShowMenu(true)}
+                            style={{ padding: spacing.xs }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <MoreHorizontal size={22} color={colors.text.secondary} />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {/* Content Text */}
+                <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm }}>
+                    <RNText
+                        style={{
+                            fontSize: 16,
+                            fontWeight: '500',
+                            color: colors.text.primary,
+                            lineHeight: 24,
+                        }}
+                    >
+                        {announcement.message}
                     </RNText>
                 </View>
 
-                {/* Actions */}
-                {canManage && (
-                    <View style={{ flexDirection: 'row', gap: spacing.xs, marginLeft: spacing.sm }}>
-                        {isCreator && (
-                            <>
-                                <TouchableOpacity
-                                    onPress={handleSendReminder}
-                                    disabled={sendReminderMutation.isPending}
-                                    style={{
-                                        padding: spacing.xs,
-                                        borderRadius: borderRadius.md,
-                                        backgroundColor: colors.background.secondary,
-                                        opacity: sendReminderMutation.isPending ? 0.5 : 1,
-                                    }}
-                                >
-                                    <Bell size={18} color={colors.primary[600]} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={handleTogglePin}
-                                    style={{
-                                        padding: spacing.xs,
-                                        borderRadius: borderRadius.md,
-                                        backgroundColor: announcement.pinned ? colors.primary[100] : colors.background.secondary,
-                                    }}
-                                >
-                                    <Pin
-                                        size={18}
-                                        color={announcement.pinned ? colors.primary[600] : colors.text.secondary}
-                                        fill={announcement.pinned ? colors.primary[600] : 'none'}
-                                    />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    onPress={handleDelete}
-                                    style={{
-                                        padding: spacing.xs,
-                                        borderRadius: borderRadius.md,
-                                        backgroundColor: colors.background.secondary,
-                                    }}
-                                >
-                                    <Trash2 size={18} color={colors.error[600]} />
-                                </TouchableOpacity>
-                            </>
-                        )}
-                    </View>
+                {/* Image - Full width */}
+                {announcement.image_url && (
+                    <TouchableOpacity 
+                        activeOpacity={0.95} 
+                        onPress={() => setShowImageModal(true)}
+                        style={{ marginTop: spacing.xs }}
+                    >
+                        <Image
+                            source={{ uri: announcement.image_url }}
+                            style={{
+                                width: SCREEN_WIDTH,
+                                height: SCREEN_WIDTH * 0.75,
+                                backgroundColor: colors.background.secondary,
+                            }}
+                            resizeMode="cover"
+                        />
+                    </TouchableOpacity>
                 )}
             </View>
 
-            {/* Title */}
-            <RNText
-                style={{
-                    fontSize: typography.fontSize.lg,
-                    fontWeight: typography.fontWeight.bold,
-                    color: colors.text.primary,
-                    marginBottom: spacing.xs,
-                }}
+            {/* Actions Menu Modal */}
+            <Modal
+                visible={showMenu}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowMenu(false)}
             >
-                {announcement.title}
-            </RNText>
+                <Pressable 
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
+                    onPress={() => setShowMenu(false)}
+                >
+                    <Pressable onPress={e => e.stopPropagation()}>
+                        <View
+                            style={{
+                                backgroundColor: colors.surface.primary,
+                                borderTopLeftRadius: borderRadius['2xl'],
+                                borderTopRightRadius: borderRadius['2xl'],
+                                paddingBottom: 34,
+                            }}
+                        >
+                            {/* Handle bar */}
+                            <View style={{ alignItems: 'center', paddingVertical: spacing.sm }}>
+                                <View style={{
+                                    width: 36,
+                                    height: 4,
+                                    backgroundColor: colors.border.medium,
+                                    borderRadius: 2,
+                                }} />
+                            </View>
 
-            {/* Message */}
-            <RNText
-                style={{
-                    fontSize: typography.fontSize.base,
-                    color: colors.text.secondary,
-                    lineHeight: 22,
-                    marginBottom: spacing.sm,
-                }}
+                            {/* Edit */}
+                            <TouchableOpacity
+                                onPress={handleEdit}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingVertical: spacing.md,
+                                    paddingHorizontal: spacing.lg,
+                                    gap: spacing.md,
+                                }}
+                            >
+                                <Edit3 size={24} color={colors.text.primary} />
+                                <RNText style={{ fontSize: 16, color: colors.text.primary }}>
+                                    Edit
+                                </RNText>
+                            </TouchableOpacity>
+
+                            {/* Send Reminder */}
+                            <TouchableOpacity
+                                onPress={handleSendReminder}
+                                disabled={sendReminderMutation.isPending}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingVertical: spacing.md,
+                                    paddingHorizontal: spacing.lg,
+                                    gap: spacing.md,
+                                    opacity: sendReminderMutation.isPending ? 0.5 : 1,
+                                }}
+                            >
+                                <Bell size={24} color={colors.text.primary} />
+                                <RNText style={{ fontSize: 16, color: colors.text.primary }}>
+                                    Send Reminder
+                                </RNText>
+                            </TouchableOpacity>
+
+                            {/* Pin/Unpin */}
+                            <TouchableOpacity
+                                onPress={handleTogglePin}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingVertical: spacing.md,
+                                    paddingHorizontal: spacing.lg,
+                                    gap: spacing.md,
+                                }}
+                            >
+                                <Pin size={24} color={colors.text.primary} fill={announcement.pinned ? colors.text.primary : 'none'} />
+                                <RNText style={{ fontSize: 16, color: colors.text.primary }}>
+                                    {announcement.pinned ? 'Unpin' : 'Pin to top'}
+                                </RNText>
+                            </TouchableOpacity>
+
+                            {/* Delete */}
+                            <TouchableOpacity
+                                onPress={handleDelete}
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingVertical: spacing.md,
+                                    paddingHorizontal: spacing.lg,
+                                    gap: spacing.md,
+                                }}
+                            >
+                                <Trash2 size={24} color={colors.error[500]} />
+                                <RNText style={{ fontSize: 16, color: colors.error[500] }}>
+                                    Delete
+                                </RNText>
+                            </TouchableOpacity>
+
+                            {/* Cancel */}
+                            <TouchableOpacity
+                                onPress={() => setShowMenu(false)}
+                                style={{
+                                    alignItems: 'center',
+                                    paddingVertical: spacing.md,
+                                    marginTop: spacing.sm,
+                                    marginHorizontal: spacing.lg,
+                                    backgroundColor: colors.background.secondary,
+                                    borderRadius: borderRadius.lg,
+                                }}
+                            >
+                                <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.text.primary }}>
+                                    Cancel
+                                </RNText>
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal>
+
+            {/* Image Fullscreen Modal */}
+            <Modal
+                visible={showImageModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowImageModal(false)}
             >
-                {announcement.message}
-            </RNText>
-
-            {/* Footer */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                {/* Author & Time */}
-                <View style={{ flex: 1 }}>
-                    <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.tertiary }}>
-                        Posted by {announcement.creator?.full_name || 'Unknown'} • {getTimeAgo(announcement.created_at)}
-                    </RNText>
-                </View>
-
-                {/* Target Audience */}
-                <View
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: spacing.xs,
-                        backgroundColor: colors.background.secondary,
-                        paddingHorizontal: spacing.sm,
-                        paddingVertical: spacing.xs,
-                        borderRadius: borderRadius.md,
-                    }}
-                >
-                    {announcement.target_type === 'all' ? (
-                        <>
-                            <Users size={14} color={colors.text.tertiary} />
-                            <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary }}>
-                                All Students
-                            </RNText>
-                        </>
-                    ) : (
-                        <>
-                            <GraduationCap size={14} color={colors.text.tertiary} />
-                            <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary }}>
-                                {announcement.class
-                                    ? `Grade ${announcement.class.grade}${announcement.class.section ? `-${announcement.class.section}` : ''}`
-                                    : 'Class'
-                                }
-                            </RNText>
-                        </>
-                    )}
-                </View>
-            </View>
-
-            {/* Pinned Indicator */}
-            {announcement.pinned && (
-                <View
-                    style={{
-                        position: 'absolute',
-                        top: -8,
-                        right: spacing.md,
-                        backgroundColor: colors.primary[600],
-                        paddingHorizontal: spacing.sm,
-                        paddingVertical: 4,
-                        borderRadius: borderRadius.full,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 4,
-                        ...shadows.md,
-                    }}
-                >
-                    <Pin size={12} color={colors.text.inverse} fill={colors.text.inverse} />
-                    <RNText
+                <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
+                    <TouchableOpacity
+                        onPress={() => setShowImageModal(false)}
                         style={{
-                            fontSize: typography.fontSize.xs,
-                            fontWeight: typography.fontWeight.bold,
-                            color: colors.text.inverse,
+                            position: 'absolute',
+                            top: 50,
+                            right: 16,
+                            zIndex: 10,
+                            padding: spacing.sm,
                         }}
                     >
-                        PINNED
-                    </RNText>
+                        <X size={28} color="#fff" />
+                    </TouchableOpacity>
+                    {announcement.image_url && (
+                        <Image
+                            source={{ uri: announcement.image_url }}
+                            style={{
+                                width: SCREEN_WIDTH,
+                                height: SCREEN_WIDTH,
+                            }}
+                            resizeMode="contain"
+                        />
+                    )}
                 </View>
-            )}
-        </View>
+            </Modal>
+        </>
     );
 }

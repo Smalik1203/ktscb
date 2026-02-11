@@ -4,11 +4,11 @@
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, Button, ActivityIndicator, Portal, Modal } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { Text, Button, ActivityIndicator, Portal, Modal, TextInput } from 'react-native-paper';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Receipt, Plus, CreditCard, Wallet, Smartphone, Calendar, Trash2, FileText, Edit2, AlertTriangle } from 'lucide-react-native';
-import { TouchableOpacity } from 'react-native';
+import { X, Receipt, Plus, CreditCard, Wallet, Smartphone, Calendar, Trash2, FileText, Edit2, AlertTriangle, Bell } from 'lucide-react-native';
+
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { invoiceService } from '../../services/fees';
@@ -18,6 +18,7 @@ import {
   useRemoveInvoiceItems,
   useUpdateInvoiceItem,
   useDeleteInvoice,
+  useUpdateInvoice,
 } from '../../hooks/useInvoiceOperations';
 import { PaymentScreen } from './PaymentScreen';
 import { InvoiceDocumentViewer } from './InvoiceDocumentViewer';
@@ -69,18 +70,18 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
     () => createStyles(colors, typography, spacing, borderRadius, shadows),
     [colors, typography, spacing, borderRadius, shadows]
   );
-  
+
   const queryClient = useQueryClient();
   const { can } = useCapabilities();
   const canAddItems = can('fees.write');
   const canDeleteInvoice = can('fees.write');
-  
+
   // Mutation hooks (separated from UI)
   const addItemsMutation = useAddInvoiceItems();
   const removeItemsMutation = useRemoveInvoiceItems();
   const updateItemMutation = useUpdateInvoiceItem();
   const deleteInvoiceMutation = useDeleteInvoice();
-  
+
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingItemLabel, setEditingItemLabel] = useState('');
@@ -89,7 +90,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [receiptNo, setReceiptNo] = useState('');
   const [saving, setSaving] = useState(false);
-  
+
   // Add items form
   const [showAddItemsForm, setShowAddItemsForm] = useState(false);
   const [newItems, setNewItems] = useState<Array<{ id: string; label: string; amount: string }>>([
@@ -98,6 +99,13 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
   const [showPaymentScreen, setShowPaymentScreen] = useState(false);
   const [showInvoiceDocument, setShowInvoiceDocument] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+  const [sendingReminder, setSendingReminder] = useState(false);
+
+  // Edit Invoice Details State
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [editDueDate, setEditDueDate] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const updateInvoiceMutation = useUpdateInvoice();
 
   // Payment receipt generation
   const { generateInvoice, isGenerating, currentInvoice, clearInvoice } = useInvoice({
@@ -114,13 +122,13 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
     queryFn: () => invoiceId ? invoiceService.getDetail(invoiceId) : null,
     enabled: !!invoiceId && visible,
     retry: 1, // Retry once on failure
-    staleTime: 0, // Always consider data stale to allow refetch
-    gcTime: 0, // Don't cache to ensure fresh data (formerly cacheTime)
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000,
   });
 
   const handleRecordPayment = async () => {
     if (!invoiceId || !paymentAmount) return;
-    
+
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
       Alert.alert('Invalid Amount', 'Please enter a valid amount');
@@ -135,7 +143,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
         method: paymentMethod as 'cash' | 'card' | 'online' | 'cheque' | 'bank_transfer',
         receipt_number: receiptNo || undefined,
       });
-      
+
       Alert.alert('Success', 'Payment recorded successfully');
       setShowPaymentForm(false);
       setPaymentAmount('');
@@ -170,7 +178,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
   };
 
   const updateNewItem = (id: string, field: 'label' | 'amount', value: string) => {
-    setNewItems(newItems.map(item => 
+    setNewItems(newItems.map(item =>
       item.id === id ? { ...item, [field]: value } : item
     ));
   };
@@ -179,7 +187,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
     if (!invoiceId) return;
 
     const validItems = newItems.filter(i => i.label.trim() && parseFloat(i.amount));
-    
+
     if (validItems.length === 0) {
       Alert.alert('Error', 'Add at least one item with label and amount');
       return;
@@ -193,7 +201,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
           amount: parseFloat(i.amount),
         })),
       });
-      
+
       Alert.alert('Success', 'Items added successfully');
       setShowAddItemsForm(false);
       setNewItems([{ id: '1', label: '', amount: '' }]);
@@ -209,7 +217,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
   const items = data && 'items' in data ? data.items : [];
   const payments = data && 'payments' in data ? data.payments : [];
   const balance = invoice ? invoice.total_amount - invoice.paid_amount : 0;
-  
+
   // NOTE: This hook must be called before any early returns to maintain hook order
   // Removed debug logging for production
 
@@ -274,35 +282,106 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
               {/* Summary */}
               <View style={styles.summary}>
                 {invoice.student && (
-                  <Text style={styles.studentName}>{invoice.student.full_name}</Text>
-                )}
-                {invoice.due_date && (
-                  <View style={styles.dueDateRow}>
-                    <Calendar size={14} color={isOverdue(invoice.due_date) ? colors.error[600] : colors.text.secondary} />
-                    <Text style={[styles.dueDateText, isOverdue(invoice.due_date) && styles.dueDateOverdue]}>
-                      Due Date: {formatDate(invoice.due_date)}
-                      {isOverdue(invoice.due_date) && ' (Overdue)'}
-                    </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={styles.studentName}>{invoice.student.full_name}</Text>
+                    {canAddItems && !isEditingDetails && (
+                      <TouchableOpacity onPress={() => {
+                        setEditDueDate(invoice.due_date || '');
+                        setEditNotes(invoice.notes || '');
+                        setIsEditingDetails(true);
+                      }}>
+                        <Edit2 size={16} color={colors.primary[600]} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
-                <View style={styles.summaryRow}>
-                  <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Total</Text>
-                    <Text style={styles.summaryValue}>{formatAmount(invoice.total_amount)}</Text>
+
+                {isEditingDetails ? (
+                  <View style={styles.editForm}>
+                    <Text style={styles.inputLabel}>Due Date (YYYY-MM-DD)</Text>
+                    <TextInput
+                      mode="outlined"
+                      dense
+                      style={styles.textInput}
+                      value={editDueDate}
+                      onChangeText={setEditDueDate}
+                      placeholder="YYYY-MM-DD"
+                      contentStyle={{ backgroundColor: colors.surface.primary }}
+                    />
+                    <Text style={styles.inputLabel}>Notes</Text>
+                    <TextInput
+                      mode="outlined"
+                      dense
+                      style={[styles.textInput, { height: undefined }]}
+                      value={editNotes}
+                      onChangeText={setEditNotes}
+                      multiline
+                      numberOfLines={3}
+                      placeholder="Add notes..."
+                      contentStyle={{ backgroundColor: colors.surface.primary, height: 80 }}
+                    />
+                    <View style={[styles.formActions, { marginTop: 10 }]}>
+                      <Button mode="outlined" onPress={() => setIsEditingDetails(false)} style={{ marginRight: 8 }}>Cancel</Button>
+                      <Button
+                        mode="contained"
+                        onPress={async () => {
+                          try {
+                            await updateInvoiceMutation.mutateAsync({
+                              invoiceId: invoice.id,
+                              updates: {
+                                due_date: editDueDate || undefined,
+                                notes: editNotes || null
+                              }
+                            });
+                            setIsEditingDetails(false);
+                            refetch();
+                          } catch (err: any) {
+                            Alert.alert('Error', err.message || 'Failed to update');
+                          }
+                        }}
+                        loading={updateInvoiceMutation.isPending}
+                      >
+                        Save
+                      </Button>
+                    </View>
                   </View>
-                  <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Paid</Text>
-                    <Text style={[styles.summaryValue, { color: colors.success[600] }]}>
-                      {formatAmount(invoice.paid_amount)}
-                    </Text>
+                ) : (
+                  <>
+                    {invoice.due_date && (
+                      <View style={styles.dueDateRow}>
+                        <Calendar size={14} color={isOverdue(invoice.due_date) ? colors.error[600] : colors.text.secondary} />
+                        <Text style={[styles.dueDateText, isOverdue(invoice.due_date) && styles.dueDateOverdue]}>
+                          Due Date: {formatDate(invoice.due_date)}
+                          {isOverdue(invoice.due_date) && ' (Overdue)'}
+                        </Text>
+                      </View>
+                    )}
+                    {invoice.notes && (
+                      <Text style={styles.notesText}>{invoice.notes}</Text>
+                    )}
+                  </>
+                )}
+
+                {!isEditingDetails && (
+                  <View style={styles.summaryRow}>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Total</Text>
+                      <Text style={styles.summaryValue}>{formatAmount(invoice.total_amount)}</Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Paid</Text>
+                      <Text style={[styles.summaryValue, { color: colors.success[600] }]}>
+                        {formatAmount(invoice.paid_amount)}
+                      </Text>
+                    </View>
+                    <View style={styles.summaryItem}>
+                      <Text style={styles.summaryLabel}>Due</Text>
+                      <Text style={[styles.summaryValue, { color: balance > 0 ? colors.error[600] : colors.success[600] }]}>
+                        {formatAmount(balance)}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.summaryItem}>
-                    <Text style={styles.summaryLabel}>Due</Text>
-                    <Text style={[styles.summaryValue, { color: balance > 0 ? colors.error[600] : colors.success[600] }]}>
-                      {formatAmount(balance)}
-                    </Text>
-                  </View>
-                </View>
+                )}
               </View>
 
               {/* Items */}
@@ -319,7 +398,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                     </TouchableOpacity>
                   )}
                 </View>
-                
+
                 {items.length === 0 ? (
                   <View style={styles.emptyItemsState}>
                     <Text style={styles.emptyItemsText}>No items added yet</Text>
@@ -327,28 +406,32 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                 ) : (
                   items.map(item => {
                     const isEditing = editingItemId === item.id;
-                    
+
                     return (
                       <View key={item.id} style={styles.itemCard}>
                         {isEditing ? (
                           <View style={styles.editItemForm}>
                             <View style={styles.editItemFormRow}>
                               <TextInput
+                                mode="outlined"
+                                dense
                                 style={styles.editItemLabelInput}
                                 value={editingItemLabel}
                                 onChangeText={setEditingItemLabel}
                                 placeholder="Item name"
-                                placeholderTextColor={colors.text.tertiary}
+                                contentStyle={{ backgroundColor: colors.surface.secondary }}
                               />
                               <View style={styles.editItemAmountWrap}>
-                                <Text style={styles.rupee}>₹</Text>
                                 <TextInput
+                                  mode="outlined"
+                                  dense
                                   style={styles.editItemAmountInput}
                                   value={editingItemAmount}
                                   onChangeText={setEditingItemAmount}
                                   placeholder="0"
                                   keyboardType="decimal-pad"
-                                  placeholderTextColor={colors.text.tertiary}
+                                  left={<TextInput.Affix text="₹" />}
+                                  contentStyle={{ backgroundColor: colors.surface.secondary }}
                                 />
                               </View>
                             </View>
@@ -370,7 +453,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                                     Alert.alert('Error', 'Please enter both label and amount');
                                     return;
                                   }
-                                  
+
                                   try {
                                     await updateItemMutation.mutateAsync({
                                       itemId: item.id,
@@ -433,7 +516,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                                                   invoiceId: invoiceId!,
                                                   itemIds: [item.id],
                                                 });
-                                                
+
                                                 // Force refetch after deletion
                                                 await refetch();
                                                 onPaymentRecorded?.();
@@ -467,21 +550,25 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                     {newItems.map((item) => (
                       <View key={item.id} style={styles.newItemRow}>
                         <TextInput
+                          mode="outlined"
+                          dense
                           style={styles.newItemLabelInput}
                           value={item.label}
                           onChangeText={(v) => updateNewItem(item.id, 'label', v)}
                           placeholder="Item name"
-                          placeholderTextColor={colors.text.tertiary}
+                          contentStyle={{ backgroundColor: colors.surface.primary }}
                         />
                         <View style={styles.newItemAmountWrap}>
-                          <Text style={styles.rupee}>₹</Text>
                           <TextInput
+                            mode="outlined"
+                            dense
                             style={styles.newItemAmountInput}
                             value={item.amount}
                             onChangeText={(v) => updateNewItem(item.id, 'amount', v)}
                             placeholder="0"
                             keyboardType="decimal-pad"
-                            placeholderTextColor={colors.text.tertiary}
+                            left={<TextInput.Affix text="₹" />}
+                            contentStyle={{ backgroundColor: colors.surface.primary }}
                           />
                         </View>
                         <TouchableOpacity
@@ -565,19 +652,21 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
               {showPaymentForm && balance > 0 && (
                 <View style={styles.paymentForm}>
                   <Text style={styles.sectionTitle}>Record Payment</Text>
-                  
+
                   <Text style={styles.inputLabel}>Amount</Text>
                   <View style={styles.amountInputRow}>
-                    <Text style={styles.currencySymbol}>₹</Text>
                     <TextInput
-                      style={styles.amountInput}
+                      mode="outlined"
+                      dense
+                      style={styles.paymentAmountInput}
                       value={paymentAmount}
                       onChangeText={setPaymentAmount}
                       placeholder={balance.toString()}
                       keyboardType="decimal-pad"
-                      placeholderTextColor={colors.text.tertiary}
+                      left={<TextInput.Affix text="₹" />}
+                      contentStyle={{ backgroundColor: colors.background.secondary, fontSize: 18, fontWeight: 'bold' }}
                     />
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.fullAmountBtn}
                       onPress={() => setPaymentAmount(balance.toString())}
                     >
@@ -607,11 +696,13 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
 
                   <Text style={styles.inputLabel}>Receipt # (optional)</Text>
                   <TextInput
+                    mode="outlined"
+                    dense
                     style={styles.textInput}
                     value={receiptNo}
                     onChangeText={setReceiptNo}
                     placeholder="e.g. RCP-001"
-                    placeholderTextColor={colors.text.tertiary}
+                    contentStyle={{ backgroundColor: colors.background.secondary }}
                   />
 
                   <View style={styles.formActions}>
@@ -636,52 +727,76 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
           {invoice && !showPaymentForm && (
             <View style={styles.footer}>
               {balance > 0 && (
+                <View style={styles.footerButtonRow}>
+                  <Button
+                    mode="contained"
+                    icon={() => <Receipt size={18} color="#fff" />}
+                    onPress={() => setShowPaymentScreen(true)}
+                    style={[styles.payBtn, { flex: 1 }]}
+                  >
+                    Record Payment
+                  </Button>
+                  <Button
+                    mode="outlined"
+                    icon={() => <Bell size={18} color={colors.warning[600]} />}
+                    onPress={async () => {
+                      setSendingReminder(true);
+                      try {
+                        await invoiceService.sendPaymentReminder(invoiceId!);
+                        Alert.alert('Success', 'Payment reminder sent to student');
+                      } catch (err: any) {
+                        Alert.alert('Error', err.message || 'Failed to send reminder');
+                      } finally {
+                        setSendingReminder(false);
+                      }
+                    }}
+                    loading={sendingReminder}
+                    disabled={sendingReminder}
+                    buttonColor={colors.warning[50]}
+                    textColor={colors.warning[700]}
+                    style={styles.reminderBtn}
+                  >
+                    Remind
+                  </Button>
+                </View>
+              )}
+              {canDeleteInvoice && (
                 <Button
-                  mode="contained"
-                  icon={() => <Receipt size={18} color="#fff" />}
-                  onPress={() => setShowPaymentScreen(true)}
-                  style={styles.payBtn}
+                  mode="outlined"
+                  onPress={() => {
+                    Alert.alert(
+                      'Delete Invoice',
+                      'Are you sure you want to delete this invoice? This action cannot be undone. All items and associated data will be permanently deleted.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          style: 'destructive',
+                          onPress: async () => {
+                            try {
+                              await deleteInvoiceMutation.mutateAsync(invoiceId!);
+                              onPaymentRecorded?.();
+                              onClose();
+                              Alert.alert('Success', 'Invoice deleted successfully');
+                            } catch (err: unknown) {
+                              const errorMessage = err instanceof Error ? err.message : 'Failed to delete invoice';
+                              Alert.alert('Error', errorMessage);
+                            }
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                  icon={() => <Trash2 size={18} color={colors.error[600]} />}
+                  loading={deleteInvoiceMutation.isPending}
+                  disabled={deleteInvoiceMutation.isPending}
+                  buttonColor={colors.error[50]}
+                  textColor={colors.error[600]}
+                  style={styles.deleteInvoiceButtonBottom}
                 >
-                  Record Payment
+                  Delete Invoice
                 </Button>
               )}
-                  {canDeleteInvoice && (
-                    <Button
-                      mode="outlined"
-                      onPress={() => {
-                        Alert.alert(
-                          'Delete Invoice',
-                          'Are you sure you want to delete this invoice? This action cannot be undone. All items and associated data will be permanently deleted.',
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Delete',
-                              style: 'destructive',
-                              onPress: async () => {
-                                try {
-                                  await deleteInvoiceMutation.mutateAsync(invoiceId!);
-                                  onPaymentRecorded?.();
-                                  onClose();
-                                  Alert.alert('Success', 'Invoice deleted successfully');
-                                } catch (err: unknown) {
-                                  const errorMessage = err instanceof Error ? err.message : 'Failed to delete invoice';
-                                  Alert.alert('Error', errorMessage);
-                                }
-                              },
-                            },
-                          ]
-                        );
-                      }}
-                      icon={() => <Trash2 size={18} color={colors.error[600]} />}
-                      loading={deleteInvoiceMutation.isPending}
-                      disabled={deleteInvoiceMutation.isPending}
-                      buttonColor={colors.error[50]}
-                      textColor={colors.error[600]}
-                      style={styles.deleteInvoiceButtonBottom}
-                    >
-                      Delete Invoice
-                    </Button>
-                  )}
             </View>
           )}
         </KeyboardAvoidingView>
@@ -904,30 +1019,16 @@ const createStyles = (
   editItemLabelInput: {
     flex: 2,
     backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    minHeight: 44,
+    fontSize: typography.fontSize.sm,
+    height: 40,
   },
   editItemAmountWrap: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    paddingHorizontal: spacing.md,
-    minHeight: 44,
   },
   editItemAmountInput: {
-    flex: 1,
-    padding: spacing.md,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
+    backgroundColor: colors.surface.secondary,
+    fontSize: typography.fontSize.sm,
+    height: 40,
   },
   editItemActions: {
     flexDirection: 'row',
@@ -972,7 +1073,7 @@ const createStyles = (
     backgroundColor: colors.error[50],
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: colors.error[200],
+    borderColor: colors.error[300],
     marginTop: spacing.sm,
     minHeight: 44,
   },
@@ -981,6 +1082,7 @@ const createStyles = (
     fontWeight: typography.fontWeight.semibold,
     color: colors.error[600],
   },
+
   dueDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -994,11 +1096,7 @@ const createStyles = (
     color: colors.error[600],
     fontWeight: typography.fontWeight.semibold,
   },
-  itemAmount: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
+
   paymentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1056,23 +1154,13 @@ const createStyles = (
   amountInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    paddingHorizontal: spacing.sm,
+    gap: spacing.sm,
   },
-  currencySymbol: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.secondary,
-  },
-  amountInput: {
+  paymentAmountInput: {
     flex: 1,
+    backgroundColor: colors.background.secondary,
     fontSize: typography.fontSize.lg,
-    color: colors.text.primary,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
+    fontWeight: 'bold',
   },
   fullAmountBtn: {
     backgroundColor: colors.primary[100],
@@ -1186,35 +1274,18 @@ const createStyles = (
   newItemLabelInput: {
     flex: 2,
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    padding: spacing.sm,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
+    fontSize: typography.fontSize.sm,
+    height: 40,
   },
   newItemAmountWrap: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    paddingHorizontal: spacing.sm,
   },
   newItemAmountInput: {
-    flex: 1,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface.primary,
+    fontSize: typography.fontSize.sm,
+    height: 40,
   },
-  rupee: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    marginRight: spacing.xs,
-  },
+
   deleteNewItemBtn: {
     padding: spacing.xs,
   },
@@ -1257,9 +1328,26 @@ const createStyles = (
   payBtn: {
     borderRadius: borderRadius.md,
   },
-  deleteInvoiceButtonBottom: {
-    borderColor: colors.error[300],
+  footerButtonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  reminderBtn: {
     borderRadius: borderRadius.md,
+    borderColor: colors.warning[300],
+  },
+  editForm: {
+    backgroundColor: colors.primary[50], // Same as summary background or slightly different?
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  notesText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
   },
 });
 

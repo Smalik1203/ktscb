@@ -47,7 +47,7 @@ export function useSubjects(
       // Get total count
       const { count, error: countError } = await supabase
         .from(DB.tables.subjects)
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq(DB.columns.schoolCode, schoolCode);
 
       if (countError) {
@@ -86,7 +86,7 @@ export function useSubjects(
           school_code: input.school_code,
           created_by: input.created_by,
         })
-        .select()
+        .select('id, subject_name, school_code, created_by, created_at, subject_name_norm')
         .single();
 
       if (error) {

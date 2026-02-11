@@ -60,13 +60,13 @@ export function useReportComment(options: UseReportCommentOptions = {}) {
 
             const { data, error } = await supabase
                 .from('report_comments')
-                .select('*')
+                .select('id, student_id, term_id, class_instance_id, teacher_id, school_code, input_data, data_freshness_days, tone, focus, language, generated_comment, word_count, similarity_score, positivity_score, generation_version, model_used, edited_comment, edit_diff_length, was_regenerated, regeneration_count, status, approved_at, approved_by, rejection_reason, created_at, updated_at')
                 .eq('student_id', studentId)
                 .eq('class_instance_id', classInstanceId)
                 .single();
 
             if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-                console.error('Error fetching comment:', error);
+                // Comment fetch failed
                 return null;
             }
 

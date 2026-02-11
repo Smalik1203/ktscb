@@ -1,11 +1,18 @@
 /**
  * Push Notification Service
  * 
- * Handles registration, token management, and sending notifications.
+ * Handles registration, token management, and lifecycle events.
+ * 
+ * Production standards:
+ * 1. Security: No direct table access, all via secure RPCs.
+ * 2. Dynamic Config: Resolves projectId from Expo Constants.
+ * 3. Stateless: No UI side effects or alerts.
+ * 4. Resilient: Handles permission states and platform differences.
  */
 
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { log } from '../lib/logger';
@@ -21,42 +28,38 @@ Notifications.setNotificationHandler({
     }),
 });
 
-export interface PushNotificationToken {
-    token: string;
-    deviceType: 'ios' | 'android' | 'web';
+/**
+ * Result of a registration attempt
+ */
+export interface PushRegistrationResult {
+    success: boolean;
+    token: string | null;
+    error?: string;
 }
 
 /**
  * Register for push notifications and get the Expo push token.
- * 
- * @returns The push token and device type, or null if registration fails
+ * Does NOT sync with the server.
  */
-export async function registerForPushNotifications(): Promise<PushNotificationToken | null> {
-    // Check if running on a physical device
+export async function registerForPushNotifications(): Promise<PushRegistrationResult> {
     if (!Device.isDevice) {
-        log.warn('Push notifications only work on physical devices');
-        return null;
+        return { success: false, token: null, error: 'Must use physical device for push notifications' };
     }
 
     try {
-        // Check existing permissions
         const { status: existingStatus } = await Notifications.getPermissionsAsync();
         let finalStatus = existingStatus;
 
-        // Request permissions if not already granted
         if (existingStatus !== 'granted') {
-            log.info('Requesting push permissions...');
             const { status } = await Notifications.requestPermissionsAsync();
             finalStatus = status;
-            log.info(`Permission request result: ${status}`);
         }
 
         if (finalStatus !== 'granted') {
-            log.warn(`Push notification permission denied. Status: ${finalStatus}`);
-            return null;
+            return { success: false, token: null, error: 'Permission not granted' };
         }
 
-        // Set up Android notification channel
+        // Configure Android channel for maximum visibility
         if (Platform.OS === 'android') {
             await Notifications.setNotificationChannelAsync('default', {
                 name: 'KTS Notifications',
@@ -67,150 +70,98 @@ export async function registerForPushNotifications(): Promise<PushNotificationTo
             });
         }
 
-        // Get the Expo push token
-        // Use default config first
-        const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: 'f9bfdbf0-86d0-462d-b627-2a4edad56adc', // From app.json
-        });
+        // Resolve projectId dynamically from Expo config
+        const projectId =
+            Constants.expoConfig?.extra?.eas?.projectId ||
+            Constants.easConfig?.projectId;
 
-        log.info('Push notification token obtained', { token: tokenData.data });
+        if (!projectId) {
+            log.error('EAS Project ID not found in Constants');
+            return { success: false, token: null, error: 'Project configuration missing' };
+        }
+
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
 
         return {
+            success: true,
             token: tokenData.data,
-            deviceType: Platform.OS as 'ios' | 'android',
         };
     } catch (error) {
-        log.error('Failed to register for push notifications', { error });
-        return null;
+        const errorMsg = error instanceof Error ? error.message : 'Unknown registration error';
+        log.error('Push registration error', { error });
+        return {
+            success: false,
+            token: null,
+            error: errorMsg
+        };
     }
 }
 
 /**
- * Save push token to Supabase for the current user.
+ * Sync the push token with the Supabase backend via secure RPC.
  */
-export async function savePushToken(userId: string, tokenData: PushNotificationToken): Promise<boolean> {
+export async function syncTokenWithServer(token: string): Promise<boolean> {
     try {
-        log.debug('[savePushToken] Attempting to save token via RPC', {
-            userId,
-            tokenPreview: tokenData.token.substring(0, 30) + '...',
-            deviceType: tokenData.deviceType
+        const { error } = await supabase.rpc('register_push_token', {
+            p_token: token,
+            p_device_type: Platform.OS,
         });
-
-        console.log('[savePushToken] DEBUG - Starting RPC call for user:', userId);
-
-        // Use RPC function to handle upsert securely (bypassing RLS for unique constraints)
-        const { data, error } = await supabase.rpc('register_push_token', {
-            p_token: tokenData.token,
-            p_device_type: tokenData.deviceType,
-        });
-
-        console.log('[savePushToken] DEBUG - RPC result:', { data, error: error?.message });
 
         if (error) {
-            console.error('[savePushToken] RPC error:', {
-                message: error.message,
-                code: error.code,
-                details: error.details,
-                hint: error.hint
-            });
-            log.error('Failed to save push token via RPC', { error });
-            // Show alert for debugging - REMOVE IN PRODUCTION
-            const { Alert } = require('react-native');
-            Alert.alert('Push Token Error', `Failed to register: ${error.message}`);
+            log.error('Failed to sync push token via RPC', { error });
             return false;
         }
 
-        console.log('[savePushToken] DEBUG - Token saved successfully!');
-        log.info('Push token saved successfully');
         return true;
     } catch (error) {
-        console.error('[savePushToken] Unexpected error:', error);
-        log.error('Failed to save push token', { error });
-        // Show alert for debugging - REMOVE IN PRODUCTION
-        const { Alert } = require('react-native');
-        Alert.alert('Push Token Error', `Unexpected: ${(error as Error).message}`);
+        log.error('Unexpected error syncing push token', { error });
         return false;
     }
 }
 
 /**
- * Remove push token from Supabase (call on logout).
+ * Remove the current device's token from the server on logout.
  */
-export async function removePushToken(token: string): Promise<boolean> {
+export async function removeTokenFromServer(token: string): Promise<boolean> {
     try {
-        const { error } = await supabase
-            .from('push_notification_tokens')
-            .delete()
-            .eq('token', token);
+        const { error } = await supabase.rpc('remove_push_token', {
+            p_token: token,
+        });
 
         if (error) {
-            log.error('Failed to remove push token', { error });
+            log.error('Failed to remove push token via RPC', { error });
             return false;
         }
 
-        log.info('Push token removed successfully');
         return true;
     } catch (error) {
-        log.error('Failed to remove push token', { error });
+        log.error('Unexpected error removing push token', { error });
         return false;
     }
 }
 
 /**
- * Send a local test notification (for verifying setup).
+ * Cleanly add and remove notification listeners.
  */
-export async function sendTestNotification(): Promise<void> {
+export function addNotificationListeners(
+    onReceived: (notification: Notifications.Notification) => void,
+    onTapped: (response: Notifications.NotificationResponse) => void
+) {
+    const receivedSub = Notifications.addNotificationReceivedListener(onReceived);
+    const tappedSub = Notifications.addNotificationResponseReceivedListener(onTapped);
+
+    return () => {
+        receivedSub.remove();
+        tappedSub.remove();
+    };
+}
+
+/**
+ * Local development test
+ */
+export async function sendLocalTestNotification(title: string, body: string) {
     await Notifications.scheduleNotificationAsync({
-        content: {
-            title: 'Test Notification 🎉',
-            body: 'Push notifications are working!',
-            data: { type: 'test' },
-        },
-        trigger: null, // Immediately
+        content: { title, body },
+        trigger: null,
     });
 }
-
-/**
- * Schedule a local notification.
- */
-export async function scheduleLocalNotification(
-    title: string,
-    body: string,
-    data?: Record<string, unknown>,
-    delaySeconds?: number
-): Promise<string> {
-    const trigger: Notifications.NotificationTriggerInput = delaySeconds
-        ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: delaySeconds }
-        : null;
-
-    return await Notifications.scheduleNotificationAsync({
-        content: {
-            title,
-            body,
-            data: data ?? {},
-        },
-        trigger,
-    });
-}
-
-/**
- * Add listener for notification received while app is foregrounded.
- */
-export function addNotificationReceivedListener(
-    callback: (notification: Notifications.Notification) => void
-): Notifications.EventSubscription {
-    return Notifications.addNotificationReceivedListener(callback);
-}
-
-/**
- * Add listener for notification response (when user taps notification).
- */
-export function addNotificationResponseListener(
-    callback: (response: Notifications.NotificationResponse) => void
-): Notifications.EventSubscription {
-    return Notifications.addNotificationResponseReceivedListener(callback);
-}
-
-// REMOVED: sendNotificationToAllUsers()
-// Security risk - client must never call Expo Push API or read all tokens
-// Use Edge Function instead: supabase.functions.invoke('send-notification', {...})

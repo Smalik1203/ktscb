@@ -7,3 +7,5 @@ export { EmptyState } from './EmptyState';
 export { LoadingView } from './LoadingView';
 export { ErrorView } from './ErrorView';
 export { NetworkStatus } from './NetworkStatus';
+export { SearchBar } from './SearchBar';
+export { SegmentedControl } from './SegmentedControl';

@@ -2,7 +2,7 @@ import React, { useMemo, useRef, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Text } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
@@ -18,7 +18,6 @@ import {
   NotebookText,
   UserCheck,
   UsersRound,
-  LineChart,
   CreditCard,
   LogOut,
   Bell,
@@ -37,7 +36,9 @@ import {
   TrendingUp,
   DollarSign,
   Package,
-  MessageSquare
+  MessageSquare,
+  MessageSquareMore,
+  Bot
 } from 'lucide-react-native';
 import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -107,6 +108,14 @@ const MENU: MenuItem[] = [
     description: 'School updates and news'
   },
   {
+    key: 'feedback',
+    label: 'Feedback',
+    icon: MessageSquareMore,
+    route: '/(tabs)/feedback',
+    section: 'Main',
+    description: 'Share and view feedback'
+  },
+  {
     key: 'syllabus_staff',
     label: 'Syllabus',
     icon: NotebookText,
@@ -152,7 +161,7 @@ const MENU: MenuItem[] = [
   },
   {
     key: 'progress',
-    label: 'My Progress',
+    label: 'Student Progress',
     icon: TrendingUp,
     route: '/(tabs)/progress',
     section: 'Academic',
@@ -168,14 +177,6 @@ const MENU: MenuItem[] = [
     requiredCapability: 'fees.write',
     section: 'Academic',
     description: 'Invoice management'
-  },
-  {
-    key: 'analytics',
-    label: 'Analytics',
-    icon: LineChart,
-    route: '/(tabs)/analytics',
-    section: 'Academic',
-    description: 'Performance insights'
   },
   {
     key: 'tasks',
@@ -254,11 +255,40 @@ const MENU: MenuItem[] = [
 
 export function DrawerContent(props: DrawerContentComponentProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { profile, signOut } = useAuth();
   const { colors, isDark, toggleTheme } = useTheme();
   const { can, role } = useCapabilities();
 
-  const [activeItem, setActiveItem] = React.useState<string>('home');
+  // Derive active item from current pathname
+  const activeItem = useMemo(() => {
+    if (pathname === '/' || pathname === '/(tabs)' || pathname === '/(tabs)/index') {
+      return 'home';
+    }
+    // Match routes to menu keys
+    if (pathname.includes('/calendar')) return 'calendar';
+    if (pathname.includes('/timetable')) return 'timetable';
+    if (pathname.includes('/resources')) return 'resources';
+    if (pathname.includes('/announcements')) return 'announcements';
+    if (pathname.includes('/feedback')) return 'feedback';
+    if (pathname.includes('/syllabus-student')) return 'syllabus_student';
+    if (pathname.includes('/syllabus')) return 'syllabus_staff';
+    if (pathname.includes('/attendance')) return 'attendance';
+    if (pathname.includes('/fees-student')) return 'fees_student';
+    if (pathname.includes('/fees')) return 'fees';
+    if (pathname.includes('/assessments')) return 'assessments';
+    if (pathname.includes('/progress')) return 'progress';
+    if (pathname.includes('/tasks')) return 'tasks';
+    if (pathname.includes('/manage')) return 'class_mgmt';
+    if (pathname.includes('/add-admin')) return 'add_admin';
+    if (pathname.includes('/add-classes')) return 'add_classes';
+    if (pathname.includes('/add-subjects')) return 'add_subjects';
+    if (pathname.includes('/add-student')) return 'add_student';
+    if (pathname.includes('/inventory')) return 'inventory';
+    if (pathname.includes('/finance')) return 'finance';
+    return 'home';
+  }, [pathname]);
+
   const [expandedMenus, setExpandedMenus] = React.useState<Set<string>>(new Set());
   const insets = useSafeAreaInsets();
 
@@ -454,7 +484,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
       await signOut();
       router.replace('/login');
     } catch (error) {
-      console.error('Logout error:', error);
+      // Logout error - silent fail
     }
   };
 
@@ -477,20 +507,13 @@ export function DrawerContent(props: DrawerContentComponentProps) {
         return;
       }
 
-      setActiveItem(item.key);
       props.navigation.closeDrawer();
-
-      // Handle sub-menu items by setting parent as active too
-      if (item.parent) {
-        setActiveItem(item.parent);
-      }
-
       router.push(item.route as any);
     } catch (_error) {
       try {
         router.replace(item.route as any);
       } catch (fallbackError) {
-        console.error('Navigation error:', fallbackError);
+        // Navigation fallback error - silent fail
       }
     }
   };

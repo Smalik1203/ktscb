@@ -55,7 +55,7 @@ export function useStudentTimetable(classInstanceId?: string, dateStr?: string):
 
       if (progressError) {
         // Don't throw, just log - taught status is optional
-        console.warn('Error fetching taught slots:', progressError);
+        // Taught status is optional - skip on error
       }
 
       const taughtSlotIds = new Set((progressData || []).map(p => p.timetable_slot_id).filter(Boolean));

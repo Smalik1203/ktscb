@@ -12,6 +12,7 @@ import type {
   RecordPaymentInput,
   UpdateInvoiceItemInput,
   CreateInvoiceItemInput,
+  UpdateInvoiceInput,
 } from '../domain/fees/types';
 
 /**
@@ -112,4 +113,19 @@ export function useDeleteInvoice() {
   });
 }
 
+/**
+ * Hook for updating an invoice (due date, notes)
+ */
+export function useUpdateInvoice() {
+  const queryClient = useQueryClient();
 
+  return useMutation({
+    mutationFn: (params: { invoiceId: string; updates: UpdateInvoiceInput }) =>
+      invoiceService.update(params.invoiceId, params.updates),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['student-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoice-detail', variables.invoiceId] });
+    },
+  });
+}

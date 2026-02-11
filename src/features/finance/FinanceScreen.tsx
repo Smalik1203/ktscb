@@ -10,7 +10,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Download, FileText, AlertCircle, Calendar, TrendingUp, TrendingDown, Wallet, ArrowRight, Filter, ChevronDown } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../lib/supabase';
+import { supabase as supabaseClient } from '../../lib/supabase';
 import { financeService, financeReportsService } from '../../services/finance';
 import type { FinanceTransaction } from '../../services/finance';
 import { exportTransactionsToCSV, generateFinanceReportPDF } from '../../services/financeExport';
@@ -113,7 +113,7 @@ function AddExpenseModal({ visible, onClose, onSuccess, schoolCode }: AddExpense
               style={{
                 marginBottom: spacing.sm,
                 borderWidth: 1,
-                borderColor: colors.border?.default || colors.text.secondary + '30',
+                borderColor: colors.border?.DEFAULT || colors.text.secondary + '30',
                 borderRadius: 8,
                 padding: spacing.sm,
                 backgroundColor: colors.surface.secondary,
@@ -215,6 +215,7 @@ export default function FinanceScreen() {
   const { colors, spacing } = useTheme();
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const supabase = supabaseClient as any;
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showInconsistencies, setShowInconsistencies] = useState(false);
   const [inconsistencies, setInconsistencies] = useState<any[]>([]);
@@ -282,7 +283,8 @@ export default function FinanceScreen() {
     queryKey: ['finance-reports', 'income-vs-expense', schoolCode, dateRange.startDate, dateRange.endDate],
     queryFn: () => financeReportsService.getIncomeVsExpense(schoolCode!, dateRange.startDate, dateRange.endDate),
     enabled: !!schoolCode,
-    staleTime: 0, // Always refetch on refresh
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000,
     refetchOnMount: true,
   });
   
@@ -295,7 +297,8 @@ export default function FinanceScreen() {
       limit: 100,
     }),
     enabled: !!schoolCode,
-    staleTime: 0, // Always refetch on refresh
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000,
     refetchOnMount: true,
   });
   
@@ -370,7 +373,7 @@ export default function FinanceScreen() {
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.md,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border?.default || colors.text.secondary + '10',
+        borderBottomColor: colors.border?.DEFAULT || colors.text.secondary + '10',
       }}>
         {/* Filter Row */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
@@ -420,7 +423,7 @@ export default function FinanceScreen() {
           <View style={{
             width: 1,
             height: 40,
-            backgroundColor: colors.border?.default || colors.text.secondary + '20',
+            backgroundColor: colors.border?.DEFAULT || colors.text.secondary + '20',
             marginHorizontal: spacing.sm,
             flexShrink: 0,
           }} />
@@ -471,7 +474,7 @@ export default function FinanceScreen() {
           <View style={{
             width: 1,
             height: 40,
-            backgroundColor: colors.border?.default || colors.text.secondary + '20',
+            backgroundColor: colors.border?.DEFAULT || colors.text.secondary + '20',
             marginHorizontal: spacing.sm,
             flexShrink: 0,
           }} />
@@ -480,9 +483,9 @@ export default function FinanceScreen() {
           <View style={{ flexDirection: 'row', gap: spacing.xs, flexShrink: 0 }}>
             <TouchableOpacity
               onPress={async () => {
-                if (!profile?.id || !profile?.role) return;
+                if (!profile?.auth_id || !profile?.role) return;
                 try {
-                  await exportTransactionsToCSV(schoolCode!, dateRange.startDate, dateRange.endDate, profile.id, profile.role);
+                  await exportTransactionsToCSV(schoolCode!, dateRange.startDate, dateRange.endDate, profile.auth_id, profile.role);
                 } catch (error) {
                   Alert.alert('Export Failed', 'Failed to export CSV.');
                 }
@@ -495,7 +498,7 @@ export default function FinanceScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderWidth: 1,
-                borderColor: colors.border?.default || colors.text.secondary + '20',
+                borderColor: colors.border?.DEFAULT || colors.text.secondary + '20',
               }}
               activeOpacity={0.7}
             >
@@ -503,9 +506,9 @@ export default function FinanceScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={async () => {
-                if (!profile?.id || !profile?.role) return;
+                if (!profile?.auth_id || !profile?.role) return;
                 try {
-                  await generateFinanceReportPDF(schoolCode!, dateRange.startDate, dateRange.endDate, profile.id, profile.role);
+                  await generateFinanceReportPDF(schoolCode!, dateRange.startDate, dateRange.endDate, profile.auth_id, profile.role);
                 } catch (error) {
                   Alert.alert('Export Failed', 'Failed to generate PDF.');
                 }
@@ -518,7 +521,7 @@ export default function FinanceScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderWidth: 1,
-                borderColor: colors.border?.default || colors.text.secondary + '20',
+                borderColor: colors.border?.DEFAULT || colors.text.secondary + '20',
               }}
               activeOpacity={0.7}
             >
@@ -607,7 +610,7 @@ export default function FinanceScreen() {
                     borderRadius: 8,
                     backgroundColor: filterType === type ? colors.primary[600] : colors.surface.secondary,
                     borderWidth: 1,
-                    borderColor: filterType === type ? colors.primary[600] : colors.border?.default || colors.text.secondary + '20',
+                    borderColor: filterType === type ? colors.primary[600] : colors.border?.DEFAULT || colors.text.secondary + '20',
                     alignItems: 'center',
                     justifyContent: 'center',
                     minHeight: 36,

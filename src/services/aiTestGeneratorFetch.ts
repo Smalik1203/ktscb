@@ -100,7 +100,7 @@ async function getCachedResult(
 
     return data;
   } catch (error) {
-    console.warn('Cache read error:', error);
+    // Cache read failed - return null to fetch fresh
     return null;
   }
 }
@@ -128,7 +128,7 @@ async function cacheResult(
     // Clean up old cache entries
     await cleanupOldCache();
   } catch (error) {
-    console.warn('Cache write error:', error);
+    // Cache write failed silently
   }
 }
 
@@ -166,7 +166,7 @@ async function cleanupOldCache(): Promise<void> {
       await AsyncStorage.removeItem(key);
     }
   } catch (error) {
-    console.warn('Cache cleanup error:', error);
+    // Cache cleanup failed silently
   }
 }
 
@@ -179,7 +179,7 @@ export async function clearAICache(): Promise<void> {
     const cacheKeys = keys.filter(k => k.startsWith(CACHE_PREFIX));
     await AsyncStorage.multiRemove(cacheKeys);
   } catch (error) {
-    console.warn('Cache clear error:', error);
+    // Cache clear failed silently
   }
 }
 

@@ -90,7 +90,7 @@ export function ThemeProvider({
           }
         }
       } catch (error) {
-        console.warn('Failed to load theme preference:', error);
+        // Theme preference load failed - use defaults
       } finally {
         setIsLoaded(true);
       }
@@ -117,7 +117,7 @@ export function ThemeProvider({
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, newThemeId);
     } catch (error) {
-      console.warn('Failed to persist theme preference:', error);
+      // Theme preference persist failed silently
     }
   }, []);
 

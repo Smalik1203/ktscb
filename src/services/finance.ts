@@ -11,7 +11,7 @@
  * - Fee-derived income is read-only (managed automatically)
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase as supabaseClient } from '../lib/supabase';
 import { log } from '../lib/logger';
 import { assertCapability, type AuthorizableUser } from '../domain/auth/assert';
 import type { Capability } from '../domain/auth/capabilities';
@@ -41,6 +41,8 @@ export interface FinanceCategory {
   updated_at: string;
   created_by: string;
 }
+
+const supabase = supabaseClient as any;
 
 export interface FinanceTransaction {
   id: string;
@@ -547,7 +549,7 @@ export const financeService = {
 
     const { data, error } = await supabase
       .from('finance_accounts')
-      .select('*')
+      .select('id, school_code, name, type, is_active, created_at, updated_at, created_by')
       .eq('school_code', schoolCode)
       .eq('is_active', true)
       .order('name');
@@ -572,7 +574,7 @@ export const financeService = {
 
     let query = supabase
       .from('finance_categories')
-      .select('*')
+      .select('id, school_code, name, type, is_active, created_at, updated_at, created_by')
       .eq('school_code', schoolCode)
       .eq('is_active', true)
       .order('name');

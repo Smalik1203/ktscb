@@ -16,6 +16,7 @@ export interface Announcement {
     pinned: boolean;
     likes_count: number;
     views_count: number;
+    image_url: string | null;
     // Joined data
     creator?: {
         full_name: string;
@@ -34,6 +35,7 @@ interface CreateAnnouncementInput {
     class_instance_id?: string;
     school_code: string;
     created_by: string;
+    image_url?: string;
 }
 
 const PAGE_SIZE = 20;
@@ -51,10 +53,12 @@ export function useAnnouncementsFeed(schoolCode?: string) {
             const { data, error, count } = await supabase
                 .from('announcements')
                 .select(`
-          *,
-          creator:users!created_by(full_name),
-          class:class_instances(grade, section)
-        `, { count: 'exact' })
+                    id, title, message, priority, target_type, class_instance_id, 
+                    school_code, created_by, created_at, updated_at, pinned, 
+                    likes_count, views_count, image_url,
+                    creator:users!created_by(full_name),
+                    class:class_instances(grade, section)
+                `, { count: 'exact' })
                 .eq('school_code', schoolCode!)
                 .order('pinned', { ascending: false })
                 .order('created_at', { ascending: false })
@@ -100,7 +104,34 @@ export function useCreateAnnouncement() {
             queryClient.invalidateQueries({ queryKey: ['announcements', 'feed'] });
         },
         onError: (error) => {
-            console.error('Failed to create announcement:', error);
+            // Handled by mutation caller
+        },
+    });
+}
+
+/**
+ * Update an announcement
+ */
+export function useUpdateAnnouncement() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, ...updates }: { 
+            id: string; 
+            title?: string; 
+            message?: string; 
+            priority?: 'low' | 'medium' | 'high' | 'urgent';
+            image_url?: string | null;
+        }) => {
+            const { error } = await supabase
+                .from('announcements')
+                .update(updates)
+                .eq('id', id);
+
+            if (error) throw error;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['announcements', 'feed'] });
         },
     });
 }
@@ -166,7 +197,7 @@ export function useSendReminder() {
             return data;
         },
         onError: (error) => {
-            console.error('Failed to send reminder:', error);
+            // Handled by mutation caller
         },
     });
 }

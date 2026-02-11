@@ -11,7 +11,8 @@
  * No plans, no components - just invoices, items, and payments.
  */
 
-import { supabase } from '../lib/supabase';
+import { supabase as supabaseClient } from '../lib/supabase';
+const supabase = supabaseClient as any;
 import { log } from '../lib/logger';
 import { assertCapability, type AuthorizableUser } from '../domain/auth/assert';
 import type { Capability } from '../domain/auth/capabilities';
@@ -27,12 +28,14 @@ import type {
   CreateInvoiceItemInput,
   RecordPaymentInput,
   UpdateInvoiceItemInput,
+  UpdateInvoiceInput,
 } from '../domain/fees/types';
 import {
   CreateInvoiceInputSchema,
   CreateInvoiceItemInputSchema,
   RecordPaymentInputSchema,
   UpdateInvoiceItemInputSchema,
+  UpdateInvoiceInputSchema,
   calculateInvoiceStatus,
   validatePaymentAmount,
   calculateInvoiceTotal,
@@ -468,6 +471,28 @@ export const invoiceService = {
       if (itemsErr) throw itemsErr;
     }
 
+    // Trigger notifications for newly created invoices (async, non-blocking)
+    if (invoices && invoices.length > 0) {
+      queueMicrotask(async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) return;
+
+          await supabase.functions.invoke('send-fee-notification', {
+            body: {
+              type: 'invoice_generated',
+              invoice_ids: invoices.map(inv => inv.id),
+            },
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+        } catch (err) {
+          log.warn('Failed to send invoice generation notifications', { error: err });
+        }
+      });
+    }
+
     return { created: newStudents.length, skipped: existingIds.size };
   },
 
@@ -574,6 +599,27 @@ export const invoiceService = {
       // Finance transaction is secondary to payment recording
       log.error('Failed to create finance transaction for fee payment:', financeError);
     }
+
+    // Send payment received notification (async, non-blocking)
+    queueMicrotask(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        await supabase.functions.invoke('send-fee-notification', {
+          body: {
+            type: 'payment_received',
+            invoice_id: validatedInput.invoice_id,
+            payment_amount: validatedInput.amount,
+          },
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+      } catch (err) {
+        log.warn('Failed to send payment received notification', { error: err });
+      }
+    });
 
     return { id: data.id };
   },
@@ -805,7 +851,7 @@ export const invoiceService = {
       .delete()
       .in('id', itemIds)
       .eq('invoice_id', invoiceId)
-      .select(); // Return deleted rows to verify deletion
+      .select('id'); // Return deleted rows to verify deletion
 
     if (deleteErr) {
       log.error('Failed to delete invoice items', deleteErr);
@@ -944,6 +990,46 @@ export const invoiceService = {
   },
 
   /**
+   * Update invoice properties (due_date, notes)
+   */
+  async update(
+    invoiceId: string,
+    updates: UpdateInvoiceInput
+  ): Promise<void> {
+    await assertCurrentUserCapability('fees.write');
+
+    // Backend-authoritative validation
+    const validatedUpdates = parseOrThrow(UpdateInvoiceInputSchema, updates, 'UpdateInvoiceInput');
+
+    // Get user profile for school_code validation
+    const userProfile = await assertCurrentUserCapability('fees.write');
+
+    // Verify invoice exists and belongs to user's school
+    const { data: invoice, error: invoiceErr } = await supabase
+      .from('fee_invoices')
+      .select('id, school_code')
+      .eq('id', invoiceId)
+      .eq('school_code', userProfile.school_code)
+      .single();
+
+    if (invoiceErr || !invoice) {
+      throw new InvoiceAccessDeniedError(invoiceId, userProfile.school_code);
+    }
+
+    const { error: updateErr } = await supabase
+      .from('fee_invoices')
+      .update(validatedUpdates)
+      .eq('id', invoiceId);
+
+    if (updateErr) {
+      log.error('Failed to update invoice', { invoiceId, error: updateErr });
+      throw updateErr;
+    }
+
+    log.info('Updated invoice properties', { invoiceId, updates: validatedUpdates });
+  },
+
+  /**
    * Delete an entire invoice
    * 
    * Business Rules:
@@ -1052,6 +1138,33 @@ export const invoiceService = {
       server_computed: data.server_computed,
       generated_at: data.generated_at,
     };
+  },
+
+  /**
+   * Send a payment reminder notification to the student
+   */
+  async sendPaymentReminder(invoiceId: string): Promise<{ success: boolean }> {
+    await assertCurrentUserCapability('fees.read');
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase.functions.invoke('send-fee-notification', {
+      body: {
+        type: 'payment_reminder',
+        invoice_id: invoiceId,
+      },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (error) {
+      log.error('Failed to send payment reminder', { invoiceId, error });
+      throw error;
+    }
+
+    return { success: true };
   },
 };
 

@@ -97,7 +97,7 @@ export function useVoiceRecording(): VoiceRecordingResult {
 
             return granted;
         } catch (error) {
-            console.error('Error requesting audio permission:', error);
+            // Audio permission request failed
             setState(prev => ({
                 ...prev,
                 hasPermission: false,
@@ -152,7 +152,7 @@ export function useVoiceRecording(): VoiceRecordingResult {
                 duration: 0,
             }));
         } catch (error) {
-            console.error('Error starting recording:', error);
+            // Recording start failed
             setState(prev => ({
                 ...prev,
                 isRecording: false,
@@ -219,7 +219,7 @@ export function useVoiceRecording(): VoiceRecordingResult {
                 duration: finalDuration,
             };
         } catch (error) {
-            console.error('Error stopping recording:', error);
+            // Recording stop failed
             setState(prev => ({
                 ...prev,
                 isRecording: false,
@@ -253,7 +253,7 @@ export function useVoiceRecording(): VoiceRecordingResult {
                     allowsRecordingIOS: false,
                 });
             } catch (error) {
-                console.error('Error canceling recording:', error);
+                // Recording cancel failed silently
             }
         }
 

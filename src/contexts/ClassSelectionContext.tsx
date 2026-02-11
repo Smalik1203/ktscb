@@ -98,7 +98,7 @@ export const ClassSelectionProvider: React.FC<{ children: React.ReactNode }> = (
             }
           } catch (parseError) {
             // Corrupted JSON - clear it
-            console.warn('Corrupted scope data in storage, clearing:', parseError);
+            // Corrupted JSON - clear it
             await AsyncStorage.removeItem(SCOPE_STORAGE_KEY);
           }
         }

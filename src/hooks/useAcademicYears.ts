@@ -11,7 +11,6 @@ type AcademicYear = {
   start_date?: string; // YYYY-MM-DD
   end_date?: string; // YYYY-MM-DD
   is_active: boolean;
-  created_at: string;
 };
 
 type CreateAcademicYearInput = {
@@ -45,7 +44,7 @@ export function useAcademicYears(schoolCode: string | null | undefined) {
 
       const { data, error } = await supabase
         .from('academic_years')
-        .select('*')
+        .select('id, school_name, school_code, year_start, year_end, is_active, start_date, end_date')
         .eq('school_code', schoolCode)
         .order('year_start', { ascending: false });
 
@@ -76,7 +75,7 @@ export function useActiveAcademicYear(schoolCode: string | null | undefined) {
 
       const { data, error } = await supabase
         .from('academic_years')
-        .select('*')
+        .select('id, school_name, school_code, year_start, year_end, is_active, start_date, end_date')
         .eq('school_code', schoolCode)
         .eq('is_active', true)
         .maybeSingle();
@@ -131,7 +130,7 @@ export function useCreateAcademicYear(schoolCode: string | null | undefined) {
           end_date: input.end_date,
           is_active: true,
         })
-        .select()
+        .select('id, school_name, school_code, year_start, year_end, is_active, start_date, end_date')
         .single();
 
       if (error) {

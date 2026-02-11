@@ -1,2 +1,0 @@
-export { AttendanceDetailView } from './AttendanceDetailView';
-

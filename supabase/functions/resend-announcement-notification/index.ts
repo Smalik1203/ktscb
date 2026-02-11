@@ -25,7 +25,7 @@ Deno.serve(async (req: Request) => {
         // 2. Fetch announcement details
         const { data: announcement, error: fetchError } = await supabase
             .from('announcements')
-            .select('*')
+            .select('id, title, message, priority, target_type, class_instance_id, target_role, school_code')
             .eq('id', announcement_id)
             .single();
 
@@ -72,7 +72,6 @@ Deno.serve(async (req: Request) => {
         }
 
         // 4. Send notifications
-        const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
         const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
 
         // Choose emoji based on priority
@@ -96,27 +95,56 @@ Deno.serve(async (req: Request) => {
                 break;
         }
 
-        const response = await fetch(notificationUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': authHeader,
+        const notificationPayload = {
+            event: 'announcement_reminder',
+            title: `🔔 Reminder: ${emoji} ${prefix}${announcement.title}`,
+            body: `${announcement.message} 📣`,
+            data: {
+                type: 'announcement',
+                announcement_id: announcement.id,
+                priority: announcement.priority,
+                is_reminder: true,
             },
-            body: JSON.stringify({
-                event: 'announcement_reminder',
-                targets: { user_ids: userIds },
-                payload: {
-                    title: `🔔 Reminder: ${emoji} ${prefix}${announcement.title}`,
-                    body: `${announcement.message} 📣`,
-                    data: {
-                        type: 'announcement',
-                        announcement_id: announcement.id,
-                        priority: announcement.priority,
-                        is_reminder: true,
-                    },
+        };
+
+        let response: Response;
+
+        // Use queue for large audiences (50+ users), direct send for small
+        if (userIds.length > 50) {
+            const queueUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/queue-notification`;
+            response = await fetch(queueUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': authHeader,
                 },
-            }),
-        });
+                body: JSON.stringify({
+                    ...notificationPayload,
+                    targets: { user_ids: userIds },
+                    priority: announcement.priority === 'urgent' ? 1 : 
+                             announcement.priority === 'high' ? 3 : 5
+                }),
+            });
+            console.log(`Queued reminder for ${userIds.length} users`);
+        } else {
+            const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
+            response = await fetch(notificationUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': authHeader,
+                },
+                body: JSON.stringify({
+                    event: notificationPayload.event,
+                    targets: { user_ids: userIds },
+                    payload: {
+                        title: notificationPayload.title,
+                        body: notificationPayload.body,
+                        data: notificationPayload.data,
+                    },
+                }),
+            });
+        }
 
         if (!response.ok) {
             const errorText = await response.text();

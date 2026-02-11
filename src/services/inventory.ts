@@ -128,7 +128,7 @@ export const inventoryItemsService = {
 
     const { data, error } = await supabase
       .from('inventory_items')
-      .select('*')
+      .select('id, school_code, name, category, description, track_quantity, current_quantity, low_stock_threshold, track_serially, can_be_issued, issue_to, must_be_returned, return_duration_days, is_chargeable, charge_type, charge_amount, auto_add_to_fees, fee_category, unit_cost, allow_price_override, internal_notes, is_active, created_at, updated_at, created_by')
       .eq('school_code', schoolCode)
       .eq('is_active', true)
       .order('created_at', { ascending: false });
@@ -150,7 +150,7 @@ export const inventoryItemsService = {
 
     const { data, error } = await supabase
       .from('inventory_items')
-      .select('*')
+      .select('id, school_code, name, category, description, track_quantity, current_quantity, low_stock_threshold, track_serially, can_be_issued, issue_to, must_be_returned, return_duration_days, is_chargeable, charge_type, charge_amount, auto_add_to_fees, fee_category, unit_cost, allow_price_override, internal_notes, is_active, created_at, updated_at, created_by')
       .eq('id', itemId)
       .eq('school_code', userProfile.school_code)
       .eq('is_active', true)

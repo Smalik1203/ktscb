@@ -93,7 +93,6 @@ export const getTimetableForDate = async (
     if (error) throw error;
     return (data || []) as TimetableSlot[];
   } catch (error) {
-    console.error('Error fetching timetable:', error);
     throw error;
   }
 };
@@ -107,7 +106,7 @@ export const getTestsForDate = async (
   try {
     let query = supabase
       .from(DB.tables.tests)
-      .select('*')
+      .select('id, title, description, class_instance_id, subject_id, school_code, test_type, time_limit_seconds, created_by, created_at, allow_reattempts, chapter_id, test_mode, test_date, status, max_marks')
       .eq('test_date', date)
       .eq('school_code', schoolCode)
       .eq('status', 'active');
@@ -121,7 +120,6 @@ export const getTestsForDate = async (
     if (error) throw error;
     return (data || []) as TestData[];
   } catch (error) {
-    console.error('Error fetching tests:', error);
     throw error;
   }
 };
@@ -136,7 +134,7 @@ export const getCalendarEventsForDateRange = async (
   try {
     let query = supabase
       .from(DB.tables.schoolCalendarEvents)
-      .select('*')
+      .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
       .eq('school_code', schoolCode)
       .eq('is_active', true)
       .gte('start_date', startDate)
@@ -169,7 +167,6 @@ export const getCalendarEventsForDateRange = async (
       created_by: event.created_by || undefined,
     })) as CalendarEvent[];
   } catch (error) {
-    console.error('Error fetching calendar events:', error);
     throw error;
   }
 };
@@ -195,7 +192,6 @@ export const getDayData = async (
       hasData: timetable.length > 0 || tests.length > 0 || events.length > 0,
     };
   } catch (error) {
-    console.error('Error fetching day data:', error);
     throw error;
   }
 };
@@ -213,7 +209,6 @@ export const getClassesForSchool = async (schoolCode: string) => {
     if (error) throw error;
     return data || [];
   } catch (error) {
-    console.error('Error fetching classes:', error);
     throw error;
   }
 };
@@ -244,7 +239,7 @@ export const getHolidayInfo = async (
     // Check for explicit holidays in the database
     let query = supabase
       .from(DB.tables.schoolCalendarEvents)
-      .select('*')
+      .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
       .eq('school_code', schoolCode)
       .eq('event_type', 'holiday')
       .lte('start_date', date)
@@ -263,7 +258,6 @@ export const getHolidayInfo = async (
       description: data.description || undefined,
     } as CalendarEvent : null;
   } catch (error) {
-    console.error('Error checking holiday:', error);
     return null;
   }
 };
@@ -298,7 +292,6 @@ export const getStudentCalendarData = async (
       classInstanceId: student.class_instance_id,
     };
   } catch (error) {
-    console.error('Error fetching student calendar data:', error);
     throw error;
   }
 };

@@ -40,7 +40,6 @@ export function useUserActivityStats(schoolCode: string | null | undefined) {
       });
 
       if (error) {
-        console.error('[useUserActivityStats] Error:', error);
         throw error;
       }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef , useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import {
@@ -19,6 +19,7 @@ import { useTestQuestions, useCreateAttempt, useUpdateAttempt, useSubmitTest, us
 import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
 import { SuccessAnimation } from '../ui/SuccessAnimation';
+import { supabase } from '../../lib/supabase';
 
 interface Answer {
   questionId: string;
@@ -38,8 +39,30 @@ export function TestTakingScreen() {
   const studentIdParam = params.studentId as string | undefined;
 
   const { user, profile } = useAuth();
+  const [fetchedStudentId, setFetchedStudentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (studentIdParam) return;
+    if (!user?.id) return;
+
+    const fetchStudentId = async () => {
+      const { data } = await supabase
+        .from('student')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+      if (data?.id) {
+        setFetchedStudentId(data.id);
+      }
+    };
+
+    fetchStudentId();
+  }, [studentIdParam, user?.id]);
+
   // For students, we pass studentId via route params since profile doesn't include student relation yet
-  const studentId = studentIdParam || user?.id;
+  // If not passed, we use the fetched ID (for when student takes test themselves)
+  const studentId = studentIdParam || fetchedStudentId;
 
   const { data: questions = [], isLoading: questionsLoading } = useTestQuestions(testId);
   const { data: existingAttempts } = useStudentAttempts(studentId || '', testId);
@@ -114,55 +137,55 @@ export function TestTakingScreen() {
     initializeAttempt();
   }, [studentId, testId, existingAttempts]);
 
-  // Timer countdown - start once when attempt is ready
+  // Timer countdown - using timestamp calculation for accuracy
   useEffect(() => {
-    if (!timeLimit || !attemptId) return;
+    if (!timeLimit || !attemptId || !existingAttempts) return;
     if (isSubmittedRef.current) return;
-    if (timerStartedRef.current) return; // Don't restart if already started
+    if (timerStartedRef.current) return;
 
-    // Wait a tick to ensure timeRemaining is set
+    const inProgressAttempt = existingAttempts?.find((a) => a.status === 'in_progress');
+    const startTimePayload = inProgressAttempt?.started_at ? new Date(inProgressAttempt.started_at).getTime() : Date.now();
+    const endTime = startTimePayload + (timeLimit * 1000);
+
     const startTimer = () => {
-      if (timeRemaining <= 0) return;
+      // Calculate initial remaining
+      const now = Date.now();
+      const initialRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
 
+      if (initialRemaining <= 0 && !isSubmittedRef.current) {
+        handleAutoSubmit();
+        return;
+      }
+
+      setTimeRemaining(initialRemaining);
       timerStartedRef.current = true;
 
       timerRef.current = setInterval(() => {
-        // Check if submitted before each tick
         if (isSubmittedRef.current) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
+          if (timerRef.current) clearInterval(timerRef.current);
           return;
         }
 
-        setTimeRemaining((prev) => {
-          const newTime = prev - 1;
-          if (newTime <= 0) {
-            // Clear interval immediately when time's up
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-              timerRef.current = null;
-            }
-            // Trigger auto-submit
-            handleAutoSubmit();
-            return 0;
-          }
-          return newTime;
-        });
+        const currentNow = Date.now();
+        const remaining = Math.max(0, Math.floor((endTime - currentNow) / 1000));
+
+        setTimeRemaining(remaining);
+
+        if (remaining <= 0) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          handleAutoSubmit();
+        }
       }, 1000);
     };
 
-    // Delay slightly to ensure state is updated
+    // Small delay to ensure state ready
     const timer = setTimeout(startTimer, 100);
 
     return () => {
       clearTimeout(timer);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [timeLimit, attemptId]); // Only depend on timeLimit and attemptId, NOT timeRemaining
+  }, [timeLimit, attemptId, existingAttempts]);
 
   // Auto-save functionality
   useEffect(() => {
@@ -228,7 +251,7 @@ export function TestTakingScreen() {
 
       lastSavedAnswersRef.current = currentAnswersStr;
     } catch (error) {
-      console.error('Failed to save answers:', error);
+      // Answer save failed silently - will retry
     }
   };
 
@@ -300,7 +323,7 @@ export function TestTakingScreen() {
       setSubmissionScore({ earned: earnedPoints, total: totalPoints });
       setShowSuccessAnimation(true);
     } catch (error: any) {
-      console.error('Auto-submit failed:', error);
+      // Auto-submit failed - alert shown below
       Alert.alert('Error', 'Failed to submit test automatically. Please try again.');
       isSubmittedRef.current = false;
       setIsSubmitting(false);
@@ -391,8 +414,7 @@ export function TestTakingScreen() {
     const confirmSubmit = () => {
       Alert.alert(
         'Submit Test?',
-        `You have answered ${Object.keys(answers).length} out of ${questions.length} questions. ${
-          autoSubmit ? 'Time is up.' : 'Are you sure you want to submit?'
+        `You have answered ${Object.keys(answers).length} out of ${questions.length} questions. ${autoSubmit ? 'Time is up.' : 'Are you sure you want to submit?'
         }`,
         [
           ...(autoSubmit ? [] : [{ text: 'Cancel', style: 'cancel' as const }]),
@@ -458,7 +480,7 @@ export function TestTakingScreen() {
     return 'unanswered';
   };
 
-  if (questionsLoading || !attemptId) {
+  if (questionsLoading || !attemptId || !studentId) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -751,403 +773,403 @@ export function TestTakingScreen() {
 
 const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
   StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.primary,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  emptyText: {
-    marginTop: spacing.md,
-    fontSize: typography.fontSize.lg,
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  backButton: {
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.primary[600],
-    borderRadius: borderRadius.md,
-  },
-  backButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface.primary,
-    ...shadows.sm,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  backIcon: {
-    marginRight: spacing.md,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  headerSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  timerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.primary[50],
-    borderRadius: borderRadius.md,
-  },
-  timerWarning: {
-    backgroundColor: colors.error[50],
-  },
-  timerText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary[600],
-  },
-  timerTextWarning: {
-    color: colors.error[600],
-  },
-  content: {
-    flex: 1,
-    padding: spacing.lg,
-  },
-  questionCard: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    ...shadows.md,
-  },
-  questionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  questionNumber: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary[600],
-  },
-  badges: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  badge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.primary[100],
-  },
-  badgePoints: {
-    backgroundColor: colors.success[100],
-  },
-  badgeText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[700],
-  },
-  questionText: {
-    fontSize: typography.fontSize.lg,
-    lineHeight: typography.fontSize.lg * 1.5,
-    color: colors.text.primary,
-    marginBottom: spacing.lg,
-  },
-  answerSection: {
-    marginBottom: spacing.md,
-  },
-  optionsContainer: {
-    gap: spacing.md,
-  },
-  optionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 2,
-    borderColor: colors.border.DEFAULT,
-    backgroundColor: colors.surface.secondary,
-  },
-  optionButtonSelected: {
-    borderColor: colors.primary[600],
-    backgroundColor: colors.primary[50],
-  },
-  radioButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border.DEFAULT,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioButtonSelected: {
-    borderColor: colors.primary[600],
-  },
-  radioButtonInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.primary[600],
-  },
-  optionText: {
-    flex: 1,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  optionTextSelected: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[700],
-  },
-  textInput: {
-    backgroundColor: colors.surface.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  textArea: {
-    height: 150,
-    textAlignVertical: 'top',
-  },
-  reviewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    backgroundColor: colors.surface.secondary,
-  },
-  reviewButtonText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-  },
-  reviewButtonTextActive: {
-    color: colors.warning[600],
-    fontWeight: typography.fontWeight.semibold,
-  },
-  paletteToggle: {
-    padding: spacing.md,
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    ...shadows.sm,
-  },
-  paletteToggleText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[600],
-  },
-  questionPalette: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    ...shadows.sm,
-  },
-  paletteHeader: {
-    marginBottom: spacing.md,
-  },
-  paletteTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  paletteLegend: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    flexWrap: 'wrap',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  legendAnswered: {
-    backgroundColor: colors.success[500],
-  },
-  legendMarked: {
-    backgroundColor: colors.warning[500],
-  },
-  legendUnanswered: {
-    backgroundColor: colors.neutral[300],
-  },
-  legendText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  paletteGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  paletteItem: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.neutral[200],
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  paletteItemActive: {
-    borderWidth: 2,
-    borderColor: colors.primary[600],
-  },
-  paletteItemAnswered: {
-    backgroundColor: colors.success[100],
-  },
-  paletteItemMarked: {
-    backgroundColor: colors.warning[100],
-  },
-  paletteItemText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
-  paletteItemTextActive: {
-    color: colors.primary[600],
-  },
-  checkIcon: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-  },
-  flagIcon: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-  },
-  statsCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    ...shadows.sm,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: typography.fontSize['2xl'],
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary[600],
-  },
-  statLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: colors.border.DEFAULT,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.lg,
-    backgroundColor: colors.surface.primary,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.DEFAULT,
-    ...shadows.sm,
-  },
-  navButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.primary[600],
-    backgroundColor: colors.surface.secondary,
-  },
-  navButtonDisabled: {
-    borderColor: colors.border.DEFAULT,
-    backgroundColor: colors.surface.secondary,
-    opacity: 0.5,
-  },
-  navButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[600],
-  },
-  navButtonTextDisabled: {
-    color: colors.text.secondary,
-  },
-  nextButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary[600],
-  },
-  nextButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-  },
-  submitButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.success[600],
-  },
-  submitButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-  },
-});
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.primary,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: spacing.md,
+      fontSize: typography.fontSize.base,
+      color: colors.text.secondary,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.xl,
+    },
+    emptyText: {
+      marginTop: spacing.md,
+      fontSize: typography.fontSize.lg,
+      color: colors.text.secondary,
+      textAlign: 'center',
+    },
+    backButton: {
+      marginTop: spacing.lg,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      backgroundColor: colors.primary[600],
+      borderRadius: borderRadius.md,
+    },
+    backButtonText: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.inverse,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      backgroundColor: colors.surface.primary,
+      ...shadows.sm,
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    backIcon: {
+      marginRight: spacing.md,
+    },
+    headerTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    headerSubtitle: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    timerContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.primary[50],
+      borderRadius: borderRadius.md,
+    },
+    timerWarning: {
+      backgroundColor: colors.error[50],
+    },
+    timerText: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.primary[600],
+    },
+    timerTextWarning: {
+      color: colors.error[600],
+    },
+    content: {
+      flex: 1,
+      padding: spacing.lg,
+    },
+    questionCard: {
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+      ...shadows.md,
+    },
+    questionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    questionNumber: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.primary[600],
+    },
+    badges: {
+      flexDirection: 'row',
+      gap: spacing.xs,
+    },
+    badge: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderRadius: borderRadius.sm,
+      backgroundColor: colors.primary[100],
+    },
+    badgePoints: {
+      backgroundColor: colors.success[100],
+    },
+    badgeText: {
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.primary[700],
+    },
+    questionText: {
+      fontSize: typography.fontSize.lg,
+      lineHeight: typography.fontSize.lg * 1.5,
+      color: colors.text.primary,
+      marginBottom: spacing.lg,
+    },
+    answerSection: {
+      marginBottom: spacing.md,
+    },
+    optionsContainer: {
+      gap: spacing.md,
+    },
+    optionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      borderWidth: 2,
+      borderColor: colors.border.DEFAULT,
+      backgroundColor: colors.surface.secondary,
+    },
+    optionButtonSelected: {
+      borderColor: colors.primary[600],
+      backgroundColor: colors.primary[50],
+    },
+    radioButton: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: colors.border.DEFAULT,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    radioButtonSelected: {
+      borderColor: colors.primary[600],
+    },
+    radioButtonInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.primary[600],
+    },
+    optionText: {
+      flex: 1,
+      fontSize: typography.fontSize.base,
+      color: colors.text.primary,
+    },
+    optionTextSelected: {
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.primary[700],
+    },
+    textInput: {
+      backgroundColor: colors.surface.secondary,
+      borderWidth: 1,
+      borderColor: colors.border.DEFAULT,
+      borderRadius: borderRadius.md,
+      padding: spacing.md,
+      fontSize: typography.fontSize.base,
+      color: colors.text.primary,
+    },
+    textArea: {
+      height: 150,
+      textAlignVertical: 'top',
+    },
+    reviewButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.border.DEFAULT,
+      backgroundColor: colors.surface.secondary,
+    },
+    reviewButtonText: {
+      fontSize: typography.fontSize.base,
+      color: colors.text.secondary,
+    },
+    reviewButtonTextActive: {
+      color: colors.warning[600],
+      fontWeight: typography.fontWeight.semibold,
+    },
+    paletteToggle: {
+      padding: spacing.md,
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.md,
+      alignItems: 'center',
+      marginBottom: spacing.md,
+      ...shadows.sm,
+    },
+    paletteToggleText: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.primary[600],
+    },
+    questionPalette: {
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+      ...shadows.sm,
+    },
+    paletteHeader: {
+      marginBottom: spacing.md,
+    },
+    paletteTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+      marginBottom: spacing.sm,
+    },
+    paletteLegend: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      flexWrap: 'wrap',
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+    },
+    legendDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+    },
+    legendAnswered: {
+      backgroundColor: colors.success[500],
+    },
+    legendMarked: {
+      backgroundColor: colors.warning[500],
+    },
+    legendUnanswered: {
+      backgroundColor: colors.neutral[300],
+    },
+    legendText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+    },
+    paletteGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+    },
+    paletteItem: {
+      width: 48,
+      height: 48,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.neutral[200],
+      justifyContent: 'center',
+      alignItems: 'center',
+      position: 'relative',
+    },
+    paletteItemActive: {
+      borderWidth: 2,
+      borderColor: colors.primary[600],
+    },
+    paletteItemAnswered: {
+      backgroundColor: colors.success[100],
+    },
+    paletteItemMarked: {
+      backgroundColor: colors.warning[100],
+    },
+    paletteItemText: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+    },
+    paletteItemTextActive: {
+      color: colors.primary[600],
+    },
+    checkIcon: {
+      position: 'absolute',
+      top: 2,
+      right: 2,
+    },
+    flagIcon: {
+      position: 'absolute',
+      top: 2,
+      right: 2,
+    },
+    statsCard: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+      ...shadows.sm,
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statValue: {
+      fontSize: typography.fontSize['2xl'],
+      fontWeight: typography.fontWeight.bold,
+      color: colors.primary[600],
+    },
+    statLabel: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+      marginTop: spacing.xs,
+    },
+    statDivider: {
+      width: 1,
+      backgroundColor: colors.border.DEFAULT,
+    },
+    footer: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      padding: spacing.lg,
+      backgroundColor: colors.surface.primary,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.DEFAULT,
+      ...shadows.sm,
+    },
+    navButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.primary[600],
+      backgroundColor: colors.surface.secondary,
+    },
+    navButtonDisabled: {
+      borderColor: colors.border.DEFAULT,
+      backgroundColor: colors.surface.secondary,
+      opacity: 0.5,
+    },
+    navButtonText: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.primary[600],
+    },
+    navButtonTextDisabled: {
+      color: colors.text.secondary,
+    },
+    nextButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.primary[600],
+    },
+    nextButtonText: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.inverse,
+    },
+    submitButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.success[600],
+    },
+    submitButtonText: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.inverse,
+    },
+  });

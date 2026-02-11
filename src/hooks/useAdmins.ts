@@ -42,15 +42,16 @@ type UpdateAdminInput = {
  */
 export function useAdmins(
   schoolCode: string | null | undefined,
-  options?: { page?: number; pageSize?: number }
+  options?: { page?: number; pageSize?: number; search?: string }
 ) {
   const page = options?.page ?? 1;
   const pageSize = options?.pageSize ?? 25;
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+  const search = options?.search?.trim();
   
   return useQuery<AdminsPaginationResult>({
-    queryKey: ['admins', schoolCode, page, pageSize],
+    queryKey: ['admins', schoolCode, page, pageSize, search],
     queryFn: async () => {
       if (!schoolCode) {
         return { data: [], total: 0, page, pageSize };
@@ -59,11 +60,23 @@ export function useAdmins(
       log.info('Fetching admins', { schoolCode });
 
       // Get total count - try admin table first
-      const { count: adminCount, error: adminCountError } = await supabase
+      let adminCountQuery = supabase
         .from(DB.tables.admin)
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq(DB.columns.schoolCode, schoolCode)
         .eq('role', 'admin');
+
+      if (search) {
+        const filter = [
+          `full_name.ilike.%${search}%`,
+          `email.ilike.%${search}%`,
+          `phone.ilike.%${search}%`,
+          `admin_code.ilike.%${search}%`,
+        ].join(',');
+        adminCountQuery = adminCountQuery.or(filter);
+      }
+
+      const { count: adminCount, error: adminCountError } = await adminCountQuery;
 
       let totalCount = 0;
       let useAdminTable = false;
@@ -73,11 +86,23 @@ export function useAdmins(
         useAdminTable = true;
       } else {
         // Fallback to users table for count
-        const { count: usersCount, error: usersCountError } = await supabase
+        let usersCountQuery = supabase
           .from(DB.tables.users)
-          .select('*', { count: 'exact', head: true })
+          .select('id', { count: 'exact', head: true })
           .eq(DB.columns.schoolCode, schoolCode)
           .eq('role', 'admin');
+
+        if (search) {
+          const filter = [
+            `full_name.ilike.%${search}%`,
+            `email.ilike.%${search}%`,
+            `phone.ilike.%${search}%`,
+            `admin_code.ilike.%${search}%`,
+          ].join(',');
+          usersCountQuery = usersCountQuery.or(filter);
+        }
+
+        const { count: usersCount, error: usersCountError } = await usersCountQuery;
 
         if (usersCountError) {
           log.error('Failed to fetch admin count', usersCountError);
@@ -89,13 +114,25 @@ export function useAdmins(
 
       // Fetch paginated data
       if (useAdminTable) {
-        const { data: adminData, error: adminError } = await supabase
+        let adminDataQuery = supabase
           .from(DB.tables.admin)
           .select('id, full_name, email, phone, role, admin_code, school_code, school_name, created_at')
           .eq(DB.columns.schoolCode, schoolCode)
           .eq('role', 'admin')
           .order('created_at', { ascending: false })
           .range(from, to);
+
+        if (search) {
+          const filter = [
+            `full_name.ilike.%${search}%`,
+            `email.ilike.%${search}%`,
+            `phone.ilike.%${search}%`,
+            `admin_code.ilike.%${search}%`,
+          ].join(',');
+          adminDataQuery = adminDataQuery.or(filter);
+        }
+
+        const { data: adminData, error: adminError } = await adminDataQuery;
 
         if (!adminError && adminData) {
           return {
@@ -118,13 +155,25 @@ export function useAdmins(
       }
 
       // Fallback to users table
-      const { data: usersData, error: usersError } = await supabase
+      let usersDataQuery = supabase
         .from(DB.tables.users)
         .select('id, full_name, email, phone, role, admin_code, school_code, school_name, created_at')
         .eq(DB.columns.schoolCode, schoolCode)
         .eq('role', 'admin')
         .order('created_at', { ascending: false })
         .range(from, to);
+
+      if (search) {
+        const filter = [
+          `full_name.ilike.%${search}%`,
+          `email.ilike.%${search}%`,
+          `phone.ilike.%${search}%`,
+          `admin_code.ilike.%${search}%`,
+        ].join(',');
+        usersDataQuery = usersDataQuery.or(filter);
+      }
+
+      const { data: usersData, error: usersError } = await usersDataQuery;
 
       if (usersError) {
         log.error('Failed to fetch admins', usersError);

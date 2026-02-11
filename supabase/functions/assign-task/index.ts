@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
                 school_code: task.school_code,
                 status: 'pending',
             })
-            .select()
+            .select('id, school_code, academic_year_id, class_instance_id, subject_id, title, description, priority, assigned_date, due_date, max_marks, instructions, attachments, is_active, created_by, created_at, updated_at')
             .single();
 
         if (insertError) {
@@ -65,59 +65,50 @@ Deno.serve(async (req: Request) => {
             );
         }
 
-        // 4. Trigger notifications (async, server-controlled)
-        queueMicrotask(async () => {
-            try {
-                const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
-                const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+        // 4. Send notifications (fire-and-forget)
+        const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+        const userIds = students.map(s => s.user_id).filter(Boolean) as string[];
 
-                const userIds = students.map(s => s.user_id).filter(Boolean);
+        if (userIds.length > 0) {
+            const dueDate = new Date(task.due_date);
+            const formattedDate = dueDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: dueDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+            });
 
-                if (userIds.length === 0) {
-                    console.warn('No valid user_ids found');
-                    return;
-                }
+            const daysUntil = Math.ceil((dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+            const urgency = daysUntil <= 1 ? '🔥 ' : daysUntil <= 3 ? '⏰ ' : '';
 
-                // Format due date nicely
-                const dueDate = new Date(task.due_date);
-                const formattedDate = dueDate.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: dueDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-                });
+            const baseUrl = Deno.env.get('SUPABASE_URL');
+            const notifUrl = userIds.length > 50 
+                ? `${baseUrl}/functions/v1/queue-notification`
+                : `${baseUrl}/functions/v1/send-notification`;
 
-                // Calculate days until due
-                const daysUntil = Math.ceil((dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                const urgency = daysUntil <= 1 ? '🔥 ' : daysUntil <= 3 ? '⏰ ' : '';
-
-                await fetch(notificationUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': authHeader,
-                    },
-                    body: JSON.stringify({
-                        event: 'task_assigned',
-                        targets: { user_ids: userIds },
-                        payload: {
-                            title: `📝 New ${task.subject ? task.subject + ' ' : ''}Task Assigned!`,
-                            body: `${urgency}${task.title} - Due ${formattedDate} ✏️`,
-                            data: {
-                                type: 'task',
-                                task_id: insertedTask.id,
-                                title: task.title,
-                                due_date: task.due_date,
-                                subject: task.subject,
-                            },
+            fetch(notifUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+                body: JSON.stringify({
+                    event: 'task_assigned',
+                    targets: { user_ids: userIds },
+                    payload: {
+                        title: `📝 New ${task.subject ? task.subject + ' ' : ''}Task Assigned!`,
+                        body: `${urgency}${task.title} - Due ${formattedDate} ✏️`,
+                        data: {
+                            type: 'task',
+                            task_id: insertedTask.id,
+                            title: task.title,
+                            due_date: task.due_date,
+                            subject: task.subject,
                         },
-                    }),
-                });
-            } catch (err) {
-                console.error('Notification trigger failed:', err);
-            }
-        });
+                    },
+                }),
+            }).catch(err => console.error('Task notification failed:', err));
+            
+            console.log(`Triggered task notification for ${userIds.length} users`);
+        }
 
-        // 5. Return immediately
+        // 5. Return
         return new Response(
             JSON.stringify({
                 success: true,

@@ -1,29 +1,82 @@
 /**
  * ResourcesScreen
- * 
- * Refactored to use centralized design system with dynamic theming.
- * All styling uses theme tokens via useTheme hook.
+ *
+ * Production-quality learning resources browser.
+ * Students see only their class resources; admins see all with class filter.
+ * Modern card-based UI with pill tabs, animated bottom sheets, and clear hierarchy.
  */
 
-import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, FlatList, ScrollView, TouchableOpacity, Modal, Alert, Pressable, Linking, Animated, Platform } from 'react-native';
+import React, { useMemo, useState, useCallback } from 'react';
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  Pressable,
+  Linking,
+  Animated,
+  Platform,
+  ActivityIndicator,
+  Dimensions,
+} from 'react-native';
 import { Text } from 'react-native-paper';
-import { BookOpen, FileText, Video as VideoIcon, Plus, Edit, Trash2, Download } from 'lucide-react-native';
+import {
+  BookOpen,
+  FileText,
+  Video as VideoIcon,
+  Plus,
+  Edit2,
+  Trash2,
+  Download,
+  ChevronDown,
+  Filter,
+  Library,
+  PlayCircle,
+  File,
+  Search,
+  GraduationCap,
+  Check,
+} from 'lucide-react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import * as FileSystem from 'expo-file-system';
+import {
+  downloadAsync,
+  cacheDirectory,
+  StorageAccessFramework,
+  readAsStringAsync,
+  EncodingType,
+  writeAsStringAsync,
+} from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
-import { useAllResources } from '../../hooks/useResources';
+import { useInfiniteResources, useClassResources } from '../../hooks/useResources';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
-import { Card, LoadingView, ErrorView } from '../../components/ui';
+import { LoadingView, ErrorView } from '../../components/ui';
 import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
 import { VideoPlayer } from '../../components/resources/VideoPlayer';
 import { PDFViewer } from '../../components/resources/PDFViewer';
 import { AddResourceModal } from '../../components/resources/AddResourceModal';
 import { LearningResource } from '../../services/api';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ─── Type-safe tab config ──────────────────────────────────────────
+type TabKey = 'all' | 'lectures' | 'study_materials';
+interface TabConfig {
+  key: TabKey;
+  label: string;
+  icon: React.ElementType;
+}
+const TABS: TabConfig[] = [
+  { key: 'all', label: 'All', icon: Library },
+  { key: 'lectures', label: 'Videos', icon: PlayCircle },
+  { key: 'study_materials', label: 'Documents', icon: File },
+];
 
 export default function ResourcesScreen() {
   const { profile } = useAuth();
@@ -31,58 +84,161 @@ export default function ResourcesScreen() {
   const { can } = useCapabilities();
   const queryClient = useQueryClient();
   const schoolCode = profile?.school_code ?? undefined;
-  const { data: resources, isLoading, error } = useAllResources(schoolCode, 50);
+  const studentClassId = profile?.class_instance_id ?? undefined;
+
+  // ── Data fetching ──────────────────────────────────────────────
+  const {
+    data: infiniteData,
+    isLoading: infiniteLoading,
+    error: infiniteError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteResources(!studentClassId ? schoolCode : undefined, 10);
+
+  const {
+    data: classResourcesData,
+    isLoading: classLoading,
+    error: classError,
+  } = useClassResources(studentClassId, schoolCode);
+
+  const isLoading = studentClassId ? classLoading : infiniteLoading;
+  const error = studentClassId ? classError : infiniteError;
+
+  const resources = useMemo(() => {
+    if (studentClassId) return classResourcesData || [];
+    return infiniteData?.pages.flatMap((page) => page) || [];
+  }, [studentClassId, classResourcesData, infiniteData]);
+
   const { data: classes = [] } = useClasses(schoolCode);
   const { data: subjectsResult } = useSubjects(schoolCode);
   const subjects = subjectsResult?.data || [];
-  
-  // Capability-based check (NO role checks in UI)
+
+  // ── State ──────────────────────────────────────────────────────
   const canManage = can('resources.manage');
+  const isStudentView = !canManage && !!profile?.class_instance_id;
+
   const [selectedResource, setSelectedResource] = useState<LearningResource | null>(null);
   const [viewerType, setViewerType] = useState<'video' | 'pdf' | null>(null);
-  const [selectedClass, setSelectedClass] = useState<string>('all');
-  const [selectedSubject, setSelectedSubject] = useState<string>('all');
-  const [selectedTab, setSelectedTab] = useState<'all' | 'lectures' | 'study_materials'>('all');
+  const [selectedClass, setSelectedClass] = useState<string | null>(
+    profile?.class_instance_id ?? null,
+  );
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedTab, setSelectedTab] = useState<TabKey>('all');
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-  
-  const typeSlideAnim = React.useRef(new Animated.Value(0)).current;
-  const classSlideAnim = React.useRef(new Animated.Value(0)).current;
-  const subjectSlideAnim = React.useRef(new Animated.Value(0)).current;
-  const overlayOpacity = React.useRef(new Animated.Value(0)).current;
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingResource, setEditingResource] = useState<LearningResource | null>(null);
 
-  // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark), 
-    [colors, spacing, borderRadius, typography, shadows, isDark]);
+  // Bottom-sheet animations
+  const classSlideAnim = React.useRef(new Animated.Value(0)).current;
+  const subjectSlideAnim = React.useRef(new Animated.Value(0)).current;
+  const overlayOpacity = React.useRef(new Animated.Value(0)).current;
 
-  const getResourceIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'pdf':
-      case 'document':
-        return <FileText size={20} color={colors.error.main} />;
-      case 'video':
-        return <VideoIcon size={20} color={colors.primary.main} />;
-      default:
-        return <BookOpen size={20} color={colors.info.main} />;
-    }
-  };
+  const styles = useMemo(
+    () => createStyles(colors, spacing, borderRadius, typography, shadows, isDark),
+    [colors, spacing, borderRadius, typography, shadows, isDark],
+  );
 
-  const getResourceColor = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'pdf':
-      case 'document':
-        return colors.error[100];
-      case 'video':
-        return colors.primary[100];
-      default:
-        return colors.info[100];
-    }
-  };
+  // ── Helpers ────────────────────────────────────────────────────
+  const getResourceAccent = useCallback(
+    (type: string) => {
+      switch (type.toLowerCase()) {
+        case 'pdf':
+        case 'document':
+          return { color: colors.error.main, bg: colors.error[100], label: 'PDF' };
+        case 'video':
+          return { color: colors.primary.main, bg: colors.primary[100], label: 'Video' };
+        default:
+          return { color: colors.info.main, bg: colors.info[100], label: 'File' };
+      }
+    },
+    [colors],
+  );
 
-  const handleOpenResource = (resource: LearningResource) => {
+  const getResourceIcon = useCallback(
+    (type: string, size = 22) => {
+      const { color } = getResourceAccent(type);
+      switch (type.toLowerCase()) {
+        case 'pdf':
+        case 'document':
+          return <FileText size={size} color={color} />;
+        case 'video':
+          return <PlayCircle size={size} color={color} />;
+        default:
+          return <BookOpen size={size} color={color} />;
+      }
+    },
+    [getResourceAccent],
+  );
+
+  const getClassDisplay = useCallback(
+    (classId: string | null | undefined) => {
+      if (!classId) return undefined;
+      const match = classes.find((cls) => cls.id === classId);
+      return match ? `${match.grade}-${match.section}` : undefined;
+    },
+    [classes],
+  );
+
+  const formatDate = useCallback((dateString?: string | null) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }, []);
+
+  const studentClassName = useMemo(() => {
+    if (!isStudentView || !profile?.class_instance_id) return '';
+    const cls = classes.find((c) => c.id === profile.class_instance_id);
+    return cls ? `${cls.grade}-${cls.section}` : '';
+  }, [isStudentView, profile?.class_instance_id, classes]);
+
+  // ── Filtered data ──────────────────────────────────────────────
+  const filteredResources = useMemo(() => {
+    return (
+      resources?.filter((resource) => {
+        if (selectedClass && selectedClass !== 'all' && resource.class_instance_id !== selectedClass)
+          return false;
+        if (selectedSubject && selectedSubject !== 'all' && resource.subject_id !== selectedSubject)
+          return false;
+        switch (selectedTab) {
+          case 'lectures':
+            return resource.resource_type.toLowerCase() === 'video';
+          case 'study_materials':
+            return ['pdf', 'document'].includes(resource.resource_type.toLowerCase());
+          default:
+            return true;
+        }
+      }) || []
+    );
+  }, [resources, selectedClass, selectedSubject, selectedTab]);
+
+  // ── Resource counts by tab ─────────────────────────────────────
+  const tabCounts = useMemo(() => {
+    const baseFiltered =
+      resources?.filter((r) => {
+        if (selectedClass && selectedClass !== 'all' && r.class_instance_id !== selectedClass) return false;
+        if (selectedSubject && selectedSubject !== 'all' && r.subject_id !== selectedSubject) return false;
+        return true;
+      }) || [];
+    return {
+      all: baseFiltered.length,
+      lectures: baseFiltered.filter((r) => r.resource_type.toLowerCase() === 'video').length,
+      study_materials: baseFiltered.filter((r) =>
+        ['pdf', 'document'].includes(r.resource_type.toLowerCase()),
+      ).length,
+    };
+  }, [resources, selectedClass, selectedSubject]);
+
+  // ── Handlers ───────────────────────────────────────────────────
+  const handleOpenResource = useCallback((resource: LearningResource) => {
     if (!resource.content_url) return;
     const type = resource.resource_type.toLowerCase();
     if (type === 'video') {
@@ -92,145 +248,116 @@ export default function ResourcesScreen() {
       setSelectedResource(resource);
       setViewerType('pdf');
     }
-  };
+  }, []);
 
-  const handleCloseViewer = () => {
+  const handleCloseViewer = useCallback(() => {
     setSelectedResource(null);
     setViewerType(null);
-  };
+  }, []);
 
-  const handleAddResource = () => {
+  const handleAddResource = useCallback(() => {
     setEditingResource(null);
     setShowAddModal(true);
-  };
+  }, []);
 
-  // Animation effects for bottom sheets
-  React.useEffect(() => {
-    if (showTypeDropdown) {
-      typeSlideAnim.setValue(0);
-      overlayOpacity.setValue(0);
-      Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
-        Animated.spring(typeSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-        Animated.timing(typeSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [showTypeDropdown, overlayOpacity, typeSlideAnim]);
-
-  React.useEffect(() => {
-    if (showClassDropdown) {
-      classSlideAnim.setValue(0);
-      overlayOpacity.setValue(0);
-      Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
-        Animated.spring(classSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-        Animated.timing(classSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [showClassDropdown, overlayOpacity, classSlideAnim]);
-
-  React.useEffect(() => {
-    if (showSubjectDropdown) {
-      subjectSlideAnim.setValue(0);
-      overlayOpacity.setValue(0);
-      Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 1, duration: 280, useNativeDriver: true }),
-        Animated.spring(subjectSlideAnim, { toValue: 1, tension: 65, friction: 10, useNativeDriver: true }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 0, duration: 220, useNativeDriver: true }),
-        Animated.timing(subjectSlideAnim, { toValue: 0, duration: 220, useNativeDriver: true }),
-      ]).start();
-    }
-  }, [showSubjectDropdown, overlayOpacity, subjectSlideAnim]);
-
-  const handleResourceSuccess = async () => {
+  const handleResourceSuccess = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ['resources'] });
-  };
+  }, [queryClient]);
 
-  const handleDownloadResource = async (resource: LearningResource) => {
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const getMimeType = useCallback((resourceType: string) => {
+    switch (resourceType.toLowerCase()) {
+      case 'pdf':
+      case 'document':
+        return 'application/pdf';
+      case 'video':
+        return 'video/mp4';
+      default:
+        return 'application/octet-stream';
+    }
+  }, []);
+
+  const handleDownloadResource = useCallback(async (resource: LearningResource) => {
     if (!resource.content_url) {
-      Alert.alert('Unavailable', 'This resource does not have downloadable content yet.');
+      Alert.alert('Unavailable', 'No downloadable content yet.');
       return;
     }
 
-    try {
-      const urlParts = resource.content_url.split('/');
-      const filename = urlParts[urlParts.length - 1] || `${resource.title}.pdf`;
+    if (Platform.OS === 'web') {
+      await Linking.openURL(resource.content_url);
+      return;
+    }
 
-      if (Platform.OS === 'web') {
-        await Linking.openURL(resource.content_url);
+    // Build a safe local cache path
+    const urlParts = resource.content_url.split('/');
+    const rawName = urlParts[urlParts.length - 1] || `${resource.title}.pdf`;
+    const safeName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const cachePath = `${cacheDirectory}${safeName}`;
+
+    setDownloadingId(resource.id);
+    try {
+      // Step 1: Download to cache
+      const result = await downloadAsync(resource.content_url, cachePath);
+      if (result.status !== 200) {
+        // Download returned non-200 status
+        Alert.alert('Download Failed', 'Could not download the file. Please try again.');
         return;
       }
 
-      Alert.alert(
-        'Download File',
-        `Download "${resource.title}" to your device?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Download',
-            onPress: async () => {
-              try {
-                Alert.alert('Downloading', 'Please wait...');
-                if (!resource.content_url) {
-                  Alert.alert('Error', 'Resource URL is not available');
-                  return;
-                }
-                const downloadResult = await FileSystem.downloadAsync(
-                  resource.content_url,
-                  filename
-                );
+      // Step 2: Save to device
+      if (Platform.OS === 'android') {
+        // Android: Save directly to user-chosen folder (usually Downloads)
+        const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (!permissions.granted) {
+          // User cancelled -- file is still in cache, no error
+          Alert.alert('Cancelled', 'Download was cancelled.');
+          return;
+        }
 
-                if (downloadResult.status === 200) {
-                  const isSharingAvailable = await Sharing.isAvailableAsync();
-                  if (isSharingAvailable) {
-                    await Sharing.shareAsync(downloadResult.uri, {
-                      mimeType: resource.resource_type === 'pdf' ? 'application/pdf' :
-                                resource.resource_type === 'video' ? 'video/mp4' :
-                                'application/octet-stream',
-                      dialogTitle: 'Save File',
-                    });
-                    Alert.alert('Success', 'File downloaded successfully!');
-                  } else {
-                    Alert.alert('Downloaded', `File saved to: ${downloadResult.uri}`);
-                  }
-                } else {
-                  throw new Error('Download failed');
-                }
-              } catch (error) {
-                console.error('Download error:', error);
-                Alert.alert('Error', 'Failed to download file. Please try again.');
-              }
-            }
-          }
-        ]
-      );
+        const mimeType = getMimeType(resource.resource_type);
+        const fileUri = await StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          safeName,
+          mimeType,
+        );
+        // Read from cache and write to the chosen location
+        const fileContent = await readAsStringAsync(cachePath, {
+          encoding: EncodingType.Base64,
+        });
+        await writeAsStringAsync(fileUri, fileContent, {
+          encoding: EncodingType.Base64,
+        });
+
+        Alert.alert('Saved', `"${resource.title}" has been saved to your device.`);
+      } else {
+        // iOS: Use share sheet so user can save to Files app
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(result.uri, {
+            mimeType: getMimeType(resource.resource_type),
+            dialogTitle: `Save ${resource.title}`,
+          });
+        } else {
+          Alert.alert('Downloaded', `"${resource.title}" saved to app cache.`);
+        }
+      }
     } catch (err) {
-      console.error('Download error:', err);
-      Alert.alert('Error', 'Unable to download the resource.');
+      // Download error - alert shown below
+      Alert.alert('Error', 'Something went wrong while downloading. Please try again.');
+    } finally {
+      setDownloadingId(null);
     }
-  };
+  }, [getMimeType]);
 
-  const handleEditResource = (resource: LearningResource) => {
+  const handleEditResource = useCallback((resource: LearningResource) => {
     setEditingResource(resource);
     setShowAddModal(true);
-  };
+  }, []);
 
-  const handleDeleteResource = async (resource: LearningResource) => {
-    Alert.alert(
-      'Delete Resource',
-      `Are you sure you want to delete "${resource.title}"?`,
-      [
+  const handleDeleteResource = useCallback(
+    (resource: LearningResource) => {
+      Alert.alert('Delete Resource', `Delete "${resource.title}"?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
@@ -240,345 +367,539 @@ export default function ResourcesScreen() {
               const { api } = await import('../../services/api');
               await api.resources.delete(resource.id);
               await queryClient.invalidateQueries({ queryKey: ['resources'] });
-              Alert.alert('Success', 'Resource deleted successfully');
-            } catch (error: any) {
-              console.error('Delete error:', error);
-              Alert.alert('Error', error?.message || 'Failed to delete resource');
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to delete resource');
             }
           },
         },
-      ]
-    );
-  };
+      ]);
+    },
+    [queryClient],
+  );
 
-  const getClassDisplay = (classId: string | null | undefined, classList: typeof classes) => {
-    if (!classId) return undefined;
-    const match = classList.find(cls => cls.id === classId);
-    if (!match) return undefined;
-    return `${match.grade}-${match.section}`;
-  };
+  // ── Bottom-sheet animation helpers ─────────────────────────────
+  const openSheet = useCallback(
+    (slideAnim: Animated.Value) => {
+      slideAnim.setValue(0);
+      overlayOpacity.setValue(0);
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.spring(slideAnim, { toValue: 1, tension: 65, friction: 11, useNativeDriver: true }),
+      ]).start();
+    },
+    [overlayOpacity],
+  );
 
-  const formatResourceDate = (dateString?: string | null) => {
-    if (!dateString) return 'Date TBD';
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return 'Date TBD';
-    
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-    
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
+  const closeSheet = useCallback(
+    (slideAnim: Animated.Value, cb: () => void) => {
+      Animated.parallel([
+        Animated.timing(overlayOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start(cb);
+    },
+    [overlayOpacity],
+  );
 
-  const formatResourceType = (type?: string | null) => {
-    if (!type) return 'Resource';
-    return type.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
-  };
+  React.useEffect(() => {
+    if (showClassDropdown) openSheet(classSlideAnim);
+  }, [showClassDropdown, openSheet, classSlideAnim]);
 
-  // Filter resources
-  const filteredResources = resources?.filter(resource => {
-    if (selectedClass !== 'all' && resource.class_instance_id !== selectedClass) return false;
-    if (selectedSubject !== 'all' && resource.subject_id !== selectedSubject) return false;
-    
-    switch (selectedTab) {
-      case 'lectures':
-        return resource.resource_type.toLowerCase() === 'video';
-      case 'study_materials':
-        return ['pdf', 'document'].includes(resource.resource_type.toLowerCase());
-        default:
-          return true;
-      }
-    }) || [];
+  React.useEffect(() => {
+    if (showSubjectDropdown) openSheet(subjectSlideAnim);
+  }, [showSubjectDropdown, openSheet, subjectSlideAnim]);
 
-  if (isLoading) {
-    return <LoadingView message="Loading resources..." />;
-  }
+  // ── Loading / Error states ─────────────────────────────────────
+  if (isLoading) return <LoadingView message="Loading resources..." />;
+  if (error) return <ErrorView message={error.message} />;
 
-  if (error) {
-    return <ErrorView message={error.message} />;
-  }
+  // ── Render helpers ─────────────────────────────────────────────
 
+  const selectedClassName =
+    !selectedClass || selectedClass === 'all'
+      ? 'All Classes'
+      : getClassDisplay(selectedClass) || 'Class';
+
+  const selectedSubjectName =
+    !selectedSubject || selectedSubject === 'all'
+      ? 'All Subjects'
+      : subjects.find((s) => s.id === selectedSubject)?.subject_name || 'Subject';
+
+  // ── Header ─────────────────────────────────────────────────────
   const renderHeader = () => (
-    <>
-      <View style={styles.filterSection}>
-        <View style={styles.filterRow}>
-          <TouchableOpacity style={styles.filterItem} onPress={() => setShowClassDropdown(true)}>
-            <View style={styles.filterIcon}>
-              <BookOpen size={14} color={colors.text.inverse} />
-            </View>
-            <View style={styles.filterContent}>
-              <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                {selectedClass === 'all' ? 'Class' : 
-                 classes.find(c => c.id === selectedClass)?.grade + '-' + 
-                 classes.find(c => c.id === selectedClass)?.section || 'Class'}
-              </Text>
-            </View>
-          </TouchableOpacity>
+    <View style={styles.headerContainer}>
+      {/* Hero area */}
+      <View style={styles.heroSection}>
+        <View style={styles.heroTop}>
+          <View>
+            <Text style={styles.heroTitle}>
+              {isStudentView ? 'My Resources' : 'Resources'}
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              {isStudentView && studentClassName
+                ? `Class ${studentClassName}`
+                : `${filteredResources.length} learning material${filteredResources.length !== 1 ? 's' : ''}`}
+            </Text>
+          </View>
+          <View style={styles.heroIconContainer}>
+            <GraduationCap size={28} color={colors.primary.main} />
+          </View>
+        </View>
 
-          <View style={styles.filterDivider} />
-
-          <TouchableOpacity style={styles.filterItem} onPress={() => setShowSubjectDropdown(true)}>
-            <View style={styles.filterIcon}>
-              <FileText size={14} color={colors.text.inverse} />
-            </View>
-            <View style={styles.filterContent}>
-              <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                {selectedSubject === 'all' ? 'Subject' : 
-                 subjects.find(s => s.id === selectedSubject)?.subject_name || 'Subject'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.filterDivider} />
-
-          <TouchableOpacity style={styles.filterItem} onPress={() => setShowTypeDropdown(true)}>
-            <View style={styles.filterIcon}>
-              <VideoIcon size={14} color={colors.text.inverse} />
-            </View>
-            <View style={styles.filterContent}>
-              <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                {selectedTab === 'all' ? 'Type' : 
-                 selectedTab === 'lectures' ? 'Lectures' : 'Materials'}
-              </Text>
-            </View>
-          </TouchableOpacity>
+        {/* Quick stats row */}
+        <View style={styles.quickStatsRow}>
+          <View style={styles.quickStat}>
+            <Text style={styles.quickStatValue}>{tabCounts.all}</Text>
+            <Text style={styles.quickStatLabel}>Total</Text>
+          </View>
+          <View style={[styles.quickStatDivider, { backgroundColor: colors.border.light }]} />
+          <View style={styles.quickStat}>
+            <Text style={[styles.quickStatValue, { color: colors.primary.main }]}>
+              {tabCounts.lectures}
+            </Text>
+            <Text style={styles.quickStatLabel}>Videos</Text>
+          </View>
+          <View style={[styles.quickStatDivider, { backgroundColor: colors.border.light }]} />
+          <View style={styles.quickStat}>
+            <Text style={[styles.quickStatValue, { color: colors.error.main }]}>
+              {tabCounts.study_materials}
+            </Text>
+            <Text style={styles.quickStatLabel}>Documents</Text>
+          </View>
         </View>
       </View>
 
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Resources</Text>
-        <Text style={styles.sectionCount}>{filteredResources.length} items</Text>
-      </View>
-    </>
-  );
-
-  return (
-    <View style={styles.container}>
-      {filteredResources.length === 0 ? (
-        <View style={styles.scrollView}>
-          {renderHeader()}
-          <EmptyStateIllustration
-            type="resources"
-            title="No Resources"
-            description="Get started by adding your first learning resource"
-            action={
-              <TouchableOpacity style={styles.createResourceButton} onPress={handleAddResource}>
-                <Plus size={20} color={colors.text.inverse} />
-                <Text style={styles.createResourceButtonText}>Create Resource</Text>
-              </TouchableOpacity>
+      {/* Filter chips (admin only: class + subject, student: subject only) */}
+      <View style={styles.filterChipsRow}>
+        {!isStudentView && (
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              selectedClass && selectedClass !== 'all' && styles.filterChipActive,
+            ]}
+            onPress={() => setShowClassDropdown(true)}
+            activeOpacity={0.7}
+          >
+            <BookOpen
+              size={14}
+              color={
+                selectedClass && selectedClass !== 'all'
+                  ? colors.primary.main
+                  : colors.text.secondary
+              }
+            />
+            <Text
+              style={[
+                styles.filterChipText,
+                selectedClass && selectedClass !== 'all' && styles.filterChipTextActive,
+              ]}
+              numberOfLines={1}
+            >
+              {selectedClassName}
+            </Text>
+            <ChevronDown
+              size={14}
+              color={
+                selectedClass && selectedClass !== 'all'
+                  ? colors.primary.main
+                  : colors.text.tertiary
+              }
+            />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[
+            styles.filterChip,
+            selectedSubject && selectedSubject !== 'all' && styles.filterChipActive,
+          ]}
+          onPress={() => setShowSubjectDropdown(true)}
+          activeOpacity={0.7}
+        >
+          <Filter
+            size={14}
+            color={
+              selectedSubject && selectedSubject !== 'all'
+                ? colors.primary.main
+                : colors.text.secondary
             }
           />
+          <Text
+            style={[
+              styles.filterChipText,
+              selectedSubject && selectedSubject !== 'all' && styles.filterChipTextActive,
+            ]}
+            numberOfLines={1}
+          >
+            {selectedSubjectName}
+          </Text>
+          <ChevronDown
+            size={14}
+            color={
+              selectedSubject && selectedSubject !== 'all'
+                ? colors.primary.main
+                : colors.text.tertiary
+            }
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Pill tabs */}
+      <View style={styles.tabBarContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
+          {TABS.map((tab) => {
+            const isActive = selectedTab === tab.key;
+            const Icon = tab.icon;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.tabPill, isActive && styles.tabPillActive]}
+                onPress={() => setSelectedTab(tab.key)}
+                activeOpacity={0.7}
+              >
+                <Icon
+                  size={15}
+                  color={isActive ? colors.text.inverse : colors.text.secondary}
+                />
+                <Text style={[styles.tabPillText, isActive && styles.tabPillTextActive]}>
+                  {tab.label}
+                </Text>
+                <View
+                  style={[
+                    styles.tabCountBadge,
+                    {
+                      backgroundColor: isActive
+                        ? 'rgba(255,255,255,0.25)'
+                        : colors.background.secondary,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabCountText,
+                      { color: isActive ? colors.text.inverse : colors.text.tertiary },
+                    ]}
+                  >
+                    {tabCounts[tab.key]}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+    </View>
+  );
+
+  // ── Resource Card ──────────────────────────────────────────────
+  const renderResourceCard = ({ item: resource }: { item: LearningResource }) => {
+    const accent = getResourceAccent(resource.resource_type);
+    const className = getClassDisplay(resource.class_instance_id);
+    const date = formatDate(resource.created_at);
+
+    return (
+      <Pressable
+        onPress={() => handleOpenResource(resource)}
+        style={({ pressed }) => [styles.resourceCard, pressed && styles.resourceCardPressed]}
+        disabled={!resource.content_url}
+      >
+        {/* Left accent bar */}
+        <View style={[styles.accentBar, { backgroundColor: accent.color }]} />
+
+        <View style={styles.cardBody}>
+          {/* Icon */}
+          <View style={[styles.resourceIconBox, { backgroundColor: accent.bg }]}>
+            {getResourceIcon(resource.resource_type, 22)}
+          </View>
+
+          {/* Content */}
+          <View style={styles.resourceContent}>
+            <Text style={styles.resourceTitle} numberOfLines={2}>
+              {resource.title}
+            </Text>
+            {resource.description ? (
+              <Text style={styles.resourceDescription} numberOfLines={1}>
+                {resource.description}
+              </Text>
+            ) : null}
+            <View style={styles.resourceMeta}>
+              {/* Type badge */}
+              <View style={[styles.typeBadge, { backgroundColor: accent.bg }]}>
+                <Text style={[styles.typeBadgeText, { color: accent.color }]}>{accent.label}</Text>
+              </View>
+              {className && !isStudentView ? (
+                <>
+                  <View style={styles.dot} />
+                  <Text style={styles.metaText}>{className}</Text>
+                </>
+              ) : null}
+              {date ? (
+                <>
+                  <View style={styles.dot} />
+                  <Text style={styles.metaText}>{date}</Text>
+                </>
+              ) : null}
+            </View>
+          </View>
+
+          {/* Actions */}
+          <View style={styles.cardActions}>
+            {resource.content_url && (
+              <TouchableOpacity
+                onPress={() => handleDownloadResource(resource)}
+                style={styles.actionButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                disabled={downloadingId === resource.id}
+              >
+                {downloadingId === resource.id ? (
+                  <ActivityIndicator size={18} color={colors.primary.main} />
+                ) : (
+                  <Download size={20} color={colors.text.secondary} />
+                )}
+              </TouchableOpacity>
+            )}
+            {canManage && (
+              <>
+                <TouchableOpacity
+                  onPress={() => handleEditResource(resource)}
+                  style={styles.actionButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Edit2 size={16} color={colors.text.tertiary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleDeleteResource(resource)}
+                  style={styles.actionButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Trash2 size={16} color={colors.error.main} />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Pressable>
+    );
+  };
+
+  // ── Bottom sheet renderer ──────────────────────────────────────
+  const renderBottomSheet = (
+    visible: boolean,
+    slideAnim: Animated.Value,
+    title: string,
+    onClose: () => void,
+    children: React.ReactNode,
+  ) => (
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <Animated.View style={[styles.overlay, { opacity: overlayOpacity }]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <Animated.View
+          style={[
+            styles.sheet,
+            {
+              transform: [
+                {
+                  translateY: slideAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [500, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>{title}</Text>
+          <ScrollView
+            style={styles.sheetScroll}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
+            {children}
+          </ScrollView>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+
+  const renderSheetOption = (
+    label: string,
+    isActive: boolean,
+    onPress: () => void,
+    subtitle?: string,
+  ) => (
+    <TouchableOpacity
+      style={[styles.sheetOption, isActive && styles.sheetOptionActive]}
+      onPress={onPress}
+      activeOpacity={0.6}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.sheetOptionText, isActive && styles.sheetOptionTextActive]}>
+          {label}
+        </Text>
+        {subtitle ? <Text style={styles.sheetOptionSubtitle}>{subtitle}</Text> : null}
+      </View>
+      {isActive && (
+        <View style={styles.sheetCheck}>
+          <Check size={16} color={colors.text.inverse} />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+
+  // ── No class selected (admin only) ────────────────────────────
+  const needsClassSelection = !isStudentView && !selectedClass;
+
+  // ── Main render ────────────────────────────────────────────────
+  return (
+    <View style={styles.container}>
+      {needsClassSelection ? (
+        <View style={{ flex: 1 }}>
+          {renderHeader()}
+          <View style={styles.emptyContainer}>
+            <EmptyStateIllustration
+              type="search"
+              title="Select a Class"
+              description="Choose a class from the filter above to view resources"
+            />
+          </View>
+        </View>
+      ) : filteredResources.length === 0 ? (
+        <View style={{ flex: 1 }}>
+          {renderHeader()}
+          <View style={styles.emptyContainer}>
+            <EmptyStateIllustration
+              type="resources"
+              title="No Resources Yet"
+              description={
+                isStudentView
+                  ? 'No learning materials available for your class yet'
+                  : 'No resources match the selected filters'
+              }
+              action={
+                canManage ? (
+                  <TouchableOpacity style={styles.addButton} onPress={handleAddResource}>
+                    <Plus size={18} color={colors.text.inverse} />
+                    <Text style={styles.addButtonText}>Add Resource</Text>
+                  </TouchableOpacity>
+                ) : undefined
+              }
+            />
+          </View>
         </View>
       ) : (
         <FlatList
           ListHeaderComponent={renderHeader}
-            data={filteredResources}
-            renderItem={({ item: resource }) => {
-              const className = getClassDisplay(resource.class_instance_id, classes) || 'Class';
-              const formattedDate = formatResourceDate(resource.created_at);
-              const typeLabel = formatResourceType(resource.resource_type);
-              
-              return (
-                <Card style={styles.resourceCard}>
-                  <Pressable
-                    onPress={() => handleOpenResource(resource)}
-                  android_ripple={{ color: `${colors.primary.main}10` }}
-                  style={({ pressed }) => [styles.cardPressable, pressed && styles.cardPressed]}
-                    disabled={!resource.content_url}
-                  >
-                    <View style={styles.cardInner}>
-                      <View style={[styles.resourceIcon, { backgroundColor: getResourceColor(resource.resource_type) }]}>
-                        {getResourceIcon(resource.resource_type)}
-                      </View>
-                      
-                      <View style={styles.resourceDetails}>
-                      <Text style={styles.resourceTitle} numberOfLines={1}>{resource.title}</Text>
-                      {resource.description && (
-                        <Text style={styles.resourceSubtitle} numberOfLines={1}>{resource.description}</Text>
-                      )}
-                        <View style={styles.metaRow}>
-                          <Text style={styles.metaText}>{className}</Text>
-                          <View style={styles.metaDot} />
-                          <Text style={styles.metaText}>{formattedDate}</Text>
-                        </View>
-                        <View style={styles.chipRow}>
-                          <View style={styles.chip}>
-                            <Text style={styles.chipLabel}>{typeLabel}</Text>
-                          </View>
-                        </View>
-                      </View>
-
-                      <View style={styles.cardActions}>
-                      {resource.content_url && (
-                          <TouchableOpacity
-                            style={styles.actionBtn}
-                            onPress={() => handleDownloadResource(resource)}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          >
-                            <Download size={18} color={colors.text.primary} />
-                          </TouchableOpacity>
-                      )}
-                        {canManage && (
-                          <>
-                            <TouchableOpacity
-                              style={styles.actionBtn}
-                              onPress={() => handleEditResource(resource)}
-                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            >
-                              <Edit size={18} color={colors.text.primary} />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={styles.actionBtn}
-                              onPress={() => handleDeleteResource(resource)}
-                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            >
-                            <Trash2 size={18} color={colors.error.main} />
-                            </TouchableOpacity>
-                          </>
-                        )}
-                      </View>
-                    </View>
-                  </Pressable>
-                </Card>
-              );
-            }}
+          data={filteredResources}
+          renderItem={renderResourceCard}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.resourcesContent}
-          removeClippedSubviews={true}
+          contentContainerStyle={styles.listContent}
+          removeClippedSubviews
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           windowSize={10}
+          onEndReached={() => {
+            if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <View style={{ paddingVertical: 16 }}>
+                <ActivityIndicator size="small" color={colors.primary.main} />
+              </View>
+            ) : null
+          }
           showsVerticalScrollIndicator={false}
         />
       )}
 
-      {filteredResources.length > 0 && canManage && (
-        <TouchableOpacity onPress={handleAddResource} style={styles.floatingButton}>
-          <Plus size={24} color={colors.text.inverse} />
+      {/* FAB */}
+      {canManage && (
+        <TouchableOpacity onPress={handleAddResource} style={styles.fab} activeOpacity={0.85}>
+          <Plus size={24} color={colors.text.inverse} strokeWidth={2.5} />
         </TouchableOpacity>
       )}
 
-      {/* Type Dropdown Modal */}
-      <Modal visible={showTypeDropdown} transparent animationType="none" onRequestClose={() => setShowTypeDropdown(false)}>
-        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowTypeDropdown(false)} />
-          <Animated.View 
-            style={[
-              styles.bottomSheet,
-              { transform: [{ translateY: typeSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [500, 0] }) }] },
-            ]}
-          >
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Select Type</Text>
-            <View style={styles.sheetContent}>
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'lectures', label: 'Lectures' },
-                { id: 'study_materials', label: 'Study Materials' },
-              ].map((item) => (
-              <TouchableOpacity
-                  key={item.id}
-                  style={[styles.sheetItem, selectedTab === item.id && styles.sheetItemActive]}
-                  onPress={() => { setSelectedTab(item.id as any); setShowTypeDropdown(false); }}
-              >
-                  <Text style={[styles.sheetItemText, selectedTab === item.id && styles.sheetItemTextActive]}>{item.label}</Text>
-                  {selectedTab === item.id && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-              ))}
-            </View>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+      {/* Class bottom sheet */}
+      {renderBottomSheet(
+        showClassDropdown,
+        classSlideAnim,
+        'Select Class',
+        () => {
+          closeSheet(classSlideAnim, () => setShowClassDropdown(false));
+        },
+        <>
+          {renderSheetOption('All Classes', selectedClass === 'all' || !selectedClass, () => {
+            setSelectedClass('all');
+            closeSheet(classSlideAnim, () => setShowClassDropdown(false));
+          })}
+          {classes.map((cls) =>
+            renderSheetOption(
+              `${cls.grade}-${cls.section}`,
+              selectedClass === cls.id,
+              () => {
+                setSelectedClass(cls.id);
+                closeSheet(classSlideAnim, () => setShowClassDropdown(false));
+              },
+            ),
+          )}
+        </>,
+      )}
 
-      {/* Class Dropdown Modal */}
-      <Modal visible={showClassDropdown} transparent animationType="none" onRequestClose={() => setShowClassDropdown(false)}>
-        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowClassDropdown(false)} />
-          <Animated.View 
-            style={[
-              styles.bottomSheet,
-              { transform: [{ translateY: classSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [500, 0] }) }] },
-            ]}
-          >
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Select Class</Text>
-            <ScrollView style={styles.sheetContent}>
-              <TouchableOpacity
-                style={[styles.sheetItem, selectedClass === 'all' && styles.sheetItemActive]}
-                onPress={() => { setSelectedClass('all'); setShowClassDropdown(false); }}
-              >
-                <Text style={[styles.sheetItemText, selectedClass === 'all' && styles.sheetItemTextActive]}>All Classes</Text>
-                {selectedClass === 'all' && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-              {classes.map((cls) => (
-                <TouchableOpacity
-                  key={cls.id}
-                  style={[styles.sheetItem, selectedClass === cls.id && styles.sheetItemActive]}
-                  onPress={() => { setSelectedClass(cls.id); setShowClassDropdown(false); }}
-                >
-                  <Text style={[styles.sheetItemText, selectedClass === cls.id && styles.sheetItemTextActive]}>{cls.grade}-{cls.section}</Text>
-                  {selectedClass === cls.id && <Text style={styles.checkmark}>✓</Text>}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
+      {/* Subject bottom sheet */}
+      {renderBottomSheet(
+        showSubjectDropdown,
+        subjectSlideAnim,
+        'Select Subject',
+        () => {
+          closeSheet(subjectSlideAnim, () => setShowSubjectDropdown(false));
+        },
+        <>
+          {renderSheetOption('All Subjects', selectedSubject === 'all' || !selectedSubject, () => {
+            setSelectedSubject('all');
+            closeSheet(subjectSlideAnim, () => setShowSubjectDropdown(false));
+          })}
+          {subjects.map((s) =>
+            renderSheetOption(
+              s.subject_name,
+              selectedSubject === s.id,
+              () => {
+                setSelectedSubject(s.id);
+                closeSheet(subjectSlideAnim, () => setShowSubjectDropdown(false));
+              },
+            ),
+          )}
+        </>,
+      )}
 
-      {/* Subject Dropdown Modal */}
-      <Modal visible={showSubjectDropdown} transparent animationType="none" onRequestClose={() => setShowSubjectDropdown(false)}>
-        <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowSubjectDropdown(false)} />
-          <Animated.View 
-            style={[
-              styles.bottomSheet,
-              { transform: [{ translateY: subjectSlideAnim.interpolate({ inputRange: [0, 1], outputRange: [500, 0] }) }] },
-            ]}
-          >
-            <View style={styles.sheetHandle} />
-            <Text style={styles.sheetTitle}>Select Subject</Text>
-            <ScrollView style={styles.sheetContent}>
-              <TouchableOpacity
-                style={[styles.sheetItem, selectedSubject === 'all' && styles.sheetItemActive]}
-                onPress={() => { setSelectedSubject('all'); setShowSubjectDropdown(false); }}
-              >
-                <Text style={[styles.sheetItemText, selectedSubject === 'all' && styles.sheetItemTextActive]}>All Subjects</Text>
-                {selectedSubject === 'all' && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-              {subjects.map((subject) => (
-                <TouchableOpacity
-                  key={subject.id}
-                  style={[styles.sheetItem, selectedSubject === subject.id && styles.sheetItemActive]}
-                  onPress={() => { setSelectedSubject(subject.id); setShowSubjectDropdown(false); }}
-                >
-                  <Text style={[styles.sheetItemText, selectedSubject === subject.id && styles.sheetItemTextActive]}>{subject.subject_name}</Text>
-                  {selectedSubject === subject.id && <Text style={styles.checkmark}>✓</Text>}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Animated.View>
-        </Animated.View>
-      </Modal>
-
-      {/* Resource Viewer Modal */}
-      <Modal visible={!!selectedResource && !!viewerType} animationType="slide" onRequestClose={handleCloseViewer}>
+      {/* Resource viewer */}
+      <Modal
+        visible={!!selectedResource && !!viewerType}
+        animationType="slide"
+        onRequestClose={handleCloseViewer}
+      >
         {selectedResource && viewerType === 'video' && selectedResource.content_url && (
-          <VideoPlayer uri={selectedResource.content_url} title={selectedResource.title} onClose={handleCloseViewer} />
+          <VideoPlayer
+            uri={selectedResource.content_url}
+            title={selectedResource.title}
+            onClose={handleCloseViewer}
+          />
         )}
         {selectedResource && viewerType === 'pdf' && selectedResource.content_url && (
-          <PDFViewer uri={selectedResource.content_url} title={selectedResource.title} onClose={handleCloseViewer} />
+          <PDFViewer
+            uri={selectedResource.content_url}
+            title={selectedResource.title}
+            onClose={handleCloseViewer}
+          />
         )}
       </Modal>
 
-      {/* Add Resource Modal */}
+      {/* Add / edit modal */}
       {canManage && (
         <AddResourceModal
           visible={showAddModal}
-          onDismiss={() => { setShowAddModal(false); setEditingResource(null); }}
+          onDismiss={() => {
+            setShowAddModal(false);
+            setEditingResource(null);
+          }}
           onSuccess={handleResourceSuccess}
           editingResource={editingResource}
         />
@@ -587,257 +908,370 @@ export default function ResourcesScreen() {
   );
 }
 
+// ═════════════════════════════════════════════════════════════════════
+// STYLES
+// ═════════════════════════════════════════════════════════════════════
+
 const createStyles = (
   colors: ThemeColors,
   spacing: any,
   borderRadius: any,
   typography: any,
   shadows: any,
-  isDark: boolean
-) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.secondary,
-  },
-  filterSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: 12,
-    paddingBottom: spacing.md,
-  },
-  filterRow: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...shadows.sm,
-    borderWidth: isDark ? 1 : 0,
-    borderColor: colors.border.DEFAULT,
-  },
-  filterItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 0,
-    overflow: 'hidden',
-  },
-  filterIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.primary.main,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.xs,
-    flexShrink: 0,
-  },
-  filterContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-  filterValue: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
-  filterDivider: {
-    width: 1,
-    height: 28,
-    backgroundColor: colors.border.DEFAULT,
-    marginHorizontal: spacing.xs,
-    flexShrink: 0,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  sectionCount: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-  },
-  resourcesContent: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  resourceCard: {
-    marginBottom: 6,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  cardPressable: {
-    backgroundColor: colors.surface.primary,
-  },
-  cardPressed: {
-    opacity: 0.7,
-  },
-  cardInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    gap: 12,
-  },
-  resourceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  resourceDetails: {
-    flex: 1,
-  },
-  resourceTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  resourceSubtitle: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  metaText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.text.secondary,
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.text.secondary,
-    marginHorizontal: 6,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: colors.background.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  chipLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.text.secondary,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionBtn: {
-    padding: 8,
-    borderRadius: 6,
-  },
-  floatingButton: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary.main,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.lg,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.surface.overlay,
-    justifyContent: 'flex-end',
-  },
-  bottomSheet: {
-    backgroundColor: colors.surface.primary,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-    maxHeight: '70%',
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: colors.border.DEFAULT,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: spacing.md,
-  },
-  sheetTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  sheetContent: {
-    paddingHorizontal: spacing.lg,
-    maxHeight: 400,
-  },
-  sheetItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: 12,
-    marginBottom: spacing.xs,
-    backgroundColor: colors.background.secondary,
-  },
-  sheetItemActive: {
-    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
-  },
-  sheetItemText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.medium,
-    flex: 1,
-  },
-  sheetItemTextActive: {
-    color: colors.primary.main,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  checkmark: {
-    fontSize: typography.fontSize.lg,
-    color: colors.primary.main,
-    fontWeight: typography.fontWeight.bold,
-  },
-  createResourceButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary.main,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.button,
-  },
-  createResourceButtonText: {
-    color: colors.text.inverse,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-  },
-});
+  isDark: boolean,
+) =>
+  StyleSheet.create({
+    // ── Layout ─────────────────────────────────────────────────
+    container: {
+      flex: 1,
+      backgroundColor: colors.background.secondary,
+    },
+    listContent: {
+      paddingBottom: 100,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: spacing.xl,
+    },
+
+    // ── Hero Header ────────────────────────────────────────────
+    headerContainer: {
+      paddingBottom: spacing.xs,
+    },
+    heroSection: {
+      marginHorizontal: spacing.md,
+      marginTop: spacing.md,
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.xl,
+      padding: spacing.lg,
+      ...shadows.sm,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: colors.border.DEFAULT,
+    },
+    heroTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: spacing.lg,
+    },
+    heroTitle: {
+      fontSize: 22,
+      fontWeight: '700' as const,
+      color: colors.text.primary,
+      letterSpacing: -0.3,
+    },
+    heroSubtitle: {
+      fontSize: typography.fontSize.sm,
+      fontWeight: '500' as const,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    heroIconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: colors.primary[100],
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+
+    // ── Quick Stats ────────────────────────────────────────────
+    quickStatsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.background.secondary,
+      borderRadius: borderRadius.lg,
+      paddingVertical: 12,
+      paddingHorizontal: spacing.sm,
+    },
+    quickStat: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    quickStatValue: {
+      fontSize: 20,
+      fontWeight: '700' as const,
+      color: colors.text.primary,
+    },
+    quickStatLabel: {
+      fontSize: 11,
+      fontWeight: '500' as const,
+      color: colors.text.tertiary,
+      marginTop: 1,
+    },
+    quickStatDivider: {
+      width: 1,
+      height: 28,
+      borderRadius: 0.5,
+    },
+
+    // ── Filter Chips ───────────────────────────────────────────
+    filterChipsRow: {
+      flexDirection: 'row',
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.sm,
+      gap: spacing.sm,
+    },
+    filterChip: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.full,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: colors.border.light,
+    },
+    filterChipActive: {
+      borderColor: colors.primary.main,
+      backgroundColor: isDark ? colors.primary[100] : `${colors.primary.main}08`,
+    },
+    filterChipText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '500' as const,
+      color: colors.text.secondary,
+    },
+    filterChipTextActive: {
+      color: colors.primary.main,
+      fontWeight: '600' as const,
+    },
+
+    // ── Pill Tabs ──────────────────────────────────────────────
+    tabBarContainer: {
+      paddingTop: spacing.sm,
+    },
+    tabBarScroll: {
+      paddingHorizontal: spacing.md,
+      gap: 8,
+    },
+    tabPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: borderRadius.full,
+      backgroundColor: colors.surface.primary,
+      borderWidth: 1,
+      borderColor: colors.border.light,
+    },
+    tabPillActive: {
+      backgroundColor: colors.primary.main,
+      borderColor: colors.primary.main,
+    },
+    tabPillText: {
+      fontSize: 13,
+      fontWeight: '600' as const,
+      color: colors.text.secondary,
+    },
+    tabPillTextActive: {
+      color: colors.text.inverse,
+    },
+    tabCountBadge: {
+      paddingHorizontal: 7,
+      paddingVertical: 1,
+      borderRadius: 10,
+      minWidth: 22,
+      alignItems: 'center',
+    },
+    tabCountText: {
+      fontSize: 11,
+      fontWeight: '700' as const,
+    },
+
+    // ── Resource Card ──────────────────────────────────────────
+    resourceCard: {
+      marginHorizontal: spacing.md,
+      marginTop: spacing.sm,
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      ...shadows.sm,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: colors.border.DEFAULT,
+      overflow: 'hidden',
+      flexDirection: 'row',
+    },
+    resourceCardPressed: {
+      opacity: 0.75,
+      transform: [{ scale: 0.985 }],
+    },
+    accentBar: {
+      width: 4,
+    },
+    cardBody: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      gap: 12,
+    },
+    resourceIconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    resourceContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    resourceTitle: {
+      fontSize: 15,
+      fontWeight: '600' as const,
+      color: colors.text.primary,
+      lineHeight: 20,
+    },
+    resourceDescription: {
+      fontSize: 13,
+      fontWeight: '400' as const,
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    resourceMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 6,
+      flexWrap: 'wrap',
+      gap: 4,
+    },
+    typeBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 6,
+    },
+    typeBadgeText: {
+      fontSize: 11,
+      fontWeight: '700' as const,
+    },
+    dot: {
+      width: 3,
+      height: 3,
+      borderRadius: 1.5,
+      backgroundColor: colors.text.tertiary,
+      marginHorizontal: 2,
+    },
+    metaText: {
+      fontSize: 12,
+      fontWeight: '500' as const,
+      color: colors.text.tertiary,
+    },
+    cardActions: {
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 4,
+    },
+    actionButton: {
+      padding: 6,
+      borderRadius: 8,
+    },
+
+    // ── FAB ────────────────────────────────────────────────────
+    fab: {
+      position: 'absolute',
+      bottom: 24,
+      right: 20,
+      width: 56,
+      height: 56,
+      borderRadius: 16,
+      backgroundColor: colors.primary.main,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...shadows.lg,
+      // Subtle elevation boost on iOS
+      ...(Platform.OS === 'ios' && {
+        shadowOffset: { width: 0, height: 6 },
+        shadowRadius: 12,
+        shadowOpacity: 0.2,
+      }),
+    },
+
+    // ── Add button (empty state) ───────────────────────────────
+    addButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.primary.main,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: borderRadius.full,
+    },
+    addButtonText: {
+      color: colors.text.inverse,
+      fontSize: 15,
+      fontWeight: '600' as const,
+    },
+
+    // ── Bottom Sheet ───────────────────────────────────────────
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: colors.surface.primary,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.xl + 16,
+      maxHeight: '65%',
+    },
+    sheetHandle: {
+      width: 36,
+      height: 4,
+      backgroundColor: colors.border.DEFAULT,
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginBottom: spacing.md,
+    },
+    sheetTitle: {
+      fontSize: 18,
+      fontWeight: '700' as const,
+      color: colors.text.primary,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    sheetScroll: {
+      paddingHorizontal: spacing.md,
+      maxHeight: 380,
+    },
+    sheetOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: spacing.md,
+      borderRadius: 12,
+      marginBottom: 4,
+      backgroundColor: 'transparent',
+    },
+    sheetOptionActive: {
+      backgroundColor: isDark ? colors.primary[100] : `${colors.primary.main}0A`,
+    },
+    sheetOptionText: {
+      fontSize: 15,
+      fontWeight: '500' as const,
+      color: colors.text.primary,
+    },
+    sheetOptionTextActive: {
+      color: colors.primary.main,
+      fontWeight: '600' as const,
+    },
+    sheetOptionSubtitle: {
+      fontSize: 12,
+      color: colors.text.tertiary,
+      marginTop: 2,
+    },
+    sheetCheck: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.primary.main,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+  });

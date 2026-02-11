@@ -6,16 +6,11 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import * as Notifications from 'expo-notifications';
 import { useAuth } from '../contexts/AuthContext';
 import {
     registerForPushNotifications,
-    savePushToken,
-    removePushToken,
-    sendTestNotification as sendTest,
-    addNotificationReceivedListener,
-    addNotificationResponseListener,
-    type PushNotificationToken,
+    syncTokenWithServer,
+    addNotificationListeners,
 } from '../services/notifications';
 import { log } from '../lib/logger';
 
@@ -37,97 +32,68 @@ export function useNotifications(): UseNotificationsReturn {
     const tokenRef = useRef<string | null>(null);
     const registrationAttempted = useRef(false);
 
+    const register = useCallback(async () => {
+        const result = await registerForPushNotifications();
+
+        if (result.success && result.token) {
+            setPushToken(result.token);
+            tokenRef.current = result.token;
+            setPermissionGranted(true);
+
+            await syncTokenWithServer(result.token);
+
+            // Persist for logout cleanup
+            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+            await AsyncStorage.setItem('push-token-v2', result.token);
+        } else {
+            log.warn('Push registration skipped or failed', { error: result.error });
+            setPermissionGranted(false);
+        }
+    }, []);
+
     // Register for push notifications when authenticated
     useEffect(() => {
         if (status !== 'signedIn' || !user?.id) {
-            // Clear token state if not signed in
             setPushToken(null);
             tokenRef.current = null;
             registrationAttempted.current = false;
             return;
         }
 
-        // Only attempt registration once per session
-        if (registrationAttempted.current) return;
+        if (registrationAttempted.current) {
+            return;
+        }
         registrationAttempted.current = true;
 
-        const register = async () => {
-            log.debug('[useNotifications] Starting token registration for user', { userId: user.id });
-
-            const tokenData = await registerForPushNotifications();
-
-            log.debug('[useNotifications] Token registration result', {
-                hasToken: !!tokenData,
-                deviceType: tokenData?.deviceType
-            });
-
-            if (tokenData) {
-                setPushToken(tokenData.token);
-                tokenRef.current = tokenData.token;
-                setPermissionGranted(true);
-
-                // Save to Supabase
-                log.debug('[useNotifications] Saving token to Supabase');
-                await savePushToken(user.id, tokenData);
-
-                // Store in AsyncStorage for logout cleanup
-                const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-                await AsyncStorage.setItem('pushToken', tokenData.token);
-            } else {
-                log.debug('[useNotifications] No token received - check permissions or device compatibility');
-            }
-        };
-
         register();
-    }, [status, user?.id]);
+    }, [status, user?.id, register]);
 
-    // Handle notification received while app is foregrounded
+    // Handle listeners
     useEffect(() => {
-        const subscription = addNotificationReceivedListener((notification) => {
-            log.info('Notification received in foreground', {
-                title: notification.request.content.title,
-                data: notification.request.content.data,
-            });
-        });
+        const cleanup = addNotificationListeners(
+            (notification) => {
+                log.info('Notification received in foreground', {
+                    title: notification.request.content.title,
+                });
+            },
+            (response) => {
+                const data = response.notification.request.content.data;
+                log.info('Notification tapped', { data });
+            }
+        );
 
-        return () => subscription.remove();
-    }, []);
-
-    // Handle notification tap
-    useEffect(() => {
-        const subscription = addNotificationResponseListener((response) => {
-            const data = response.notification.request.content.data;
-            log.info('Notification tapped', { data });
-
-            // TODO: Handle navigation based on notification type
-            // For example, navigate to attendance screen if type is 'attendance'
-        });
-
-        return () => subscription.remove();
-    }, []);
-
-    // Cleanup token on unmount (logout handled separately)
-    useEffect(() => {
-        return () => {
-            // Token cleanup is handled by signOut in AuthContext
-        };
+        return cleanup;
     }, []);
 
     const sendTestNotification = useCallback(async () => {
-        await sendTest();
+        const { sendLocalTestNotification } = await import('../services/notifications');
+        await sendLocalTestNotification('Test Notification 🎉', 'Everything is configured correctly!');
     }, []);
 
     const reRegister = useCallback(async () => {
         if (!user?.id) return;
-
-        const tokenData = await registerForPushNotifications();
-        if (tokenData) {
-            setPushToken(tokenData.token);
-            tokenRef.current = tokenData.token;
-            setPermissionGranted(true);
-            await savePushToken(user.id, tokenData);
-        }
-    }, [user?.id]);
+        await register();
+    }, [user?.id, register]);
 
     return {
         pushToken,
@@ -135,12 +101,4 @@ export function useNotifications(): UseNotificationsReturn {
         sendTestNotification,
         reRegister,
     };
-}
-
-/**
- * Get the current push token reference (for use in signOut).
- * This is an internal export for AuthContext cleanup.
- */
-export function getCurrentPushToken(): string | null {
-    return null; // Will be managed via AsyncStorage if needed
 }

@@ -4,6 +4,20 @@ import { supabase } from '../lib/supabase';
 
 type AttendanceRecord = Awaited<ReturnType<typeof api.attendance.getByClass>>[number];
 
+/** Response from mark-attendance edge function */
+export interface MarkAttendanceResponse {
+  success: boolean;
+  updated: number;
+  inserted: number;
+  data: unknown;
+  notifications: {
+    sent: boolean;
+    presentCount: number;
+    absentCount: number;
+    error?: string;
+  };
+}
+
 export function useClassAttendance(
   classId?: string,
   date?: string,
@@ -76,19 +90,24 @@ export function useClassAttendanceSummary(classId?: string, startDate?: string, 
 /**
  * Mark attendance for students.
  * Server-controlled: validates, writes to DB, and triggers notifications.
+ * Returns notification status so UI can show appropriate feedback.
  */
 export function useMarkAttendance() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (records: AttendanceInput[]) => {
+    mutationFn: async (records: AttendanceInput[]): Promise<MarkAttendanceResponse> => {
       // Call server-side Edge Function (Level 3: Server-Controlled)
-      const { data, error } = await supabase.functions.invoke('mark-attendance', {
+      const { data, error } = await supabase.functions.invoke<MarkAttendanceResponse>('mark-attendance', {
         body: { records }
       });
 
       if (error) {
         throw new Error(error.message || 'Failed to mark attendance');
+      }
+
+      if (!data) {
+        throw new Error('No response from server');
       }
 
       return data;
@@ -113,8 +132,8 @@ export function useMarkAttendance() {
         });
       }
     },
-    onError: (error) => {
-      console.error('Failed to mark attendance:', error);
+    onError: () => {
+      // Handled by mutation caller
     },
     retry: 2,
     retryDelay: 1000,
@@ -162,8 +181,8 @@ export function useMarkBulkAttendance() {
         queryKey: ['attendance', 'stats']
       });
     },
-    onError: (error) => {
-      console.error('Failed to mark bulk attendance:', error);
+    onError: () => {
+      // Handled by mutation caller
     },
     retry: 2,
     retryDelay: 1000,

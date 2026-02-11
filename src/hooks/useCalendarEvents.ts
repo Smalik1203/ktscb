@@ -56,6 +56,31 @@ export function useHolidayCheck(schoolCode: string, date: string, classInstanceI
   });
 }
 
+// Hook to fetch holidays for a date range (for attendance integration)
+export function useSchoolHolidays(schoolCode: string | null, startDate: string, endDate: string) {
+  return useQuery({
+    queryKey: ['school-holidays', schoolCode, startDate, endDate],
+    queryFn: async () => {
+      // Fetch holidays that overlap with [startDate, endDate]
+      // start_date <= endDate AND (end_date >= startDate OR end_date is null and start_date >= startDate)
+      const { data, error } = await supabase
+        .from(DB.tables.schoolCalendarEvents)
+        .select('start_date, end_date, title')
+        .eq('school_code', schoolCode!)
+        .eq('event_type', 'holiday')
+        .eq('is_active', true)
+        .lte('start_date', endDate)
+        .or(`end_date.gte.${startDate},end_date.is.null`);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!schoolCode && !!startDate && !!endDate,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
 // Hook to create calendar event
 export function useCreateCalendarEvent() {
   const queryClient = useQueryClient();
@@ -65,7 +90,7 @@ export function useCreateCalendarEvent() {
       const { data, error } = await supabase
         .from(DB.tables.schoolCalendarEvents)
         .insert([eventData])
-        .select()
+        .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
         .single();
 
       if (error) throw error;
@@ -89,7 +114,7 @@ export function useUpdateCalendarEvent() {
         .from(DB.tables.schoolCalendarEvents)
         .update(eventData)
         .eq('id', id)
-        .select()
+        .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
         .single();
 
       if (error) throw error;

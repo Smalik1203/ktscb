@@ -22,10 +22,9 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
-import { useCreateTest } from '../../hooks/tests';
+import { useCreateTestWithQuestions } from '../../hooks/tests';
 import { generateQuestionsFromImage, GeneratedQuestion } from '../../services/aiTestGeneratorFetch';
 import { TestInput } from '../../types/test.types';
-import { api } from '../../services/api';
 
 // UI Components
 import { Heading, Body } from '../../ui';
@@ -43,14 +42,14 @@ const STEP_LABELS = ['Upload', 'Configure', 'Review'];
 
 export default function AITestGeneratorScreen() {
   const router = useRouter();
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const { colors, spacing, borderRadius, shadows, isDark } = useTheme();
 
   // Data hooks
   const { data: classes = [] } = useClasses(profile?.school_code || '');
   const { data: subjectsResult } = useSubjects(profile?.school_code || '');
   const subjects = subjectsResult?.data || [];
-  const createTest = useCreateTest();
+  const createTest = useCreateTestWithQuestions();
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(0);
@@ -118,7 +117,7 @@ export default function AITestGeneratorScreen() {
         setGeneratedQuestions([]); // Reset if new image
       }
     } catch (error) {
-      console.error('Error picking image:', error);
+      // Image picker failed
       Alert.alert('Error', 'Failed to pick image');
     }
   };
@@ -156,7 +155,7 @@ export default function AITestGeneratorScreen() {
       setStreamingText('');
       goToStep(2); // Move to review step
     } catch (error: any) {
-      console.error('Error generating:', error);
+      // Generation failed
       // Check for network errors
       if (error.message?.includes('network') || error.message?.includes('Network') || error.name === 'TypeError') {
         Alert.alert(
@@ -200,23 +199,18 @@ export default function AITestGeneratorScreen() {
     try {
       setSaving(true);
 
-      const testData: TestInput = {
+      const testData: Omit<TestInput, 'school_code' | 'created_by'> = {
         title: testTitle.trim(),
         description: `AI-generated test with ${generatedQuestions.length} questions`,
         class_instance_id: selectedClassId,
         subject_id: selectedSubjectId,
-        school_code: profile?.school_code || '',
         test_type: 'quiz',
         test_mode: 'online',
         time_limit_seconds: generatedQuestions.length * 60,
         status: 'active',
-        created_by: user?.id || '',
       };
 
-      const createdTest = await createTest.mutateAsync(testData);
-
       const questionsToCreate = generatedQuestions.map((q, index) => ({
-        test_id: createdTest.id,
         question_text: q.question_text,
         question_type: 'mcq',
         options: q.options,
@@ -226,7 +220,10 @@ export default function AITestGeneratorScreen() {
         order_index: index,
       }));
 
-      await api.testQuestions.createBulk(questionsToCreate);
+      const createdTest = await createTest.mutateAsync({
+        testData,
+        questionsData: questionsToCreate,
+      });
 
       setSaveSheetVisible(false);
 
@@ -246,7 +243,7 @@ export default function AITestGeneratorScreen() {
         ]
       );
     } catch (error: any) {
-      console.error('Error saving test:', error);
+      // Save failed
       // Check for network errors
       if (error.message?.includes('network') || error.message?.includes('Network') || error.name === 'TypeError') {
         Alert.alert(

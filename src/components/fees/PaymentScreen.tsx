@@ -43,6 +43,7 @@ const PAYMENT_METHODS = [
 
 export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }: PaymentScreenProps) {
   const { colors, typography, spacing, borderRadius, shadows } = useTheme();
+  const { profile } = useAuth();
   const styles = useMemo(
     () => createStyles(colors, typography, spacing, borderRadius, shadows),
     [colors, typography, spacing, borderRadius, shadows]

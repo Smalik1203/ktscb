@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+import { supabase as supabaseClient } from '../lib/supabase';
 import { useRef, useEffect } from 'react';
 import { TimetableSlot } from '../services/api';
 import { useSyllabusLoader } from './useSyllabusLoader';
+
+const supabase = supabaseClient as any;
 
 export interface UnifiedTimetableResult {
   slots: TimetableSlot[];
@@ -16,6 +18,7 @@ export interface UnifiedTimetableResult {
   markSlotTaught: (slotId: string) => Promise<void>;
   unmarkSlotTaught: (slotId: string) => Promise<void>;
   updateSlotStatus: (slotId: string, status: 'planned' | 'done' | 'cancelled') => Promise<void>;
+  copyTimetable: (payload: CopyTimetablePayload) => Promise<{ copiedCount: number; skippedDates: string[] }>;
   displayPeriodNumber: number;
   taughtSlotIds: Set<string>;
 }
@@ -62,10 +65,19 @@ export interface QuickGeneratePayload {
   }[];
 }
 
+export interface CopyTimetablePayload {
+  class_instance_id: string;
+  school_code: string;
+  source_date: string;           // Date to copy FROM
+  selected_days: number[];       // Days of week to copy to (0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat)
+  weeks_ahead: number;           // Number of weeks to copy ahead (1-8)
+  replace_existing: boolean;     // Whether to replace existing slots on target dates
+}
+
 export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCode?: string): UnifiedTimetableResult {
   const queryClient = useQueryClient();
   const abortControllerRef = useRef<AbortController | null>(null);
-  
+
   // Load syllabus data for chapter and topic names
   const { syllabusContentMap } = useSyllabusLoader(classId, schoolCode);
 
@@ -81,9 +93,9 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
     queryKey: ['unifiedTimetable', classId, dateStr],
     queryFn: async () => {
       if (!classId || !dateStr) return { slots: [], taughtSlotIds: new Set<string>() };
-      
+
       abortControllerRef.current = new AbortController();
-      
+
       // Fetch timetable slots for the selected date - scoped by school_code
       const { data: slotsData, error: slotsError } = await supabase
         .from('timetable_slots')
@@ -160,14 +172,18 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
         throw progressError;
       }
 
-      const taughtSlotIds = new Set((progressData || []).map(p => p.timetable_slot_id));
+      const taughtSlotIds = new Set<string>(
+        (progressData || [])
+          .map((p: any) => p.timetable_slot_id)
+          .filter((id: any): id is string => typeof id === 'string' && id.length > 0)
+      );
 
       // Combine slots with subject and teacher data
       const enrichedSlots = slotsData.map(slot => {
         // Get chapter and topic names from syllabus content map
         const chapterContent = slot.syllabus_chapter_id ? syllabusContentMap?.get(`chapter_${slot.syllabus_chapter_id}`) : null;
         const topicContent = slot.syllabus_topic_id ? syllabusContentMap?.get(`topic_${slot.syllabus_topic_id}`) : null;
-        
+
         return {
           ...slot,
           subject_name: slot.subject_id ? subjectsMap.get(slot.subject_id)?.subject_name : null,
@@ -185,7 +201,6 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
     gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache longer
     retry: 2, // Reduce retries for faster failure feedback
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: true, // ✅ Ensures fresh data when user returns to app
     refetchOnMount: true, // ✅ Ensures fresh data on screen load
     // ❌ Removed refetchInterval - no more aggressive polling
     // User gets fresh data when it matters (on focus/mount) without wasting resources
@@ -211,13 +226,13 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
     for (let i = 0; i < allSlots.length; i++) {
       const slot = allSlots[i];
       const newPeriodNumber = i + 1; // Start from 1, no 0s
-      
+
       if (slot.period_number !== newPeriodNumber) {
         const { error } = await supabase
           .from('timetable_slots')
           .update({ period_number: newPeriodNumber })
           .eq('id', slot.id);
-        
+
         if (error) {
           throw error;
         }
@@ -260,7 +275,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
           .from('timetable_slots')
           .update({ start_time: updates.end_time })
           .eq('id', nextSlot.id);
-        
+
         if (nextError) {
           // Log warning but don't fail the operation
         }
@@ -275,7 +290,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
           .from('timetable_slots')
           .update({ end_time: updates.start_time })
           .eq('id', prevSlot.id);
-        
+
         if (prevError) {
           // Log warning but don't fail the operation
         }
@@ -498,7 +513,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
           .eq('end_time', slot.end_time)
           .limit(1)
           .maybeSingle();
-        
+
         if (!existing) {
           slotsToInsert.push(slot);
         }
@@ -567,7 +582,6 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
       });
 
       if (error) {
-        console.error('[markSlotTaught] RPC error:', error);
         throw error;
       }
     },
@@ -605,7 +619,6 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
       });
 
       if (error) {
-        console.error('[unmarkSlotTaught] RPC error:', error);
         throw error;
       }
     },
@@ -639,6 +652,138 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
     },
   });
 
+  // Copy timetable mutation - copies slots from source date to target date range
+  const copyTimetableMutation = useMutation({
+    mutationFn: async (payload: CopyTimetablePayload): Promise<{ copiedCount: number; skippedDates: string[] }> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
+      // Fetch source slots
+      const { data: sourceSlots, error: fetchError } = await supabase
+        .from('timetable_slots')
+        .select('slot_type, name, start_time, end_time, subject_id, teacher_id, syllabus_chapter_id, syllabus_topic_id, plan_text')
+        .eq('class_instance_id', payload.class_instance_id)
+        .eq('class_date', payload.source_date)
+        .eq('school_code', payload.school_code)
+        .order('start_time', { ascending: true });
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (!sourceSlots || sourceSlots.length === 0) {
+        throw new Error('No timetable slots found on the source date');
+      }
+
+      // Generate list of target dates based on selected weekdays and weeks ahead
+      const targetDates: string[] = [];
+      const sourceDate = new Date(payload.source_date);
+
+      // Calculate dates for each selected weekday over the specified weeks
+      for (let week = 0; week < payload.weeks_ahead; week++) {
+        for (const dayOfWeek of payload.selected_days) {
+          // Calculate the date for this weekday in this week
+          const weekStart = new Date(sourceDate);
+          weekStart.setDate(sourceDate.getDate() + (week * 7));
+
+          // Find the next occurrence of this weekday from the week start
+          const currentDay = weekStart.getDay();
+          let daysUntilTarget = dayOfWeek - currentDay;
+          if (daysUntilTarget < 0) daysUntilTarget += 7;
+          if (week === 0 && daysUntilTarget === 0) {
+            // Skip if it's the source date itself in the first week
+            continue;
+          }
+
+          const targetDate = new Date(weekStart);
+          targetDate.setDate(weekStart.getDate() + daysUntilTarget);
+          const dateStr = targetDate.toISOString().split('T')[0];
+
+          // Skip the source date itself and avoid duplicates
+          if (dateStr !== payload.source_date && !targetDates.includes(dateStr)) {
+            targetDates.push(dateStr);
+          }
+        }
+      }
+
+      let copiedCount = 0;
+      const skippedDates: string[] = [];
+
+      for (const targetDate of targetDates) {
+        // Check if target date already has slots
+        const { data: existingSlots } = await supabase
+          .from('timetable_slots')
+          .select('id')
+          .eq('class_instance_id', payload.class_instance_id)
+          .eq('class_date', targetDate)
+          .eq('school_code', payload.school_code)
+          .limit(1);
+
+        if (existingSlots && existingSlots.length > 0) {
+          if (payload.replace_existing) {
+            // Delete existing slots
+            const { error: deleteError } = await supabase
+              .from('timetable_slots')
+              .delete()
+              .eq('class_instance_id', payload.class_instance_id)
+              .eq('class_date', targetDate)
+              .eq('school_code', payload.school_code);
+
+            if (deleteError) {
+              skippedDates.push(targetDate);
+              continue;
+            }
+          } else {
+            // Skip this date
+            skippedDates.push(targetDate);
+            continue;
+          }
+        }
+
+        // Create new slots for this target date
+        const newSlots = sourceSlots.map((slot, index) => ({
+          school_code: payload.school_code,
+          class_instance_id: payload.class_instance_id,
+          class_date: targetDate,
+          period_number: index + 1,
+          slot_type: slot.slot_type,
+          name: slot.name,
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          subject_id: slot.subject_id,
+          teacher_id: slot.teacher_id,
+          syllabus_chapter_id: slot.syllabus_chapter_id,
+          syllabus_topic_id: slot.syllabus_topic_id,
+          plan_text: slot.plan_text,
+          status: 'planned' as const,
+          created_by: userId,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('timetable_slots')
+          .insert(newSlots);
+
+        if (insertError) {
+          skippedDates.push(targetDate);
+          continue;
+        }
+
+        copiedCount += newSlots.length;
+      }
+
+      return { copiedCount, skippedDates };
+    },
+    onSuccess: () => {
+      // Invalidate all timetable queries for better cross-device sync
+      queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
+      // Also invalidate syllabus progress queries
+      queryClient.invalidateQueries({ queryKey: ['syllabus_progress'] });
+    },
+  });
+
   // Manual refresh function for better sync
   const refreshData = async () => {
     await queryClient.invalidateQueries({ queryKey: ['unifiedTimetable'] });
@@ -658,6 +803,7 @@ export function useUnifiedTimetable(classId?: string, dateStr?: string, schoolCo
     markSlotTaught: (slotId: string) => markSlotTaughtMutation.mutateAsync(slotId),
     unmarkSlotTaught: (slotId: string) => unmarkSlotTaughtMutation.mutateAsync(slotId),
     updateSlotStatus: (slotId: string, status: 'planned' | 'done' | 'cancelled') => updateSlotStatusMutation.mutateAsync({ slotId, status }),
+    copyTimetable: (payload: CopyTimetablePayload) => copyTimetableMutation.mutateAsync(payload),
     displayPeriodNumber: (slots?.slots || []).filter(slot => slot.slot_type === 'period').length,
     taughtSlotIds: slots?.taughtSlotIds || new Set<string>(),
   };
@@ -673,7 +819,7 @@ function generateSlots(payload: QuickGeneratePayload, userId: string): any[] {
     // Add period
     const periodStart = currentTime;
     const periodEnd = addMinutes(periodStart, payload.periodDurationMin);
-    
+
     slots.push({
       school_code: payload.school_code,
       class_instance_id: payload.class_instance_id,
@@ -699,7 +845,7 @@ function generateSlots(payload: QuickGeneratePayload, userId: string): any[] {
     if (breakConfig) {
       const breakStart = currentTime;
       const breakEnd = addMinutes(breakStart, breakConfig.durationMin);
-      
+
       slots.push({
         school_code: payload.school_code,
         class_instance_id: payload.class_instance_id,

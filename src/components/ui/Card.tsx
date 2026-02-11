@@ -12,9 +12,9 @@ interface CardProps {
   padding?: 'none' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export function Card({ 
-  children, 
-  style, 
+export function Card({
+  children,
+  style,
   variant = 'default',
   onPress,
   disabled = false,
@@ -64,7 +64,7 @@ export function Card({
   const getVariantStyles = useMemo((): any => {
     // In dark mode, use subtle borders instead of shadows for depth
     const darkModeBorder = isDark ? { borderWidth: 1, borderColor: colors.border.light } : {};
-    
+
     switch (variant) {
       case 'elevated':
         return {
@@ -125,9 +125,9 @@ export function Card({
 
   if (onPress && !disabled) {
     return (
-      <Animated.View 
+      <Animated.View
         style={[
-          { 
+          {
             transform: [{ scale: scaleAnim }],
             opacity: opacityAnim,
           }
@@ -158,7 +158,8 @@ export function Card({
 const styles = StyleSheet.create({
   card: {
     borderRadius: borderRadius.card, // 12px ClassBridge
-    overflow: 'hidden',
+    // Note: overflow 'hidden' removed to prevent shadow clipping on Surface components
+    // If content overflow clipping is needed, wrap inner content in a View with overflow: 'hidden'
   },
   disabled: {
     opacity: 0.6,

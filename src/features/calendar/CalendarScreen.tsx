@@ -81,7 +81,7 @@ export default function CalendarScreen() {
       if (error) throw error;
       setClasses(data || []);
     } catch (error) {
-      console.error('Error fetching classes:', error);
+      // Classes fetch failed
     } finally {
       setLoadingClasses(false);
     }
@@ -114,7 +114,7 @@ export default function CalendarScreen() {
     try {
       await refetch();
     } catch (err) {
-      console.error('Error refreshing calendar:', err);
+      // Calendar refresh failed
     } finally {
       setRefreshing(false);
     }
@@ -189,7 +189,12 @@ export default function CalendarScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteEventMutation.mutate(event.id),
+          onPress: () => {
+            deleteEventMutation.mutate(event.id);
+            setIsEventModalVisible(false);
+            setIsHolidayModalVisible(false);
+            setSelectedEvent(null);
+          },
         },
       ]
     );
@@ -209,7 +214,7 @@ export default function CalendarScreen() {
       setSelectedEvent(null);
     } catch (error) {
       Alert.alert('Error', 'Failed to save event');
-      console.error('Error saving event:', error);
+      // Event save failed - alert shown above
     }
   };
 
@@ -583,6 +588,7 @@ export default function CalendarScreen() {
           setSelectedEvent(null);
         }}
         onSuccess={handleSaveEvent}
+        onDelete={selectedEvent ? () => handleDeleteEvent(selectedEvent) : undefined}
       />
 
       {/* Holiday Form Modal */}
@@ -599,6 +605,7 @@ export default function CalendarScreen() {
           setSelectedEvent(null);
         }}
         onSuccess={handleSaveEvent}
+        onDelete={selectedEvent ? () => handleDeleteEvent(selectedEvent) : undefined}
       />
 
       {/* Floating Add Button */}

@@ -83,7 +83,7 @@ export default function StudentSyllabusTab() {
           setSelectedSubjectId(firstSubject.id);
         }
       } catch (error) {
-        console.error('Error loading subjects:', error);
+        // Subjects load failed - error state handled
       } finally {
         setLoading(false);
       }
@@ -106,7 +106,7 @@ export default function StudentSyllabusTab() {
       setTree(treeRes);
       setTaught(progressRes);
     } catch (error) {
-      console.error('Error loading syllabus:', error);
+      // Syllabus load failed - error state handled
     } finally {
       setRefreshing(false);
     }

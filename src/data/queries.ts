@@ -343,20 +343,33 @@ export async function listAdmins(
 export async function listStudents(
   classInstanceId: string,
   schoolCode: string,
-  options?: { signal?: AbortSignal; from?: number; to?: number; limit?: number }
+  options?: { signal?: AbortSignal; from?: number; to?: number; limit?: number; search?: string }
 ): Promise<QueryResult<StudentLite[]>> {
   try {
     const limit = options?.limit ?? 50; // Default to 50 (was 499)
     const from = options?.from ?? 0;
     const to = from + limit - 1;
-    
-    const { data, error } = await supabase
+
+    let query = supabase
       .from(DB.tables.student)
       .select('id, student_code, full_name, email, phone, class_instance_id, school_code, created_at')
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.schoolCode, schoolCode)
       .order('full_name', { ascending: true })
       .range(from, to);
+
+    const search = options?.search?.trim();
+    if (search) {
+      const filter = [
+        `full_name.ilike.%${search}%`,
+        `email.ilike.%${search}%`,
+        `student_code.ilike.%${search}%`,
+        `phone.ilike.%${search}%`,
+      ].join(',');
+      query = query.or(filter);
+    }
+
+    const { data, error } = await query;
     
     if (error) {
       return {
@@ -493,7 +506,7 @@ export async function getAttendanceOverview(
     
     const { data, error } = await supabase
       .from(DB.tables.attendance)
-      .select('*')
+      .select('id, student_id, class_instance_id, status, date, marked_by, created_at, school_code, marked_by_role_code, updated_at')
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.schoolCode, schoolCode)
       .gte('date', startDate)
@@ -546,7 +559,7 @@ export async function saveAttendance(
     const { data, error } = await supabase
       .from(DB.tables.attendance)
       .insert(records)
-      .select();
+      .select('id, student_id, class_instance_id, status, date, marked_by, created_at, school_code, marked_by_role_code, updated_at');
     
     if (error) {
       return {
@@ -571,7 +584,7 @@ export async function checkHoliday(
   try {
     let query = supabase
       .from(DB.tables.schoolCalendarEvents)
-      .select('*')
+      .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
       .eq(DB.columns.schoolCode, schoolCode)
       .eq('start_date', date)
       .eq('is_active', true);
@@ -629,10 +642,35 @@ export async function getStudentFees(
     const { data: planData, error: planError } = await supabase
       .from(DB.tables.feeStudentPlans)
       .select(`
-        *,
+        id,
+        school_code,
+        student_id,
+        class_instance_id,
+        academic_year_id,
+        status,
+        created_by,
+        created_at,
         items:${DB.tables.feeStudentPlanItems}(
-          *,
-          component:${DB.tables.feeComponentTypes}(*)
+          id,
+          plan_id,
+          component_type_id,
+          quantity,
+          meta,
+          created_at,
+          amount_inr,
+          component:${DB.tables.feeComponentTypes}(
+            id,
+            school_code,
+            code,
+            name,
+            is_recurring,
+            period,
+            is_optional,
+            meta,
+            created_by,
+            created_at,
+            default_amount_inr
+          )
         )
       `)
       .eq('student_id', studentId)
@@ -752,8 +790,23 @@ export async function getClassStudentsFees(
     const { data: plans } = await supabase
       .from(DB.tables.feeStudentPlans)
       .select(`
-        *,
-        items:${DB.tables.feeStudentPlanItems}(*)
+        id,
+        school_code,
+        student_id,
+        class_instance_id,
+        academic_year_id,
+        status,
+        created_by,
+        created_at,
+        items:${DB.tables.feeStudentPlanItems}(
+          id,
+          plan_id,
+          component_type_id,
+          quantity,
+          meta,
+          created_at,
+          amount_inr
+        )
       `)
       .in('student_id', studentIds)
       .eq(DB.columns.academicYearId, academicYearId)
@@ -763,7 +816,7 @@ export async function getClassStudentsFees(
     // Get all payments for these students
     const { data: payments } = await supabase
       .from(DB.tables.feePayments)
-      .select('*')
+      .select('id, student_id, plan_id, component_type_id, payment_date, payment_method, transaction_id, receipt_number, remarks, school_code, created_by, created_at, updated_at, recorded_by_name, amount_inr, invoice_id, invoice_item_id, recorded_by_user_id, recorded_at')
       .in('student_id', studentIds)
       .eq(DB.columns.schoolCode, schoolCode);
     
@@ -851,7 +904,7 @@ export async function getFeeComponentTypes(schoolCode: string, options?: { signa
   try {
     const { data, error } = await supabase
       .from(DB.tables.feeComponentTypes)
-      .select('*')
+      .select('id, school_code, code, name, is_recurring, period, is_optional, meta, created_by, created_at, default_amount_inr')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('name', { ascending: true })
       .range(options?.from ?? 0, options?.to ?? 99);
@@ -889,7 +942,7 @@ export async function recordPayment(payment: FeePaymentInsert): Promise<QueryRes
     const { data, error } = await supabase
       .from(DB.tables.feePayments)
       .insert(payment)
-      .select()
+      .select('id, student_id, plan_id, component_type_id, payment_date, payment_method, transaction_id, receipt_number, remarks, school_code, created_by, created_at, updated_at, recorded_by_name, amount_inr, invoice_id, invoice_item_id, recorded_by_user_id, recorded_at')
       .maybeSingle();
     
     if (error) {
@@ -926,7 +979,7 @@ export async function listResources(
   try {
     let query = supabase
       .from(DB.tables.learningResources)
-      .select('*')
+      .select('id, title, description, resource_type, content_url, file_size, school_code, class_instance_id, subject_id, uploaded_by, created_at, updated_at')
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.schoolCode, schoolCode)
       .order('created_at', { ascending: false })
@@ -953,6 +1006,40 @@ export async function listResources(
   }
 }
 
+export async function listResourcesBySchool(
+  schoolCode: string,
+  subjectId?: string,
+  options?: { signal?: AbortSignal; from?: number; to?: number }
+): Promise<QueryResult<DomainLearningResource[]>> {
+  try {
+    let query = supabase
+      .from(DB.tables.learningResources)
+      .select('id, title, description, resource_type, content_url, file_size, school_code, class_instance_id, subject_id, uploaded_by, created_at, updated_at')
+      .eq(DB.columns.schoolCode, schoolCode)
+      .order('created_at', { ascending: false })
+      .range(options?.from ?? 0, options?.to ?? 49);
+
+    if (subjectId) {
+      query = query.eq('subject_id', subjectId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      return {
+        data: null,
+        error: mapError(error, { queryName: 'listResourcesBySchool', table: 'learning_resources' }),
+      };
+    }
+
+    const normalized = normalizeLearningResources(data);
+    return { data: normalized.data, error: null, warnings: normalized.warnings };
+  } catch (err) {
+    const mappedError = mapError(err, { queryName: 'listResourcesBySchool' });
+    return { data: null, error: mappedError };
+  }
+}
+
 export async function listQuizzes(
   classInstanceId: string,
   schoolCode: string,
@@ -962,7 +1049,7 @@ export async function listQuizzes(
   try {
     let query = supabase
       .from(DB.tables.tests)
-      .select('*')
+      .select('id, title, description, class_instance_id, subject_id, school_code, test_type, time_limit_seconds, created_by, created_at, allow_reattempts, chapter_id, test_mode, test_date, status, max_marks')
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.schoolCode, schoolCode)
       .order('created_at', { ascending: false })
@@ -1010,7 +1097,7 @@ export async function getQuizDetails(testId: string, options?: { signal?: AbortS
   try {
     const { data: test, error: testError } = await supabase
       .from(DB.tables.tests)
-      .select('*')
+      .select('id, title, description, class_instance_id, subject_id, school_code, test_type, time_limit_seconds, created_by, created_at, allow_reattempts, chapter_id, test_mode, test_date, status, max_marks')
       .eq('id', testId)
       .maybeSingle();
     
@@ -1030,7 +1117,7 @@ export async function getQuizDetails(testId: string, options?: { signal?: AbortS
     
     const { data: questions, error: questionsError } = await supabase
       .from(DB.tables.testQuestions)
-      .select('*')
+      .select('id, test_id, question_text, question_type, options, correct_index, correct_text, created_at, correct_answer, points, order_index')
       .eq('test_id', testId)
       .order('order_index', { ascending: true });
     
@@ -1188,7 +1275,7 @@ export async function listCalendarEvents(
     
     let query = supabase
       .from(DB.tables.schoolCalendarEvents)
-      .select('*')
+      .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
       .eq(DB.columns.schoolCode, schoolCode)
       .eq('is_active', true)
       .gte('start_date', startDate)
@@ -1242,7 +1329,7 @@ export async function listTasks(
   try {
     const { data, error } = await supabase
       .from(DB.tables.tasks)
-      .select('*')
+      .select('id, school_code, academic_year_id, class_instance_id, subject_id, title, description, priority, assigned_date, due_date, max_marks, instructions, attachments, is_active, created_by, created_at, updated_at')
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq(DB.columns.academicYearId, academicYearId)
       .eq(DB.columns.schoolCode, schoolCode)
@@ -1271,7 +1358,7 @@ export async function listSubjects(schoolCode: string, options?: { signal?: Abor
   try {
     const { data, error } = await supabase
       .from(DB.tables.subjects)
-      .select('*')
+      .select('id, subject_name, school_code, created_by, created_at, subject_name_norm')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('subject_name', { ascending: true })
       .range(options?.from ?? 0, options?.to ?? 199);

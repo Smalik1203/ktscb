@@ -1,11 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { View, ScrollView, StyleSheet, TouchableOpacity, TextInput as RNTextInput, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Text, Modal, Portal } from 'react-native-paper';
-import { UserPlus, Trash2, Edit, X, Search } from 'lucide-react-native';
+import { Trash2, Edit, X } from 'lucide-react-native';
 import { spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
-import { Card, Button, Input, EmptyState } from '../../components/ui';
+import { Button, Input, EmptyState, Badge, SearchBar, SegmentedControl } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import { AccessDenied } from '../../components/common/AccessDenied';
@@ -24,10 +24,17 @@ export default function AddAdminScreen() {
   
   const schoolCode = profile?.school_code;
 
+  // Search query (server-side)
+  const [adminSearch, setAdminSearch] = useState('');
+
   // Queries
   const [adminPage, setAdminPage] = useState(1);
   const adminPageSize = 25;
-  const { data: adminsResponse, isLoading, error, refetch } = useAdmins(schoolCode, { page: adminPage, pageSize: adminPageSize });
+  const { data: adminsResponse, isLoading, error, refetch } = useAdmins(schoolCode, {
+    page: adminPage,
+    pageSize: adminPageSize,
+    search: adminSearch,
+  });
   const [mode, setMode] = useState<'create' | 'list'>('create');
 
   // Extract data from pagination response
@@ -36,23 +43,11 @@ export default function AddAdminScreen() {
   const totalPages = Math.ceil(totalAdmins / adminPageSize);
 
   // Reset to page 1 when search changes
-  const [adminSearch, setAdminSearch] = useState('');
   useEffect(() => {
     setAdminPage(1);
   }, [adminSearch]);
 
-  // Search & filter
-  const norm = (s: string) => s.trim().toLowerCase();
-  const filteredAdmins = useMemo(() => {
-    if (!adminSearch.trim()) return admins;
-    const q = norm(adminSearch);
-    return admins.filter((a: any) =>
-      norm(a.full_name || '').includes(q) ||
-      norm(a.email || '').includes(q) ||
-      norm(a.phone || '').includes(q) ||
-      norm(a.admin_code || '').includes(q)
-    );
-  }, [admins, adminSearch]);
+  // Search handled in SQL (no client-side filtering)
   const createMutation = useCreateAdmin(schoolCode);
   const updateMutation = useUpdateAdmin(schoolCode);
   const deleteMutation = useDeleteAdmin(schoolCode);
@@ -213,20 +208,20 @@ export default function AddAdminScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Segment */}
-        <View style={styles.segment}>
-          <TouchableOpacity style={[styles.segmentItem, mode === 'create' && styles.segmentItemActive]} onPress={() => setMode('create')}>
-            <Text style={[styles.segmentText, mode === 'create' && styles.segmentTextActive]}>Create</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.segmentItem, mode === 'list' && styles.segmentItemActive]} onPress={() => setMode('list')}>
-            <Text style={[styles.segmentText, mode === 'list' && styles.segmentTextActive]}>Existing</Text>
-          </TouchableOpacity>
-        </View>
+        <SegmentedControl
+          value={mode}
+          onChange={(value) => setMode(value as 'create' | 'list')}
+          options={[
+            { label: 'Create', value: 'create' },
+            { label: 'Existing', value: 'list' },
+          ]}
+          containerStyle={styles.segment}
+        />
 
         {/* Create Admin Form */}
         {mode === 'create' && (
-        <Card style={styles.card}>
+        <View style={styles.section}>
           <View style={styles.cardHeader}>
-            <UserPlus size={24} color={colors.primary[600]} />
             <Text style={styles.cardTitle}>Add Admin</Text>
           </View>
 
@@ -279,38 +274,26 @@ export default function AddAdminScreen() {
 
             {/* Moved primary action to sticky footer */}
           </View>
-        </Card>
+        </View>
         )}
 
         {/* Admins List */}
         {mode === 'list' && (
-        <Card style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Existing Admins</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{totalAdmins}</Text>
-            </View>
+        <View style={styles.section}>
+          <View style={styles.listHeaderRow}>
+            <Text style={styles.listTitle}>Admins</Text>
+            <Badge variant="primary">{totalAdmins}</Badge>
           </View>
 
           {/* Search */}
-          <View style={styles.searchRow}>
-            <Search size={18} color={colors.text.tertiary} />
-            <RNTextInput
-              style={styles.searchInput}
-              placeholder="Search admins by name, email, phone, code"
-              placeholderTextColor={colors.text.tertiary}
-              value={adminSearch}
-              onChangeText={setAdminSearch}
-            />
-            {adminSearch.length > 0 && (
-              <TouchableOpacity onPress={() => setAdminSearch('')}>
-                <X size={18} color={colors.text.tertiary} />
-              </TouchableOpacity>
-            )}
-          </View>
+          <SearchBar
+            value={adminSearch}
+            onChangeText={setAdminSearch}
+            placeholder="Search admins by name, email, phone, code"
+          />
 
           <ThreeStateView
-            state={isLoading ? 'loading' : error ? 'error' : filteredAdmins.length === 0 ? 'empty' : 'success'}
+            state={isLoading ? 'loading' : error ? 'error' : admins.length === 0 ? 'empty' : 'success'}
             loadingMessage="Loading admins..."
             errorMessage="Failed to load admins"
             errorDetails={(error as any)?.message}
@@ -318,7 +301,7 @@ export default function AddAdminScreen() {
             onRetry={() => refetch()}
           >
             <View style={styles.adminList}>
-              {filteredAdmins.map((admin) => (
+              {admins.map((admin) => (
                 <View key={admin.id} style={styles.adminCard}>
                   <View style={styles.adminInfo}>
                     <Text style={styles.adminName}>{admin.full_name}</Text>
@@ -355,7 +338,7 @@ export default function AddAdminScreen() {
               onPageChange={setAdminPage}
             />
           )}
-        </Card>
+        </View>
         )}
       </ScrollView>
 
@@ -442,7 +425,7 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.md,
+    padding: spacing.sm,
     paddingBottom: spacing.xl * 2 + 64,
   },
   formRow: {
@@ -452,50 +435,22 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   formCol: {
     flex: 1,
   },
-  card: {
+  section: {
     marginBottom: spacing.md,
-    padding: spacing.md,
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   cardTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.semibold as any,
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.text.primary,
-    marginLeft: spacing.sm,
     flex: 1,
-  },
-  badge: {
-    backgroundColor: colors.primary[100],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.full,
-  },
-  badgeText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold as any,
-    color: colors.primary[700],
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
   },
   form: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   submitButton: {
     marginTop: spacing.md,
@@ -512,54 +467,41 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     ...shadows.md,
   },
   segment: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface.secondary,
-    padding: 4,
-    borderRadius: borderRadius.full,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  segmentItem: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderRadius: borderRadius.full,
-  },
-  segmentItemActive: {
-    backgroundColor: colors.surface.primary,
-    ...shadows.sm,
-  },
-  segmentText: {
-    color: colors.text.secondary,
-    fontWeight: '600',
-  },
-  segmentTextActive: {
-    color: colors.text.primary,
+    marginBottom: spacing.lg,
   },
   adminList: {
-    gap: spacing.md,
+    gap: 0,
+  },
+  listHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  listTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
   },
   adminCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border.light,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
   },
   adminInfo: {
     flex: 1,
   },
   adminName: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold as any,
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.text.primary,
     marginBottom: spacing.xs,
   },
   adminDetail: {
-    fontSize: typography.fontSize.sm,
+    fontSize: 13,
     color: colors.text.secondary,
     marginBottom: spacing.xs / 2,
   },
@@ -579,7 +521,7 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   adminMetaRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.xs,
+    marginTop: 2,
   },
   adminActions: {
     flexDirection: 'row',
@@ -588,21 +530,20 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   actionButton: {
     padding: spacing.sm,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.surface.primary,
-    ...shadows.sm,
+    backgroundColor: 'transparent',
   },
   modal: {
     backgroundColor: colors.surface.primary,
-    marginHorizontal: spacing.xl,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
     maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   modalTitle: {
     fontSize: typography.fontSize.xl,
@@ -610,12 +551,12 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     color: colors.text.primary,
   },
   modalContent: {
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   modalActions: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   modalButton: {
     flex: 1,

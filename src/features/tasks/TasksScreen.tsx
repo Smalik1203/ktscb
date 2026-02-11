@@ -60,7 +60,6 @@ function TaskDetailModal({ visible, onDismiss, task, classes, subjects, colors, 
         Alert.alert('Error', 'File URL not available');
       }
     } catch (error) {
-      console.error('Error opening file:', error);
       Alert.alert('Error', 'Failed to open file');
     }
   };
@@ -562,7 +561,6 @@ export default function TasksScreen() {
       });
       Alert.alert('Success', 'Task unsubmitted successfully');
     } catch (error) {
-      console.error('Failed to unsubmit task:', error);
       Alert.alert('Error', 'Failed to unsubmit task. Please try again.');
     }
   };
@@ -658,7 +656,6 @@ export default function TasksScreen() {
                 }
                 Alert.alert('Success', `${downloadedCount} file(s) downloaded successfully!`);
               } catch (error) {
-                console.error('Download error:', error);
                 Alert.alert('Error', 'Failed to download some files');
               }
             }
@@ -1390,7 +1387,6 @@ export default function TasksScreen() {
                           );
                         }
                       } catch (error) {
-                        console.error('Error opening file:', error);
                         Alert.alert('Error', 'Failed to open file. Please try again.');
                       }
                     } else {
@@ -1459,7 +1455,7 @@ export default function TasksScreen() {
                       </View>
                     )}
                     onError={(syntheticEvent) => {
-                      console.error('WebView error:', syntheticEvent.nativeEvent);
+                      // WebView load error
                       Alert.alert(
                         'Error',
                         'Failed to load file. Would you like to open it in an external app?',

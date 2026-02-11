@@ -305,7 +305,7 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
   }, []);
 
   const handleYoutubeError = useCallback((e: any) => {
-    console.warn('YouTube error:', e);
+    // YouTube player error - fallback to WebView
     // Fallback to WebView
     setSource('webview-fallback');
     setPlayerState('loading');

@@ -1,12 +1,45 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+  <!--
+    Mark hardware features as OPTIONAL so Play Store does not filter out
+    tablets, IFPs (EDLA), kiosks, or large-format devices that lack them.
+    The app still uses these features where available; it simply won't
+    be hidden on devices that don't have them.
+  -->
+  <!-- Touchscreen: required=true by DEFAULT in every Android app. IFPs may report differently. -->
+  <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+  <!-- Telephony: IFPs and tablets are not phones -->
+  <uses-feature android:name="android.hardware.telephony" android:required="false"/>
+  <!-- Camera: IFPs typically have no camera; prevents merged-manifest surprises -->
+  <uses-feature android:name="android.hardware.camera" android:required="false"/>
+  <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+  <!-- Microphone: implied by RECORD_AUDIO permission -->
+  <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+  <!-- Vibrator: implied by VIBRATE permission -->
+  <uses-feature android:name="android.hardware.vibrator" android:required="false"/>
+  <!-- Sensors: IFPs/panels lack accelerometer, compass, GPS -->
+  <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false"/>
+  <uses-feature android:name="android.hardware.sensor.compass" android:required="false"/>
+  <uses-feature android:name="android.hardware.location" android:required="false"/>
+  <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
+  <uses-feature android:name="android.hardware.location.network" android:required="false"/>
+  <!-- Connectivity: IFPs may use ethernet only, no WiFi/Bluetooth -->
+  <uses-feature android:name="android.hardware.wifi" android:required="false"/>
+  <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+  <!-- Explicitly support ALL screen sizes including IFP/large panels -->
+  <supports-screens
+    android:smallScreens="true"
+    android:normalScreens="true"
+    android:largeScreens="true"
+    android:xlargeScreens="true"
+    android:anyDensity="true"/>
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
   <uses-permission android:name="android.permission.INTERNET"/>
   <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
   <uses-permission android:name="android.permission.RECORD_AUDIO"/>
   <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
   <uses-permission android:name="android.permission.VIBRATE"/>
-  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
   <queries>
     <intent>
       <action android:name="android.intent.action.VIEW"/>
@@ -15,6 +48,10 @@
     </intent>
   </queries>
   <application android:name=".MainApplication" android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:allowBackup="true" android:theme="@style/AppTheme" android:supportsRtl="true" android:enableOnBackInvokedCallback="false" android:fullBackupContent="@xml/secure_store_backup_rules" android:dataExtractionRules="@xml/secure_store_data_extraction_rules">
+    <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notification_icon_color"/>
+    <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/notification_icon"/>
+    <meta-data android:name="expo.modules.notifications.default_notification_color" android:resource="@color/notification_icon_color"/>
+    <meta-data android:name="expo.modules.notifications.default_notification_icon" android:resource="@drawable/notification_icon"/>
     <meta-data android:name="expo.modules.updates.ENABLED" android:value="false"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>

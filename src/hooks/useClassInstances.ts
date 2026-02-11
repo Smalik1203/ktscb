@@ -109,7 +109,7 @@ export function useCreateClassInstance(schoolCode: string | null | undefined) {
       // Check if class template exists
       const { data: existingClass } = await supabase
         .from('classes')
-        .select('*')
+        .select('id')
         .eq('grade', Number(input.grade))
         .eq('section', input.section)
         .eq('school_code', input.school_code)
@@ -128,7 +128,7 @@ export function useCreateClassInstance(schoolCode: string | null | undefined) {
             school_code: input.school_code,
             created_by: input.created_by,
           })
-          .select()
+          .select('id, school_name, school_code, grade, section, created_by, created_at')
           .single();
 
         if (classError) {
@@ -163,7 +163,7 @@ export function useCreateClassInstance(schoolCode: string | null | undefined) {
           grade: Number(input.grade),
           section: input.section,
         })
-        .select()
+        .select('id, class_id, class_teacher_id, created_by, school_code, created_at, academic_year_id, grade, section')
         .single();
 
       if (insertError) {

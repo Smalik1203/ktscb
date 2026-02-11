@@ -81,7 +81,7 @@ export default function AssessmentsScreen() {
             return JSON.parse(attempt.answers);
           } catch (parseError) {
             // Invalid JSON - return empty object
-            console.warn('Failed to parse attempt answers JSON:', parseError);
+            // Invalid JSON - return empty object
             return {};
           }
         }

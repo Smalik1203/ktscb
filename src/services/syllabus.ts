@@ -196,7 +196,7 @@ export async function addChapter(syllabusId: UUID, payload: Pick<SyllabusChapter
 	const { data, error } = await supabase
 		.from('syllabus_chapters')
 		.insert({ syllabus_id: syllabusId, title: payload.title, description: payload.description || null, chapter_no: nextNo, created_by: createdBy } as Database['public']['Tables']['syllabus_chapters']['Insert'])
-		.select('*')
+		.select('id, syllabus_id, chapter_no, title, description, ref_code, created_by, created_at, updated_at')
 		.single();
 	if (error) throw error;
 	return data as unknown as SyllabusChapter;
@@ -210,7 +210,7 @@ export async function updateChapter(chapterId: UUID, payload: Partial<Pick<Sylla
 		.from('syllabus_chapters')
 		.update({ title: payload.title, description: payload.description })
 		.eq('id', chapterId)
-		.select('*')
+		.select('id, syllabus_id, chapter_no, title, description, ref_code, created_by, created_at, updated_at')
 		.single();
 	if (error) throw error;
 	return data as unknown as SyllabusChapter;
@@ -240,7 +240,7 @@ export async function addTopic(chapterId: UUID, payload: Pick<SyllabusTopic, 'ti
 	const { data, error } = await supabase
 		.from('syllabus_topics')
 		.insert({ chapter_id: chapterId, title: payload.title, description: payload.description || null, topic_no: nextNo, created_by: createdBy } as Database['public']['Tables']['syllabus_topics']['Insert'])
-		.select('*')
+		.select('id, chapter_id, topic_no, title, description, ref_code, created_by, created_at, updated_at')
 		.single();
 	if (error) throw error;
 	return data as unknown as SyllabusTopic;
@@ -254,7 +254,7 @@ export async function updateTopic(topicId: UUID, payload: Partial<Pick<SyllabusT
 		.from('syllabus_topics')
 		.update({ title: payload.title, description: payload.description })
 		.eq('id', topicId)
-		.select('*')
+		.select('id, chapter_id, topic_no, title, description, ref_code, created_by, created_at, updated_at')
 		.single();
 	if (error) throw error;
 	return data as unknown as SyllabusTopic;

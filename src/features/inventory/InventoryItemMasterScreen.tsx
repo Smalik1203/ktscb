@@ -124,12 +124,12 @@ export default function InventoryItemMasterScreen() {
           }
         } catch (parseError) {
           // Corrupted JSON - clear it
-          console.warn('Corrupted draft data in storage, clearing:', parseError);
+          // Corrupted JSON - clear it
           await AsyncStorage.removeItem(DRAFT_STORAGE_KEY);
         }
       }
     } catch (err) {
-      console.warn('Failed to load draft', err);
+      // Draft load failed - start fresh
     }
   };
 
@@ -139,7 +139,7 @@ export default function InventoryItemMasterScreen() {
       setDraftData(data);
       setHasDraft(true);
     } catch (err) {
-      console.warn('Failed to save draft', err);
+      // Draft save failed silently
     }
   };
 
@@ -149,7 +149,7 @@ export default function InventoryItemMasterScreen() {
       setDraftData(null);
       setHasDraft(false);
     } catch (err) {
-      console.warn('Failed to clear draft', err);
+      // Draft clear failed silently
     }
   };
 

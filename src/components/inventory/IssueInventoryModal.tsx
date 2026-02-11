@@ -6,8 +6,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal as RNModal } from 'react-native';
-import { Text, Portal, Modal, ActivityIndicator, SegmentedButtons } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal } from 'react-native';
+import { Text, Portal, Modal, ActivityIndicator, SegmentedButtons, TextInput } from 'react-native-paper';
 import { X, User, Users, Package, AlertCircle, Info } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -112,12 +112,12 @@ export function IssueInventoryModal({
         .eq('school_code', schoolCode)
         .in('role', ['admin', 'teacher', 'cb_admin'])
         .order('full_name');
-      
+
       if (!error && data) {
         setStaff(data);
       }
     } catch (err) {
-      console.error('Failed to load staff', err);
+      // Staff load failed
     } finally {
       setLoadingStaff(false);
     }
@@ -136,8 +136,8 @@ export function IssueInventoryModal({
   const totalCharge = useMemo(() => {
     if (!inventoryItem.is_chargeable || !inventoryItem.charge_amount) return null;
     const qty = parseInt(quantity) || 1;
-    const amount = chargeAmountOverride 
-      ? parseFloat(chargeAmountOverride) 
+    const amount = chargeAmountOverride
+      ? parseFloat(chargeAmountOverride)
       : inventoryItem.charge_amount;
     return amount * qty;
   }, [quantity, chargeAmountOverride, inventoryItem.charge_amount, inventoryItem.is_chargeable]);
@@ -147,10 +147,10 @@ export function IssueInventoryModal({
     if (!inventoryItem.must_be_returned || !inventoryItem.return_duration_days) return null;
     const date = new Date();
     date.setDate(date.getDate() + inventoryItem.return_duration_days);
-    return date.toLocaleDateString('en-IN', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
   }, [inventoryItem.must_be_returned, inventoryItem.return_duration_days]);
 
@@ -164,7 +164,7 @@ export function IssueInventoryModal({
       Alert.alert('Required', 'Please select a staff member');
       return;
     }
-    
+
     const qty = parseInt(quantity);
     if (!quantity || isNaN(qty) || qty <= 0) {
       Alert.alert('Invalid', 'Please enter a valid quantity');
@@ -206,12 +206,14 @@ export function IssueInventoryModal({
         serial_number: inventoryItem.track_serially ? serialNumber.trim() : undefined,
         charge_amount_override: chargeAmountOverride ? parseFloat(chargeAmountOverride) : undefined,
       });
-      
+
       Alert.alert('Success', 'Item issued successfully', [
-        { text: 'OK', onPress: () => {
-          onSuccess();
-          handleClose();
-        }},
+        {
+          text: 'OK', onPress: () => {
+            onSuccess();
+            handleClose();
+          }
+        },
       ]);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to issue item');
@@ -299,17 +301,22 @@ export function IssueInventoryModal({
               <>
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Class *</Text>
-                  <TouchableOpacity
-                    style={styles.pickerButton}
-                    onPress={() => setShowClassPicker(true)}
-                  >
-                    <Text style={styles.pickerButtonText}>
-                      {selectedClassId
+                  <TouchableOpacity onPress={() => setShowClassPicker(true)}>
+                    <TextInput
+                      mode="outlined"
+                      dense
+                      value={selectedClassId
                         ? classes.find((c: any) => c.id === selectedClassId)
                           ? `Grade ${classes.find((c: any) => c.id === selectedClassId)?.grade} - ${classes.find((c: any) => c.id === selectedClassId)?.section}`
                           : 'Select Class'
-                        : 'Select Class'}
-                    </Text>
+                        : ''}
+                      placeholder="Select Class"
+                      editable={false}
+                      right={<TextInput.Icon icon="chevron-down" />}
+                      style={styles.input}
+                      pointerEvents="none"
+                      contentStyle={{ backgroundColor: colors.surface.secondary }}
+                    />
                   </TouchableOpacity>
                 </View>
 
@@ -317,13 +324,15 @@ export function IssueInventoryModal({
                   <View style={styles.formGroup}>
                     <Text style={styles.label}>Student *</Text>
                     <View style={styles.searchContainer}>
-                      <Search size={18} color={colors.text.secondary} />
                       <TextInput
+                        mode="outlined"
+                        dense
                         style={styles.searchInput}
                         placeholder="Search students..."
                         value={studentSearch}
                         onChangeText={setStudentSearch}
-                        placeholderTextColor={colors.text.secondary}
+                        left={<TextInput.Icon icon={() => <Search size={18} color={colors.text.secondary} />} />}
+                        contentStyle={{ backgroundColor: colors.surface.secondary }}
                       />
                     </View>
                     <ScrollView style={styles.pickerList} nestedScrollEnabled>
@@ -358,13 +367,15 @@ export function IssueInventoryModal({
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Staff Member *</Text>
                 <View style={styles.searchContainer}>
-                  <Search size={18} color={colors.text.secondary} />
                   <TextInput
+                    mode="outlined"
+                    dense
                     style={styles.searchInput}
                     placeholder="Search staff..."
                     value={staffSearch}
                     onChangeText={setStaffSearch}
-                    placeholderTextColor={colors.text.secondary}
+                    left={<TextInput.Icon icon={() => <Search size={18} color={colors.text.secondary} />} />}
+                    contentStyle={{ backgroundColor: colors.surface.secondary }}
                   />
                 </View>
                 {loadingStaff ? (
@@ -400,13 +411,15 @@ export function IssueInventoryModal({
             <View style={styles.formGroup}>
               <Text style={styles.label}>Quantity *</Text>
               <TextInput
+                mode="outlined"
+                dense
                 style={styles.input}
                 placeholder="1"
                 value={quantity}
                 onChangeText={setQuantity}
                 keyboardType="numeric"
-                placeholderTextColor={colors.text.secondary}
                 editable={!inventoryItem.track_serially}
+                contentStyle={{ backgroundColor: colors.surface.secondary }}
               />
               {inventoryItem.track_serially && (
                 <Text style={styles.helperText}>
@@ -420,11 +433,13 @@ export function IssueInventoryModal({
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Serial Number *</Text>
                 <TextInput
+                  mode="outlined"
+                  dense
                   style={styles.input}
                   placeholder="Enter serial number"
                   value={serialNumber}
                   onChangeText={setSerialNumber}
-                  placeholderTextColor={colors.text.secondary}
+                  contentStyle={{ backgroundColor: colors.surface.secondary }}
                 />
               </View>
             )}
@@ -436,13 +451,16 @@ export function IssueInventoryModal({
                   Charge Amount {inventoryItem.allow_price_override ? '(Override)' : ''}
                 </Text>
                 <TextInput
+                  mode="outlined"
+                  dense
                   style={styles.input}
                   placeholder={inventoryItem.charge_amount?.toString() || '0.00'}
                   value={chargeAmountOverride}
                   onChangeText={setChargeAmountOverride}
                   keyboardType="decimal-pad"
-                  placeholderTextColor={colors.text.secondary}
                   editable={inventoryItem.allow_price_override}
+                  left={<TextInput.Affix text="₹" />}
+                  contentStyle={{ backgroundColor: colors.surface.secondary }}
                 />
                 <Text style={styles.helperText}>
                   Default: ₹{inventoryItem.charge_amount} per item
@@ -611,33 +629,12 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   segmentedButtons: {
     marginTop: spacing.sm,
   },
-  pickerButton: {
-    backgroundColor: colors.surface.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    minHeight: 48,
-    justifyContent: 'center',
-  },
-  pickerButtonText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
+
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.secondary,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
     marginBottom: spacing.sm,
-    gap: spacing.sm,
   },
   searchInput: {
-    flex: 1,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
+    backgroundColor: colors.surface.secondary,
   },
   pickerList: {
     maxHeight: 200,
@@ -670,14 +667,7 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   input: {
     backgroundColor: colors.surface.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
     fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-    minHeight: 48,
   },
   helperText: {
     fontSize: typography.fontSize.sm,

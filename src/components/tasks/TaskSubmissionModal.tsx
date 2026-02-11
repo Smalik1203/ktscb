@@ -95,7 +95,6 @@ export function TaskSubmissionModal({
         setImages([...images, ...newImages]);
       }
     } catch (error) {
-      console.error('Error picking image:', error);
       Alert.alert('Error', 'Failed to pick image');
     }
   };
@@ -118,7 +117,6 @@ export function TaskSubmissionModal({
         setAttachments([...attachments, ...newAttachments]);
       }
     } catch (error) {
-      console.error('Error picking document:', error);
       Alert.alert('Error', 'Failed to pick document');
     }
   };
@@ -202,7 +200,6 @@ export function TaskSubmissionModal({
         mimeType: file.mimeType,
       };
     } catch (error: any) {
-      console.error('Error uploading file:', error);
       throw new Error(`Failed to upload ${file.name}: ${error.message}`);
     }
   };
@@ -226,7 +223,6 @@ export function TaskSubmissionModal({
         uploadedFiles.push(uploaded as any);
       }
     } catch (error) {
-      console.error('Error uploading attachments:', error);
       throw error;
     } finally {
       setUploading(false);
@@ -272,7 +268,6 @@ export function TaskSubmissionModal({
               // Show success animation
               setShowSuccessAnimation(true);
             } catch (error: any) {
-              console.error('Error submitting task:', error);
               Alert.alert('Error', error.message || 'Failed to submit task');
             } finally {
               setSubmitting(false);

@@ -4,8 +4,8 @@
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, Alert, TouchableOpacity } from 'react-native';
-import { Text, Button, Portal, Modal, IconButton } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { Text, Button, Portal, Modal, IconButton, TextInput } from 'react-native-paper';
 import { X, Plus, Trash2, Users, Calendar, Receipt, Edit2 } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
@@ -100,9 +100,9 @@ export function GenerateFeesModal({
   const [generating, setGenerating] = useState(false);
 
   const addItem = () => {
-    setItems([...items, { 
-      id: Date.now().toString(), 
-      label: '', 
+    setItems([...items, {
+      id: Date.now().toString(),
+      label: '',
       amount: ''
     }]);
   };
@@ -124,9 +124,9 @@ export function GenerateFeesModal({
       updateItem(items[emptyIdx].id, 'label', preset.label);
       updateItem(items[emptyIdx].id, 'amount', preset.amount.toString());
     } else {
-      setItems([...items, { 
-        id: Date.now().toString(), 
-        label: preset.label, 
+      setItems([...items, {
+        id: Date.now().toString(),
+        label: preset.label,
         amount: preset.amount.toString()
       }]);
     }
@@ -136,7 +136,7 @@ export function GenerateFeesModal({
 
   const handleGenerate = async () => {
     const validItems = items.filter(i => i.label.trim() && parseFloat(i.amount));
-    
+
     if (validItems.length === 0) {
       Alert.alert('Error', 'Add at least one fee item');
       return;
@@ -176,8 +176,8 @@ export function GenerateFeesModal({
                 classInstanceId,
                 schoolCode,
                 billingPeriod,
-                validItems.map(i => ({ 
-                  label: i.label, 
+                validItems.map(i => ({
+                  label: i.label,
                   amount: parseFloat(i.amount)
                 })),
                 activeAcademicYear.id,
@@ -239,10 +239,10 @@ export function GenerateFeesModal({
                   <Calendar size={16} color={colors.text.secondary} />
                   <Text style={styles.infoLabel}>Due Date:</Text>
                   <Text style={styles.infoValue}>
-                    {dueDate.toLocaleDateString('en-IN', { 
-                      day: 'numeric', 
-                      month: 'long', 
-                      year: 'numeric' 
+                    {dueDate.toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
                     })}
                   </Text>
                   <TouchableOpacity
@@ -280,25 +280,29 @@ export function GenerateFeesModal({
               <Receipt size={16} color={colors.text.secondary} />
               <Text style={styles.fieldLabel}>Fee Items</Text>
             </View>
-            
+
             {items.map((item, idx) => (
               <View key={item.id} style={styles.itemRow}>
                 <TextInput
+                  mode="outlined"
+                  dense
                   style={styles.labelInput}
                   value={item.label}
                   onChangeText={(v) => updateItem(item.id, 'label', v)}
                   placeholder="Item name"
-                  placeholderTextColor={colors.text.tertiary}
+                  contentStyle={{ backgroundColor: colors.surface.primary }}
                 />
-                <View style={styles.amountInputWrap}>
-                  <Text style={styles.rupee}>₹</Text>
+                <View style={styles.amountContainer}>
                   <TextInput
+                    mode="outlined"
+                    dense
                     style={styles.amountInput}
                     value={item.amount}
                     onChangeText={(v) => updateItem(item.id, 'amount', v)}
                     placeholder="0"
                     keyboardType="decimal-pad"
-                    placeholderTextColor={colors.text.tertiary}
+                    left={<TextInput.Affix text="₹" />}
+                    contentStyle={{ backgroundColor: colors.surface.primary }}
                   />
                 </View>
                 <TouchableOpacity
@@ -493,29 +497,17 @@ const createStyles = (
   },
   labelInput: {
     flex: 2,
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
+    backgroundColor: colors.surface.primary,
+    fontSize: typography.fontSize.sm,
+    height: 48,
   },
-  amountInputWrap: {
+  amountContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.sm,
-  },
-  rupee: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
   },
   amountInput: {
-    flex: 1,
-    padding: spacing.sm,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
+    backgroundColor: colors.surface.primary,
+    fontSize: typography.fontSize.sm,
+    height: 48,
   },
   deleteBtn: {
     padding: spacing.xs,

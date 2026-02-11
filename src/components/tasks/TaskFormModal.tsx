@@ -1,4 +1,4 @@
-import React, { useState, useEffect , useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
@@ -122,7 +122,7 @@ export function TaskFormModal({
         }]);
       }
     } catch (error) {
-      console.error('Error picking document:', error);
+      // Document picker failed
       alert('Failed to pick document');
     }
   };
@@ -218,7 +218,6 @@ export function TaskFormModal({
         throw error;
       }
     } catch (error) {
-      console.error('Error uploading file:', error);
       throw error;
     }
   };
@@ -269,10 +268,10 @@ export function TaskFormModal({
       // Upload attachments if any
       if (attachments.length > 0) {
         try {
-          const uploadPromises = attachments.map(file => 
+          const uploadPromises = attachments.map(file =>
             uploadFileToStorage(file, taskId)
           );
-          
+
           uploadedAttachments = await Promise.all(uploadPromises) as any[];
 
           // Update task with attachment URLs via service (capability assertion happens there)
@@ -281,14 +280,14 @@ export function TaskFormModal({
             Alert.alert('Success', `Task created with ${uploadedAttachments.length} file(s)!`);
           } catch (updateError: any) {
             Alert.alert(
-              'Warning', 
+              'Warning',
               `Task created but failed to save attachments: ${updateError.message}. Please try editing the task to add files.`
             );
           }
         } catch (uploadError: any) {
-          console.error('Error uploading files:', uploadError);
+          // File upload failed - alert shown below
           Alert.alert(
-            'Warning', 
+            'Warning',
             `Task created but file upload failed: ${uploadError.message || 'Unknown error'}. Please try editing the task to add files.`
           );
         }
@@ -301,7 +300,7 @@ export function TaskFormModal({
       setUploadingStatus('');
       onDismiss();
     } catch (error) {
-      console.error('Failed to submit task:', error);
+      // Task submission failed
       setUploadProgress(0);
       setUploadingStatus('');
       alert('Failed to save task. Please try again.');
@@ -371,70 +370,64 @@ export function TaskFormModal({
 
           {/* Priority */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.label}>
-              Priority <Text style={styles.required}>*</Text>
-            </Text>
-            <TouchableOpacity
-              style={styles.selectButton}
-              onPress={() => setShowPriorityModal(true)}
-            >
-              <View style={styles.selectButtonContent}>
-                {priority && (
-                  <View style={[
-                    styles.priorityIndicator,
-                    { backgroundColor: PRIORITIES.find(p => p.value === priority)?.color }
-                  ]} />
-                )}
-                <Text style={[styles.selectButtonText, priority && styles.selectButtonTextSelected]}>
-                  {priority ? PRIORITIES.find(p => p.value === priority)?.label : 'Select Priority'}
-                </Text>
-              </View>
-              <X size={16} color={colors.text.secondary} style={{ transform: [{ rotate: '90deg' }] }} />
+            <TouchableOpacity onPress={() => setShowPriorityModal(true)}>
+              <TextInput
+                label="Priority"
+                value={priority ? PRIORITIES.find(p => p.value === priority)?.label : ''}
+                mode="outlined"
+                dense
+                editable={false}
+                pointerEvents="none"
+                style={styles.input}
+                outlineColor={colors.border.light}
+                right={<TextInput.Icon icon="chevron-down" color={colors.text.secondary} />}
+                textColor={colors.text.primary}
+              />
             </TouchableOpacity>
           </View>
 
           {/* Class */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.label}>
-              Class <Text style={styles.required}>*</Text>
-            </Text>
-            <TouchableOpacity
-              style={styles.selectButton}
-              onPress={() => setShowClassModal(true)}
-            >
-              <Text style={[styles.selectButtonText, selectedClassId && styles.selectButtonTextSelected]}>
-                {selectedClassId
+            <TouchableOpacity onPress={() => setShowClassModal(true)}>
+              <TextInput
+                label="Class"
+                value={selectedClassId
                   ? `Grade ${classes?.find(c => c.id === selectedClassId)?.grade} - Section ${classes?.find(c => c.id === selectedClassId)?.section}`
-                  : 'Select Class'}
-              </Text>
-              <X size={16} color={colors.text.secondary} style={{ transform: [{ rotate: '90deg' }] }} />
+                  : ''}
+                mode="outlined"
+                dense
+                editable={false}
+                pointerEvents="none"
+                style={styles.input}
+                outlineColor={colors.border.light}
+                right={<TextInput.Icon icon="chevron-down" color={colors.text.secondary} />}
+                textColor={colors.text.primary}
+              />
             </TouchableOpacity>
           </View>
 
           {/* Subject */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.label}>
-              Subject <Text style={styles.required}>*</Text>
-            </Text>
             <TouchableOpacity
-              style={[styles.selectButton, !selectedClassId && styles.selectButtonDisabled]}
               onPress={() => selectedClassId && setShowSubjectModal(true)}
               disabled={!selectedClassId}
             >
-              <Text style={[
-                styles.selectButtonText,
-                selectedSubjectId && styles.selectButtonTextSelected,
-                !selectedClassId && styles.selectButtonTextDisabled,
-              ]}>
-                {selectedSubjectId
+              <TextInput
+                label="Subject"
+                value={selectedSubjectId
                   ? subjects?.find(s => s.id === selectedSubjectId)?.subject_name
-                  : 'Select Subject'}
-              </Text>
-              <X size={16} color={colors.text.secondary} style={{ transform: [{ rotate: '90deg' }] }} />
+                  : ''}
+                placeholder={!selectedClassId ? "Select a class first" : ""}
+                mode="outlined"
+                dense
+                editable={false}
+                pointerEvents="none"
+                style={styles.input}
+                outlineColor={colors.border.light}
+                right={<TextInput.Icon icon="chevron-down" color={colors.text.secondary} />}
+                textColor={colors.text.primary}
+              />
             </TouchableOpacity>
-            {!selectedClassId && (
-              <Text style={styles.helperText}>Please select a class first</Text>
-            )}
           </View>
 
           {/* Schedule Section */}
@@ -445,28 +438,36 @@ export function TaskFormModal({
           {/* Date Row */}
           <View style={styles.row}>
             <View style={[styles.fieldContainer, styles.halfWidth]}>
-              <Text style={styles.label}>
-                Assigned Date <Text style={styles.required}>*</Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowAssignedDatePicker(true)}
-              >
-                <Calendar size={16} color={colors.text.secondary} />
-                <Text style={styles.dateText}>{formatDate(assignedDate)}</Text>
+              <TouchableOpacity onPress={() => setShowAssignedDatePicker(true)}>
+                <TextInput
+                  label="Assigned Date"
+                  value={formatDate(assignedDate)}
+                  mode="outlined"
+                  dense
+                  editable={false}
+                  pointerEvents="none"
+                  style={styles.input}
+                  outlineColor={colors.border.light}
+                  right={<TextInput.Icon icon={Calendar} size={20} color={colors.text.secondary} />}
+                  textColor={colors.text.primary}
+                />
               </TouchableOpacity>
             </View>
 
             <View style={[styles.fieldContainer, styles.halfWidth]}>
-              <Text style={styles.label}>
-                Due Date <Text style={styles.required}>*</Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.dateButton}
-                onPress={() => setShowDueDatePicker(true)}
-              >
-                <Calendar size={16} color={colors.text.secondary} />
-                <Text style={styles.dateText}>{formatDate(dueDate)}</Text>
+              <TouchableOpacity onPress={() => setShowDueDatePicker(true)}>
+                <TextInput
+                  label="Due Date"
+                  value={formatDate(dueDate)}
+                  mode="outlined"
+                  dense
+                  editable={false}
+                  pointerEvents="none"
+                  style={styles.input}
+                  outlineColor={colors.border.light}
+                  right={<TextInput.Icon icon={Calendar} size={20} color={colors.text.secondary} />}
+                  textColor={colors.text.primary}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -491,7 +492,7 @@ export function TaskFormModal({
             <Text style={styles.helperText}>
               Supported: Images, PDF, DOC, DOCX, TXT
             </Text>
-            
+
             {/* Upload Progress Indicator */}
             {submitting && uploadingStatus && (
               <View style={styles.uploadProgressContainer}>
@@ -500,14 +501,14 @@ export function TaskFormModal({
                   <Text style={styles.uploadStatusText}>{uploadingStatus}</Text>
                   <Text style={styles.uploadProgressText}>{Math.round(uploadProgress)}%</Text>
                 </View>
-                <ProgressBar 
-                  progress={uploadProgress / 100} 
-                  color={colors.primary[600]} 
+                <ProgressBar
+                  progress={uploadProgress / 100}
+                  color={colors.primary[600]}
                   style={styles.progressBar}
                 />
               </View>
             )}
-            
+
             {attachments.length > 0 && (
               <View style={styles.attachmentsList}>
                 {attachments.map((file, index) => (
@@ -727,267 +728,223 @@ export function TaskFormModal({
 
 const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
   StyleSheet.create({
-  modal: {
-    backgroundColor: colors.surface.primary,
-    margin: spacing.md,
-    borderRadius: borderRadius.lg,
-    maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    backgroundColor: colors.background.secondary,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    flex: 1,
-  },
-  headerIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold as any,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  headerSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-  },
-  content: {
-    padding: spacing.lg,
-  },
-  sectionHeader: {
-    marginBottom: spacing.md,
-    marginTop: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.bold as any,
-    color: colors.text.primary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  fieldContainer: {
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium as any,
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  required: {
-    color: colors.error[600],
-  },
-  input: {
-    backgroundColor: colors.surface.primary,
-    fontSize: typography.fontSize.base,
-  },
-  textArea: {
-    backgroundColor: colors.surface.primary,
-    minHeight: 100,
-    fontSize: typography.fontSize.base,
-    textAlignVertical: 'top',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  halfWidth: {
-    flex: 1,
-  },
-  selectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surface.primary,
-  },
-  selectButtonDisabled: {
-    opacity: 0.5,
-    backgroundColor: colors.background.secondary,
-  },
-  selectButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    flex: 1,
-  },
-  selectButtonText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-  },
-  selectButtonTextSelected: {
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.medium as any,
-  },
-  selectButtonTextDisabled: {
-    color: colors.text.secondary,
-  },
-  priorityIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  helperText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-  },
-  uploadProgressContainer: {
-    marginTop: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.primary[50],
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.primary[200],
-  },
-  uploadProgressHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  uploadStatusText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-    flex: 1,
-    fontWeight: typography.fontWeight.medium,
-  },
-  uploadProgressText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.primary[700],
-    fontWeight: typography.fontWeight.bold,
-  },
-  progressBar: {
-    height: 6,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.primary[100],
-  },
-  selectionModal: {
-    backgroundColor: colors.surface.primary,
-    margin: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: borderRadius.lg,
-    maxHeight: '70%',
-  },
-  selectionModalTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold as any,
-    color: colors.text.primary,
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
-  selectionList: {
-    maxHeight: 300,
-    marginBottom: spacing.md,
-  },
-  selectionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
-  },
-  selectionItemSelected: {
-    backgroundColor: colors.primary[50],
-  },
-  selectionItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  selectionItemText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  selectionItemTextSelected: {
-    color: colors.primary[600],
-    fontWeight: typography.fontWeight.semibold as any,
-  },
-  selectionModalButton: {
-    borderColor: colors.border.DEFAULT,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.surface.primary,
-  },
-  dateText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  uploadButton: {
-    borderColor: colors.primary[600],
-    borderStyle: 'dashed',
-  },
-  uploadButtonLabel: {
-    color: colors.primary[600],
-  },
-  attachmentsList: {
-    marginTop: spacing.sm,
-  },
-  attachmentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    padding: spacing.sm,
-    backgroundColor: colors.background.secondary,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.xs,
-  },
-  attachmentName: {
-    flex: 1,
-    fontSize: typography.fontSize.sm,
-    color: colors.text.primary,
-  },
-  charCount: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    textAlign: 'right',
-    marginTop: spacing.xs,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.light,
-    backgroundColor: colors.background.secondary,
-  },
-  cancelButton: {
-    flex: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  submitButton: {
-    flex: 1,
-    backgroundColor: colors.primary[600],
-    elevation: 2,
-  },
-});
+    modal: {
+      backgroundColor: colors.surface.primary,
+      margin: spacing.md,
+      borderRadius: borderRadius.lg,
+      maxHeight: '90%',
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.light,
+      backgroundColor: colors.background.secondary,
+    },
+    headerContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      flex: 1,
+    },
+    headerIconCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.primary[50],
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold as any,
+      color: colors.text.primary,
+      marginBottom: spacing.xs,
+    },
+    headerSubtitle: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+    },
+    content: {
+      padding: spacing.lg,
+    },
+    sectionHeader: {
+      marginBottom: spacing.md,
+      marginTop: spacing.sm,
+    },
+    sectionTitle: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.bold as any,
+      color: colors.text.primary,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    fieldContainer: {
+      marginBottom: spacing.sm,
+    },
+    label: {
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.medium as any,
+      color: colors.text.primary,
+      marginBottom: 4, // Reduced
+    },
+    required: {
+      color: colors.error[600],
+    },
+    input: {
+      backgroundColor: colors.surface.primary,
+      fontSize: typography.fontSize.sm,
+      height: 48,
+    },
+    textArea: {
+      backgroundColor: colors.surface.primary,
+      fontSize: typography.fontSize.sm,
+    },
+
+    row: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+    },
+    halfWidth: {
+      flex: 1,
+    },
+
+    priorityIndicator: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+    },
+    helperText: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.secondary,
+      marginTop: spacing.xs,
+    },
+
+    uploadProgressContainer: {
+      marginTop: spacing.md,
+      padding: spacing.md,
+      backgroundColor: colors.primary[50],
+      borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.primary[200],
+    },
+    uploadProgressHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+      gap: spacing.sm,
+    },
+    uploadStatusText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.primary,
+      flex: 1,
+      fontWeight: typography.fontWeight.medium,
+    },
+    uploadProgressText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.primary[700],
+      fontWeight: typography.fontWeight.bold,
+    },
+    progressBar: {
+      height: 6,
+      borderRadius: borderRadius.sm,
+      backgroundColor: colors.primary[100],
+    },
+    selectionModal: {
+      backgroundColor: colors.surface.primary,
+      margin: spacing.lg,
+      padding: spacing.lg,
+      borderRadius: borderRadius.lg,
+      maxHeight: '70%',
+    },
+    selectionModalTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.bold as any,
+      color: colors.text.primary,
+      marginBottom: spacing.md,
+      textAlign: 'center',
+    },
+    selectionList: {
+      maxHeight: 300,
+      marginBottom: spacing.md,
+    },
+    selectionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.DEFAULT,
+    },
+    selectionItemSelected: {
+      backgroundColor: colors.primary[50],
+    },
+    selectionItemContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+    },
+    selectionItemText: {
+      fontSize: typography.fontSize.base,
+      color: colors.text.primary,
+    },
+    selectionItemTextSelected: {
+      color: colors.primary[600],
+      fontWeight: typography.fontWeight.semibold as any,
+    },
+    selectionModalButton: {
+      borderColor: colors.border.DEFAULT,
+    },
+
+    uploadButton: {
+      borderColor: colors.primary[600],
+      borderStyle: 'dashed',
+    },
+    uploadButtonLabel: {
+      color: colors.primary[600],
+    },
+    attachmentsList: {
+      marginTop: spacing.sm,
+    },
+    attachmentItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      padding: spacing.sm,
+      backgroundColor: colors.background.secondary,
+      borderRadius: borderRadius.md,
+      marginBottom: spacing.xs,
+    },
+    attachmentName: {
+      flex: 1,
+      fontSize: typography.fontSize.sm,
+      color: colors.text.primary,
+    },
+    charCount: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.secondary,
+      textAlign: 'right',
+      marginTop: spacing.xs,
+    },
+    footer: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      padding: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.light,
+      backgroundColor: colors.background.secondary,
+    },
+    cancelButton: {
+      flex: 1,
+      borderColor: colors.border.DEFAULT,
+    },
+    submitButton: {
+      flex: 1,
+      backgroundColor: colors.primary[600],
+      elevation: 2,
+    },
+  });
 

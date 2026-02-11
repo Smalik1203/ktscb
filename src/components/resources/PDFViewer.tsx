@@ -57,7 +57,7 @@ export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
         data = JSON.parse(eventData);
       } catch (parseError) {
         // Invalid JSON - ignore message
-        console.warn('Invalid JSON in PDF viewer message:', parseError);
+        // Invalid JSON - ignore message
         return;
       }
       

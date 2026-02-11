@@ -17,37 +17,37 @@ export type Capability =
   // Dashboard
   | 'dashboard.view'
   | 'dashboard.admin_stats'
-  
+
   // Attendance
   | 'attendance.read'
   | 'attendance.read_own'
   | 'attendance.mark'
   | 'attendance.bulk_mark'
-  
+
   // Fees
   | 'fees.read'
   | 'fees.read_own'
   | 'fees.write'
   | 'fees.manage_components'
   | 'fees.record_payments'
-  
+
   // Timetable
   | 'timetable.read'
   | 'timetable.manage'
-  
+
   // Calendar
   | 'calendar.read'
   | 'calendar.manage'
-  
+
   // Resources
   | 'resources.read'
   | 'resources.manage'
-  
+
   // Syllabus
   | 'syllabus.read'
   | 'syllabus.manage'
   | 'syllabus.track_progress'
-  
+
   // Assessments / Tests
   | 'assessments.read'
   | 'assessments.read_own'
@@ -55,46 +55,54 @@ export type Capability =
   | 'assessments.manage'
   | 'assessments.take_test'
   | 'assessments.upload_marks'
-  
+
   // Tasks / Homework
   | 'tasks.read'
   | 'tasks.read_own'
   | 'tasks.create'
   | 'tasks.manage'
-  
+
   // Analytics
   | 'analytics.read'
   | 'analytics.read_own'
   | 'analytics.read_school'
-  
+
   // Students
   | 'students.read'
   | 'students.create'
   | 'students.manage'
-  
+
   // Classes
   | 'classes.read'
   | 'classes.create'
   | 'classes.manage'
-  
+
   // Subjects
   | 'subjects.read'
   | 'subjects.create'
   | 'subjects.manage'
-  
+
   // Admin Management
   | 'admins.read'
   | 'admins.create'
   | 'admins.manage'
-  
+
   // School Management
   | 'management.view'
   | 'management.user_activity'
-  
+
   // Inventory
   | 'inventory.read'
   | 'inventory.create'
-  | 'inventory.manage';
+  | 'inventory.manage'
+
+  // Feedback
+  | 'feedback.submit'        // Students: submit feedback to admin
+  | 'feedback.read_own'      // Admins: view feedback received
+  | 'feedback.view_all'      // Super Admins: view all school feedback
+  | 'feedback.add_note'      // Super Admins: add management notes
+  | 'feedback.acknowledge'   // Admins: acknowledge feedback
+  | 'feedback.archive';      // Super Admins: archive feedback
 
 /**
  * Explicit mapping of roles to their capabilities.
@@ -108,256 +116,282 @@ export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
     // Dashboard
     'dashboard.view',
     'dashboard.admin_stats',
-    
+
     // Attendance
     'attendance.read',
     'attendance.mark',
     'attendance.bulk_mark',
-    
+
     // Fees
     'fees.read',
     'fees.write',
     'fees.manage_components',
     'fees.record_payments',
-    
+
     // Timetable
     'timetable.read',
     'timetable.manage',
-    
+
     // Calendar
     'calendar.read',
     'calendar.manage',
-    
+
     // Resources
     'resources.read',
     'resources.manage',
-    
+
     // Syllabus
     'syllabus.read',
     'syllabus.manage',
     'syllabus.track_progress',
-    
+
     // Assessments
     'assessments.read',
     'assessments.create',
     'assessments.manage',
     'assessments.upload_marks',
-    
+
     // Tasks
     'tasks.read',
     'tasks.create',
     'tasks.manage',
-    
+
     // Analytics
     'analytics.read',
     'analytics.read_school',
-    
+
     // Students
     'students.read',
     'students.create',
     'students.manage',
-    
+
     // Classes
     'classes.read',
     'classes.create',
     'classes.manage',
-    
+
     // Subjects
     'subjects.read',
     'subjects.create',
     'subjects.manage',
-    
+
     // Admin Management
     'admins.read',
     'admins.create',
     'admins.manage',
-    
+
     // School Management
     'management.view',
     'management.user_activity',
-    
+
     // Inventory
     'inventory.read',
     'inventory.create',
     'inventory.manage',
+
+    // Feedback (all capabilities)
+    'feedback.submit',
+    'feedback.read_own',
+    'feedback.view_all',
+    'feedback.add_note',
+    'feedback.acknowledge',
+    'feedback.archive',
   ],
-  
+
   // CB Admin (school board admin) - almost all capabilities except admin management
   [ROLES.CB_ADMIN]: [
     'dashboard.view',
     'dashboard.admin_stats',
-    
+
     'attendance.read',
     'attendance.mark',
     'attendance.bulk_mark',
-    
+
     'fees.read',
     'fees.write',
     'fees.manage_components',
     'fees.record_payments',
-    
+
     'timetable.read',
     'timetable.manage',
-    
+
     'calendar.read',
     'calendar.manage',
-    
+
     'resources.read',
     'resources.manage',
-    
+
     'syllabus.read',
     'syllabus.manage',
     'syllabus.track_progress',
-    
+
     'assessments.read',
     'assessments.create',
     'assessments.manage',
     'assessments.upload_marks',
-    
+
     'tasks.read',
     'tasks.create',
     'tasks.manage',
-    
+
     'analytics.read',
     'analytics.read_school',
-    
+
     'students.read',
     'students.create',
     'students.manage',
-    
+
     'classes.read',
     'classes.manage',
-    
+
     'subjects.read',
     'subjects.manage',
-    
+
     'admins.read',
-    
+
     'management.view',
     'management.user_activity',
-    
+
     // Inventory
     'inventory.read',
     'inventory.create',
     'inventory.manage',
+
+    // Feedback
+    'feedback.read_own',
+    'feedback.view_all',
+    'feedback.add_note',
+    'feedback.acknowledge',
+    'feedback.archive',
   ],
-  
+
   // Regular Admin - school-level administration
   [ROLES.ADMIN]: [
     'dashboard.view',
     'dashboard.admin_stats',
-    
+
     'attendance.read',
     'attendance.mark',
     'attendance.bulk_mark',
-    
+
     'fees.read',
     'fees.write',
     'fees.manage_components',
     'fees.record_payments',
-    
+
     'timetable.read',
     'timetable.manage',
-    
+
     'calendar.read',
     'calendar.manage',
-    
+
     'resources.read',
     'resources.manage',
-    
+
     'syllabus.read',
     'syllabus.manage',
     'syllabus.track_progress',
-    
+
     'assessments.read',
     'assessments.create',
     'assessments.manage',
     'assessments.upload_marks',
-    
+
     'tasks.read',
     'tasks.create',
     'tasks.manage',
-    
+
     'analytics.read',
     'analytics.read_school',
-    
+
     'students.read',
     'students.create',
     'students.manage',
-    
+
     'classes.read',
-    
+
     'subjects.read',
-    
+
     'management.view',
     'management.user_activity',
-    
+
     // Inventory
     'inventory.read',
     'inventory.create',
     'inventory.manage',
+
+    // Feedback
+    'feedback.read_own',
+    'feedback.acknowledge',
   ],
-  
+
   // Teacher - teaching-related capabilities
   [ROLES.TEACHER]: [
     'dashboard.view',
-    
+
     'attendance.read',
     'attendance.mark',
-    
+
     'timetable.read',
-    
+
     'calendar.read',
-    
+
     'resources.read',
     'resources.manage',
-    
+
     'syllabus.read',
     'syllabus.manage',
     'syllabus.track_progress',
-    
+
     'assessments.read',
     'assessments.create',
     'assessments.manage',
     'assessments.upload_marks',
-    
+
     'tasks.read',
     'tasks.create',
     'tasks.manage',
-    
+
     'analytics.read',
-    
+
     'students.read',
-    
+
     'classes.read',
-    
+
     'subjects.read',
+
+    // Feedback
+    'feedback.read_own',
+    'feedback.acknowledge',
   ],
-  
+
   // Student - student-specific capabilities
   [ROLES.STUDENT]: [
     'dashboard.view',
-    
+
     'attendance.read_own',
-    
+
     'fees.read_own',
-    
+
     'timetable.read',
-    
+
     'calendar.read',
-    
+
     'resources.read',
-    
+
     'syllabus.read',
-    
+
     'assessments.read_own',
     'assessments.take_test',
-    
+
     'tasks.read_own',
-    
+
     'analytics.read_own',
+
+    // Feedback
+    'feedback.submit',
   ],
-  
+
   // Unknown role - no capabilities (must be explicitly handled)
   [ROLES.UNKNOWN]: [],
 } as const;
@@ -408,5 +442,6 @@ export const CAPABILITY_DOMAINS = {
   admins: ['admins.read', 'admins.create', 'admins.manage'],
   management: ['management.view', 'management.user_activity'],
   inventory: ['inventory.read', 'inventory.create', 'inventory.manage'],
+  feedback: ['feedback.submit', 'feedback.read_own', 'feedback.view_all', 'feedback.add_note', 'feedback.acknowledge', 'feedback.archive'],
 } as const;
 

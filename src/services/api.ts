@@ -701,23 +701,15 @@ export const api = {
     },
 
     async getAll(schoolCode: string, limit?: number): Promise<DomainLearningResource[]> {
-      // Get all classes, then get resources from each
-      const classesResult = await listClasses(schoolCode);
-      if (classesResult.error || !classesResult.data) {
-        throw new Error(classesResult.error?.userMessage || 'Failed to fetch classes');
+      const cappedLimit = limit ?? 50;
+      const { listResourcesBySchool } = await import('../data/queries');
+      const result = await listResourcesBySchool(schoolCode, undefined, { from: 0, to: cappedLimit - 1 });
+
+      if (result.error) {
+        throw new Error(result.error.userMessage || 'Failed to fetch resources');
       }
-      
-      const allResources: DomainLearningResource[] = [];
-      
-      for (const classInstance of classesResult.data) {
-        const result = await listResources(classInstance.id, schoolCode, undefined, { to: limit ? limit - allResources.length : 99 });
-        if (result.data) {
-          allResources.push(...result.data);
-          if (limit && allResources.length >= limit) break;
-        }
-      }
-      
-      return allResources.slice(0, limit);
+
+      return result.data || [];
     },
 
     async getPaginated(schoolCode: string, offset: number, limit: number): Promise<LearningResource[]> {
@@ -746,7 +738,7 @@ export const api = {
           ...resourceData,
           content_url: resourceData.content_url, // TypeScript now knows this is not null
         }])
-        .select()
+        .select('id, title, description, resource_type, content_url, file_size, school_code, class_instance_id, subject_id, uploaded_by, created_at, updated_at')
         .single();
 
       if (error) throw error;
@@ -766,7 +758,7 @@ export const api = {
         .from('learning_resources')
         .update(updateData)
         .eq('id', id)
-        .select()
+        .select('id, title, description, resource_type, content_url, file_size, school_code, class_instance_id, subject_id, uploaded_by, created_at, updated_at')
         .single();
 
       if (error) throw error;
@@ -961,7 +953,7 @@ export const api = {
       const { data, error } = await supabase
         .from('tests')
         .insert([testData])
-        .select()
+        .select('id, title, description, class_instance_id, subject_id, school_code, test_type, time_limit_seconds, created_by, created_at, allow_reattempts, chapter_id, test_mode, test_date, status, max_marks')
         .single();
 
       if (error) throw error;
@@ -976,7 +968,7 @@ export const api = {
         .from('tests')
         .update(testData)
         .eq('id', testId)
-        .select()
+        .select('id, title, description, class_instance_id, subject_id, school_code, test_type, time_limit_seconds, created_by, created_at, allow_reattempts, chapter_id, test_mode, test_date, status, max_marks')
         .single();
 
       if (error) throw error;
@@ -996,60 +988,35 @@ export const api = {
       return true;
     },
 
-    async getWithStats(schoolCode: string, classInstanceId?: string, options?: { limit?: number; offset?: number; test_mode?: 'online' | 'offline' }) {
-      const tests = await this.getBySchool(schoolCode, classInstanceId, options);
+    async getWithStats(
+      schoolCode: string,
+      classInstanceId?: string,
+      options?: { limit?: number; offset?: number; test_mode?: 'online' | 'offline' }
+    ) {
+      const limit = options?.limit ?? 50;
+      const offset = options?.offset ?? 0;
+      const { data, error } = await supabase.rpc('get_tests_with_stats', {
+        p_class_instance_id: classInstanceId ?? null,
+        p_limit: limit,
+        p_offset: offset,
+        p_test_mode: options?.test_mode ?? null,
+      });
 
-      // Get question counts and marks info for each test
-      const testsWithStats = await Promise.all(
-        tests.map(async (test: any) => {
-          let questionCount = 0;
-          let marksUploaded = 0;
-          let totalStudents = 0;
-          let attemptsCount = 0;
+      if (error) throw error;
+      return data || [];
+    },
 
-          if (test.test_mode === 'online') {
-            // Get question count
-            const { count: qCount } = await supabase
-              .from('test_questions')
-              .select('*', { count: 'exact', head: true })
-              .eq('test_id', test.id);
-            questionCount = qCount || 0;
+    async createWithQuestions(testData: any, questionsData: any[]): Promise<any> {
+      // Service-level authorization: require assessments.create capability
+      await assertCurrentUserCapability('assessments.create');
 
-            // Get attempts count
-            const { count: aCount } = await supabase
-              .from('test_attempts')
-              .select('*', { count: 'exact', head: true })
-              .eq('test_id', test.id);
-            attemptsCount = aCount || 0;
-          } else if (test.test_mode === 'offline') {
-            // Get marks uploaded count
-            const { count: mCount } = await supabase
-              .from('test_marks')
-              .select('*', { count: 'exact', head: true })
-              .eq('test_id', test.id);
-            marksUploaded = mCount || 0;
-          }
+      const { data, error } = await supabase.rpc('create_test_with_questions', {
+        test_payload: testData,
+        questions_payload: questionsData,
+      });
 
-          // Get total students in class
-          const { count: sCount } = await supabase
-            .from('student')
-            .select('*', { count: 'exact', head: true })
-            .eq('class_instance_id', test.class_instance_id);
-          totalStudents = sCount || 0;
-
-          return {
-            ...test,
-            class_name: `Grade ${test.class_instances?.grade} - ${test.class_instances?.section}`,
-            subject_name: test.subjects?.subject_name || 'Unknown',
-            question_count: questionCount,
-            marks_uploaded: marksUploaded,
-            total_students: totalStudents,
-            attempts_count: attemptsCount,
-          };
-        })
-      );
-
-      return testsWithStats;
+      if (error) throw error;
+      return Array.isArray(data) ? data[0] : data;
     },
   },
 
@@ -1072,7 +1039,7 @@ export const api = {
       const { data, error } = await supabase
         .from('test_questions')
         .insert([questionData])
-        .select()
+        .select('id, test_id, question_text, question_type, options, correct_index, correct_text, created_at, correct_answer, points, order_index')
         .single();
 
       if (error) throw error;
@@ -1087,7 +1054,7 @@ export const api = {
         .from('test_questions')
         .update(questionData)
         .eq('id', questionId)
-        .select()
+        .select('id, test_id, question_text, question_type, options, correct_index, correct_text, created_at, correct_answer, points, order_index')
         .single();
 
       if (error) throw error;
@@ -1136,7 +1103,7 @@ export const api = {
       const { data, error } = await supabase
         .from('test_questions')
         .insert(questionsData)
-        .select();
+        .select('id, test_id, question_text, question_type, options, correct_index, correct_text, created_at, correct_answer, points, order_index');
 
       if (error) throw error;
       return data || [];
@@ -1190,7 +1157,7 @@ export const api = {
       const { data, error } = await supabase
         .from('test_marks')
         .insert([markData])
-        .select()
+        .select('id, test_id, student_id, marks_obtained, max_marks, remarks, created_by, created_at, updated_at')
         .single();
 
       if (error) throw error;
@@ -1207,7 +1174,7 @@ export const api = {
           onConflict: 'test_id,student_id',
           ignoreDuplicates: false,
         })
-        .select();
+        .select('id, test_id, student_id, marks_obtained, max_marks, remarks, created_by, created_at, updated_at');
 
       if (error) throw error;
       return data || [];
@@ -1221,7 +1188,7 @@ export const api = {
         .from('test_marks')
         .update(markData)
         .eq('id', markId)
-        .select()
+        .select('id, test_id, student_id, marks_obtained, max_marks, remarks, created_by, created_at, updated_at')
         .single();
 
       if (error) throw error;
@@ -1291,7 +1258,7 @@ export const api = {
       const { data, error } = await supabase
         .from('test_attempts')
         .insert([attemptData])
-        .select()
+        .select('id, test_id, student_id, answers, score, status, evaluated_by, completed_at, started_at, created_at, earned_points, total_points')
         .single();
 
       if (error) throw error;
@@ -1303,7 +1270,7 @@ export const api = {
         .from('test_attempts')
         .update(attemptData)
         .eq('id', attemptId)
-        .select()
+        .select('id, test_id, student_id, answers, score, status, evaluated_by, completed_at, started_at, created_at, earned_points, total_points')
         .single();
 
       if (error) throw error;
@@ -1321,7 +1288,7 @@ export const api = {
           total_points: totalPoints,
         })
         .eq('id', attemptId)
-        .select()
+        .select('id, test_id, student_id, answers, score, status, evaluated_by, completed_at, started_at, created_at, earned_points, total_points')
         .single();
 
       if (error) throw error;

@@ -178,6 +178,102 @@ export type Database = {
           },
         ]
       }
+      ai_generation_logs: {
+        Row: {
+          created_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          estimated_cost_usd: number | null
+          has_context: boolean | null
+          id: string
+          image_size_bytes: number | null
+          input_tokens: number | null
+          output_tokens: number | null
+          question_count_requested: number
+          questions_generated: number | null
+          school_code: string
+          success: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          estimated_cost_usd?: number | null
+          has_context?: boolean | null
+          id?: string
+          image_size_bytes?: number | null
+          input_tokens?: number | null
+          output_tokens?: number | null
+          question_count_requested: number
+          questions_generated?: number | null
+          school_code: string
+          success: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          estimated_cost_usd?: number | null
+          has_context?: boolean | null
+          id?: string
+          image_size_bytes?: number | null
+          input_tokens?: number | null
+          output_tokens?: number | null
+          question_count_requested?: number
+          questions_generated?: number | null
+          school_code?: string
+          success?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_usage_limits: {
+        Row: {
+          created_at: string | null
+          daily_limit: number | null
+          generations_this_month: number | null
+          generations_today: number | null
+          id: string
+          last_generation_at: string | null
+          last_reset_daily: string | null
+          last_reset_monthly: string | null
+          monthly_limit: number | null
+          school_code: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          daily_limit?: number | null
+          generations_this_month?: number | null
+          generations_today?: number | null
+          id?: string
+          last_generation_at?: string | null
+          last_reset_daily?: string | null
+          last_reset_monthly?: string | null
+          monthly_limit?: number | null
+          school_code: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          daily_limit?: number | null
+          generations_this_month?: number | null
+          generations_today?: number | null
+          id?: string
+          last_generation_at?: string | null
+          last_reset_daily?: string | null
+          last_reset_monthly?: string | null
+          monthly_limit?: number | null
+          school_code?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       analytics_academics_summary: {
         Row: {
           avg_score_percent: number | null
@@ -580,6 +676,89 @@ export type Database = {
           },
         ]
       }
+      announcements: {
+        Row: {
+          class_instance_id: string | null
+          created_at: string | null
+          created_by: string
+          id: string
+          image_url: string | null
+          likes_count: number | null
+          message: string
+          pinned: boolean | null
+          priority: string | null
+          school_code: string
+          target_role: string | null
+          target_type: string | null
+          title: string
+          updated_at: string | null
+          views_count: number | null
+        }
+        Insert: {
+          class_instance_id?: string | null
+          created_at?: string | null
+          created_by: string
+          id?: string
+          image_url?: string | null
+          likes_count?: number | null
+          message: string
+          pinned?: boolean | null
+          priority?: string | null
+          school_code: string
+          target_role?: string | null
+          target_type?: string | null
+          title: string
+          updated_at?: string | null
+          views_count?: number | null
+        }
+        Update: {
+          class_instance_id?: string | null
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          image_url?: string | null
+          likes_count?: number | null
+          message?: string
+          pinned?: boolean | null
+          priority?: string | null
+          school_code?: string
+          target_role?: string | null
+          target_type?: string | null
+          title?: string
+          updated_at?: string | null
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "class_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "fee_collection_summary"
+            referencedColumns: ["class_instance_id"]
+          },
+          {
+            foreignKeyName: "announcements_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "student_fee_summary"
+            referencedColumns: ["class_instance_id"]
+          },
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance: {
         Row: {
           class_instance_id: string | null
@@ -675,33 +854,6 @@ export type Database = {
             referencedColumns: ["student_id"]
           },
         ]
-      }
-      push_notification_tokens: {
-        Row: {
-          created_at: string | null
-          device_type: string | null
-          id: string
-          token: string
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          device_type?: string | null
-          id?: string
-          token: string
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          device_type?: string | null
-          id?: string
-          token?: string
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
       }
       cb_admin: {
         Row: {
@@ -1698,6 +1850,113 @@ export type Database = {
           },
         ]
       }
+      feedback: {
+        Row: {
+          acknowledged_at: string | null
+          archived_at: string | null
+          archived_by: string | null
+          category: string
+          class_instance_id: string | null
+          content: string
+          created_at: string | null
+          feedback_type: string
+          from_user_id: string
+          id: string
+          requires_acknowledgement: boolean | null
+          school_code: string
+          sentiment: string | null
+          subject_id: string | null
+          to_user_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          category: string
+          class_instance_id?: string | null
+          content: string
+          created_at?: string | null
+          feedback_type: string
+          from_user_id: string
+          id?: string
+          requires_acknowledgement?: boolean | null
+          school_code: string
+          sentiment?: string | null
+          subject_id?: string | null
+          to_user_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          category?: string
+          class_instance_id?: string | null
+          content?: string
+          created_at?: string | null
+          feedback_type?: string
+          from_user_id?: string
+          id?: string
+          requires_acknowledgement?: boolean | null
+          school_code?: string
+          sentiment?: string | null
+          subject_id?: string | null
+          to_user_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "class_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "fee_collection_summary"
+            referencedColumns: ["class_instance_id"]
+          },
+          {
+            foreignKeyName: "feedback_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "student_fee_summary"
+            referencedColumns: ["class_instance_id"]
+          },
+          {
+            foreignKeyName: "feedback_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       finance_accounts: {
         Row: {
           created_at: string
@@ -2456,6 +2715,63 @@ export type Database = {
           },
         ]
       }
+      notification_events: {
+        Row: {
+          created_at: string | null
+          enabled: boolean | null
+          event: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean | null
+          event: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean | null
+          event?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      notification_logs: {
+        Row: {
+          body: string
+          created_at: string | null
+          data: Json | null
+          error: string | null
+          event: string
+          id: string
+          status: string
+          title: string
+          user_id: string | null
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          data?: Json | null
+          error?: string | null
+          event: string
+          id?: string
+          status: string
+          title: string
+          user_id?: string | null
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          data?: Json | null
+          error?: string | null
+          event?: string
+          id?: string
+          status?: string
+          title?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -2485,6 +2801,159 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      push_notification_tokens: {
+        Row: {
+          created_at: string | null
+          device_type: string | null
+          id: string
+          token: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          device_type?: string | null
+          id?: string
+          token: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          device_type?: string | null
+          id?: string
+          token?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      report_comments: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          class_instance_id: string
+          created_at: string | null
+          data_freshness_days: number | null
+          edit_diff_length: number | null
+          edited_comment: string | null
+          focus: string | null
+          generated_comment: string
+          generation_version: number | null
+          id: string
+          input_data: Json
+          language: string | null
+          model_used: string | null
+          positivity_score: number | null
+          regeneration_count: number | null
+          rejection_reason: string | null
+          school_code: string
+          similarity_score: number | null
+          status: string | null
+          student_id: string
+          teacher_id: string
+          term_id: string | null
+          tone: string | null
+          updated_at: string | null
+          was_regenerated: boolean | null
+          word_count: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          class_instance_id: string
+          created_at?: string | null
+          data_freshness_days?: number | null
+          edit_diff_length?: number | null
+          edited_comment?: string | null
+          focus?: string | null
+          generated_comment: string
+          generation_version?: number | null
+          id?: string
+          input_data?: Json
+          language?: string | null
+          model_used?: string | null
+          positivity_score?: number | null
+          regeneration_count?: number | null
+          rejection_reason?: string | null
+          school_code: string
+          similarity_score?: number | null
+          status?: string | null
+          student_id: string
+          teacher_id: string
+          term_id?: string | null
+          tone?: string | null
+          updated_at?: string | null
+          was_regenerated?: boolean | null
+          word_count?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          class_instance_id?: string
+          created_at?: string | null
+          data_freshness_days?: number | null
+          edit_diff_length?: number | null
+          edited_comment?: string | null
+          focus?: string | null
+          generated_comment?: string
+          generation_version?: number | null
+          id?: string
+          input_data?: Json
+          language?: string | null
+          model_used?: string | null
+          positivity_score?: number | null
+          regeneration_count?: number | null
+          rejection_reason?: string | null
+          school_code?: string
+          similarity_score?: number | null
+          status?: string | null
+          student_id?: string
+          teacher_id?: string
+          term_id?: string | null
+          tone?: string | null
+          updated_at?: string | null
+          was_regenerated?: boolean | null
+          word_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_comments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "fee_collection_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "report_comments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "student"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_comments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "student_fee_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "report_comments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "view_student_tasks_summary"
+            referencedColumns: ["student_id"]
+          },
+          {
+            foreignKeyName: "report_comments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "view_syllabus_progress_by_subject"
+            referencedColumns: ["student_id"]
+          },
+        ]
       }
       school_calendar_events: {
         Row: {
@@ -2643,6 +3112,77 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      smart_task_logs: {
+        Row: {
+          audio_duration_seconds: number | null
+          confirmed_at: string | null
+          created_at: string | null
+          created_by: string
+          edits_made: Json | null
+          error_message: string | null
+          field_confidences: Json
+          fields_needing_review: string[] | null
+          final_task_id: string | null
+          id: string
+          input_type: string
+          overall_confidence: number | null
+          parsed_output: Json
+          raw_input: string
+          school_code: string
+          status: string | null
+          transcription: string | null
+          was_edited: boolean | null
+        }
+        Insert: {
+          audio_duration_seconds?: number | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          created_by: string
+          edits_made?: Json | null
+          error_message?: string | null
+          field_confidences: Json
+          fields_needing_review?: string[] | null
+          final_task_id?: string | null
+          id?: string
+          input_type: string
+          overall_confidence?: number | null
+          parsed_output: Json
+          raw_input: string
+          school_code: string
+          status?: string | null
+          transcription?: string | null
+          was_edited?: boolean | null
+        }
+        Update: {
+          audio_duration_seconds?: number | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          created_by?: string
+          edits_made?: Json | null
+          error_message?: string | null
+          field_confidences?: Json
+          fields_needing_review?: string[] | null
+          final_task_id?: string | null
+          id?: string
+          input_type?: string
+          overall_confidence?: number | null
+          parsed_output?: Json
+          raw_input?: string
+          school_code?: string
+          status?: string | null
+          transcription?: string | null
+          was_edited?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "smart_task_logs_final_task_id_fkey"
+            columns: ["final_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       student: {
         Row: {
@@ -4123,6 +4663,20 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_usage_daily_summary: {
+        Row: {
+          avg_duration_ms: number | null
+          date: string | null
+          failed_generations: number | null
+          school_code: string | null
+          successful_generations: number | null
+          total_cost_usd: number | null
+          total_generations: number | null
+          total_questions: number | null
+          unique_users: number | null
+        }
+        Relationships: []
+      }
       cb_admin_platform_metrics: {
         Row: {
           active_schools: number | null
@@ -4217,6 +4771,63 @@ export type Database = {
           table_name: string | null
         }
         Relationships: []
+      }
+      feedback_for_admin: {
+        Row: {
+          acknowledged_at: string | null
+          category: string | null
+          class_instance_id: string | null
+          content: string | null
+          created_at: string | null
+          feedback_type: string | null
+          grade: number | null
+          id: string | null
+          requires_acknowledgement: boolean | null
+          school_code: string | null
+          section: string | null
+          sentiment: string | null
+          subject_id: string | null
+          subject_name: string | null
+          to_user_id: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "class_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "fee_collection_summary"
+            referencedColumns: ["class_instance_id"]
+          },
+          {
+            foreignKeyName: "feedback_class_instance_id_fkey"
+            columns: ["class_instance_id"]
+            isOneToOne: false
+            referencedRelation: "student_fee_summary"
+            referencedColumns: ["class_instance_id"]
+          },
+          {
+            foreignKeyName: "feedback_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mv_daily_attendance_summary: {
         Row: {
@@ -4620,6 +5231,10 @@ export type Database = {
       }
     }
     Functions: {
+      approve_report_comment: {
+        Args: { p_comment_id: string; p_edited_comment?: string }
+        Returns: boolean
+      }
       assign_fee_to_class: {
         Args: { p_class_instance_id: string; p_fee_structure_id: string }
         Returns: number
@@ -4650,6 +5265,15 @@ export type Database = {
       can_access_school_data: {
         Args: { target_school_code: string }
         Returns: boolean
+      }
+      check_ai_rate_limit: {
+        Args: { p_user_id: string }
+        Returns: {
+          allowed: boolean
+          daily_remaining: number
+          monthly_remaining: number
+          reason: string
+        }[]
       }
       class_plan_summary: {
         Args: { p_class_instance_id: string }
@@ -4714,6 +5338,27 @@ export type Database = {
           p_name: string
         }
         Returns: Json
+      }
+      create_test_with_questions: {
+        Args: { questions_payload: Json; test_payload: Json }
+        Returns: {
+          allow_reattempts: boolean
+          chapter_id: string
+          class_instance_id: string
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          max_marks: number
+          school_code: string
+          status: string
+          subject_id: string
+          test_date: string
+          test_mode: string
+          test_type: string
+          time_limit_seconds: number
+          title: string
+        }[]
       }
       current_admin_id: { Args: never; Returns: string }
       current_app_role: { Args: never; Returns: string }
@@ -4836,6 +5481,37 @@ export type Database = {
         }
         Returns: Json
       }
+      get_all_schools: {
+        Args: never
+        Returns: {
+          created_at: string
+          id: string
+          is_active: boolean
+          school_address: string
+          school_code: string
+          school_email: string
+          school_name: string
+          school_phone: string
+          updated_at: string
+        }[]
+      }
+      get_all_super_admins: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          phone: string
+          school_code: string
+          school_name: string
+          super_admin_code: string
+        }[]
+      }
+      get_login_email_by_user_code: {
+        Args: { p_user_code: string }
+        Returns: string | null
+      }
       get_calendar_events: {
         Args: {
           p_academic_year_id?: string
@@ -4892,6 +5568,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_dashboard_bundle: { Args: never; Returns: Json }
       get_day_data_integrated: {
         Args: {
           p_class_instance_id?: string
@@ -4971,6 +5648,10 @@ export type Database = {
         }[]
       }
       get_student_id_from_auth: { Args: never; Returns: string }
+      get_student_report_data: {
+        Args: { p_class_instance_id: string; p_student_id: string }
+        Returns: Json
+      }
       get_super_admin_analytics: {
         Args: {
           p_end_date: string
@@ -4982,6 +5663,38 @@ export type Database = {
       get_syllabus_tree: {
         Args: { p_class_instance_id: string; p_subject_id: string }
         Returns: Json
+      }
+      get_tests_with_stats: {
+        Args: {
+          p_class_instance_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_test_mode?: string
+        }
+        Returns: {
+          allow_reattempts: boolean
+          attempts_count: number
+          chapter_id: string
+          class_instance_id: string
+          class_name: string
+          created_at: string
+          created_by: string
+          description: string
+          id: string
+          marks_uploaded: number
+          max_marks: number
+          question_count: number
+          school_code: string
+          status: string
+          subject_id: string
+          subject_name: string
+          test_date: string
+          test_mode: string
+          test_type: string
+          time_limit_seconds: number
+          title: string
+          total_students: number
+        }[]
       }
       get_user_activity_stats: {
         Args: { p_school_code: string }
@@ -5005,6 +5718,10 @@ export type Database = {
       get_user_school_context: { Args: never; Returns: Json }
       get_user_student_code: { Args: never; Returns: string }
       grade_for_percentage: { Args: { p: number }; Returns: string }
+      increment_ai_usage: {
+        Args: { p_school_code: string; p_user_id: string }
+        Returns: undefined
+      }
       is_admin: { Args: never; Returns: boolean }
       is_admin_in_school: { Args: { p_school: string }; Returns: boolean }
       is_holiday_date: {
@@ -5027,6 +5744,20 @@ export type Database = {
       learning_analytics: {
         Args: { p_class_id?: string; p_end: string; p_start: string }
         Returns: Json
+      }
+      log_ai_generation: {
+        Args: {
+          p_duration_ms: number
+          p_error_message: string
+          p_has_context: boolean
+          p_image_size_bytes: number
+          p_question_count_requested: number
+          p_questions_generated: number
+          p_school_code: string
+          p_success: boolean
+          p_user_id: string
+        }
+        Returns: string
       }
       log_cross_school_access_attempt: {
         Args: {
@@ -5105,6 +5836,11 @@ export type Database = {
       }
       refresh_syllabus_analytics: { Args: never; Returns: undefined }
       refresh_timetable_analytics: { Args: never; Returns: undefined }
+      register_push_token: {
+        Args: { p_device_type: string; p_token: string }
+        Returns: undefined
+      }
+      remove_push_token: { Args: { p_token: string }; Returns: undefined }
       reorder_chapters: {
         Args: { p_ordered_ids: string[]; p_syllabus_id: string }
         Returns: undefined
@@ -5129,6 +5865,21 @@ export type Database = {
           school_code: string
           user_id: string
         }[]
+      }
+      save_report_comment: {
+        Args: {
+          p_class_instance_id: string
+          p_focus?: string
+          p_generated_comment: string
+          p_input_data: Json
+          p_language?: string
+          p_positivity_score?: number
+          p_school_code: string
+          p_student_id: string
+          p_tone?: string
+          p_word_count?: number
+        }
+        Returns: string
       }
       set_student_discount: {
         Args: { p_assignment_id: string; p_discount_paise: number }
@@ -5241,116 +5992,116 @@ type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-  | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-  : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-    DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
-  ? R
-  : never
+    ? R
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])
-  ? (DefaultSchema["Tables"] &
-    DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-      Row: infer R
-    }
-  ? R
-  : never
-  : never
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
+      Insert: infer I
+    }
+    ? I
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Insert: infer I
-  }
-  ? I
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-  | keyof DefaultSchema["Tables"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-    Update: infer U
-  }
-  ? U
-  : never
+      Update: infer U
+    }
+    ? U
+    : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-  ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-    Update: infer U
-  }
-  ? U
-  : never
-  : never
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-  | keyof DefaultSchema["Enums"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-  ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-  : never
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-  | keyof DefaultSchema["CompositeTypes"]
-  | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-  ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-  : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-  ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-  : never
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
 
 export const Constants = {
   public: {
@@ -5369,54 +6120,3 @@ export const Constants = {
     },
   },
 } as const
-
-// =============================================================================
-// BACKWARD COMPATIBILITY TYPE ALIASES
-// These provide the same interface as the previous types file structure
-// =============================================================================
-
-// Row types (for reading from database)
-export type User = Tables<'users'>
-export type Student = Tables<'student'>
-export type Admin = Tables<'admin'>
-export type ClassInstance = Tables<'class_instances'>
-export type Subject = Tables<'subjects'>
-export type TimetableSlot = Tables<'timetable_slots'>
-export type Attendance = Tables<'attendance'>
-export type Task = Tables<'tasks'>
-export type Test = Tables<'tests'>
-export type TestQuestion = Tables<'test_questions'>
-export type FeeComponentType = Tables<'fee_component_types'>
-export type FeeStudentPlan = Tables<'fee_student_plans'>
-export type FeeStudentPlanItem = Tables<'fee_student_plan_items'>
-export type FeePayment = Tables<'fee_payments'>
-export type AcademicYear = Tables<'academic_years'>
-export type CalendarEvent = Tables<'school_calendar_events'>
-export type LearningResource = Tables<'learning_resources'>
-export type FeeInvoice = Tables<'fee_invoices'>
-export type FeeInvoiceItem = Tables<'fee_invoice_items'>
-export type InventoryItem = Tables<'inventory_items'>
-export type InventoryIssue = Tables<'inventory_issues'>
-export type FinanceTransaction = Tables<'finance_transactions'>
-export type FinanceAccount = Tables<'finance_accounts'>
-export type FinanceCategory = Tables<'finance_categories'>
-export type FinanceTransactionLink = Tables<'finance_transaction_links'>
-
-// Insert types (for creating new records)
-export type AttendanceInsert = TablesInsert<'attendance'>
-export type FeePaymentInsert = TablesInsert<'fee_payments'>
-export type TaskInsert = TablesInsert<'tasks'>
-export type StudentInsert = TablesInsert<'student'>
-export type AdminInsert = TablesInsert<'admin'>
-export type FeeInvoiceInsert = TablesInsert<'fee_invoices'>
-export type FeeInvoiceItemInsert = TablesInsert<'fee_invoice_items'>
-export type InventoryItemInsert = TablesInsert<'inventory_items'>
-export type InventoryIssueInsert = TablesInsert<'inventory_issues'>
-export type FinanceTransactionInsert = TablesInsert<'finance_transactions'>
-
-// Update types (for updating records)
-export type AttendanceUpdate = TablesUpdate<'attendance'>
-export type FeePaymentUpdate = TablesUpdate<'fee_payments'>
-export type TaskUpdate = TablesUpdate<'tasks'>
-export type FeeInvoiceUpdate = TablesUpdate<'fee_invoices'>
-export type InventoryItemUpdate = TablesUpdate<'inventory_items'>

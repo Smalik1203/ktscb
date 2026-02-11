@@ -48,6 +48,8 @@ export interface ContainerProps {
   refreshing?: boolean;
   /** Fill available space */
   flex?: boolean;
+  /** Keyboard should persist taps (for ScrollView) */
+  keyboardShouldPersistTaps?: 'always' | 'never' | 'handled';
   /** Custom style */
   style?: ViewStyle;
   /** Test ID for testing */
@@ -67,6 +69,7 @@ export function Container({
   showScrollIndicator = false,
   onRefresh,
   refreshing = false,
+  keyboardShouldPersistTaps,
   flex = true,
   style,
   testID,
@@ -150,6 +153,7 @@ export function Container({
           !flex && styles.contentContainer,
         ]}
         showsVerticalScrollIndicator={showScrollIndicator}
+        keyboardShouldPersistTaps={keyboardShouldPersistTaps}
         refreshControl={
           onRefresh ? (
             <RefreshControl

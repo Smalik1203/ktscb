@@ -188,7 +188,7 @@ export default function ReportCommentsScreen() {
 
                     if (!response.ok) {
                         const error = await response.json();
-                        console.error(`Failed to generate for ${student.full_name}:`, error);
+                        // Generation failed for this student - continue with next
                         continue;
                     }
 
@@ -208,14 +208,13 @@ export default function ReportCommentsScreen() {
                         });
                     }
                 } catch (error) {
-                    console.error(`Error generating for ${student.full_name}:`, error);
+                    // Generation error for this student - continue with next
                 }
             }
 
             setComments(generatedComments);
             Alert.alert('Generation Complete', `Generated ${generatedComments.length} comments.`);
         } catch (error) {
-            console.error('Generation error:', error);
             Alert.alert('Error', 'Failed to generate comments. Please try again.');
         } finally {
             setIsGenerating(false);
@@ -241,7 +240,6 @@ export default function ReportCommentsScreen() {
                     : c
             ));
         } catch (error) {
-            console.error('Approve error:', error);
             Alert.alert('Error', 'Failed to approve comment.');
         }
     };

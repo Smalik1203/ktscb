@@ -88,7 +88,6 @@ export function useSyllabusLoader(classId?: string, schoolCode?: string): Syllab
     gcTime: 30 * 60 * 1000, // 30 minutes
     retry: 2, // Reduce retries for faster failure feedback
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    refetchOnWindowFocus: true, // ✅ Ensures fresh data when user returns
     refetchOnMount: true,
   });
 

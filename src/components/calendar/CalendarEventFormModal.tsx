@@ -6,8 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { Text, Modal, Portal, Button, TextInput, Switch, Chip } from 'react-native-paper';
-import { Calendar as CalendarIcon, Clock, X } from 'lucide-react-native';
+import { Text, Modal, Portal, Button, TextInput, Switch } from 'react-native-paper';
+import { Calendar as CalendarIcon, Clock, X, ChevronRight } from 'lucide-react-native';
 import { DatePickerModal } from '../common/DatePickerModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
@@ -22,26 +22,19 @@ interface CalendarEventFormModalProps {
   userId: string;
   onCancel: () => void;
   onSuccess: (eventData: any) => void;
+  onDelete?: () => void;
 }
 
-const EVENT_TYPES = [
-  { label: 'Assembly', value: 'assembly' },
-  { label: 'Exam', value: 'exam' },
-  { label: 'Holiday', value: 'holiday' },
-  { label: 'PTM', value: 'ptm' },
-  { label: 'Sports Day', value: 'sports day' },
-  { label: 'Cultural Event', value: 'cultural event' },
-  { label: 'Other', value: 'other' },
-];
+// Removed EVENT_TYPES constant
 
-const EVENT_COLORS = [
-  '#ff4d4f', // Red
-  '#2678BE', // Blue
-  '#f59e0b', // Orange
-  '#10B981', // Green
-  '#8B5CF6', // Purple
-  '#EC4899', // Pink
-  '#6B7280', // Gray
+const PRESET_COLORS = [
+  { color: '#4f46e5', label: 'Indigo' },
+  { color: '#0ea5e9', label: 'Sky' },
+  { color: '#10b981', label: 'Emerald' },
+  { color: '#f59e0b', label: 'Amber' },
+  { color: '#ef4444', label: 'Red' },
+  { color: '#8b5cf6', label: 'Violet' },
+  { color: '#ec4899', label: 'Pink' },
 ];
 
 export default function CalendarEventFormModal({
@@ -54,6 +47,7 @@ export default function CalendarEventFormModal({
   userId,
   onCancel,
   onSuccess,
+  onDelete,
 }: CalendarEventFormModalProps) {
   const { colors, typography, spacing, borderRadius, shadows } = useTheme();
   const styles = useMemo(
@@ -63,14 +57,14 @@ export default function CalendarEventFormModal({
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [eventType, setEventType] = useState('assembly');
+  const [eventType, setEventType] = useState(''); // Changed default to empty
   const [classInstanceId, setClassInstanceId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState<Date | null>(null);
   const [isAllDay, setIsAllDay] = useState(true);
   const [startTime, setStartTime] = useState(new Date());
   const [endTime, setEndTime] = useState(new Date());
-  const [color, setColor] = useState('#2678BE');
+  const [color, setColor] = useState(PRESET_COLORS[0].color);
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -88,21 +82,22 @@ export default function CalendarEventFormModal({
         // Edit mode
         setTitle(event.title || '');
         setDescription(event.description || '');
-        setEventType(event.event_type || 'assembly');
+        setEventType(event.event_type || ''); // Direct assignment
         setClassInstanceId(event.class_instance_id || null);
         setStartDate(event.start_date ? new Date(event.start_date) : new Date());
         setEndDate(event.end_date ? new Date(event.end_date) : null);
         setIsAllDay(event.is_all_day ?? true);
         setStartTime(event.start_time ? new Date(`2000-01-01T${event.start_time}`) : new Date());
         setEndTime(event.end_time ? new Date(`2000-01-01T${event.end_time}`) : new Date());
-        setColor(event.color || '#2678BE');
+        setColor(event.color || PRESET_COLORS[0].color);
         setIsActive(event.is_active ?? true);
       } else {
         // Create mode
         resetForm();
         if (isHoliday) {
           setEventType('holiday');
-          setColor('#f59e0b');
+          setColor(PRESET_COLORS.find(c => c.label === 'Orange')?.color || '#f59e0b');
+          setTitle(''); // Clear title for new holiday
         }
       }
     }
@@ -111,14 +106,14 @@ export default function CalendarEventFormModal({
   const resetForm = () => {
     setTitle('');
     setDescription('');
-    setEventType('assembly');
+    setEventType(''); // Reset to empty string
     setClassInstanceId(null);
     setStartDate(new Date());
     setEndDate(null);
     setIsAllDay(true);
     setStartTime(new Date());
     setEndTime(new Date());
-    setColor('#2678BE');
+    setColor(PRESET_COLORS[0].color);
     setIsActive(true);
   };
 
@@ -144,7 +139,7 @@ export default function CalendarEventFormModal({
         class_instance_id: classInstanceId,
         title: title.trim(),
         description: description.trim(),
-        event_type: eventType,
+        event_type: eventType.trim() || 'General', // Use direct text input
         start_date: formatDateLocal(startDate),
         end_date: endDate ? formatDateLocal(endDate) : formatDateLocal(startDate),
         is_all_day: isAllDay,
@@ -158,7 +153,7 @@ export default function CalendarEventFormModal({
       onSuccess(eventData);
       resetForm();
     } catch (error) {
-      console.error('Error submitting event:', error);
+      // Event submission failed
       alert('Failed to save event');
     } finally {
       setLoading(false);
@@ -202,188 +197,225 @@ export default function CalendarEventFormModal({
 
           {/* Title */}
           <View style={styles.field}>
-            <Text variant="labelLarge" style={styles.label}>
-              Title *
-            </Text>
             <TextInput
               mode="outlined"
+              label="Title *"
               value={title}
               onChangeText={setTitle}
               placeholder="Enter event title"
               style={styles.input}
+              outlineColor={colors.border.DEFAULT}
+              activeOutlineColor={colors.primary.main}
+              textColor={colors.text.primary}
             />
           </View>
 
           {/* Description */}
           <View style={styles.field}>
-            <Text variant="labelLarge" style={styles.label}>
-              Description
-            </Text>
             <TextInput
               mode="outlined"
+              label="Description"
               value={description}
               onChangeText={setDescription}
-              placeholder="Enter event description (optional)"
+              placeholder="Enter details (optional)"
               multiline
               numberOfLines={3}
-              style={styles.input}
+              style={[styles.input, styles.textArea]}
+              outlineColor={colors.border.DEFAULT}
+              activeOutlineColor={colors.primary.main}
+              textColor={colors.text.primary}
             />
           </View>
 
-          {/* Event Type */}
-          <View style={styles.field}>
-            <Text variant="labelLarge" style={styles.label}>
-              Event Type *
-            </Text>
-            <View style={styles.chipContainer}>
-              {EVENT_TYPES.map((type) => (
-                <Chip
-                  key={type.value}
-                  selected={eventType === type.value}
-                  onPress={() => setEventType(type.value)}
-                  style={[
-                    styles.chip,
-                    eventType === type.value && styles.chipSelected,
-                  ]}
-                  textStyle={eventType === type.value ? styles.chipTextSelected : undefined}
-                >
-                  {type.label}
-                </Chip>
-              ))}
+          {/* Event Type & Class Selection Row */}
+          <View style={styles.row}>
+            {/* Event Type */}
+            <View style={[styles.field, styles.halfField]}>
+              <TextInput
+                mode="outlined"
+                label="Event Type *"
+                value={eventType}
+                onChangeText={setEventType}
+                placeholder="e.g. Exam"
+                style={styles.input}
+                outlineColor={colors.border.DEFAULT}
+                activeOutlineColor={colors.primary.main}
+                textColor={colors.text.primary}
+                dense
+              />
             </View>
-          </View>
 
-          {/* Class Selection */}
-          <View style={styles.field}>
-            <Text variant="labelLarge" style={styles.label}>
-              Class (Optional)
-            </Text>
-            <Text variant="bodySmall" style={styles.helperText}>
-              Leave empty for school-wide events
-            </Text>
-            <TouchableOpacity
-              style={styles.selector}
-              onPress={() => setShowClassSelector(true)}
-            >
-              <Text style={styles.selectorText}>
-                {selectedClass
-                  ? `Grade ${selectedClass.grade}${selectedClass.section ? `-${selectedClass.section}` : ''}`
-                  : 'All Classes (School-wide)'}
-              </Text>
-            </TouchableOpacity>
+            {/* Class Selection */}
+            <View style={[styles.field, styles.halfField]}>
+              <TouchableOpacity
+                onPress={() => setShowClassSelector(true)}
+                activeOpacity={0.7}
+              >
+                <View pointerEvents="none">
+                  <TextInput
+                    mode="outlined"
+                    label="Class"
+                    value={selectedClass
+                      ? `Grade ${selectedClass.grade}${selectedClass.section ? `-${selectedClass.section}` : ''}`
+                      : 'School-wide'}
+                    editable={false}
+                    style={styles.input}
+                    outlineColor={colors.border.DEFAULT}
+                    textColor={colors.text.primary}
+                    dense
+                    right={<TextInput.Icon icon="chevron-right" color={colors.text.tertiary} />}
+                  />
+                </View>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Dates */}
           <View style={styles.row}>
             <View style={[styles.field, styles.halfField]}>
-              <Text variant="labelLarge" style={styles.label}>
-                Start Date *
-              </Text>
               <TouchableOpacity
-                style={styles.dateButton}
                 onPress={() => {
                   setDatePickerMode('start');
                   setShowStartDatePicker(true);
                 }}
+                activeOpacity={0.7}
               >
-                <CalendarIcon size={20} color={colors.primary[600]} />
-                <Text style={styles.dateButtonText}>{formatDate(startDate)}</Text>
+                <View pointerEvents="none">
+                  <TextInput
+                    mode="outlined"
+                    label="Start Date *"
+                    value={formatDate(startDate)}
+                    editable={false}
+                    style={styles.input}
+                    outlineColor={colors.border.DEFAULT}
+                    textColor={colors.text.primary}
+                    dense
+                    left={<TextInput.Icon icon="calendar" color={colors.text.tertiary} />}
+                  />
+                </View>
               </TouchableOpacity>
             </View>
 
             <View style={[styles.field, styles.halfField]}>
-              <Text variant="labelLarge" style={styles.label}>
-                End Date
-              </Text>
               <TouchableOpacity
-                style={styles.dateButton}
                 onPress={() => {
                   setDatePickerMode('end');
                   setShowEndDatePicker(true);
                 }}
+                activeOpacity={0.7}
               >
-                <CalendarIcon size={20} color={colors.primary[600]} />
-                <Text style={styles.dateButtonText}>
-                  {endDate ? formatDate(endDate) : 'Same day'}
-                </Text>
+                <View pointerEvents="none">
+                  <TextInput
+                    mode="outlined"
+                    label="End Date"
+                    value={endDate ? formatDate(endDate) : 'Same day'}
+                    editable={false}
+                    style={styles.input}
+                    outlineColor={colors.border.DEFAULT}
+                    textColor={colors.text.primary}
+                    dense
+                    left={<TextInput.Icon icon="calendar-end" color={colors.text.tertiary} />}
+                  />
+                </View>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* All Day Toggle */}
-          <View style={styles.switchField}>
-            <View>
-              <Text variant="labelLarge" style={styles.label}>
-                All Day Event
-              </Text>
-              <Text variant="bodySmall" style={styles.helperText}>
-                No specific time required
-              </Text>
+          {/* All Day Toggle - Compact */}
+          <View style={styles.compactToggleRow}>
+            <View style={styles.toggleLabelContainer}>
+              <Text style={styles.compactLabel}>All Day Event</Text>
             </View>
-            <Switch value={isAllDay} onValueChange={setIsAllDay} />
+            <Switch value={isAllDay} onValueChange={setIsAllDay} color={colors.primary.main} style={{ transform: [{ scale: 0.8 }] }} />
           </View>
 
           {/* Times */}
           {!isAllDay && (
             <View style={styles.row}>
               <View style={[styles.field, styles.halfField]}>
-                <Text variant="labelLarge" style={styles.label}>
-                  Start Time
-                </Text>
                 <TouchableOpacity
-                  style={styles.dateButton}
                   onPress={() => setShowStartTimePicker(true)}
+                  activeOpacity={0.7}
                 >
-                  <Clock size={20} color={colors.primary[600]} />
-                  <Text style={styles.dateButtonText}>{formatTime(startTime)}</Text>
+                  <View pointerEvents="none">
+                    <TextInput
+                      mode="outlined"
+                      label="Start Time"
+                      value={formatTime(startTime)}
+                      editable={false}
+                      style={styles.input}
+                      outlineColor={colors.border.DEFAULT}
+                      textColor={colors.text.primary}
+                      dense
+                      left={<TextInput.Icon icon="clock-outline" color={colors.text.tertiary} size={20} />}
+                    />
+                  </View>
                 </TouchableOpacity>
               </View>
 
               <View style={[styles.field, styles.halfField]}>
-                <Text variant="labelLarge" style={styles.label}>
-                  End Time
-                </Text>
                 <TouchableOpacity
-                  style={styles.dateButton}
                   onPress={() => setShowEndTimePicker(true)}
+                  activeOpacity={0.7}
                 >
-                  <Clock size={20} color={colors.primary[600]} />
-                  <Text style={styles.dateButtonText}>{formatTime(endTime)}</Text>
+                  <View pointerEvents="none">
+                    <TextInput
+                      mode="outlined"
+                      label="End Time"
+                      value={formatTime(endTime)}
+                      editable={false}
+                      style={styles.input}
+                      outlineColor={colors.border.DEFAULT}
+                      textColor={colors.text.primary}
+                      dense
+                      left={<TextInput.Icon icon="clock-outline" color={colors.text.tertiary} size={20} />}
+                    />
+                  </View>
                 </TouchableOpacity>
               </View>
             </View>
           )}
 
-          {/* Color Picker */}
-          <View style={styles.field}>
-            <Text variant="labelLarge" style={styles.label}>
-              Color
-            </Text>
-            <View style={styles.colorContainer}>
-              {EVENT_COLORS.map((c) => (
+          {/* Color Picker - Compact */}
+          <View style={styles.compactField}>
+            <Text style={styles.compactLabel}>Color Code</Text>
+            <View style={styles.compactColorRow}>
+              {PRESET_COLORS.map((c) => (
                 <TouchableOpacity
-                  key={c}
+                  key={c.color}
                   style={[
-                    styles.colorButton,
-                    { backgroundColor: c },
-                    color === c && styles.colorButtonSelected,
+                    styles.compactColorDot,
+                    { backgroundColor: c.color },
+                    color === c.color && styles.compactColorSelected,
                   ]}
-                  onPress={() => setColor(c)}
+                  onPress={() => setColor(c.color)}
+                  activeOpacity={0.8}
                 />
               ))}
             </View>
           </View>
 
-          {/* Active Toggle */}
-          <View style={styles.switchField}>
-            <Text variant="labelLarge" style={styles.label}>
-              Active
-            </Text>
-            <Switch value={isActive} onValueChange={setIsActive} />
+          {/* Active Toggle - Compact */}
+          <View style={styles.compactToggleRow}>
+            <View style={styles.toggleLabelContainer}>
+              <Text style={styles.compactLabel}>Active Status</Text>
+            </View>
+            <Switch value={isActive} onValueChange={setIsActive} color={colors.success.main} style={{ transform: [{ scale: 0.8 }] }} />
           </View>
 
           {/* Action Buttons */}
           <View style={styles.actions}>
+            {event && onDelete && (
+              <Button
+                mode="outlined"
+                onPress={onDelete}
+                style={[styles.actionButton, { borderColor: colors.error.main }]}
+                textColor={colors.error.main}
+                disabled={loading}
+              >
+                Delete
+              </Button>
+            )}
             <Button
               mode="outlined"
               onPress={onCancel}
@@ -399,7 +431,7 @@ export default function CalendarEventFormModal({
               loading={loading}
               disabled={loading}
             >
-              {event ? 'Update' : 'Create'} Event
+              {event ? 'Update' : 'Create'}
             </Button>
           </View>
         </ScrollView>
@@ -415,7 +447,7 @@ export default function CalendarEventFormModal({
           initialDate={startDate}
           title="Select Start Date"
         />
-        
+
         <DatePickerModal
           visible={showEndDatePicker}
           onDismiss={() => setShowEndDatePicker(false)}
@@ -526,162 +558,157 @@ const createStyles = (
   shadows: Shadows
 ) =>
   StyleSheet.create({
-  modalContainer: {
-    backgroundColor: colors.background.card,
-    marginHorizontal: spacing.md,
-    marginVertical: spacing.xl,
-    borderRadius: borderRadius.lg,
-    maxHeight: '90%',
-  },
-  scrollView: {
-    padding: spacing.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  closeButton: {
-    padding: spacing.xs,
-  },
-  field: {
-    marginBottom: spacing.lg,
-  },
-  halfField: {
-    flex: 1,
-  },
-  label: {
-    marginBottom: spacing.xs,
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  helperText: {
-    color: colors.text.tertiary,
-    marginBottom: spacing.xs,
-  },
-  input: {
-    backgroundColor: colors.background.app,
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  chip: {
-    marginRight: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  chipSelected: {
-    backgroundColor: colors.primary[600],
-  },
-  chipTextSelected: {
-    color: colors.text.inverse,
-  },
-  selector: {
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    backgroundColor: colors.background.app,
-  },
-  selectorText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  classModalContainer: {
-    backgroundColor: colors.background.card,
-    marginHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
-    maxHeight: '80%',
-    padding: spacing.lg,
-  },
-  classModalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  classModalTitle: {
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  classModalList: {
-    maxHeight: 400,
-    marginBottom: spacing.md,
-  },
-  classModalItem: {
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.xs,
-  },
-  classModalItemSelected: {
-    backgroundColor: colors.primary[50],
-    borderBottomColor: colors.primary[200],
-  },
-  classModalItemText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  classModalItemTextSelected: {
-    color: colors.primary[700],
-    fontWeight: typography.fontWeight.semibold,
-  },
-  classModalButton: {
-    marginTop: spacing.md,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  dateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    backgroundColor: colors.background.app,
-  },
-  dateButtonText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  switchField: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  colorContainer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  colorButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  colorButtonSelected: {
-    borderColor: colors.primary[600],
-    borderWidth: 3,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.lg,
-  },
-  actionButton: {
-    flex: 1,
-  },
-});
+    modalContainer: {
+      backgroundColor: colors.background.card,
+      marginHorizontal: spacing.md,
+      marginVertical: spacing.xl,
+      borderRadius: borderRadius.lg,
+      maxHeight: '90%',
+    },
+    scrollView: {
+      padding: spacing.lg,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+    },
+    headerTitle: {
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    closeButton: {
+      padding: spacing.xs,
+    },
+    field: {
+      marginBottom: spacing.sm,
+    },
+    halfField: {
+      flex: 1,
+    },
+    input: {
+      backgroundColor: colors.surface.primary,
+      fontSize: typography.fontSize.sm,
+      height: 48, // Enforce compact height
+    },
+    textArea: {
+      minHeight: 60,
+      height: 60,
+    },
+    row: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    compactToggleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+      minHeight: 32,
+    },
+    toggleLabelContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs
+    },
+    compactLabel: {
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.medium,
+      color: colors.text.secondary,
+    },
+    compactField: {
+      marginBottom: spacing.md,
+    },
+    compactColorRow: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginTop: spacing.xs,
+      alignItems: 'center',
+    },
+    compactColorDot: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+    },
+    compactColorSelected: {
+      borderWidth: 2,
+      borderColor: colors.text.primary,
+      transform: [{ scale: 1.2 }],
+    },
+    classModalContainer: {
+      backgroundColor: colors.background.card,
+      marginHorizontal: spacing.lg,
+      borderRadius: borderRadius.lg,
+      maxHeight: '80%',
+      padding: spacing.lg,
+    },
+    classModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+    },
+    classModalTitle: {
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    classModalList: {
+      maxHeight: 400,
+      marginBottom: spacing.md,
+    },
+    classModalItem: {
+      padding: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.light,
+      borderRadius: borderRadius.sm,
+      marginBottom: spacing.xs,
+    },
+    classModalItemSelected: {
+      backgroundColor: colors.primary[50],
+      borderBottomColor: colors.primary[200],
+    },
+    classModalItemText: {
+      fontSize: typography.fontSize.base,
+      color: colors.text.primary,
+    },
+    classModalItemTextSelected: {
+      color: colors.primary[700],
+      fontWeight: typography.fontWeight.semibold,
+    },
+    classModalButton: {
+      marginTop: spacing.md,
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      marginTop: spacing.lg,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.light,
+    },
+    actionButton: {
+      flex: 1,
+    },
+    customTypeInput: {
+      marginTop: spacing.sm,
+    },
+    chip: {
+      marginRight: spacing.xs,
+      marginBottom: spacing.xs,
+      backgroundColor: colors.surface.secondary,
+      borderColor: colors.border.light,
+    },
+    chipSelected: {
+      backgroundColor: colors.primary[100],
+      borderColor: colors.primary[600],
+    },
+    chipText: {
+      color: colors.text.secondary,
+    },
+    chipTextSelected: {
+      color: colors.primary[700],
+      fontWeight: '600',
+    },
+  });

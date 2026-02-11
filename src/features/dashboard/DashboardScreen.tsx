@@ -7,13 +7,14 @@
 
 import React from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Text as RNText, Platform } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import {
   CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound,
   LineChart, TrendingUp, Activity, CalendarDays,
   Target, AlertCircle, FolderOpen, ArrowUpRight,
   ArrowDownRight, ChevronRight, UserPlus, List, Layers,
   ReceiptText, ClipboardList, GraduationCap, Building2, School,
-  FileText, CheckCircle2
+  FileText, CheckCircle2, Clock
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -22,12 +23,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Hooks
-import {
-  useDashboardStats, useRecentActivity, useUpcomingEvents,
-  useFeeOverview, useTaskOverview, useSyllabusOverview,
-  type DashboardStats
-} from '../../hooks/useDashboard';
-import { useClass } from '../../hooks/useClasses';
+import { useDashboardBundle, type DashboardStats } from '../../hooks/useDashboard';
 import { useCapabilities } from '../../hooks/useCapabilities';
 
 // UI Kit Components
@@ -51,10 +47,232 @@ import {
 
 // Legacy components (to be migrated)
 import { ThreeStateView } from '../../components/common/ThreeStateView';
-import { ProgressRing } from '../../components/analytics/ProgressRing';
+import { ProgressRing } from '../../components/ui/ProgressRing';
+
+// New Dashboard Components
+import { InsightCard, ActionRequiredBanner, SparklineCard, StreakBadge, type ActionItem } from '../../components/dashboard';
 import { log } from '../../lib/logger';
+import { useNotificationContext } from '../../contexts/NotificationContext';
+import { Bell, RefreshCw } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ============================================================================
+// PUSH NOTIFICATION DEBUG (Superadmin only)
+// ============================================================================
+
+function PushNotificationDebug() {
+  const { colors, spacing, borderRadius, shadows, typography } = useTheme();
+  const { pushToken, permissionGranted, sendTestNotification, reRegister } = useNotificationContext();
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [lastAction, setLastAction] = React.useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = React.useState<'unknown' | 'syncing' | 'success' | 'failed'>('unknown');
+
+  const handleTestNotification = async () => {
+    setIsLoading(true);
+    setLastAction('Sending test notification...');
+    try {
+      await sendTestNotification();
+      setLastAction('✅ Local test notification sent!');
+    } catch (error) {
+      setLastAction(`❌ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+    }
+    setIsLoading(false);
+  };
+
+  const handleReRegister = async () => {
+    setIsLoading(true);
+    setSyncStatus('syncing');
+    setLastAction('Re-registering push token...');
+    try {
+      await reRegister();
+      // Check if token exists after re-registration
+      setTimeout(() => {
+        if (pushToken) {
+          setSyncStatus('success');
+          setLastAction('✅ Token generated! Now testing server sync...');
+          // Try direct sync test
+          testServerSync();
+        } else {
+          setSyncStatus('failed');
+          setLastAction('❌ Token generation failed');
+        }
+      }, 1000);
+    } catch (error) {
+      setSyncStatus('failed');
+      setLastAction(`❌ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
+      setIsLoading(false);
+    }
+  };
+
+  const testServerSync = async () => {
+    if (!pushToken) {
+      setLastAction('❌ No token to sync');
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      const { supabase } = await import('../../lib/supabase');
+      const { error } = await supabase.rpc('register_push_token', {
+        p_token: pushToken,
+        p_device_type: Platform.OS,
+      });
+      
+      if (error) {
+        setSyncStatus('failed');
+        setLastAction(`❌ RPC Error: ${error.message} (code: ${error.code})`);
+      } else {
+        setSyncStatus('success');
+        setLastAction('✅ Token synced to server! Try sending a notification now.');
+      }
+    } catch (err) {
+      setSyncStatus('failed');
+      setLastAction(`❌ Sync exception: ${err instanceof Error ? err.message : 'Unknown'}`);
+    }
+    setIsLoading(false);
+  };
+
+  return (
+    <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+        <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+          🔔 Push Debug
+        </RNText>
+      </View>
+      <View style={{
+        backgroundColor: colors.surface.primary,
+        borderRadius: borderRadius.lg,
+        padding: spacing.lg,
+        ...shadows.sm,
+        borderWidth: 1,
+        borderColor: colors.warning[200],
+      }}>
+        {/* Status */}
+        <View style={{ marginBottom: spacing.md }}>
+          <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.secondary, marginBottom: spacing.xs }}>
+            Permission Status
+          </RNText>
+          <RNText style={{ fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.bold, color: permissionGranted ? colors.success[600] : colors.error[600] }}>
+            {permissionGranted ? '✅ Granted' : '❌ Not Granted'}
+          </RNText>
+        </View>
+
+        <View style={{ marginBottom: spacing.md }}>
+          <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.secondary, marginBottom: spacing.xs }}>
+            Push Token
+          </RNText>
+          <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }} numberOfLines={2}>
+            {pushToken || 'No token generated'}
+          </RNText>
+        </View>
+
+        {lastAction && (
+          <View style={{ backgroundColor: colors.background.secondary, padding: spacing.sm, borderRadius: borderRadius.md, marginBottom: spacing.md }}>
+            <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.primary }}>
+              {lastAction}
+            </RNText>
+          </View>
+        )}
+
+        {/* Sync Status */}
+        {syncStatus !== 'unknown' && (
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            marginBottom: spacing.sm,
+            padding: spacing.xs,
+            borderRadius: borderRadius.sm,
+            backgroundColor: syncStatus === 'success' ? colors.success[50] : syncStatus === 'failed' ? colors.error[50] : colors.warning[50],
+          }}>
+            <RNText style={{ 
+              fontSize: typography.fontSize.sm, 
+              color: syncStatus === 'success' ? colors.success[700] : syncStatus === 'failed' ? colors.error[700] : colors.warning[700],
+              fontWeight: typography.fontWeight.medium,
+            }}>
+              Server Sync: {syncStatus === 'syncing' ? '⏳ Syncing...' : syncStatus === 'success' ? '✅ Synced' : '❌ Failed'}
+            </RNText>
+          </View>
+        )}
+
+        {/* Actions */}
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+          <TouchableOpacity
+            onPress={handleReRegister}
+            disabled={isLoading}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.primary[600],
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.md,
+              borderRadius: borderRadius.md,
+              opacity: isLoading ? 0.6 : 1,
+              gap: spacing.xs,
+            }}
+          >
+            <RefreshCw size={16} color={colors.text.inverse} />
+            <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
+              Re-register
+            </RNText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={testServerSync}
+            disabled={isLoading || !pushToken}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: pushToken ? colors.warning[600] : colors.neutral[400],
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.md,
+              borderRadius: borderRadius.md,
+              opacity: isLoading ? 0.6 : 1,
+              gap: spacing.xs,
+            }}
+          >
+            <RefreshCw size={16} color={colors.text.inverse} />
+            <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
+              Force Sync
+            </RNText>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <TouchableOpacity
+            onPress={handleTestNotification}
+            disabled={isLoading || !pushToken}
+            style={{
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: pushToken ? colors.success[600] : colors.neutral[400],
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.md,
+              borderRadius: borderRadius.md,
+              opacity: isLoading ? 0.6 : 1,
+              gap: spacing.xs,
+            }}
+          >
+            <Bell size={16} color={colors.text.inverse} />
+            <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
+              Test Local
+            </RNText>
+          </TouchableOpacity>
+        </View>
+
+        <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary, marginTop: spacing.md, textAlign: 'center' }}>
+          Check Metro/Logcat console for [PUSH] logs
+        </RNText>
+      </View>
+    </View>
+  );
+}
 
 // ============================================================================
 // SUB-COMPONENTS
@@ -69,59 +287,47 @@ interface QuickActionProps {
 }
 
 function QuickAction({ title, icon: Icon, color, bgColor, onPress }: QuickActionProps) {
-  const { spacing, borderRadius, shadows, colors: themeColors, typography } = useTheme();
+  const { spacing, shadows, colors: themeColors, typography } = useTheme();
 
   return (
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
       style={{
-        width: 80,
-        minHeight: 100,
         alignItems: 'center',
         justifyContent: 'flex-start',
-        backgroundColor: themeColors.surface.primary,
-        borderRadius: borderRadius.md,
-        paddingTop: spacing.sm,
-        paddingBottom: spacing.sm,
-        paddingHorizontal: spacing.xs,
-        ...shadows.sm,
-        borderWidth: 0.5,
-        borderColor: themeColors.border.light,
-        marginRight: spacing.sm,
+        marginRight: spacing.lg,
+        width: 70, // Fixed width for alignment
       }}
     >
       <View style={{
-        width: 44,
-        height: 44,
-        borderRadius: borderRadius.md,
+        width: 56,
+        height: 56,
+        borderRadius: 20, // Squircle-ish
+        // Use elevated surface instead of colored bg for clearer look, or keep colored
+        // Let's use the bgColor passed in but maybe softer or just white/elevated with colored icon
+        // actually the colored bg is nice for differentiation. Let's keep it but make it rounder/cleaner
         backgroundColor: bgColor,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: spacing.sm,
+        marginBottom: spacing.xs,
+        // ...shadows.sm, // Subtle shadow
       }}>
-        <Icon size={20} color={color} strokeWidth={2.5} />
+        <Icon size={24} color={color} strokeWidth={2.5} />
       </View>
-      <View style={{
-        width: '100%',
-        minHeight: 28,
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}>
-        <RNText
-          style={{
-            fontSize: 11,
-            fontWeight: typography.fontWeight.semibold,
-            color: themeColors.text.primary,
-            textAlign: 'center',
-            lineHeight: 14,
-          }}
-          numberOfLines={2}
-          ellipsizeMode="tail"
-        >
-          {title}
-        </RNText>
-      </View>
+      <RNText
+        style={{
+          fontSize: 12,
+          fontWeight: typography.fontWeight.medium,
+          color: themeColors.text.primary,
+          textAlign: 'center',
+          lineHeight: 16,
+        }}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
+        {title}
+      </RNText>
     </TouchableOpacity>
   );
 }
@@ -144,6 +350,7 @@ function StatCard({
   onPress, showProgress, progressValue, trend
 }: StatCardProps) {
   const { colors, spacing, borderRadius, shadows, typography } = useTheme();
+  // Use slightly larger width or flexible
   const cardWidth = (SCREEN_WIDTH - spacing.md * 2 - spacing.sm) / 2;
 
   return (
@@ -152,36 +359,36 @@ function StatCard({
       onPress={onPress}
       style={{
         width: cardWidth,
-        backgroundColor: colors.surface.primary,
+        backgroundColor: colors.surface.elevated, // Elevated for better contrast
         padding: spacing.md,
-        borderRadius: borderRadius.lg,
-        borderWidth: 0.5,
-        borderColor: colors.border.light,
+        borderRadius: borderRadius.xl, // Rounder
+        // No border
         ...shadows.sm,
+        marginBottom: spacing.sm,
       }}
     >
       {/* Header: Icon and Actions */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
         <View style={{
-          width: 44,
-          height: 44,
-          borderRadius: borderRadius.md,
+          width: 40,
+          height: 40,
+          borderRadius: 12,
           backgroundColor: bgColor,
           justifyContent: 'center',
           alignItems: 'center',
         }}>
-          <Icon size={22} color={color} strokeWidth={2.5} />
+          <Icon size={20} color={color} strokeWidth={2.5} />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-          {trend && (
+          {/* Trend or Arrow */}
+          {trend ? (
             trend === 'up' ? (
               <ArrowUpRight size={16} color={colors.success[600]} />
             ) : (
               <ArrowDownRight size={16} color={colors.error[600]} />
             )
-          )}
-          {onPress && (
-            <ChevronRight size={18} color={colors.text.tertiary} />
+          ) : onPress && (
+            <ChevronRight size={16} color={colors.text.tertiary} />
           )}
         </View>
       </View>
@@ -201,48 +408,41 @@ function StatCard({
             position: 'absolute',
             fontSize: typography.fontSize.xl,
             fontWeight: typography.fontWeight.bold,
-            color: colors.text.primary
+            color: colors.text.primary,
+            top: 18, // Adjust visual centering
           }}>
             {value}
           </RNText>
         </View>
       ) : (
         <RNText style={{
-          fontSize: typography.fontSize['2xl'],
+          fontSize: 28, // Larger
           fontWeight: typography.fontWeight.bold,
           color: colors.text.primary,
-          marginBottom: spacing.xs
+          marginBottom: 4
         }}>
           {value}
         </RNText>
       )}
 
-      {/* Title */}
+      {/* Title & Badge */}
       <RNText style={{
         fontSize: typography.fontSize.sm,
         color: colors.text.secondary,
         fontWeight: typography.fontWeight.medium,
-        marginBottom: spacing.sm
+        marginBottom: spacing.xs
       }}>
         {title}
       </RNText>
 
-      {/* Badge */}
-      <View style={{
-        backgroundColor: color,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 5,
-        borderRadius: borderRadius.sm,
-        alignSelf: 'flex-start',
+      {/* Status/Change Text */}
+      <RNText style={{
+        fontSize: 12,
+        fontWeight: typography.fontWeight.medium,
+        color: color // Match icon color
       }}>
-        <RNText style={{
-          fontSize: 11,
-          fontWeight: typography.fontWeight.semibold,
-          color: colors.text.inverse
-        }}>
-          {change}
-        </RNText>
-      </View>
+        {change}
+      </RNText>
     </TouchableOpacity>
   );
 }
@@ -257,16 +457,15 @@ function StatCardSkeleton() {
       minHeight: 140, // Match StatCard minHeight
       backgroundColor: colors.surface.elevated,
       padding: spacing.md,
-      borderRadius: borderRadius.lg,
-      borderWidth: 0.5,
-      borderColor: colors.border.light,
+      borderRadius: borderRadius.xl,
+      // No border
       ...shadows.sm,
+      marginBottom: spacing.sm,
       opacity: 0.6,
     }}>
-      <Skeleton width={40} height={40} variant="rounded" style={{ marginBottom: spacing.sm }} />
+      <Skeleton width={40} height={40} variant="rounded" style={{ marginBottom: spacing.lg }} />
       <Skeleton width="60%" height={28} variant="rounded" style={{ marginBottom: spacing.xs }} />
       <Skeleton width="80%" height={14} variant="rounded" style={{ marginBottom: spacing.xs }} />
-      <Skeleton width="50%" height={20} variant="rounded" style={{ marginTop: spacing.xs }} />
     </View>
   );
 }
@@ -332,117 +531,32 @@ export default function DashboardScreen() {
   // DATA FETCHING WITH HOOKS
   // ============================================================================
 
-  // Fetch class instance details (grade, section)
   const {
-    data: classInstance,
-    isLoading: classLoading
-  } = useClass(profile?.class_instance_id || undefined);
+    data: dashboardBundle,
+    isLoading: dashboardLoading,
+    error: dashboardError,
+    refetch: refetchDashboard,
+  } = useDashboardBundle(profile?.auth_id || '');
 
-  // Extract class display data from fetched instance
+  const stats = dashboardBundle?.stats;
+  const recentActivity = dashboardBundle?.recentActivity || [];
+  const upcomingEvents = dashboardBundle?.upcomingEvents || [];
+  const feeOverview = dashboardBundle?.feeOverview;
+  const taskOverview = dashboardBundle?.taskOverview;
+  const syllabusOverview = dashboardBundle?.syllabusOverview;
   const classData = React.useMemo(() => {
-    if (!classInstance) return null;
+    const classInfo = dashboardBundle?.classInfo;
+    if (!classInfo) return null;
     return {
-      grade: classInstance.grade?.toString() || '',
-      section: classInstance.section || '',
+      grade: classInfo.grade?.toString() || '',
+      section: classInfo.section || '',
     };
-  }, [classInstance]);
-
-  // Dashboard stats
-  const {
-    data: stats,
-    isLoading: statsLoading,
-    error: statsError,
-    refetch: refetchStats
-  } = useDashboardStats(
-    profile?.auth_id || '',
-    profile?.class_instance_id || undefined,
-    profile?.role
-  );
-
-  // Recent activity
-  const {
-    data: recentActivityData,
-    isLoading: activityLoading,
-    error: activityError,
-    refetch: refetchActivity
-  } = useRecentActivity(
-    profile?.auth_id || '',
-    profile?.class_instance_id || undefined
-  );
-
-  // Upcoming events
-  const {
-    data: upcomingEventsData,
-    isLoading: eventsLoading,
-    error: eventsError,
-    refetch: refetchEvents
-  } = useUpcomingEvents(
-    profile?.school_code || '',
-    profile?.class_instance_id || undefined
-  );
-
-  // Normalize data - ensure arrays are never undefined
-  const recentActivity = React.useMemo(() => {
-    const data = recentActivityData || [];
-    // Removed debug logging for production
-    return Array.isArray(data) ? data : [];
-  }, [recentActivityData, activityLoading, activityError]);
-
-  const upcomingEvents = React.useMemo(() => {
-    const data = upcomingEventsData || [];
-    // Removed debug logging for production
-    return Array.isArray(data) ? data : [];
-  }, [upcomingEventsData, eventsLoading, eventsError]);
-
-  // Fee overview (for users with read_own capability - typically students)
-  const {
-    data: feeOverview,
-    isLoading: feeLoading,
-    error: feeError,
-    refetch: refetchFee
-  } = useFeeOverview(canViewOwnDataOnly ? (profile?.auth_id || '') : '');
-
-  // Task overview (for users with read_own capability - typically students)
-  const {
-    data: taskOverview,
-    isLoading: taskLoading,
-    error: taskError,
-    refetch: refetchTask
-  } = useTaskOverview(
-    canViewOwnDataOnly ? (profile?.auth_id || '') : '',
-    profile?.class_instance_id || undefined
-  );
-
-  // Syllabus overview (for users with read_own capability - typically students)
-  const {
-    data: syllabusOverview,
-    isLoading: syllabusLoading,
-    error: syllabusError,
-    refetch: refetchSyllabus
-  } = useSyllabusOverview(
-    canViewOwnDataOnly && profile?.class_instance_id ? profile.class_instance_id : ''
-  );
+  }, [dashboardBundle?.classInfo]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const promises: Promise<any>[] = [];
-
-      if (profile?.auth_id && profile?.class_instance_id) {
-        promises.push(refetchStats(), refetchActivity());
-      }
-      if (profile?.school_code) {
-        promises.push(refetchEvents());
-      }
-      if (canViewOwnDataOnly && profile?.auth_id) {
-        promises.push(refetchFee(), refetchTask());
-      }
-      if (canViewOwnDataOnly && profile?.class_instance_id) {
-        promises.push(refetchSyllabus());
-      }
-
-      // Wait for all refetches to complete
-      await Promise.allSettled(promises);
+      await refetchDashboard();
     } catch (err) {
       log.error('Refresh error:', err);
     } finally {
@@ -460,7 +574,6 @@ export default function DashboardScreen() {
     { title: 'Fees', icon: CreditCard, color: colors.warning.main, bgColor: colors.warning[50], route: canViewOwnDataOnly ? '/(tabs)/fees-student' : '/(tabs)/fees', visible: canViewFees },
     { title: 'Assessments', icon: GraduationCap, color: colors.error.main, bgColor: colors.error[50], route: '/(tabs)/assessments', visible: can('assessments.read') || can('assessments.read_own') },
     { title: 'Tasks', icon: ClipboardList, color: colors.secondary.main, bgColor: colors.secondary[50], route: '/(tabs)/tasks', visible: canViewTasks },
-    { title: 'Analytics', icon: LineChart, color: colors.info.main, bgColor: colors.info[50], route: '/(tabs)/analytics', visible: canViewAnalytics },
     { title: 'Payments', icon: ReceiptText, color: colors.warning.main, bgColor: colors.warning[50], route: '/(tabs)/payments', visible: canViewPayments },
     { title: 'Management', icon: Building2, color: colors.neutral[600], bgColor: colors.neutral[50], route: '/(tabs)/manage', visible: canViewManagement },
   ];
@@ -478,6 +591,7 @@ export default function DashboardScreen() {
   // Dashboard stats data - using capability-based display logic
   // Type guard to ensure stats is a valid DashboardStats object
   const typedStats = stats as DashboardStats | undefined;
+
   const dashboardStats = typedStats ? [
     {
       title: "Today's Classes",
@@ -527,8 +641,8 @@ export default function DashboardScreen() {
   ] : [];
 
   // Determine overall view state
-  const isLoading = authLoading || capabilitiesLoading || statsLoading || activityLoading || eventsLoading;
-  const hasError = statsError || activityError || eventsError;
+  const isLoading = authLoading || capabilitiesLoading || dashboardLoading;
+  const hasError = dashboardError;
 
   const viewState = isLoading ? 'loading'
     : hasError ? 'error'
@@ -549,7 +663,7 @@ export default function DashboardScreen() {
       state={viewState}
       loadingMessage="Loading dashboard..."
       errorMessage="Failed to load dashboard"
-      errorDetails={(statsError as any)?.message || (activityError as any)?.message || undefined}
+      errorDetails={(dashboardError as any)?.message || undefined}
       emptyMessage={
         hasIncompleteProfile
           ? "Profile setup required. Please contact your administrator to complete your account setup."
@@ -570,29 +684,36 @@ export default function DashboardScreen() {
           />
         }
       >
-        {/* Profile Header - Modern Design */}
-        <View style={{ paddingHorizontal: spacing.md, paddingTop: spacing.lg, paddingBottom: spacing.md, marginBottom: spacing.sm }}>
-          <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, fontWeight: typography.fontWeight.medium, marginBottom: spacing.xs }}>
-            {getGreeting()} 👋
+        {/* Profile Header - Enhanced with Animation */}
+        <Animated.View
+          entering={FadeInDown.delay(0).springify()}
+          style={{ paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.md, marginBottom: 0 }}
+        >
+          <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, fontWeight: typography.fontWeight.medium }}>
+            {getGreeting()}
           </RNText>
-          <Row spacing="xs" align="center">
-            <Heading level={2} style={{ fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
-              {profile?.full_name || 'User'}
+          <Row spacing="xs" align="center" style={{ marginTop: 2 }}>
+            <Heading level={2} style={{ fontWeight: typography.fontWeight.bold, color: colors.text.primary, fontSize: 24 }}>
+              {profile?.full_name || 'User'} 👋
             </Heading>
-            {classData && (
-              <RNText style={{ fontSize: typography.fontSize.base, color: colors.text.secondary, marginLeft: spacing.xs }}>
-                • Class {classData.grade}-{classData.section}
-              </RNText>
-            )}
+            {/* Optional: Add a profile picture here if needed, or keep it minimal */}
           </Row>
-        </View>
+          {classData && (
+            <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.tertiary, marginTop: 2 }}>
+              Class {classData.grade}-{classData.section} Student
+            </RNText>
+          )}
+        </Animated.View>
 
-        {/* Quick Actions - Horizontal Scrollable */}
-        <View style={{ marginBottom: spacing.lg }}>
+        {/* Quick Actions - Horizontal Scrollable with Animation */}
+        <Animated.View
+          entering={FadeInDown.delay(100).springify()}
+          style={{ marginBottom: spacing.sm }}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.sm }}
+            contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }} // Removed gap, handled by margin
           >
             {quickActions.map((action, index) => (
               <QuickAction
@@ -605,45 +726,348 @@ export default function DashboardScreen() {
               />
             ))}
           </ScrollView>
-        </View>
+        </Animated.View>
 
-        {/* Stats Grid */}
-        <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
-          <Row wrap spacing="sm">
-            {statsLoading ? (
-              Array.from({ length: 4 }).map((_, index) => (
-                <StatCardSkeleton key={index} />
-              ))
-            ) : (
-              dashboardStats.map((stat, index) => (
-                <StatCard
-                  key={index}
-                  title={stat.title}
-                  value={stat.value}
-                  change={stat.change}
-                  icon={stat.icon}
-                  color={stat.color}
-                  bgColor={stat.bgColor}
-                  onPress={() => stat.route && router.push(stat.route as any)}
-                  showProgress={stat.showProgress}
-                  progressValue={stat.progressValue}
-                  trend={stat.trend}
-                />
-              ))
-            )}
-          </Row>
-        </View>
+        {/* SuperAdmin: 2 Large Hero Cards */}
+        {profile?.role === 'superadmin' ? (
+          <Animated.View
+            entering={FadeInDown.delay(150).springify()}
+            style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg, gap: spacing.md }}
+          >
+            {/* Attendance Card - Large */}
+            <View style={{
+              backgroundColor: colors.surface.primary,
+              borderRadius: borderRadius.xl,
+              padding: spacing.xl,
+              borderWidth: 1,
+              borderColor: colors.border.light,
+              ...shadows.md
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.lg }}>
+                <View>
+                  <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, fontWeight: typography.fontWeight.medium, marginBottom: spacing.xs }}>
+                    School-Wide Attendance
+                  </RNText>
+                  <RNText style={{ fontSize: 48, fontWeight: typography.fontWeight.bold, color: colors.success[600] }}>
+                    {typedStats?.attendancePercentage || 0}%
+                  </RNText>
+                  <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.tertiary, marginTop: spacing.xs }}>
+                    Today's attendance rate
+                  </RNText>
+                  {/* Partial Data Indicator */}
+                  {typedStats?.isPartialData && (
+                    <View style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: colors.warning[50],
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 4,
+                      borderRadius: borderRadius.sm,
+                      marginTop: spacing.xs,
+                      alignSelf: 'flex-start'
+                    }}>
+                      <Clock size={12} color={colors.warning[700]} style={{ marginRight: 4 }} />
+                      <RNText style={{ fontSize: typography.fontSize.xs, color: colors.warning[800], fontWeight: typography.fontWeight.medium }}>
+                        Marking in progress ({typedStats?.markedClassesCount || 0}/{typedStats?.totalClassesCount || 0})
+                      </RNText>
+                    </View>
+                  )}
+                </View>
+                <View style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: borderRadius.lg,
+                  backgroundColor: colors.success[50],
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <UserCheck size={32} color={colors.success[600]} strokeWidth={2.5} />
+                </View>
+              </View>
 
-        {/* Quick Stats (Admin Only) - Modern Design */}
-        {canViewAdminStats && (
-          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-              <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
-                Quick Stats
+              {/* Progress Bar */}
+              <View style={{ height: 8, backgroundColor: colors.neutral[100], borderRadius: borderRadius.full, overflow: 'hidden' }}>
+                <View style={{
+                  width: `${typedStats?.attendancePercentage || 0}%`,
+                  height: '100%',
+                  backgroundColor: colors.success[600],
+                  borderRadius: borderRadius.full
+                }} />
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.md }}>
+                <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary }}>
+                  {typedStats?.totalStudents || 0} Total Students
+                </RNText>
+                <TouchableOpacity onPress={() => router.push('/(tabs)/attendance' as any)}>
+                  <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.primary[600] }}>
+                    View Details →
+                  </RNText>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Classes Scheduled Card - Large */}
+            <View style={{
+              backgroundColor: colors.surface.primary,
+              borderRadius: borderRadius.xl,
+              padding: spacing.xl,
+              borderWidth: 1,
+              borderColor: colors.border.light,
+              ...shadows.md
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.lg }}>
+                <View>
+                  <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.secondary, fontWeight: typography.fontWeight.medium, marginBottom: spacing.xs }}>
+                    Classes Scheduled
+                  </RNText>
+                  <RNText style={{ fontSize: 48, fontWeight: typography.fontWeight.bold, color: colors.primary[600] }}>
+                    {typedStats?.todaysClasses || 0}
+                  </RNText>
+                  <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.tertiary, marginTop: spacing.xs }}>
+                    Classes running today
+                  </RNText>
+                </View>
+                <View style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: borderRadius.lg,
+                  backgroundColor: colors.primary[50],
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <CalendarDays size={32} color={colors.primary[600]} strokeWidth={2.5} />
+                </View>
+              </View>
+
+              {/* Stats Row */}
+              <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
+                <View style={{ flex: 1, backgroundColor: colors.background.secondary, padding: spacing.md, borderRadius: borderRadius.md }}>
+                  <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary, marginBottom: 4 }}>
+                    Active Tasks
+                  </RNText>
+                  <RNText style={{ fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+                    {typedStats?.pendingAssignments || 0}
+                  </RNText>
+                </View>
+                <View style={{ flex: 1, backgroundColor: colors.background.secondary, padding: spacing.md, borderRadius: borderRadius.md }}>
+                  <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary, marginBottom: 4 }}>
+                    Upcoming Tests
+                  </RNText>
+                  <RNText style={{ fontSize: typography.fontSize.xl, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+                    {typedStats?.upcomingTests || 0}
+                  </RNText>
+                </View>
+              </View>
+
+              <TouchableOpacity onPress={() => router.push('/(tabs)/timetable' as any)}>
+                <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.primary[600], textAlign: 'right' }}>
+                  View Timetable →
+                </RNText>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        ) : (
+          <>
+            {/* Stats Grid - Enhanced with Sparklines (for non-SuperAdmins) */}
+            <Animated.View
+              entering={FadeInDown.delay(150).springify()}
+              style={{ paddingHorizontal: spacing.md, marginBottom: spacing.md }}
+            >
+              <RNText style={{
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                color: colors.text.primary,
+                marginBottom: spacing.sm
+              }}>
+                At a Glance
               </RNText>
-              <TouchableOpacity onPress={() => router.push('/analytics')}>
-                <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.primary[600] }}>
-                  Analytics
+              <View style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                marginHorizontal: -spacing.xs / 2,
+              }}>
+                {dashboardLoading ? (
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <View key={index} style={{ 
+                      width: '50%',
+                      paddingHorizontal: spacing.xs / 2,
+                      marginBottom: spacing.xs,
+                    }}>
+                      <StatCardSkeleton />
+                    </View>
+                  ))
+                ) : dashboardStats.length === 0 ? (
+                  <View style={{ width: '100%', padding: spacing.lg, alignItems: 'center' }}>
+                    <RNText style={{ color: colors.text.secondary, fontSize: typography.fontSize.sm }}>
+                      No stats available. Pull down to refresh.
+                    </RNText>
+                  </View>
+                ) : (
+                  dashboardStats.map((stat, index) => {
+                    return (
+                      <View key={index} style={{ 
+                        width: '50%',
+                        paddingHorizontal: spacing.xs / 2,
+                        marginBottom: spacing.xs,
+                      }}>
+                        <SparklineCard
+                          title={stat.title}
+                          value={stat.value}
+                          subtitle={stat.change}
+                          trend={undefined}
+                          sparklineData={[]}
+                          color={stat.color}
+                          bgColor={stat.bgColor}
+                          icon={stat.icon}
+                          onPress={stat.route ? () => router.push(stat.route as any) : undefined}
+                          animationDelay={200 + index * 50}
+                          fullWidth={false}
+                        />
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            </Animated.View>
+
+            {/* Action Required Banner - Compact Design (Tasks Only) */}
+            {canViewOwnDataOnly && taskOverview?.overdue && taskOverview.overdue > 0 && (
+              <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.md }}>
+                <View style={{
+                  backgroundColor: colors.warning[50],
+                  borderLeftWidth: 4,
+                  borderLeftColor: colors.warning[600],
+                  borderRadius: borderRadius.md,
+                  padding: spacing.md,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                }}>
+                  <AlertCircle size={20} color={colors.warning[700]} />
+                  <View style={{ flex: 1 }}>
+                    <RNText style={{
+                      fontSize: typography.fontSize.sm,
+                      fontWeight: typography.fontWeight.semibold,
+                      color: colors.warning[900],
+                      marginBottom: 2
+                    }}>
+                      Needs Attention
+                    </RNText>
+                    <RNText style={{
+                      fontSize: typography.fontSize.xs,
+                      color: colors.warning[800]
+                    }}>
+                      {taskOverview.overdue} overdue task{taskOverview.overdue > 1 ? 's' : ''}
+                    </RNText>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => router.push('/tasks')}
+                    style={{
+                      backgroundColor: colors.warning[600],
+                      paddingHorizontal: spacing.sm,
+                      paddingVertical: 6,
+                      borderRadius: borderRadius.sm,
+                    }}
+                  >
+                    <RNText style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.semibold,
+                      color: '#fff'
+                    }}>
+                      View
+                    </RNText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Quick Stats (Admin Only) - Modern Design */}
+            {canViewAdminStats && (
+              <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+                  <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+                    Quick Stats
+                  </RNText>
+                </View>
+                <View style={{
+                  backgroundColor: colors.surface.primary,
+                  borderRadius: borderRadius.lg,
+                  padding: spacing.md,
+                  ...shadows.sm,
+                  borderWidth: 0.5,
+                  borderColor: colors.border.light,
+                }}>
+                  {[
+                    { icon: UserCheck, label: 'Class Attendance', value: `${typedStats?.attendancePercentage || 0}% Today`, color: colors.success[600] },
+                    { icon: FolderOpen, label: 'Resources Shared', value: 'View resources →', color: colors.info[600] },
+                    { icon: LineChart, label: 'Class Performance', value: 'View analytics →', color: colors.secondary[600] },
+                  ].map((item, index, arr) => (
+                    <React.Fragment key={index}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm }}>
+                        <View style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: borderRadius.md,
+                          backgroundColor: item.color === colors.success[600] ? colors.success[50] :
+                            item.color === colors.info[600] ? colors.info[50] :
+                              colors.secondary[50],
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginRight: spacing.sm,
+                        }}>
+                          <item.icon size={18} color={item.color} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <RNText style={{
+                            fontSize: typography.fontSize.xs,
+                            color: colors.text.secondary,
+                            marginBottom: 2
+                          }}>
+                            {item.label}
+                          </RNText>
+                          <RNText style={{
+                            fontSize: typography.fontSize.base,
+                            fontWeight: typography.fontWeight.semibold,
+                            color: colors.text.primary
+                          }}>
+                            {item.value}
+                          </RNText>
+                        </View>
+                      </View>
+                      {index < arr.length - 1 && (
+                        <View style={{
+                          height: 0.5,
+                          backgroundColor: colors.border.light,
+                          marginLeft: 44
+                        }} />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </View>
+              </View>
+            )}
+          </>
+        )}
+
+        {/* Task Overview (for users viewing own data) - Compact Design */}
+        {canViewOwnDataOnly && taskOverview && taskOverview.total > 0 && (
+          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+              <RNText style={{
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                color: colors.text.primary
+              }}>
+                Task Overview
+              </RNText>
+              <TouchableOpacity onPress={() => router.push('/tasks')}>
+                <RNText style={{
+                  fontSize: typography.fontSize.xs,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.primary[600]
+                }}>
+                  View All
                 </RNText>
               </TouchableOpacity>
             </View>
@@ -655,147 +1079,56 @@ export default function DashboardScreen() {
               borderWidth: 0.5,
               borderColor: colors.border.light,
             }}>
-              {[
-                { icon: UserCheck, label: 'Class Attendance', value: `${typedStats?.attendancePercentage || 0}% Today`, color: colors.success[600] },
-                { icon: FolderOpen, label: 'Resources Shared', value: 'View resources →', color: colors.info[600] },
-                { icon: LineChart, label: 'Class Performance', value: 'View analytics →', color: colors.secondary[600] },
-              ].map((item, index, arr) => (
-                <React.Fragment key={index}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm }}>
-                    <View style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: borderRadius.md,
-                      backgroundColor: item.color === colors.success[600] ? colors.success[50] :
-                        item.color === colors.info[600] ? colors.info[50] :
-                          colors.secondary[50],
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      marginRight: spacing.sm,
+              <View style={{
+                flexDirection: 'row',
+                justifyContent: 'space-around'
+              }}>
+                {[
+                  { value: taskOverview.total, label: 'Total', color: colors.text.primary },
+                  { value: taskOverview.completed, label: 'Completed', color: colors.success[600] },
+                  { value: taskOverview.dueThisWeek, label: 'This Week', color: colors.warning[600] },
+                  { value: taskOverview.overdue, label: 'Overdue', color: colors.error[600] },
+                ].map((item, index) => (
+                  <View key={index} style={{ alignItems: 'center' }}>
+                    <RNText style={{
+                      fontSize: typography.fontSize.xl,
+                      fontWeight: typography.fontWeight.bold,
+                      color: item.color,
+                      marginBottom: 2
                     }}>
-                      <item.icon size={18} color={item.color} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <RNText style={{
-                        fontSize: typography.fontSize.xs,
-                        color: colors.text.secondary,
-                        marginBottom: 2
-                      }}>
-                        {item.label}
-                      </RNText>
-                      <RNText style={{
-                        fontSize: typography.fontSize.base,
-                        fontWeight: typography.fontWeight.semibold,
-                        color: colors.text.primary
-                      }}>
-                        {item.value}
-                      </RNText>
-                    </View>
+                      {item.value}
+                    </RNText>
+                    <RNText style={{
+                      fontSize: typography.fontSize.xs,
+                      color: colors.text.secondary,
+                      fontWeight: typography.fontWeight.medium
+                    }}>
+                      {item.label}
+                    </RNText>
                   </View>
-                  {index < arr.length - 1 && (
-                    <View style={{
-                      height: 0.5,
-                      backgroundColor: colors.border.light,
-                      marginLeft: 44
-                    }} />
-                  )}
-                </React.Fragment>
-              ))}
+                ))}
+              </View>
             </View>
           </View>
         )}
 
-        {/* Task Overview (for users viewing own data) - Modern Design */}
-        {canViewOwnDataOnly && taskOverview && (
-          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-              <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
-                Task Overview
-              </RNText>
-              <TouchableOpacity onPress={() => router.push('/tasks')}>
-                <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.primary[600] }}>
-                  View All
-                </RNText>
-              </TouchableOpacity>
-            </View>
-            <View style={{
-              backgroundColor: colors.surface.primary,
-              borderRadius: borderRadius.lg,
-              padding: spacing.lg,
-              ...shadows.sm,
-              borderWidth: 0.5,
-              borderColor: colors.border.light,
-            }}>
-              {taskOverview.total > 0 ? (
-                <>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.md }}>
-                    {[
-                      { value: taskOverview.total, label: 'Total', color: colors.text.primary },
-                      { value: taskOverview.completed, label: 'Completed', color: colors.success[600] },
-                      { value: taskOverview.dueThisWeek, label: 'This Week', color: colors.warning[600] },
-                      { value: taskOverview.overdue, label: 'Overdue', color: colors.error[600] },
-                    ].map((item, index) => (
-                      <View key={index} style={{ alignItems: 'center' }}>
-                        <RNText style={{
-                          fontSize: typography.fontSize.xl,
-                          fontWeight: typography.fontWeight.bold,
-                          color: item.color,
-                          marginBottom: spacing.xs
-                        }}>
-                          {item.value}
-                        </RNText>
-                        <RNText style={{
-                          fontSize: typography.fontSize.xs,
-                          color: colors.text.secondary,
-                          fontWeight: typography.fontWeight.medium
-                        }}>
-                          {item.label}
-                        </RNText>
-                      </View>
-                    ))}
-                  </View>
-                  {taskOverview.overdue > 0 && (
-                    <View style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: colors.error[50],
-                      padding: spacing.sm,
-                      borderRadius: borderRadius.md,
-                      gap: spacing.xs,
-                    }}>
-                      <AlertCircle size={16} color={colors.error[600]} />
-                      <RNText style={{
-                        fontSize: typography.fontSize.sm,
-                        color: colors.error[700],
-                        fontWeight: typography.fontWeight.medium
-                      }}>
-                        You have {taskOverview.overdue} overdue task{taskOverview.overdue > 1 ? 's' : ''}
-                      </RNText>
-                    </View>
-                  )}
-                </>
-              ) : (
-                <DashboardEmptyState
-                  icon={CheckCircle2}
-                  title="All caught up! 🎉"
-                  message="No tasks assigned yet. Check back soon for new homework and assignments."
-                  actionLabel="View All Tasks"
-                  onAction={() => router.push('/tasks')}
-                />
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* Syllabus Progress (for users viewing own data) - Modern Design */}
-        {canViewOwnDataOnly && syllabusOverview && (
-          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-              <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+        {/* Syllabus Progress (for users viewing own data) - Compact Design */}
+        {canViewOwnDataOnly && syllabusOverview && syllabusOverview.totalSubjects > 0 && syllabusOverview.subjectBreakdown.length > 0 && (
+          <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+              <RNText style={{
+                fontSize: typography.fontSize.base,
+                fontWeight: typography.fontWeight.bold,
+                color: colors.text.primary
+              }}>
                 Syllabus Progress
               </RNText>
               <TouchableOpacity onPress={() => router.push('/syllabus')}>
-                <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.primary[600] }}>
+                <RNText style={{
+                  fontSize: typography.fontSize.xs,
+                  fontWeight: typography.fontWeight.semibold,
+                  color: colors.primary[600]
+                }}>
                   View All
                 </RNText>
               </TouchableOpacity>
@@ -803,119 +1136,104 @@ export default function DashboardScreen() {
             <View style={{
               backgroundColor: colors.surface.primary,
               borderRadius: borderRadius.lg,
-              padding: spacing.lg,
+              padding: spacing.md,
               ...shadows.sm,
               borderWidth: 0.5,
               borderColor: colors.border.light,
             }}>
-              {syllabusOverview.totalSubjects > 0 && syllabusOverview.subjectBreakdown.length > 0 ? (
-                <>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
-                    <View style={{ position: 'relative', marginRight: spacing.lg }}>
-                      <ProgressRing
-                        progress={syllabusOverview.overallProgress}
-                        size={80}
-                        strokeWidth={8}
-                        color={colors.primary[600]}
-                        backgroundColor={colors.neutral[100]}
-                        showPercentage={false}
-                      />
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
+                <View style={{ position: 'relative', marginRight: spacing.md }}>
+                  <ProgressRing
+                    progress={syllabusOverview.overallProgress}
+                    size={60}
+                    strokeWidth={6}
+                    color={colors.primary[600]}
+                    backgroundColor={colors.neutral[100]}
+                    showPercentage={false}
+                  />
+                  <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                    <RNText style={{
+                      fontSize: typography.fontSize.base,
+                      fontWeight: typography.fontWeight.bold,
+                      color: colors.text.primary
+                    }}>
+                      {syllabusOverview.overallProgress}%
+                    </RNText>
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <RNText style={{
+                    fontSize: typography.fontSize.sm,
+                    fontWeight: typography.fontWeight.semibold,
+                    color: colors.text.primary,
+                    marginBottom: 2
+                  }}>
+                    Overall Progress
+                  </RNText>
+                  <RNText style={{
+                    fontSize: typography.fontSize.xs,
+                    color: colors.text.secondary
+                  }}>
+                    {syllabusOverview.subjectBreakdown.reduce((sum, s) => sum + s.completedTopics, 0)} of{' '}
+                    {syllabusOverview.subjectBreakdown.reduce((sum, s) => sum + s.totalTopics, 0)} topics
+                  </RNText>
+                </View>
+              </View>
+
+              <View style={{ gap: spacing.sm }}>
+                {syllabusOverview.subjectBreakdown.slice(0, 3).map((subject, index) => (
+                  <View key={subject.subjectId}>
+                    {index > 0 && (
                       <View style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}>
-                        <RNText style={{
-                          fontSize: typography.fontSize.lg,
-                          fontWeight: typography.fontWeight.bold,
-                          color: colors.text.primary
-                        }}>
-                          {syllabusOverview.overallProgress}%
-                        </RNText>
-                      </View>
-                    </View>
-                    <View style={{ flex: 1 }}>
+                        height: 0.5,
+                        backgroundColor: colors.border.light,
+                        marginBottom: spacing.sm
+                      }} />
+                    )}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <RNText style={{
-                        fontSize: typography.fontSize.lg,
-                        fontWeight: typography.fontWeight.bold,
+                        fontSize: typography.fontSize.sm,
+                        fontWeight: typography.fontWeight.medium,
                         color: colors.text.primary,
-                        marginBottom: spacing.xs
-                      }}>
-                        Overall Progress
+                        flex: 1
+                      }} numberOfLines={1}>
+                        {subject.subjectName}
                       </RNText>
                       <RNText style={{
                         fontSize: typography.fontSize.sm,
-                        color: colors.text.secondary
+                        fontWeight: typography.fontWeight.bold,
+                        color: colors.primary[600]
                       }}>
-                        {syllabusOverview.subjectBreakdown.reduce((sum, s) => sum + s.completedTopics, 0)} / {' '}
-                        {syllabusOverview.subjectBreakdown.reduce((sum, s) => sum + s.totalTopics, 0)} topics completed
+                        {subject.progress}%
                       </RNText>
                     </View>
+                    <ProgressBar
+                      progress={subject.progress}
+                      fillColor={colors.primary[600]}
+                      size="sm"
+                    />
                   </View>
-
-                  <View style={{ gap: spacing.md }}>
-                    {syllabusOverview.subjectBreakdown.slice(0, 3).map((subject) => (
-                      <View key={subject.subjectId} style={{
-                        paddingTop: spacing.md,
-                        borderTopWidth: 0.5,
-                        borderTopColor: colors.border.light
-                      }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
-                          <RNText style={{
-                            fontSize: typography.fontSize.base,
-                            fontWeight: typography.fontWeight.semibold,
-                            color: colors.text.primary,
-                            flex: 1
-                          }} numberOfLines={1}>
-                            {subject.subjectName}
-                          </RNText>
-                          <RNText style={{
-                            fontSize: typography.fontSize.base,
-                            fontWeight: typography.fontWeight.bold,
-                            color: colors.primary[600]
-                          }}>
-                            {subject.progress}%
-                          </RNText>
-                        </View>
-                        <ProgressBar
-                          progress={subject.progress}
-                          fillColor={colors.primary[600]}
-                          size="sm"
-                        />
-                        <RNText style={{
-                          fontSize: typography.fontSize.xs,
-                          color: colors.text.secondary
-                        }}>
-                          {subject.completedTopics} / {subject.totalTopics} topics
-                        </RNText>
-                      </View>
-                    ))}
-                    {syllabusOverview.subjectBreakdown.length > 3 && (
-                      <TouchableOpacity onPress={() => router.push('/syllabus')} style={{ alignItems: 'center', paddingTop: spacing.sm }}>
-                        <RNText style={{
-                          fontSize: typography.fontSize.sm,
-                          fontWeight: typography.fontWeight.medium,
-                          color: colors.primary[600]
-                        }}>
-                          +{syllabusOverview.subjectBreakdown.length - 3} more subject{syllabusOverview.subjectBreakdown.length - 3 > 1 ? 's' : ''}
-                        </RNText>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </>
-              ) : (
-                <DashboardEmptyState
-                  icon={NotebookText}
-                  title="No syllabus data yet"
-                  message="Syllabus progress will appear here once your teacher starts tracking course completion."
-                  actionLabel="View Syllabus"
-                  onAction={() => router.push('/syllabus')}
-                />
-              )}
+                ))}
+                {syllabusOverview.subjectBreakdown.length > 3 && (
+                  <TouchableOpacity onPress={() => router.push('/syllabus')} style={{ alignItems: 'center', paddingTop: spacing.xs }}>
+                    <RNText style={{
+                      fontSize: typography.fontSize.xs,
+                      fontWeight: typography.fontWeight.medium,
+                      color: colors.primary[600]
+                    }}>
+                      +{syllabusOverview.subjectBreakdown.length - 3} more subject{syllabusOverview.subjectBreakdown.length - 3 > 1 ? 's' : ''}
+                    </RNText>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           </View>
         )}
@@ -965,14 +1283,14 @@ export default function DashboardScreen() {
         {/* Upcoming Events */}
         <SectionBlock title="Upcoming Events" action={{ label: 'View All', onPress: () => router.push('/calendar') }}>
           <Card variant="elevated" style={{ minHeight: 120 }}>
-            {eventsLoading ? (
+            {dashboardLoading ? (
               <Stack spacing="sm" padding="md">
                 <Skeleton width="100%" height={20} variant="rounded" />
                 <Skeleton width="80%" height={16} variant="rounded" />
                 <Skeleton width="100%" height={20} variant="rounded" style={{ marginTop: spacing.sm }} />
                 <Skeleton width="75%" height={16} variant="rounded" />
               </Stack>
-            ) : eventsError ? (
+            ) : dashboardError ? (
               <Stack align="center" padding="lg">
                 <AlertCircle size={32} color={colors.error.main} />
                 <Body color="error" align="center" style={{ marginTop: spacing.sm }}>
@@ -1022,89 +1340,94 @@ export default function DashboardScreen() {
           </Card>
         </SectionBlock>
 
-        {/* Recent Activity */}
-        <SectionBlock title="Recent Activity">
-          <Card variant="elevated" style={{ minHeight: 120 }}>
-            {activityLoading ? (
-              <Stack spacing="sm" padding="md">
-                <Skeleton width="100%" height={24} variant="rounded" />
-                <Skeleton width="70%" height={16} variant="rounded" />
-                <Skeleton width="100%" height={24} variant="rounded" style={{ marginTop: spacing.sm }} />
-                <Skeleton width="65%" height={16} variant="rounded" />
-              </Stack>
-            ) : activityError ? (
-              <Stack align="center" padding="lg">
-                <AlertCircle size={32} color={colors.error.main} />
-                <Body color="error" align="center" style={{ marginTop: spacing.sm }}>
-                  Failed to load activity. Pull down to refresh.
-                </Body>
-              </Stack>
-            ) : Array.isArray(recentActivity) && recentActivity.length > 0 ? (
-              <Stack spacing="none">
-                {recentActivity.map((activity, index) => {
-                  const getActivityIcon = (type: string) => {
-                    switch (type) {
-                      case 'attendance': return UserCheck;
-                      case 'assignment':
-                      case 'task': return NotebookText;
-                      case 'test': return Target;
-                      case 'event': return CalendarDays;
-                      default: return Activity;
-                    }
-                  };
+        {/* Push Notification Debug - Superadmin only */}
+        {profile?.role === 'superadmin' && <PushNotificationDebug />}
 
-                  const getActivityColor = (color?: string) => {
-                    switch (color) {
-                      case 'success': return { bg: colors.success[50], icon: colors.success.main };
-                      case 'error': return { bg: colors.error[50], icon: colors.error.main };
-                      case 'warning': return { bg: colors.warning[50], icon: colors.warning.main };
-                      case 'info': return { bg: colors.info[50], icon: colors.info.main };
-                      case 'secondary': return { bg: colors.secondary[50], icon: colors.secondary.main };
-                      default: return { bg: colors.primary[50], icon: colors.primary.main };
-                    }
-                  };
+        {/* Recent Activity - Hidden for superadmin */}
+        {profile?.role !== 'superadmin' && (
+          <SectionBlock title="Recent Activity">
+            <Card variant="elevated" style={{ minHeight: 120 }}>
+              {dashboardLoading ? (
+                <Stack spacing="sm" padding="md">
+                  <Skeleton width="100%" height={24} variant="rounded" />
+                  <Skeleton width="70%" height={16} variant="rounded" />
+                  <Skeleton width="100%" height={24} variant="rounded" style={{ marginTop: spacing.sm }} />
+                  <Skeleton width="65%" height={16} variant="rounded" />
+                </Stack>
+              ) : dashboardError ? (
+                <Stack align="center" padding="lg">
+                  <AlertCircle size={32} color={colors.error.main} />
+                  <Body color="error" align="center" style={{ marginTop: spacing.sm }}>
+                    Failed to load activity. Pull down to refresh.
+                  </Body>
+                </Stack>
+              ) : Array.isArray(recentActivity) && recentActivity.length > 0 ? (
+                <Stack spacing="none">
+                  {recentActivity.map((activity, index) => {
+                    const getActivityIcon = (type: string) => {
+                      switch (type) {
+                        case 'attendance': return UserCheck;
+                        case 'assignment':
+                        case 'task': return NotebookText;
+                        case 'test': return Target;
+                        case 'event': return CalendarDays;
+                        default: return Activity;
+                      }
+                    };
 
-                  const ActivityIcon = getActivityIcon(activity.type);
-                  const activityColor = getActivityColor(activity.color);
+                    const getActivityColor = (color?: string) => {
+                      switch (color) {
+                        case 'success': return { bg: colors.success[50], icon: colors.success.main };
+                        case 'error': return { bg: colors.error[50], icon: colors.error.main };
+                        case 'warning': return { bg: colors.warning[50], icon: colors.warning.main };
+                        case 'info': return { bg: colors.info[50], icon: colors.info.main };
+                        case 'secondary': return { bg: colors.secondary[50], icon: colors.secondary.main };
+                        default: return { bg: colors.primary[50], icon: colors.primary.main };
+                      }
+                    };
 
-                  return (
-                    <Row
-                      key={activity.id || `activity-${index}`}
-                      spacing="sm"
-                      align="center"
-                      style={{
-                        paddingVertical: spacing.sm,
-                        borderBottomWidth: index < recentActivity.length - 1 ? 1 : 0,
-                        borderBottomColor: colors.border.light,
-                      }}
-                    >
-                      <View style={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: borderRadius.sm,
-                        backgroundColor: activityColor.bg,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                      }}>
-                        <ActivityIcon size={16} color={activityColor.icon} />
-                      </View>
-                      <Stack spacing="none" flex>
-                        <Body weight="semibold">{activity.title}</Body>
-                        <Caption color="secondary">{activity.subtitle}</Caption>
-                      </Stack>
-                    </Row>
-                  );
-                })}
-              </Stack>
-            ) : (
-              <DashboardEmptyState
-                icon={Activity}
-                title="👀 Nothing yet"
-                message="Your activity feed will light up here soon. Check back after your first class!"
-              />
-            )}
-          </Card>
-        </SectionBlock>
+                    const ActivityIcon = getActivityIcon(activity.type);
+                    const activityColor = getActivityColor(activity.color);
+
+                    return (
+                      <Row
+                        key={activity.id || `activity-${index}`}
+                        spacing="sm"
+                        align="center"
+                        style={{
+                          paddingVertical: spacing.sm,
+                          borderBottomWidth: index < recentActivity.length - 1 ? 1 : 0,
+                          borderBottomColor: colors.border.light,
+                        }}
+                      >
+                        <View style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: borderRadius.sm,
+                          backgroundColor: activityColor.bg,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}>
+                          <ActivityIcon size={16} color={activityColor.icon} />
+                        </View>
+                        <Stack spacing="none" flex>
+                          <Body weight="semibold">{activity.title}</Body>
+                          <Caption color="secondary">{activity.subtitle}</Caption>
+                        </Stack>
+                      </Row>
+                    );
+                  })}
+                </Stack>
+              ) : (
+                <DashboardEmptyState
+                  icon={Activity}
+                  title="👀 Nothing yet"
+                  message="Your activity feed will light up here soon. Check back after your first class!"
+                />
+              )}
+            </Card>
+          </SectionBlock>
+        )}
       </ScrollView>
     </ThreeStateView>
   );

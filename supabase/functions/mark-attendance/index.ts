@@ -11,11 +11,17 @@ interface AttendanceRecord {
     school_code: string;
 }
 
+interface NotificationResult {
+    sent: boolean;
+    presentCount: number;
+    absentCount: number;
+    error?: string;
+}
+
 Deno.serve(async (req: Request) => {
     try {
         const { records }: { records: AttendanceRecord[] } = await req.json();
 
-        // Create Supabase client with service role
         const supabase = createClient(
             Deno.env.get('SUPABASE_URL')!,
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -29,7 +35,6 @@ Deno.serve(async (req: Request) => {
             );
         }
 
-        // Validate each record
         for (const record of records) {
             if (!record.student_id || !record.class_instance_id || !record.date || !record.status) {
                 return new Response(
@@ -39,7 +44,7 @@ Deno.serve(async (req: Request) => {
             }
         }
 
-        // 2. Check for existing records and separate updates vs inserts
+        // 2. Check for existing records
         const studentIds = records.map(r => r.student_id);
         const classId = records[0].class_instance_id;
         const date = records[0].date;
@@ -95,7 +100,7 @@ Deno.serve(async (req: Request) => {
             const { data, error } = await supabase
                 .from('attendance')
                 .insert(inserts)
-                .select();
+                .select('id, student_id, class_instance_id, status, date, marked_by, created_at, school_code, marked_by_role_code, updated_at');
 
             if (error) {
                 return new Response(
@@ -106,65 +111,136 @@ Deno.serve(async (req: Request) => {
             insertedData = data;
         }
 
-        // 5. Trigger notifications (async, server-controlled)
-        // Use queueMicrotask to not block response
-        queueMicrotask(async () => {
-            try {
-                const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
-                const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+        // 5. SEND NOTIFICATIONS (awaited for guaranteed delivery)
+        const notificationResult: NotificationResult = {
+            sent: false,
+            presentCount: 0,
+            absentCount: 0,
+        };
+
+        try {
+            const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+            const baseUrl = Deno.env.get('SUPABASE_URL');
+
+            // Fetch student user_ids
+            const { data: students } = await supabase
+                .from('student')
+                .select('id, user_id')
+                .in('id', studentIds);
+
+            if (students && students.length > 0) {
+                const studentMap = new Map(students.map(s => [s.id, s.user_id]));
+
+                const presentUserIds: string[] = [];
+                const absentUserIds: string[] = [];
 
                 for (const record of records) {
-                    // Fetch student's user_id from students table
-                    const { data: student } = await supabase
-                        .from('student')
-                        .select('user_id')
-                        .eq('id', record.student_id)
-                        .single();
+                    const userId = studentMap.get(record.student_id);
+                    if (!userId) continue;
 
-                    if (!student?.user_id) {
-                        console.warn(`No user_id found for student ${record.student_id}`);
-                        continue;
+                    if (record.status === 'present') {
+                        presentUserIds.push(userId);
+                    } else {
+                        absentUserIds.push(userId);
                     }
-
-                    await fetch(notificationUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': authHeader,
-                        },
-                        body: JSON.stringify({
-                            event: 'attendance_marked',
-                            targets: { user_ids: [student.user_id] },
-                            payload: {
-                                title: record.status === 'present'
-                                    ? '✅ Attendance Marked - Present!'
-                                    : '⚠️ Attendance Marked - Absent',
-                                body: record.status === 'present'
-                                    ? `Great! You were marked present today (${new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}) 🎉`
-                                    : `You were marked absent on ${new Date(record.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} 📅`,
-                                data: {
-                                    type: 'attendance',
-                                    status: record.status,
-                                    date: record.date,
-                                    class_instance_id: record.class_instance_id,
-                                },
-                            },
-                        }),
-                    });
                 }
-            } catch (err) {
-                console.error('Notification trigger failed:', err);
-                // Log but don't fail the request
-            }
-        });
 
-        // 6. Return immediately
+                notificationResult.presentCount = presentUserIds.length;
+                notificationResult.absentCount = absentUserIds.length;
+
+                const formattedDate = new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const notificationPromises: Promise<Response>[] = [];
+
+                // Send present notifications
+                if (presentUserIds.length > 0) {
+                    const notifUrl = presentUserIds.length > 50 
+                        ? `${baseUrl}/functions/v1/queue-notification`
+                        : `${baseUrl}/functions/v1/send-notification`;
+
+                    notificationPromises.push(
+                        fetch(notifUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+                            body: JSON.stringify({
+                                event: 'attendance_marked',
+                                targets: { user_ids: presentUserIds },
+                                payload: {
+                                    title: '✅ Attendance Marked - Present!',
+                                    body: `Great! You were marked present today (${formattedDate}) 🎉`,
+                                    data: {
+                                        type: 'attendance',
+                                        status: 'present',
+                                        date: date,
+                                        class_instance_id: classId,
+                                    },
+                                },
+                            }),
+                        })
+                    );
+                }
+
+                // Send absent notifications
+                if (absentUserIds.length > 0) {
+                    const notifUrl = absentUserIds.length > 50 
+                        ? `${baseUrl}/functions/v1/queue-notification`
+                        : `${baseUrl}/functions/v1/send-notification`;
+
+                    notificationPromises.push(
+                        fetch(notifUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': authHeader },
+                            body: JSON.stringify({
+                                event: 'attendance_marked',
+                                targets: { user_ids: absentUserIds },
+                                payload: {
+                                    title: '⚠️ Attendance Marked - Absent',
+                                    body: `You were marked absent on ${formattedDate} 📅`,
+                                    data: {
+                                        type: 'attendance',
+                                        status: 'absent',
+                                        date: date,
+                                        class_instance_id: classId,
+                                    },
+                                },
+                            }),
+                        })
+                    );
+                }
+
+                // Wait for all notifications to complete
+                if (notificationPromises.length > 0) {
+                    const results = await Promise.all(notificationPromises);
+                    const allOk = results.every(r => r.ok);
+                    
+                    if (allOk) {
+                        notificationResult.sent = true;
+                        console.log(`Notifications sent: ${presentUserIds.length} present, ${absentUserIds.length} absent`);
+                    } else {
+                        const failedResponses = results.filter(r => !r.ok);
+                        const errorTexts = await Promise.all(failedResponses.map(r => r.text()));
+                        notificationResult.error = `Some notifications failed: ${errorTexts.join(', ')}`;
+                        console.error('Notification errors:', notificationResult.error);
+                    }
+                } else {
+                    notificationResult.sent = true; // No notifications needed
+                }
+            } else {
+                notificationResult.sent = true; // No students to notify
+                console.log('No students found for notifications');
+            }
+        } catch (notifError) {
+            notificationResult.error = (notifError as Error).message;
+            console.error('Notification error:', notifError);
+        }
+
+        // 6. Return success with notification status
         return new Response(
             JSON.stringify({
                 success: true,
                 updated: updates.length,
                 inserted: inserts.length,
                 data: insertedData,
+                notifications: notificationResult,
             }),
             { status: 200, headers: { 'Content-Type': 'application/json' } }
         );

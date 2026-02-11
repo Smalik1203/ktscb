@@ -1,0 +1,35 @@
+{
+  "schoolCode": "SCHOOL_CODE",
+  "appName": "School Name",
+  "appSlug": "school-mobile",
+  "bundleId": "com.schoolname",
+  "scheme": "schoolname",
+  "owner": "your-expo-account",
+  
+  "branding": {
+    "primaryColor": "#6B3FA0",
+    "secondaryColor": "#4A90D9",
+    "accentColor": "#F59E0B",
+    "backgroundColor": "#FFFFFF",
+    "tagline": "Your School Tagline"
+  },
+  
+  "assets": {
+    "icon": "./schools/SCHOOL_CODE/assets/icon.png",
+    "adaptiveIcon": "./schools/SCHOOL_CODE/assets/adaptive-icon.png",
+    "splash": "./schools/SCHOOL_CODE/assets/splash.png",
+    "notificationIcon": "./schools/SCHOOL_CODE/assets/notification-icon.png"
+  },
+  
+  "firebase": {
+    "projectId": "your-firebase-project",
+    "googleServicesFile": "./schools/SCHOOL_CODE/google-services.json"
+  },
+  
+  "stores": {
+    "playStoreUrl": null,
+    "appStoreUrl": null
+  },
+  
+  "easProjectId": "your-eas-project-id"
+}

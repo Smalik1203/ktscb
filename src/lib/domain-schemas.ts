@@ -13,6 +13,7 @@
  */
 
 import { z } from 'zod';
+import { log } from './logger';
 
 // ==================== COMMON SCHEMAS ====================
 
@@ -507,7 +508,7 @@ export function safeParse<T extends z.ZodTypeAny>(
   const result = schema.safeParse(data);
 
   if (!result.success) {
-    console.error(`[Domain Schema Validation Error]${context ? ` ${context}:` : ':'}`, {
+    log.error(`[Domain Schema Validation Error]${context ? ` ${context}:` : ':'}`, {
       errors: result.error.errors,
       data: data,
     });

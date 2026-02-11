@@ -118,7 +118,7 @@ export function QuestionBuilderScreen() {
 
       Alert.alert('Success', `Imported ${aiQuestions.length} AI-generated questions!`);
     } catch (error: any) {
-      console.error('[QuestionBuilder] Error importing AI questions:', error);
+      // AI import failed
       Alert.alert('Error', 'Failed to import AI-generated questions');
     } finally {
       setImportingAI(false);

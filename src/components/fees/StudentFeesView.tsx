@@ -14,15 +14,34 @@ import type { ThemeColors } from '../../theme/types';
 import { invoiceService, type Invoice } from '../../services/fees';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 import { supabase } from '../../lib/supabase';
-import { ProgressRing } from '../analytics/ProgressRing';
+import { ProgressRing } from '../ui/ProgressRing';
 
 const formatAmount = (amount: number) =>
   `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
 const formatPeriod = (period: string) => {
+  if (!period) return 'Unknown';
+  
+  // Check if it's an academic year format (YYYY-YYYY)
+  if (period.includes('-') && period.length >= 9) {
+    const parts = period.split('-');
+    if (parts.length === 2 && parts[0].length === 4 && parts[1].length === 4) {
+      return `${parts[0]}-${parts[1]}`; // Return as-is: "2025-2026"
+    }
+  }
+  
+  // Otherwise assume it's YYYY-MM format
   const [year, month] = period.split('-');
+  if (!month || !year) return period;
+  
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[parseInt(month) - 1]} ${year}`;
+  const monthIndex = parseInt(month) - 1;
+  
+  if (monthIndex >= 0 && monthIndex < 12) {
+    return `${months[monthIndex]} ${year}`;
+  }
+  
+  return period; // Fallback to original value
 };
 
 export function StudentFeesView() {
@@ -58,7 +77,7 @@ export function StudentFeesView() {
           setStudentId(data.id);
         }
       } catch (err) {
-        console.error('Error fetching student:', err);
+        // Student fetch failed - error state set below
       } finally {
         setLoadingStudent(false);
       }

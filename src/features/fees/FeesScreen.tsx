@@ -26,7 +26,7 @@ export default function FeesScreen() {
   const { can } = useCapabilities();
   const { data: classes = [] } = useClasses(scope.school_code ?? undefined);
   const queryClient = useQueryClient();
-  
+
   const styles = useMemo(
     () => createStyles(colors, typography, spacing, borderRadius, shadows),
     [colors, typography, spacing, borderRadius, shadows]

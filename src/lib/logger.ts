@@ -1,5 +1,8 @@
 // src/lib/logger.ts
 // Centralized logging utility with configurable levels
+// Connects to Sentry in production so every log.error() auto-reports
+
+import * as Sentry from '@sentry/react-native';
 
 export enum LogLevel {
   ERROR = 0,
@@ -36,17 +39,47 @@ class Logger {
     if (this.shouldLog(LogLevel.ERROR)) {
       console.error(this.formatMessage('ERROR', message), ...args);
     }
+    // Always report errors to Sentry in production
+    if (!this.isDevelopment) {
+      const errorObj = args.find((a) => a instanceof Error);
+      if (errorObj) {
+        Sentry.captureException(errorObj, { extra: { message, args } });
+      } else {
+        Sentry.captureMessage(message, {
+          level: 'error',
+          extra: args.length ? { args } : undefined,
+        });
+      }
+    }
   }
 
   warn(message: string, ...args: any[]): void {
     if (this.shouldLog(LogLevel.WARN)) {
       console.warn(this.formatMessage('WARN', message), ...args);
     }
+    // Add warnings as breadcrumbs so they appear as context on crash reports
+    if (!this.isDevelopment) {
+      Sentry.addBreadcrumb({
+        category: 'logger',
+        message,
+        level: 'warning',
+        data: args.length ? { args } : undefined,
+      });
+    }
   }
 
   info(message: string, ...args: any[]): void {
     if (this.shouldLog(LogLevel.INFO)) {
       console.info(this.formatMessage('INFO', message), ...args);
+    }
+    // Add info logs as breadcrumbs in production for richer context
+    if (!this.isDevelopment) {
+      Sentry.addBreadcrumb({
+        category: 'logger',
+        message,
+        level: 'info',
+        data: args.length ? { args } : undefined,
+      });
     }
   }
 
