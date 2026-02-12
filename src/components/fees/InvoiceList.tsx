@@ -4,10 +4,9 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Text, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, ChevronRight, CheckCircle, Clock, AlertCircle } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { invoiceService, type Invoice } from '../../services/fees';
@@ -83,18 +82,18 @@ export function InvoiceList({ studentId, classInstanceId, schoolCode }: InvoiceL
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIconName = (status: string) => {
     switch (status) {
-      case 'PAID': return CheckCircle;
-      case 'PARTIAL': return Clock;
-      default: return AlertCircle;
+      case 'PAID': return 'check-circle' as const;
+      case 'PARTIAL': return 'schedule' as const;
+      default: return 'error' as const;
     }
   };
 
   if (isLoading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary[600]} />
+        <ActivityIndicator size="large" color={colors.primary[600] as string} />
         <Text style={styles.loadingText}>Loading invoices...</Text>
       </View>
     );
@@ -103,7 +102,7 @@ export function InvoiceList({ studentId, classInstanceId, schoolCode }: InvoiceL
   if (error) {
     return (
       <View style={styles.centered}>
-        <AlertCircle size={64} color={colors.error[500]} />
+        <MaterialIcons name="error" size={64} color={colors.error[500]} />
         <Text style={styles.emptyTitle}>Error Loading</Text>
         <Text style={styles.emptyText}>
           {(error as Error).message || 'Failed to load invoices'}
@@ -118,7 +117,7 @@ export function InvoiceList({ studentId, classInstanceId, schoolCode }: InvoiceL
   if (invoices.length === 0) {
     return (
       <View style={styles.centered}>
-        <FileText size={64} color={colors.neutral[300]} />
+        <MaterialIcons name="description" size={64} color={colors.neutral[300]} />
         <Text style={styles.emptyTitle}>No Invoices</Text>
         <Text style={styles.emptyText}>
           {studentId 
@@ -168,7 +167,7 @@ export function InvoiceList({ studentId, classInstanceId, schoolCode }: InvoiceL
                   return nameA.localeCompare(nameB);
                 })
                 .map(invoice => {
-                const StatusIcon = getStatusIcon(invoice.status);
+                const statusIconName = getStatusIconName(invoice.status);
                 const statusColor = getStatusColor(invoice.status);
                 const balance = invoice.total_amount - invoice.paid_amount;
                 
@@ -181,7 +180,7 @@ export function InvoiceList({ studentId, classInstanceId, schoolCode }: InvoiceL
                   >
                     <View style={styles.invoiceMain}>
                       <View style={[styles.statusDot, { backgroundColor: statusColor }]}>
-                        <StatusIcon size={14} color="#fff" />
+                        <MaterialIcons name={statusIconName} size={14} color="#fff" />
                       </View>
                       
                       <View style={styles.invoiceInfo}>
@@ -198,7 +197,7 @@ export function InvoiceList({ studentId, classInstanceId, schoolCode }: InvoiceL
                         <Text style={[styles.statusBadge, { color: statusColor }]}>
                           {invoice.status}
                         </Text>
-                        <ChevronRight size={20} color={colors.neutral[400]} />
+                        <MaterialIcons name="chevron-right" size={20} color={colors.neutral[400]} />
                       </View>
                     </View>
                   </TouchableOpacity>

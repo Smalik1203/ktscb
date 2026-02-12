@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { View, KeyboardAvoidingView, Platform, Alert, TouchableOpacity, Dimensions } from 'react-native';
-import { TextInput, ActivityIndicator } from 'react-native-paper';
+import { ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useTheme } from '../src/contexts/ThemeContext';
-import { Mail, ArrowLeft } from 'lucide-react-native';
 import { isRateLimited, getResetTime } from '../src/utils/rateLimiter';
 import { sanitizeEmail } from '../src/utils/sanitize';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +14,8 @@ import {
   Heading, 
   Body, 
   Center,
+  Input,
+  Icon,
 } from '../src/ui';
 
 const { height } = Dimensions.get('window');
@@ -36,17 +37,6 @@ export default function ForgotPasswordScreen() {
   const disabledButtonColors = isDark
     ? [colors.neutral[600], colors.neutral[500]] as const
     : [colors.neutral[300], colors.neutral[400]] as const;
-
-  const inputTheme = {
-    colors: {
-      primary: colors.primary.main,
-      background: colors.surface.primary,
-      surface: colors.surface.primary,
-      outline: colors.border.DEFAULT,
-      onSurface: colors.text.primary,
-      placeholder: colors.text.tertiary,
-    },
-  };
 
   const handleResetPassword = async () => {
     if (!email) {
@@ -86,7 +76,7 @@ export default function ForgotPasswordScreen() {
         let errorMessage = error.message || 'Failed to send password reset email.';
         let errorTitle = 'Error';
         
-        if (error.status === 500 || error.status === '500') {
+        if (error.status === 500) {
           errorTitle = 'Service Unavailable';
           errorMessage = 'Password reset service is currently unavailable. Please contact support.';
         } else if (error.message?.includes('recovery email') || error.message?.includes('sending') || error.message?.includes('email')) {
@@ -147,7 +137,7 @@ export default function ForgotPasswordScreen() {
                   padding: spacing.sm,
                 }}
               >
-                <ArrowLeft size={24} color={colors.text.primary} />
+                <Icon name="arrow-back" size={24} color={colors.text.primary} />
               </TouchableOpacity>
 
               <View style={{ width: '100%', maxWidth: 420 }}>
@@ -158,18 +148,16 @@ export default function ForgotPasswordScreen() {
                       Enter your email address and we'll send you a link to reset your password.
                     </Body>
 
-                    <TextInput
+                    <Input
                       label="Email Address"
                       value={email}
                       onChangeText={setEmail}
-                      mode="outlined"
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoComplete="email"
                       disabled={loading}
-                      left={<TextInput.Icon icon={() => <Mail size={20} color={colors.primary.main} />} />}
-                      style={{ backgroundColor: colors.surface.primary, marginBottom: spacing.lg }}
-                      theme={inputTheme}
+                      leftIcon={<Icon name="email" size={20} color={colors.primary.main} />}
+                      style={{ marginBottom: spacing.lg }}
                       onSubmitEditing={handleResetPassword}
                     />
 
@@ -198,7 +186,7 @@ export default function ForgotPasswordScreen() {
                         end={{ x: 1, y: 0 }}
                       >
                         {loading ? (
-                          <ActivityIndicator color={colors.text.inverse} size="small" />
+                          <ActivityIndicator color={colors.text.inverse} size="small" hidesWhenStopped={false} />
                         ) : (
                           <Heading level={5} color="inverse" style={{ letterSpacing: 0.5 }}>
                             Send Reset Link

@@ -33,6 +33,12 @@ yarn-error.*
 .env*.local
 .env
 
+# Firebase config (contains API keys)
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+
 # EAS configuration with secrets (if you need a local override)
 eas.json.local
 eas.local.json

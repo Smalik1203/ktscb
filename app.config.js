@@ -19,6 +19,13 @@ function loadSchoolConfig(schoolCode) {
   const configPath = path.join(__dirname, 'schools', schoolCode.toLowerCase(), 'config.json');
   
   if (!fs.existsSync(configPath)) {
+    // If already trying the default and it doesn't exist, throw instead of infinite recursion
+    if (schoolCode.toLowerCase() === 'kts') {
+      throw new Error(
+        `Default school config not found at ${configPath}. ` +
+        `Create schools/kts/config.json or set SCHOOL env to a valid school code.`
+      );
+    }
     console.warn(`⚠️  School config not found: ${configPath}`);
     console.warn(`   Using default school: kts`);
     return loadSchoolConfig('kts');
@@ -157,11 +164,14 @@ module.exports = {
         }
       ],
       "@react-native-community/datetimepicker",
-      // Sentry: uploads source maps on EAS Build for readable crash stack traces
-      ["@sentry/react-native/expo", {
-        organization: process.env.SENTRY_ORG || "your-org",
-        project: process.env.SENTRY_PROJECT || "classbridge-mobile",
-      }]
+      // Sentry: only include when SENTRY_ORG is configured to avoid
+      // invalid native config that can crash the app at launch.
+      ...(process.env.SENTRY_ORG
+        ? [["@sentry/react-native/expo", {
+            organization: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT || "classbridge-mobile",
+          }]]
+        : []),
     ],
     
     experiments: {

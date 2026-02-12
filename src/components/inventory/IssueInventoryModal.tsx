@@ -6,15 +6,14 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal } from 'react-native';
-import { Text, Portal, Modal, ActivityIndicator, SegmentedButtons, TextInput } from 'react-native-paper';
-import { X, User, Users, Package, AlertCircle, Info } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Text, TextInput as RNTextInput, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Modal } from '../../ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useStudents } from '../../hooks/useStudents';
 import { useClasses } from '../../hooks/useClasses';
 import { spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
-import { Search } from 'lucide-react-native';
 
 interface IssueInventoryModalProps {
   visible: boolean;
@@ -245,24 +244,13 @@ export function IssueInventoryModal({
   };
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={handleClose}
-        contentContainerStyle={styles.modal}
-      >
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Package size={24} color={colors.primary[600]} />
-              <Text style={styles.headerTitle}>Issue Item</Text>
-            </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <X size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-
+    <>
+    <Modal
+      visible={visible}
+      onDismiss={handleClose}
+      title="Issue Item"
+    >
+      <View style={styles.container}>
           {/* Item Info */}
           <View style={styles.itemInfoCard}>
             <Text style={styles.itemName}>{inventoryItem.name}</Text>
@@ -279,20 +267,22 @@ export function IssueInventoryModal({
             {inventoryItem.issue_to === 'both' && (
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Issue To *</Text>
-                <SegmentedButtons
-                  value={issuedToType}
-                  onValueChange={(value) => {
-                    setIssuedToType(value as 'student' | 'staff');
-                    setSelectedStudentId('');
-                    setSelectedStaffId('');
-                    setSelectedClassId('');
-                  }}
-                  buttons={[
-                    { value: 'student', label: 'Student', icon: User },
-                    { value: 'staff', label: 'Staff', icon: Users },
-                  ]}
-                  style={styles.segmentedButtons}
-                />
+                <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
+                  <TouchableOpacity
+                    style={[styles.segmentBtn, issuedToType === 'student' && styles.segmentBtnActive]}
+                    onPress={() => { setIssuedToType('student'); setSelectedStudentId(''); setSelectedStaffId(''); setSelectedClassId(''); }}
+                  >
+                    <MaterialIcons name="person" size={18} color={issuedToType === 'student' ? colors.text.inverse : colors.text.secondary} />
+                    <Text style={[styles.segmentBtnText, issuedToType === 'student' && styles.segmentBtnTextActive]}>Student</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.segmentBtn, issuedToType === 'staff' && styles.segmentBtnActive]}
+                    onPress={() => { setIssuedToType('staff'); setSelectedStudentId(''); setSelectedStaffId(''); setSelectedClassId(''); }}
+                  >
+                    <MaterialIcons name="group" size={18} color={issuedToType === 'staff' ? colors.text.inverse : colors.text.secondary} />
+                    <Text style={[styles.segmentBtnText, issuedToType === 'staff' && styles.segmentBtnTextActive]}>Staff</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
 
@@ -301,22 +291,15 @@ export function IssueInventoryModal({
               <>
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Class *</Text>
-                  <TouchableOpacity onPress={() => setShowClassPicker(true)}>
-                    <TextInput
-                      mode="outlined"
-                      dense
-                      value={selectedClassId
+                  <TouchableOpacity onPress={() => setShowClassPicker(true)} style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                    <Text style={{ color: selectedClassId ? colors.text.primary : colors.text.secondary, fontSize: typography.fontSize.base }}>
+                      {selectedClassId
                         ? classes.find((c: any) => c.id === selectedClassId)
                           ? `Grade ${classes.find((c: any) => c.id === selectedClassId)?.grade} - ${classes.find((c: any) => c.id === selectedClassId)?.section}`
                           : 'Select Class'
-                        : ''}
-                      placeholder="Select Class"
-                      editable={false}
-                      right={<TextInput.Icon icon="chevron-down" />}
-                      style={styles.input}
-                      pointerEvents="none"
-                      contentStyle={{ backgroundColor: colors.surface.secondary }}
-                    />
+                        : 'Select Class'}
+                    </Text>
+                    <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
                   </TouchableOpacity>
                 </View>
 
@@ -324,16 +307,16 @@ export function IssueInventoryModal({
                   <View style={styles.formGroup}>
                     <Text style={styles.label}>Student *</Text>
                     <View style={styles.searchContainer}>
-                      <TextInput
-                        mode="outlined"
-                        dense
-                        style={styles.searchInput}
-                        placeholder="Search students..."
-                        value={studentSearch}
-                        onChangeText={setStudentSearch}
-                        left={<TextInput.Icon icon={() => <Search size={18} color={colors.text.secondary} />} />}
-                        contentStyle={{ backgroundColor: colors.surface.secondary }}
-                      />
+                      <View style={[styles.searchInput, { flexDirection: 'row', alignItems: 'center' }]}>
+                        <MaterialIcons name="search" size={18} color={colors.text.secondary} style={{ marginRight: spacing.xs }} />
+                        <RNTextInput
+                          style={{ flex: 1, fontSize: typography.fontSize.base, color: colors.text.primary }}
+                          placeholder="Search students..."
+                          placeholderTextColor={colors.text.secondary}
+                          value={studentSearch}
+                          onChangeText={setStudentSearch}
+                        />
+                      </View>
                     </View>
                     <ScrollView style={styles.pickerList} nestedScrollEnabled>
                       {filteredStudents.map((student: any) => (
@@ -367,16 +350,16 @@ export function IssueInventoryModal({
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Staff Member *</Text>
                 <View style={styles.searchContainer}>
-                  <TextInput
-                    mode="outlined"
-                    dense
-                    style={styles.searchInput}
-                    placeholder="Search staff..."
-                    value={staffSearch}
-                    onChangeText={setStaffSearch}
-                    left={<TextInput.Icon icon={() => <Search size={18} color={colors.text.secondary} />} />}
-                    contentStyle={{ backgroundColor: colors.surface.secondary }}
-                  />
+                  <View style={[styles.searchInput, { flexDirection: 'row', alignItems: 'center' }]}>
+                    <MaterialIcons name="search" size={18} color={colors.text.secondary} style={{ marginRight: spacing.xs }} />
+                    <RNTextInput
+                      style={{ flex: 1, fontSize: typography.fontSize.base, color: colors.text.primary }}
+                      placeholder="Search staff..."
+                      placeholderTextColor={colors.text.secondary}
+                      value={staffSearch}
+                      onChangeText={setStaffSearch}
+                    />
+                  </View>
                 </View>
                 {loadingStaff ? (
                   <ActivityIndicator size="small" color={colors.primary[600]} />
@@ -410,16 +393,14 @@ export function IssueInventoryModal({
             {/* Quantity */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>Quantity *</Text>
-              <TextInput
-                mode="outlined"
-                dense
-                style={styles.input}
+              <RNTextInput
+                style={[styles.input, { fontSize: typography.fontSize.base, color: colors.text.primary }]}
                 placeholder="1"
+                placeholderTextColor={colors.text.secondary}
                 value={quantity}
                 onChangeText={setQuantity}
                 keyboardType="numeric"
                 editable={!inventoryItem.track_serially}
-                contentStyle={{ backgroundColor: colors.surface.secondary }}
               />
               {inventoryItem.track_serially && (
                 <Text style={styles.helperText}>
@@ -432,14 +413,12 @@ export function IssueInventoryModal({
             {inventoryItem.track_serially && (
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Serial Number *</Text>
-                <TextInput
-                  mode="outlined"
-                  dense
-                  style={styles.input}
+                <RNTextInput
+                  style={[styles.input, { fontSize: typography.fontSize.base, color: colors.text.primary }]}
                   placeholder="Enter serial number"
+                  placeholderTextColor={colors.text.secondary}
                   value={serialNumber}
                   onChangeText={setSerialNumber}
-                  contentStyle={{ backgroundColor: colors.surface.secondary }}
                 />
               </View>
             )}
@@ -450,18 +429,18 @@ export function IssueInventoryModal({
                 <Text style={styles.label}>
                   Charge Amount {inventoryItem.allow_price_override ? '(Override)' : ''}
                 </Text>
-                <TextInput
-                  mode="outlined"
-                  dense
-                  style={styles.input}
-                  placeholder={inventoryItem.charge_amount?.toString() || '0.00'}
-                  value={chargeAmountOverride}
-                  onChangeText={setChargeAmountOverride}
-                  keyboardType="decimal-pad"
-                  editable={inventoryItem.allow_price_override}
-                  left={<TextInput.Affix text="₹" />}
-                  contentStyle={{ backgroundColor: colors.surface.secondary }}
-                />
+                <View style={[styles.input, { flexDirection: 'row', alignItems: 'center' }]}>
+                  <Text style={{ color: colors.text.secondary, marginRight: spacing.xs }}>₹</Text>
+                  <RNTextInput
+                    style={{ flex: 1, fontSize: typography.fontSize.base, color: colors.text.primary }}
+                    placeholder={inventoryItem.charge_amount?.toString() || '0.00'}
+                    placeholderTextColor={colors.text.secondary}
+                    value={chargeAmountOverride}
+                    onChangeText={setChargeAmountOverride}
+                    keyboardType="decimal-pad"
+                    editable={inventoryItem.allow_price_override}
+                  />
+                </View>
                 <Text style={styles.helperText}>
                   Default: ₹{inventoryItem.charge_amount} per item
                   {inventoryItem.charge_type === 'deposit' && ' (refundable)'}
@@ -478,7 +457,7 @@ export function IssueInventoryModal({
             {/* Return Date Info */}
             {inventoryItem.must_be_returned && expectedReturnDate && (
               <View style={styles.infoCard}>
-                <Info size={20} color={colors.primary[600]} />
+                <MaterialIcons name="info" size={20} color={colors.primary[600]} />
                 <Text style={styles.infoText}>
                   Expected return date: {expectedReturnDate}
                 </Text>
@@ -522,7 +501,7 @@ export function IssueInventoryModal({
             <View style={styles.classPickerHeader}>
               <Text style={styles.classPickerTitle}>Select Class</Text>
               <TouchableOpacity onPress={() => setShowClassPicker(false)}>
-                <X size={24} color={colors.text.primary} />
+                <MaterialIcons name="close" size={24} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.classPickerList}>
@@ -553,7 +532,7 @@ export function IssueInventoryModal({
           </View>
         </View>
       </RNModal>
-    </Portal>
+    </>
   );
 }
 
@@ -567,27 +546,6 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   container: {
     maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  closeButton: {
-    padding: spacing.xs,
   },
   itemInfoCard: {
     backgroundColor: colors.primary[50],
@@ -628,6 +586,30 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   segmentedButtons: {
     marginTop: spacing.sm,
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.primary,
+  },
+  segmentBtnActive: {
+    backgroundColor: colors.primary[600],
+    borderColor: colors.primary[600],
+  },
+  segmentBtnText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+  },
+  segmentBtnTextActive: {
+    color: colors.text.inverse,
+    fontWeight: '600' as const,
   },
 
   searchContainer: {

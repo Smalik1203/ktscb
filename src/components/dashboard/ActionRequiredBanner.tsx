@@ -4,9 +4,8 @@
  * Displays collapsible list of items requiring user attention
  */
 
-import React, { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
+import React, { ComponentProps, useState } from 'react';
+import { View, TouchableOpacity, StyleSheet, Text as RNText } from 'react-native';
 import Animated, {
     FadeInDown,
     FadeOutUp,
@@ -15,16 +14,8 @@ import Animated, {
     useSharedValue,
     withSpring,
 } from 'react-native-reanimated';
-import {
-    AlertTriangle,
-    ChevronDown,
-    ChevronUp,
-    Clock,
-    CreditCard,
-    BookOpen,
-    TrendingDown,
-    LucideIcon,
-} from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as Haptics from 'expo-haptics';
 import { safeImpact } from '../../utils/haptics';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -36,7 +27,7 @@ export interface ActionItem {
     title: string;
     subtitle?: string;
     action?: { label: string; onPress: () => void };
-    icon?: LucideIcon;
+    icon?: ComponentProps<typeof MaterialIcons>['name'];
     priority?: 'high' | 'medium' | 'low';
 }
 
@@ -47,18 +38,18 @@ export interface ActionRequiredBannerProps {
     animationDelay?: number;
 }
 
-const getDefaultIcon = (type: ActionItemType): LucideIcon => {
+const getDefaultIcon = (type: ActionItemType): ComponentProps<typeof MaterialIcons>['name'] => {
     switch (type) {
         case 'overdue_task':
-            return Clock;
+            return 'schedule';
         case 'fee_due':
-            return CreditCard;
+            return 'credit-card';
         case 'test_tomorrow':
-            return BookOpen;
+            return 'menu-book';
         case 'low_attendance':
-            return TrendingDown;
+            return 'trending-down';
         default:
-            return AlertTriangle;
+            return 'warning';
     }
 };
 
@@ -119,12 +110,12 @@ const ActionItemRow = React.memo<{
     typography: any;
     isLast: boolean;
 }>(({ item, colors, spacing, borderRadius, typography, isLast }) => {
-    const Icon = item.icon || getDefaultIcon(item.type);
+    const iconName = item.icon || getDefaultIcon(item.type);
     const itemColors = getItemColor(item.type, item.priority, colors);
 
     const handlePress = () => {
         if (item.action?.onPress) {
-            safeImpact('Light');
+            safeImpact(Haptics.ImpactFeedbackStyle.Light);
             item.action.onPress();
         }
     };
@@ -162,11 +153,10 @@ const ActionItemRow = React.memo<{
                         },
                     ]}
                 >
-                    <Icon size={16} color={itemColors.icon} strokeWidth={2.5} />
+                    <MaterialIcons name={iconName} size={16} color={itemColors.icon} />
                 </View>
                 <View style={styles.itemTextContainer}>
-                    <Text
-                        variant="bodyMedium"
+                    <RNText
                         style={[
                             styles.itemTitle,
                             { color: itemColors.text, fontWeight: typography.fontWeight.semibold },
@@ -174,15 +164,14 @@ const ActionItemRow = React.memo<{
                         numberOfLines={1}
                     >
                         {item.title}
-                    </Text>
+                    </RNText>
                     {item.subtitle && (
-                        <Text
-                            variant="bodySmall"
+                        <RNText
                             style={[styles.itemSubtitle, { color: itemColors.text, opacity: 0.8 }]}
                             numberOfLines={1}
                         >
                             {item.subtitle}
-                        </Text>
+                        </RNText>
                     )}
                 </View>
                 {item.action && (
@@ -197,9 +186,9 @@ const ActionItemRow = React.memo<{
                             },
                         ]}
                     >
-                        <Text style={[styles.actionButtonText, { color: colors.text.inverse }]}>
+                        <RNText style={[styles.actionButtonText, { color: colors.text.inverse }]}>
                             {item.action.label}
-                        </Text>
+                        </RNText>
                     </View>
                 )}
             </TouchableOpacity>
@@ -224,7 +213,7 @@ export const ActionRequiredBanner = React.memo<ActionRequiredBannerProps>(({
     const hasMore = items.length > maxVisible;
 
     const toggleExpanded = () => {
-        safeImpact('Light');
+        safeImpact(Haptics.ImpactFeedbackStyle.Light);
         setIsExpanded(!isExpanded);
     };
 
@@ -246,9 +235,8 @@ export const ActionRequiredBanner = React.memo<ActionRequiredBannerProps>(({
             {/* Header */}
             <View style={[styles.header, { marginBottom: spacing.sm }]}>
                 <View style={styles.headerLeft}>
-                    <AlertTriangle size={18} color={colors.warning[600]} strokeWidth={2.5} />
-                    <Text
-                        variant="titleSmall"
+                    <MaterialIcons name="warning" size={18} color={colors.warning[600]} />
+                    <RNText
                         style={[
                             styles.headerTitle,
                             {
@@ -259,7 +247,7 @@ export const ActionRequiredBanner = React.memo<ActionRequiredBannerProps>(({
                         ]}
                     >
                         Needs Attention
-                    </Text>
+                    </RNText>
                 </View>
                 <View
                     style={[
@@ -272,14 +260,14 @@ export const ActionRequiredBanner = React.memo<ActionRequiredBannerProps>(({
                         },
                     ]}
                 >
-                    <Text
+                    <RNText
                         style={[
                             styles.countText,
                             { color: colors.warning[700], fontWeight: typography.fontWeight.bold },
                         ]}
                     >
                         {items.length}
-                    </Text>
+                    </RNText>
                 </View>
             </View>
 
@@ -310,19 +298,19 @@ export const ActionRequiredBanner = React.memo<ActionRequiredBannerProps>(({
                         },
                     ]}
                 >
-                    <Text
+                    <RNText
                         style={[
                             styles.expandButtonText,
                             { color: colors.primary[600], fontWeight: typography.fontWeight.medium },
                         ]}
                     >
                         {isExpanded ? 'Show less' : `+${items.length - maxVisible} more`}
-                    </Text>
-                    {isExpanded ? (
-                        <ChevronUp size={16} color={colors.primary[600]} />
-                    ) : (
-                        <ChevronDown size={16} color={colors.primary[600]} />
-                    )}
+                    </RNText>
+                    <MaterialIcons
+                        name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                        size={16}
+                        color={colors.primary[600]}
+                    />
                 </TouchableOpacity>
             )}
         </Animated.View>

@@ -23,9 +23,9 @@ import {
   AppStateStatus,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
+import { Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { VideoView, useVideoPlayer } from 'expo-video';
-import { X, AlertCircle, RefreshCw, Wifi, WifiOff, Smartphone } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
@@ -381,7 +381,7 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
         style={styles.networkBanner}
         onPress={() => setShowNetworkBanner(false)}
       >
-        <Smartphone size={16} color="white" />
+        <MaterialIcons name="smartphone" size={16} color="white" />
         <Text style={styles.networkBannerText}>Playing on mobile data</Text>
       </TouchableOpacity>
     );
@@ -392,13 +392,13 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
 
     return (
       <View style={styles.errorContainer}>
-        <AlertCircle size={48} color={colors.error[600]} />
+        <MaterialIcons name="error" size={48} color={colors.error[600]} />
         <Text style={styles.errorTitle}>
           {error.type === 'network' ? 'No Connection' : 'Playback Error'}
         </Text>
         <Text style={styles.errorMessage}>{error.message}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-          <RefreshCw size={18} color="white" />
+          <MaterialIcons name="refresh" size={18} color="white" />
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -597,10 +597,10 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
         {networkType === 'none' && (
-          <WifiOff size={18} color={colors.error[600]} style={{ marginRight: spacing.sm }} />
+          <MaterialIcons name="wifi-off" size={18} color={colors.error[600]} style={{ marginRight: spacing.sm }} />
         )}
         <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-          <X size={24} color={colors.text.primary} />
+          <MaterialIcons name="close" size={24} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
 

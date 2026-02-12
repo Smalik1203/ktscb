@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, ActivityIndicator } from 'react-native';
-import { Text } from 'react-native-paper';
+import { View, ActivityIndicator, Text } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';

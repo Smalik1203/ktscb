@@ -6,23 +6,9 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Dimensions } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Dimensions, Text, ActivityIndicator, TextInput } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import {
-  Users,
-  Calendar,
-  CheckCircle,
-  XCircle,
-  Save,
-  ChevronDown,
-  Circle,
-  AlertCircle,
-  RotateCcw,
-  History as HistoryIcon,
-  X,
-  PartyPopper,
-} from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
@@ -34,6 +20,7 @@ import { useClassAttendance, useMarkAttendance, useMarkBulkAttendance, useClassA
 import { useHolidayCheck, useCreateCalendarEvent } from '../../hooks/useCalendarEvents';
 import { AttendanceInput } from '../../services/api';
 import { StudentAttendanceView } from './StudentAttendanceView';
+import { Menu } from '../../ui';
 
 type AttendanceStatus = 'present' | 'absent' | null;
 
@@ -99,6 +86,10 @@ export const AttendanceScreen: React.FC = () => {
     canReadOwnAttendance ? 'history' : 'mark'
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterMode, setFilterMode] = useState<'all' | 'absent' | 'unmarked'>('all');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [quickActionsVisible, setQuickActionsVisible] = useState(false);
   const [historyStartDate, setHistoryStartDate] = useState<Date>(() => {
     const date = new Date();
     date.setDate(date.getDate() - 30);
@@ -143,6 +134,40 @@ export const AttendanceScreen: React.FC = () => {
 
   const markAttendanceMutation = useMarkAttendance();
   const markBulkAttendanceMutation = useMarkBulkAttendance();
+
+  // ── Completion stats ──
+  const completionStats = useMemo(() => {
+    const total = attendanceData.length;
+    const marked = attendanceData.filter(s => s.status !== null).length;
+    const present = attendanceData.filter(s => s.status === 'present').length;
+    const absent = attendanceData.filter(s => s.status === 'absent').length;
+    const unmarked = total - marked;
+    const percentage = total > 0 ? Math.round((marked / total) * 100) : 0;
+    return { total, marked, present, absent, unmarked, percentage };
+  }, [attendanceData]);
+
+  // ── Filtered + searched data ──
+  const filteredAttendanceData = useMemo(() => {
+    let data = attendanceData;
+
+    // Apply filter mode
+    if (filterMode === 'absent') {
+      data = data.filter(s => s.status === 'absent');
+    } else if (filterMode === 'unmarked') {
+      data = data.filter(s => s.status === null);
+    }
+
+    // Apply search
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      data = data.filter(s =>
+        s.studentName.toLowerCase().includes(q) ||
+        s.studentCode.toLowerCase().includes(q)
+      );
+    }
+
+    return data;
+  }, [attendanceData, searchQuery, filterMode]);
 
   // ── Holiday integration ──
   const { data: holidayInfo, isLoading: holidayLoading } = useHolidayCheck(
@@ -203,15 +228,27 @@ export const AttendanceScreen: React.FC = () => {
           };
         });
       setAttendanceData(studentAttendanceData);
+      setHasChanges(false);
+
+      // If existing attendance was loaded, show "previously saved" state
+      if (existingAttendance && existingAttendance.length > 0 && existingAttendance[0]?.created_at) {
+        setLastSavedAt(new Date(existingAttendance[0].created_at));
+      } else {
+        setLastSavedAt(null);
+      }
     } else {
       setAttendanceData([]);
+      setLastSavedAt(null);
     }
   }, [students, existingAttendance, dateString, canReadAllAttendance]);
 
   const handleDateConfirm = useCallback((date: Date) => {
     if (!canMarkAttendance) return;
     setSelectedDate(date);
-    setHasChanges(true);
+    setHasChanges(false);
+    setLastSavedAt(null);
+    setSearchQuery('');
+    setFilterMode('all');
     setShowDatePicker(false);
   }, [canMarkAttendance]);
 
@@ -327,6 +364,7 @@ export const AttendanceScreen: React.FC = () => {
             try {
               const result = await markAttendanceMutation.mutateAsync(records);
               setHasChanges(false);
+              setLastSavedAt(new Date());
               
               // Build success message with notification status
               let message = `Attendance saved for ${records.length} students.`;
@@ -380,18 +418,9 @@ export const AttendanceScreen: React.FC = () => {
       return;
     }
 
-    const statusText = status === 'present' ? 'Present' : 'Absent';
-    const studentCount = students.length;
-
-    // Simply update local state - user will submit via Save button
+    // Update local state - user will submit via Save button
     setAttendanceData(prev => prev.map(student => ({ ...student, status })));
     setHasChanges(true);
-
-    // Show a brief toast/feedback
-    Alert.alert(
-      `✓ All ${statusText}`,
-      `Marked all ${studentCount} students as ${statusText.toLowerCase()}. Tap "Save Attendance" to submit.`
-    );
   };
 
   // Users who can only view their own attendance see the student view
@@ -418,7 +447,7 @@ export const AttendanceScreen: React.FC = () => {
   if (hasError && !isLoading) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: spacing.lg }]}>
-        <AlertCircle size={48} color={colors.error[600]} />
+        <MaterialIcons name="error" size={48} color={colors.error[600]} />
         <Text style={{ marginTop: spacing.md, color: colors.error.main, textAlign: 'center' }}>
           Failed to load attendance data
         </Text>
@@ -432,7 +461,7 @@ export const AttendanceScreen: React.FC = () => {
   if (!selectedClass) {
     return (
       <View style={styles.emptyContainer}>
-        <Users size={48} color={colors.text.tertiary} />
+        <MaterialIcons name="group" size={48} color={colors.text.tertiary} />
         <Text style={styles.emptyText}>Please select a class to view attendance</Text>
       </View>
     );
@@ -441,7 +470,7 @@ export const AttendanceScreen: React.FC = () => {
   if (!hasData && !isLoading && !hasError) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: spacing.lg }]}>
-        <Users size={48} color={colors.text.tertiary} />
+        <MaterialIcons name="group" size={48} color={colors.text.tertiary} />
         <Text style={{ marginTop: spacing.md, color: colors.text.secondary, textAlign: 'center' }}>
           No students found
         </Text>
@@ -466,116 +495,101 @@ export const AttendanceScreen: React.FC = () => {
     <View style={styles.container}>
       {canReadAllAttendance ? (
         <View style={styles.dashboardCard}>
-          {/* Single Header Row: Class | Date | Mode */}
+          {/* Row 1: Class | Date | History toggle */}
           <View style={styles.headerRow}>
-            {/* Unified Filter Bar */}
             <View style={styles.filterBar}>
-              {/* Class Selector */}
               <TouchableOpacity
                 style={styles.classSelector}
                 onPress={() => bottomSheetRef.current?.present()}
                 activeOpacity={0.7}
               >
-                <Users size={16} color={colors.primary.main} />
+                <MaterialIcons name="group" size={16} color={colors.primary.main} />
                 <Text style={styles.classTitle} numberOfLines={1} ellipsizeMode="tail">
                   {selectedClass ? `${selectedClass.grade} - ${selectedClass.section}` : 'Select Class'}
                 </Text>
-                <ChevronDown size={14} color={colors.text.tertiary} style={{ marginLeft: 4 }} />
+                <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.text.tertiary} />
               </TouchableOpacity>
 
               <View style={styles.headerDivider} />
 
-              {/* Date Selector */}
               {activeTab === 'mark' ? (
                 <TouchableOpacity
                   style={styles.dateSelector}
                   onPress={() => setShowDatePicker(true)}
                   activeOpacity={0.7}
                 >
-                  <Calendar size={16} color={colors.primary.main} />
+                  <MaterialIcons name="event" size={16} color={colors.primary.main} />
                   <Text style={styles.dateText}>
                     {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </Text>
-                  <ChevronDown size={14} color={colors.text.tertiary} style={{ marginLeft: 4 }} />
+                  <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.text.tertiary} />
                 </TouchableOpacity>
               ) : (
                 <View style={styles.dateSelector}>
-                  <TouchableOpacity
-                    onPress={() => setShowHistoryStartDatePicker(true)}
-                    activeOpacity={0.7}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                  >
-                    <Calendar size={16} color={colors.primary.main} />
-                    <Text style={styles.dateText}>
-                      {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </Text>
+                  <TouchableOpacity onPress={() => setShowHistoryStartDatePicker(true)} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <MaterialIcons name="event" size={16} color={colors.primary.main} />
+                    <Text style={styles.dateText}>{historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
                   </TouchableOpacity>
-
                   <Text style={{ color: colors.text.tertiary, fontSize: 12 }}>→</Text>
-
-                  <TouchableOpacity
-                    onPress={() => setShowHistoryEndDatePicker(true)}
-                    activeOpacity={0.7}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                  >
-                    <Text style={styles.dateText}>
-                      {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </Text>
-                    <ChevronDown size={14} color={colors.text.tertiary} />
+                  <TouchableOpacity onPress={() => setShowHistoryEndDatePicker(true)} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.dateText}>{historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
                   </TouchableOpacity>
                 </View>
               )}
             </View>
 
-            {/* History Toggle (Outside the Bar) */}
             <TouchableOpacity
               style={styles.historyToggleButton}
               onPress={() => setActiveTab(activeTab === 'mark' ? 'history' : 'mark')}
               activeOpacity={0.7}
             >
-              {activeTab === 'mark' ? (
-                <HistoryIcon size={20} color={colors.primary.main} />
-              ) : (
-                <X size={20} color={colors.text.primary} />
-              )}
+              <MaterialIcons name={activeTab === 'mark' ? 'history' : 'close'} size={20} color={activeTab === 'mark' ? colors.primary.main : colors.text.primary} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.headerSeparator} />
-
-          {/* Row 3: Stats */}
-          <View style={styles.dashboardStatsRow}>
-            <View style={styles.statBigContainer}>
-              <Text style={styles.statBigNumber}>
-                {activeTab === 'mark' ? (attendanceData?.length || 0) : historyStats.total}
-              </Text>
-              <Text style={styles.statBigLabel}>Total</Text>
-            </View>
-
-            <View style={styles.statGroup}>
-              <View style={styles.statItem}>
-                <View style={[styles.statCircle, { backgroundColor: isDark ? 'rgba(34, 197, 94, 0.2)' : '#ecfdf5' }]}>
-                  <Text style={[styles.statNumber, { color: colors.success[600] }]}>
-                    {activeTab === 'mark'
-                      ? (attendanceData?.filter(s => s.status === 'present').length || 0)
-                      : `${historyStats.averageAttendance}%`}
-                  </Text>
-                </View>
-                <Text style={styles.statLabel}>{activeTab === 'mark' ? 'Present' : 'Avg Present'}</Text>
+          {/* Row 2: Progress bar + stats — single line below header */}
+          {activeTab === 'mark' && attendanceData.length > 0 && (
+            <View style={{ marginTop: 8 }}>
+              {/* Progress bar */}
+              <View style={{ height: 5, borderRadius: 3, backgroundColor: isDark ? colors.neutral[700] : colors.neutral[200], overflow: 'hidden', flexDirection: 'row' }}>
+                {completionStats.present > 0 && <View style={{ width: `${(completionStats.present / completionStats.total) * 100}%`, height: '100%', backgroundColor: colors.success[500] }} />}
+                {completionStats.absent > 0 && <View style={{ width: `${(completionStats.absent / completionStats.total) * 100}%`, height: '100%', backgroundColor: colors.error[500] }} />}
               </View>
-
-              <View style={styles.statItem}>
-                <View style={[styles.statCircle, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : '#fef2f2' }]}>
-                  <Text style={[styles.statNumber, { color: colors.error[600] }]}>
-                    {activeTab === 'mark'
-                      ? (attendanceData?.filter(s => s.status === 'absent').length || 0)
-                      : `${historyStats.averageAbsent}%`}
-                  </Text>
+              {/* Stats text */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: typography.fontWeight.bold, color: completionStats.percentage === 100 ? colors.success[600] : colors.text.primary }}>
+                  {completionStats.marked}/{completionStats.total} Marked
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <Text style={{ fontSize: 12, color: colors.success[600], fontWeight: typography.fontWeight.semibold }}>{completionStats.present}P</Text>
+                  <Text style={{ fontSize: 12, color: colors.error[600], fontWeight: typography.fontWeight.semibold }}>{completionStats.absent}A</Text>
+                  {completionStats.unmarked > 0 && <Text style={{ fontSize: 12, color: colors.warning[600], fontWeight: typography.fontWeight.semibold }}>{completionStats.unmarked} left</Text>}
                 </View>
-                <Text style={styles.statLabel}>{activeTab === 'mark' ? 'Absent' : 'Avg Absent'}</Text>
               </View>
             </View>
-          </View>
+          )}
+
+          {activeTab === 'history' && (
+            <>
+              <View style={[styles.headerSeparator, { marginVertical: 8 }]} />
+              <View style={styles.dashboardStatsRow}>
+                <View style={styles.statBigContainer}>
+                  <Text style={[styles.statBigNumber, { fontSize: 26 }]}>{historyStats.total}</Text>
+                  <Text style={styles.statBigLabel}>Total</Text>
+                </View>
+                <View style={styles.statGroup}>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statNumber, { color: colors.success[600] }]}>{historyStats.averageAttendance}%</Text>
+                    <Text style={styles.statLabel}>Avg Present</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={[styles.statNumber, { color: colors.error[600] }]}>{historyStats.averageAbsent}%</Text>
+                    <Text style={styles.statLabel}>Avg Absent</Text>
+                  </View>
+                </View>
+              </View>
+            </>
+          )}
         </View>
       ) : (
         <View style={styles.dashboardCard}>
@@ -584,7 +598,7 @@ export const AttendanceScreen: React.FC = () => {
             <View style={styles.filterBar}>
               {/* Class Selector */}
               <View style={styles.classSelector}>
-                <Users size={16} color={colors.text.secondary} />
+                <MaterialIcons name="group" size={16} color={colors.text.secondary} />
                 <Text style={styles.classTitle} numberOfLines={1} ellipsizeMode="tail">
                   {selectedClass ? `${selectedClass.grade} - ${selectedClass.section}` : 'Select Class'}
                 </Text>
@@ -600,7 +614,7 @@ export const AttendanceScreen: React.FC = () => {
                   activeOpacity={0.7}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                 >
-                  <Calendar size={16} color={colors.text.secondary} />
+                  <MaterialIcons name="event" size={16} color={colors.text.secondary} />
                   <Text style={styles.dateText}>
                     {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </Text>
@@ -634,94 +648,197 @@ export const AttendanceScreen: React.FC = () => {
 
       {activeTab === 'mark' ? (
         <View style={styles.studentsSection}>
-          {/* Holiday banner — shown when selected date is a holiday */}
+          {/* Holiday state — replaces entire student list when date is a holiday */}
           {isHoliday && (
             <View style={{
-              flexDirection: 'row',
+              flex: 1,
               alignItems: 'center',
-              backgroundColor: isDark ? 'rgba(250,173,20,0.1)' : '#fffbe6',
-              padding: spacing.md,
-              marginHorizontal: spacing.sm,
-              marginTop: spacing.sm,
-              borderRadius: borderRadius.lg,
-              borderWidth: 1,
-              borderColor: isDark ? 'rgba(250,173,20,0.2)' : '#ffe58f',
-              gap: spacing.sm,
+              justifyContent: 'center',
+              paddingHorizontal: spacing.xl,
+              paddingVertical: spacing.xl * 2,
             }}>
-              <PartyPopper size={20} color="#d48806" />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold, color: '#d48806' }}>
-                  Holiday — {holidayInfo?.title || 'School Holiday'}
-                </Text>
-                <Text style={{ fontSize: typography.fontSize.xs, color: colors.text.secondary, marginTop: 2 }}>
-                  No attendance required for this day
+              <View style={{
+                width: 72, height: 72, borderRadius: 36,
+                backgroundColor: isDark ? 'rgba(250,173,20,0.15)' : '#fffbe6',
+                alignItems: 'center', justifyContent: 'center',
+                marginBottom: spacing.lg,
+              }}>
+                <MaterialIcons name="celebration" size={36} color="#d48806" />
+              </View>
+              <Text style={{
+                fontSize: typography.fontSize.xl,
+                fontWeight: typography.fontWeight.bold,
+                color: colors.text.primary,
+                textAlign: 'center',
+                marginBottom: spacing.xs,
+              }}>
+                {holidayInfo?.title || 'School Holiday'}
+              </Text>
+              <Text style={{
+                fontSize: typography.fontSize.sm,
+                color: colors.text.secondary,
+                textAlign: 'center',
+                marginBottom: spacing.sm,
+              }}>
+                {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              </Text>
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: isDark ? 'rgba(250,173,20,0.1)' : '#fffbe6',
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                borderRadius: borderRadius.full,
+                borderWidth: 1,
+                borderColor: isDark ? 'rgba(250,173,20,0.2)' : '#ffe58f',
+              }}>
+                <MaterialIcons name="event-busy" size={16} color="#d48806" />
+                <Text style={{ fontSize: 13, fontWeight: typography.fontWeight.semibold, color: '#d48806' }}>
+                  No attendance required
                 </Text>
               </View>
+
+              {selectedClass && (
+                <Text style={{
+                  fontSize: typography.fontSize.xs,
+                  color: colors.text.tertiary,
+                  textAlign: 'center',
+                  marginTop: spacing.lg,
+                }}>
+                  {selectedClass.grade} - {selectedClass.section} · {attendanceData.length} students
+                </Text>
+              )}
             </View>
           )}
 
-          <View style={styles.studentsHeader}>
-            <Text style={styles.sectionTitle}>Students</Text>
-            <View style={styles.headerActions}>
-              {/* Mark Holiday button — only for admin/superadmin when date is NOT already a holiday */}
-              {canMarkAttendance && !isHoliday && !holidayLoading && (
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 4,
-                    backgroundColor: isDark ? 'rgba(250,173,20,0.1)' : '#fffbe6',
-                    paddingHorizontal: spacing.sm,
-                    paddingVertical: 4,
-                    borderRadius: borderRadius.full,
-                    borderWidth: 1,
-                    borderColor: isDark ? 'rgba(250,173,20,0.2)' : '#ffe58f',
-                  }}
-                  onPress={handleMarkHoliday}
-                  activeOpacity={0.7}
-                >
-                  <PartyPopper size={12} color="#d48806" />
-                  <Text style={{ fontSize: 11, fontWeight: typography.fontWeight.semibold, color: '#d48806' }}>
-                    Mark Holiday
-                  </Text>
-                </TouchableOpacity>
-              )}
-              {hasChanges && (
-                <View style={styles.changesBadge}>
-                  <Circle size={6} color={colors.warning[600]} fill={colors.warning[600]} />
-                  <Text style={styles.changesBadgeText}>Unsaved</Text>
+          {/* ── Toolbar: Search + filters + quick actions ── */}
+          {attendanceData.length > 0 && !isHoliday && (
+            <View style={{ paddingHorizontal: spacing.sm, marginTop: spacing.sm, gap: 8 }}>
+              {/* Search row with quick action button */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{
+                  flex: 1, flexDirection: 'row', alignItems: 'center',
+                  backgroundColor: colors.surface.secondary,
+                  borderRadius: borderRadius.md,
+                  borderWidth: 1, borderColor: colors.border.light,
+                  paddingHorizontal: 10, height: 36,
+                }}>
+                  <MaterialIcons name="search" size={18} color={colors.text.tertiary} />
+                  <TextInput
+                    style={{ flex: 1, fontSize: 14, color: colors.text.primary, marginLeft: 8, paddingVertical: 0 }}
+                    placeholder="Search by name or code..."
+                    placeholderTextColor={colors.text.tertiary}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+                      <MaterialIcons name="close" size={16} color={colors.text.tertiary} />
+                    </TouchableOpacity>
+                  )}
                 </View>
-              )}
-              {canBulkMark && attendanceData.length > 0 && !isHoliday && (
-                <View style={styles.bulkActions}>
-                  <TouchableOpacity
-                    style={[styles.bulkButton, styles.bulkButtonPresent]}
-                    onPress={() => handleBulkMark('present')}
-                    activeOpacity={0.7}
+
+                {/* Quick Actions Menu */}
+                {canBulkMark && (
+                  <Menu
+                    visible={quickActionsVisible}
+                    onDismiss={() => setQuickActionsVisible(false)}
+                    anchor={
+                      <TouchableOpacity
+                        onPress={() => setQuickActionsVisible(true)}
+                        activeOpacity={0.7}
+                        style={{
+                          width: 36, height: 36,
+                          borderRadius: borderRadius.md,
+                          backgroundColor: colors.primary[50],
+                          borderWidth: 1,
+                          borderColor: colors.primary[200],
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <MaterialIcons name="bolt" size={20} color={colors.primary[600]} />
+                      </TouchableOpacity>
+                    }
                   >
-                    <CheckCircle size={12} color={colors.success[700]} />
-                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextPresent]}>All Present</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.bulkButton, styles.bulkButtonAbsent]}
-                    onPress={() => handleBulkMark('absent')}
-                    activeOpacity={0.7}
-                  >
-                    <XCircle size={12} color={colors.error[700]} />
-                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextAbsent]}>All Absent</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.bulkButton, styles.bulkButtonReset]}
-                    onPress={handleResetAll}
-                    activeOpacity={0.7}
-                  >
-                    <RotateCcw size={12} color={colors.text.secondary} />
-                    <Text style={[styles.bulkButtonText, styles.bulkButtonTextReset]}>Reset</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                    <Menu.Item
+                      title="Mark All Present"
+                      icon="check-circle"
+                      onPress={() => {
+                        setQuickActionsVisible(false);
+                        handleBulkMark('present');
+                      }}
+                    />
+                    <Menu.Item
+                      title="Mark All Absent"
+                      icon="cancel"
+                      onPress={() => {
+                        setQuickActionsVisible(false);
+                        Alert.alert(
+                          'Mark All Absent',
+                          `Are you sure you want to mark all ${attendanceData.length} students as absent?`,
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Confirm', style: 'destructive', onPress: () => handleBulkMark('absent') },
+                          ]
+                        );
+                      }}
+                      destructive
+                    />
+                    <Menu.Item
+                      title="Reset All"
+                      icon="replay"
+                      onPress={() => {
+                        setQuickActionsVisible(false);
+                        handleResetAll();
+                      }}
+                    />
+                    {canMarkAttendance && !holidayLoading && (
+                      <>
+                        <Menu.Divider />
+                        <Menu.Item
+                          title="Mark Holiday"
+                          icon="celebration"
+                          onPress={() => {
+                            setQuickActionsVisible(false);
+                            handleMarkHoliday();
+                          }}
+                        />
+                      </>
+                    )}
+                  </Menu>
+                )}
+              </View>
+
+              {/* Filter chips */}
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {(['all', 'absent', 'unmarked'] as const).map((mode) => {
+                  const isActive = filterMode === mode;
+                  const label = mode === 'all' ? `All ${attendanceData.length}` : mode === 'absent' ? `Absent ${completionStats.absent}` : `Unmarked ${completionStats.unmarked}`;
+                  const chipColor = mode === 'absent' ? colors.error : mode === 'unmarked' ? colors.warning : colors.primary;
+                  return (
+                    <TouchableOpacity
+                      key={mode}
+                      onPress={() => setFilterMode(isActive ? 'all' : mode)}
+                      activeOpacity={0.7}
+                      style={{
+                        paddingHorizontal: 10, paddingVertical: 5,
+                        borderRadius: borderRadius.full,
+                        backgroundColor: isActive ? (isDark ? `rgba(${mode === 'absent' ? '239,68,68' : mode === 'unmarked' ? '234,179,8' : '99,102,241'},0.15)` : chipColor[50]) : 'transparent',
+                        borderWidth: 1,
+                        borderColor: isActive ? chipColor[300] : colors.border.light,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: isActive ? typography.fontWeight.semibold : typography.fontWeight.medium, color: isActive ? chipColor[700] : colors.text.secondary }}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
-          </View>
+          )}
 
           <View style={styles.studentsList}>
             {studentsLoading || attendanceLoading ? (
@@ -735,40 +852,85 @@ export const AttendanceScreen: React.FC = () => {
               </View>
             ) : attendanceData.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Users size={48} color={colors.text.tertiary} />
+                <MaterialIcons name="group" size={48} color={colors.text.tertiary} />
                 <Text style={styles.emptyText}>No students found in this class</Text>
+              </View>
+            ) : filteredAttendanceData.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <MaterialIcons name="filter-list-off" size={36} color={colors.text.tertiary} />
+                <Text style={styles.emptyText}>No students match current filter</Text>
+                <TouchableOpacity
+                  onPress={() => { setSearchQuery(''); setFilterMode('all'); }}
+                  activeOpacity={0.7}
+                  style={{ marginTop: 8 }}
+                >
+                  <Text style={{ fontSize: 13, color: colors.primary.main, fontWeight: typography.fontWeight.semibold }}>
+                    Clear filters
+                  </Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <FlatList
-                data={attendanceData}
-                renderItem={({ item: student, index }) => {
+                data={filteredAttendanceData}
+                renderItem={({ item: student }) => {
                   const status = student.status;
                   const isPresent = status === 'present';
                   const isAbsent = status === 'absent';
                   const isMarked = status !== null;
 
+                  // Row tint: strong for absent, medium for present, pulsing border for unmarked
+                  const rowTintColor = isPresent
+                    ? (isDark ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.06)')
+                    : isAbsent
+                    ? (isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)')
+                    : undefined;
+
                   return (
-                    <View style={styles.cardContainer}>
-                      {/* Avatar */}
+                    <View style={[
+                      styles.cardContainer,
+                      rowTintColor ? { backgroundColor: rowTintColor } : undefined,
+                      // Absent: strong red left strip
+                      isAbsent && { borderLeftWidth: 4, borderLeftColor: colors.error[500] },
+                      // Unmarked: dashed-style warning border
+                      !isMarked && {
+                        borderColor: isDark ? colors.warning[700] : colors.warning[300],
+                        borderWidth: 1.5,
+                        borderStyle: 'dashed' as any,
+                      },
+                    ]}>
+                      {/* Roll Number Badge */}
                       <View style={[
                         styles.cardAvatar,
-                        { backgroundColor: getAvatarColor(student.studentName, isDark) }
+                        {
+                          backgroundColor: isPresent
+                            ? (isDark ? 'rgba(34,197,94,0.2)' : colors.success[100])
+                            : isAbsent
+                            ? (isDark ? 'rgba(239,68,68,0.2)' : colors.error[100])
+                            : (isDark ? 'rgba(234,179,8,0.15)' : colors.warning[50]),
+                        }
                       ]}>
                         <Text style={[
                           styles.cardAvatarText,
-                          { color: getAvatarTextColor(student.studentName, isDark) }
+                          {
+                            color: isPresent
+                              ? colors.success[700]
+                              : isAbsent
+                              ? colors.error[700]
+                              : colors.warning[700],
+                          }
                         ]}>
-                          {getInitials(student.studentName)}
+                          {student.studentCode.replace(/\D/g, '').slice(-3) || getInitials(student.studentName)}
                         </Text>
                       </View>
 
-                      {/* Info */}
+                      {/* Info — Roll No prominent */}
                       <View style={styles.cardInfo}>
                         <Text style={styles.cardName} numberOfLines={1}>
+                          <Text style={{ color: colors.text.secondary, fontWeight: typography.fontWeight.bold, fontSize: 12 }}>
+                            {student.studentCode}{' '}
+                          </Text>
+                          <Text style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)' }}>{'· '}</Text>
                           {student.studentName}
-                        </Text>
-                        <Text style={styles.cardId}>
-                          {student.studentCode}
                         </Text>
                       </View>
 
@@ -784,10 +946,11 @@ export const AttendanceScreen: React.FC = () => {
                             onPress={() => handleStatusChange(student.studentId, 'present')}
                             activeOpacity={0.7}
                           >
-                            <Text style={[
-                              styles.actionText,
-                              isPresent && styles.actionTextActive
-                            ]}>Present</Text>
+                            {isPresent ? (
+                              <MaterialIcons name="check" size={16} color="#fff" />
+                            ) : (
+                              <Text style={styles.actionText}>P</Text>
+                            )}
                           </TouchableOpacity>
 
                           <TouchableOpacity
@@ -799,29 +962,30 @@ export const AttendanceScreen: React.FC = () => {
                             onPress={() => handleStatusChange(student.studentId, 'absent')}
                             activeOpacity={0.7}
                           >
-                            <Text style={[
-                              styles.actionText,
-                              isAbsent && styles.actionTextActive
-                            ]}>Absent</Text>
+                            {isAbsent ? (
+                              <MaterialIcons name="close" size={16} color="#fff" />
+                            ) : (
+                              <Text style={styles.actionText}>A</Text>
+                            )}
                           </TouchableOpacity>
                         </View>
                       ) : (
                         <View style={styles.cardStatusContainer}>
                           {isPresent && (
                             <View style={[styles.statusBadge, styles.statusBadgePresent]}>
-                              <CheckCircle size={14} color={colors.success[700]} />
+                              <MaterialIcons name="check-circle" size={14} color={colors.success[700]} />
                               <Text style={[styles.statusBadgeText, { color: colors.success[700] }]}>Present</Text>
                             </View>
                           )}
                           {isAbsent && (
                             <View style={[styles.statusBadge, styles.statusBadgeAbsent]}>
-                              <XCircle size={14} color={colors.error[700]} />
+                              <MaterialIcons name="cancel" size={14} color={colors.error[700]} />
                               <Text style={[styles.statusBadgeText, { color: colors.error[700] }]}>Absent</Text>
                             </View>
                           )}
                           {!isMarked && (
                             <View style={[styles.statusBadge, styles.statusBadgePending]}>
-                              <Circle size={14} color={colors.text.tertiary} />
+                              <MaterialIcons name="radio-button-unchecked" size={14} color={colors.text.tertiary} />
                               <Text style={[styles.statusBadgeText, { color: colors.text.tertiary }]}>Pending</Text>
                             </View>
                           )}
@@ -848,7 +1012,7 @@ export const AttendanceScreen: React.FC = () => {
           ) : (
             !selectedClass ? (
               <View style={styles.emptyContainer}>
-                <Users size={48} color={colors.text.tertiary} />
+                <MaterialIcons name="group" size={48} color={colors.text.tertiary} />
                 <Text style={styles.emptyText}>Please select a class to view attendance history</Text>
               </View>
             ) : (
@@ -990,44 +1154,107 @@ export const AttendanceScreen: React.FC = () => {
         title="Select End Date"
       />
 
-      {
-        hasChanges && canMarkAttendance && (
+      {/* ── Sticky bottom bar: save actions or "saved" confirmation ── */}
+      {canMarkAttendance && activeTab === 'mark' && !isHoliday && attendanceData.length > 0 && (
+        hasChanges ? (
           <View style={styles.saveButtonContainer}>
-            {attendanceData.length > 0 && attendanceData.filter(s => s.status === null).length > 0 && (
+            {/* Unmarked warning */}
+            {completionStats.unmarked > 0 && (
               <View style={styles.warningBanner}>
-                <AlertCircle size={12} color={colors.warning[700]} />
+                <MaterialIcons name="warning" size={12} color={colors.warning[700]} />
                 <Text style={styles.warningText}>
-                  {attendanceData.filter(s => s.status === null).length} unmarked
+                  {completionStats.unmarked} student{completionStats.unmarked !== 1 ? 's' : ''} unmarked — mark all before saving
                 </Text>
               </View>
             )}
-            <TouchableOpacity
-              style={[
-                styles.saveButton,
-                markAttendanceMutation.isPending && styles.saveButtonDisabled,
-                attendanceData.length > 0 && attendanceData.filter(s => s.status === null).length > 0 && styles.saveButtonWarning
-              ]}
-              onPress={handleSave}
-              disabled={markAttendanceMutation.isPending}
-              activeOpacity={0.8}
-            >
-              {markAttendanceMutation.isPending ? (
-                <>
-                  <ActivityIndicator size="small" color={colors.text.inverse} />
-                  <Text style={styles.saveButtonText}>Saving...</Text>
-                </>
-              ) : (
-                <>
-                  <Save size={16} color={colors.text.inverse} />
-                  <Text style={styles.saveButtonText}>
-                    Save ({attendanceData.filter(s => s.status !== null).length}/{attendanceData.length})
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {/* Reset / discard changes */}
+              <TouchableOpacity
+                style={{
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: borderRadius.md,
+                  borderWidth: 1,
+                  borderColor: colors.border.DEFAULT,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={handleResetAll}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="replay" size={18} color={colors.text.secondary} />
+              </TouchableOpacity>
+
+              {/* Save button — full width */}
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  { flex: 1 },
+                  markAttendanceMutation.isPending && styles.saveButtonDisabled,
+                  completionStats.unmarked > 0 && styles.saveButtonWarning,
+                  completionStats.percentage === 100 && { backgroundColor: colors.success[600] },
+                ]}
+                onPress={handleSave}
+                disabled={markAttendanceMutation.isPending}
+                activeOpacity={0.8}
+              >
+                {markAttendanceMutation.isPending ? (
+                  <>
+                    <ActivityIndicator size="small" color={colors.text.inverse} />
+                    <Text style={styles.saveButtonText}>Saving attendance...</Text>
+                  </>
+                ) : (
+                  <>
+                    <MaterialIcons
+                      name={completionStats.percentage === 100 ? 'check-circle' : 'save'}
+                      size={16}
+                      color={colors.text.inverse}
+                    />
+                    <Text style={styles.saveButtonText}>
+                      {completionStats.percentage === 100
+                        ? `Save Attendance (${completionStats.total})`
+                        : `Save (${completionStats.marked}/${completionStats.total})`}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        )
-      }
+        ) : lastSavedAt ? (
+          /* Saved confirmation bar */
+          <View style={[styles.saveButtonContainer, { paddingVertical: 10 }]}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}>
+              <MaterialIcons name="cloud-done" size={16} color={colors.success[600]} />
+              <Text style={{
+                fontSize: 13,
+                fontWeight: typography.fontWeight.semibold,
+                color: colors.success[700],
+              }}>
+                Saved
+              </Text>
+              <Text style={{
+                fontSize: 12,
+                color: colors.text.tertiary,
+              }}>
+                {lastSavedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              </Text>
+              <Text style={{ color: colors.text.tertiary, fontSize: 11 }}>·</Text>
+              <Text style={{
+                fontSize: 12,
+                color: colors.text.tertiary,
+              }}>
+                {completionStats.present}P / {completionStats.absent}A
+              </Text>
+            </View>
+          </View>
+        ) : null
+      )}
     </View >
   );
 };
@@ -1215,7 +1442,7 @@ const createStyles = (
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: 0,
     marginHorizontal: spacing.sm,
     ...shadows.sm,
     borderWidth: 1,
@@ -1225,7 +1452,7 @@ const createStyles = (
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 0,
   },
   filterBar: {
     flex: 1,
@@ -1235,7 +1462,7 @@ const createStyles = (
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border.light,
-    height: 44,
+    height: 40,
     paddingHorizontal: 12,
   },
   classSelector: {
@@ -1338,7 +1565,7 @@ const createStyles = (
   headerSeparator: {
     height: 1,
     backgroundColor: colors.border.light,
-    marginVertical: 12,
+    marginVertical: 8,
     marginHorizontal: -16,
   },
 
@@ -1399,12 +1626,13 @@ const createStyles = (
   studentsList: {
     flex: 1,
     paddingHorizontal: spacing.sm,
+    paddingTop: spacing.xs,
   },
   cardContainer: {
     backgroundColor: colors.surface.primary,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    padding: spacing.sm,
+    marginBottom: 6,
     flexDirection: 'row',
     alignItems: 'center',
     ...shadows.xs,
@@ -1448,7 +1676,8 @@ const createStyles = (
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 64,
+    minWidth: 38,
+    minHeight: 32,
   },
   actionButtonPresent: {
     backgroundColor: colors.surface.secondary,

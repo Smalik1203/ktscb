@@ -1,10 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, Animated, Modal, ScrollView, Dimensions } from 'react-native';
-import { Text } from 'react-native-paper';
+import { View, TouchableOpacity, StyleSheet, Animated, Modal, ScrollView, Dimensions, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DrawerActions , useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Menu, Plus, RefreshCw, Bell, UserCheck, NotebookText, Target, CalendarDays, Activity, X } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -171,14 +170,14 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
     });
   };
 
-  const getActivityIcon = (type: string) => {
+  const getActivityIconName = (type: string): React.ComponentProps<typeof MaterialIcons>['name'] => {
     switch (type) {
-      case 'attendance': return UserCheck;
+      case 'attendance': return 'how-to-reg';
       case 'assignment':
-      case 'task': return NotebookText;
-      case 'test': return Target;
-      case 'event': return CalendarDays;
-      default: return Activity;
+      case 'task': return 'auto-stories';
+      case 'test': return 'gps-fixed';
+      case 'event': return 'date-range';
+      default: return 'show-chart';
     }
   };
 
@@ -214,7 +213,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
         <View style={styles.left}>
           {showBackButton ? (
             <TouchableOpacity onPress={handleBack} style={styles.iconBtn}>
-              <ArrowLeft size={22} color={colors.text.primary} />
+              <MaterialIcons name="arrow-back" size={22} color={colors.text.primary} />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -223,7 +222,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Menu size={22} color={colors.text.primary} />
+              <MaterialIcons name="menu" size={22} color={colors.text.primary} />
             </TouchableOpacity>
           )}
           <Text style={dynamicStyles.title}>{title}</Text>
@@ -231,12 +230,12 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
         <View style={styles.right}>
           {onRefreshPress ? (
             <TouchableOpacity onPress={onRefreshPress} style={styles.iconBtn}>
-              <RefreshCw size={20} color={colors.text.primary} />
+              <MaterialIcons name="refresh" size={20} color={colors.text.primary} />
             </TouchableOpacity>
           ) : null}
           {onAddPress ? (
             <TouchableOpacity onPress={onAddPress} style={styles.iconBtn}>
-              <Plus size={20} color={colors.text.primary} />
+              <MaterialIcons name="add" size={20} color={colors.text.primary} />
             </TouchableOpacity>
           ) : null}
           <TouchableOpacity
@@ -246,7 +245,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <View style={styles.notificationContainer}>
-              <Bell size={20} color={colors.text.primary} />
+              <MaterialIcons name="notifications" size={20} color={colors.text.primary} />
               {recentActivity && recentActivity.length > 0 && (
                 <View style={dynamicStyles.notificationBadge} />
               )}
@@ -287,7 +286,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             <View style={styles.sheetHeader}>
               <Text style={dynamicStyles.sheetTitle}>Recent Activity</Text>
               <TouchableOpacity onPress={handleCloseModal} style={styles.closeButton}>
-                <X size={20} color={colors.text.primary} />
+                <MaterialIcons name="close" size={20} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.sheetContent} showsVerticalScrollIndicator={true}>
@@ -297,7 +296,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
                 </View>
               ) : recentActivity && recentActivity.length > 0 ? (
                 recentActivity.map((activity, index) => {
-                  const ActivityIcon = getActivityIcon(activity.type);
+                  const activityIconName = getActivityIconName(activity.type);
                   const activityColor = getActivityColor(activity.color);
 
                   return (
@@ -309,7 +308,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
                       ]}
                     >
                       <View style={[styles.activityIcon, { backgroundColor: activityColor.bg }]}>
-                        <ActivityIcon size={18} color={activityColor.icon} />
+                        <MaterialIcons name={activityIconName} size={18} color={activityColor.icon} />
                       </View>
                       <View style={styles.activityContent}>
                         <Text style={dynamicStyles.activityTitle}>{activity.title}</Text>
@@ -321,7 +320,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
                 })
               ) : (
                 <View style={styles.emptyState}>
-                  <Activity size={40} color={colors.text.secondary} />
+                  <MaterialIcons name="show-chart" size={40} color={colors.text.secondary} />
                   <Text style={dynamicStyles.emptyStateTitle}>No recent activity</Text>
                   <Text style={dynamicStyles.emptyStateText}>
                     Your recent activity will appear here

@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal as RNModal, Animated, ActivityIndicator } from 'react-native';
-import { Text, Button, Portal, Modal, TextInput, SegmentedButtons, ProgressBar } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal as RNModal, Animated, ActivityIndicator, Text, TextInput as RNTextInput } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Modal, Button, ProgressBar } from '../../ui';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Upload, X, FileText, Video, HelpCircle, Loader2 } from 'lucide-react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { typography, spacing, borderRadius, colors } from '../../../lib/design-system';
@@ -291,55 +291,45 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
   const getResourceTypeIcon = (type: string) => {
     switch (type) {
       case 'video':
-        return <Video size={20} color={colors.primary[600]} />;
+        return <MaterialIcons name="videocam" size={20} color={colors.primary[600]} />;
       case 'pdf':
-        return <FileText size={20} color={colors.primary[600]} />;
+        return <MaterialIcons name="description" size={20} color={colors.primary[600]} />;
       case 'quiz':
-        return <HelpCircle size={20} color={colors.primary[600]} />;
+        return <MaterialIcons name="help" size={20} color={colors.primary[600]} />;
       default:
-        return <FileText size={20} color={colors.primary[600]} />;
+        return <MaterialIcons name="description" size={20} color={colors.primary[600]} />;
     }
   };
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        contentContainerStyle={styles.modal}
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>
-            {editingResource ? 'Edit Resource' : 'Add New Resource'}
-          </Text>
-          <TouchableOpacity onPress={onDismiss} style={styles.closeButton}>
-            <X size={24} color={colors.text.secondary} />
-          </TouchableOpacity>
-        </View>
-
+    <Modal
+      visible={visible}
+      onDismiss={onDismiss}
+      title={editingResource ? 'Edit Resource' : 'Add New Resource'}
+    >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           <View style={styles.form}>
             {/* Title */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Resource Title *</Text>
-              <TextInput
+              <RNTextInput
                 value={formData.title}
                 onChangeText={(text) => handleInputChange('title', text)}
                 placeholder="Enter resource title"
+                placeholderTextColor={colors.text.secondary}
                 style={styles.input}
-                mode="outlined"
               />
             </View>
 
             {/* Description */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Description *</Text>
-              <TextInput
+              <RNTextInput
                 value={formData.description}
                 onChangeText={(text) => handleInputChange('description', text)}
                 placeholder="Enter resource description"
-                style={styles.input}
-                mode="outlined"
+                placeholderTextColor={colors.text.secondary}
+                style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
                 multiline
                 numberOfLines={3}
               />
@@ -348,89 +338,81 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
             {/* Resource Type */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Resource Type *</Text>
-              <SegmentedButtons
-                value={formData.resource_type}
-                onValueChange={(value) => handleInputChange('resource_type', value)}
-                buttons={[
-                  {
-                    value: 'video',
-                    label: 'Video',
-                    icon: 'video',
-                  },
-                  {
-                    value: 'pdf',
-                    label: 'PDF',
-                    icon: 'file-pdf-box',
-                  },
-                ]}
-                style={styles.segmentedButtons}
-              />
+              <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, formData.resource_type === 'video' && styles.segmentBtnActive]}
+                  onPress={() => handleInputChange('resource_type', 'video')}
+                >
+                  <MaterialIcons name="videocam" size={18} color={formData.resource_type === 'video' ? colors.text.inverse : colors.text.secondary} />
+                  <Text style={[styles.segmentBtnText, formData.resource_type === 'video' && styles.segmentBtnTextActive]}>Video</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, formData.resource_type === 'pdf' && styles.segmentBtnActive]}
+                  onPress={() => handleInputChange('resource_type', 'pdf')}
+                >
+                  <MaterialIcons name="description" size={18} color={formData.resource_type === 'pdf' ? colors.text.inverse : colors.text.secondary} />
+                  <Text style={[styles.segmentBtnText, formData.resource_type === 'pdf' && styles.segmentBtnTextActive]}>PDF</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Subject Selection */}
             <View style={styles.inputGroup}>
-              <TouchableOpacity onPress={() => setShowSubjectDropdown(true)}>
-                <TextInput
-                  label="Subject *"
-                  value={formData.subject_id
-                    ? subjects.find(s => s.id === formData.subject_id)?.subject_name
-                    : ''}
-                  placeholder="Select Subject"
-                  mode="outlined"
-                  dense
-                  editable={false}
-                  pointerEvents="none"
-                  style={styles.input}
-                  right={<TextInput.Icon icon="chevron-down" />}
-                />
+              <Text style={styles.label}>Subject *</Text>
+              <TouchableOpacity onPress={() => setShowSubjectDropdown(true)} style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                <Text style={{ color: formData.subject_id ? colors.text.primary : colors.text.secondary, fontSize: typography.fontSize.sm }}>
+                  {formData.subject_id
+                    ? subjects.find(s => s.id === formData.subject_id)?.subject_name || 'Select Subject'
+                    : 'Select Subject'}
+                </Text>
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
 
             {/* Class Selection */}
             <View style={styles.inputGroup}>
-              <TouchableOpacity onPress={() => setShowClassDropdown(true)}>
-                <TextInput
-                  label="Class *"
-                  value={formData.class_instance_id
+              <Text style={styles.label}>Class *</Text>
+              <TouchableOpacity onPress={() => setShowClassDropdown(true)} style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                <Text style={{ color: formData.class_instance_id ? colors.text.primary : colors.text.secondary, fontSize: typography.fontSize.sm }}>
+                  {formData.class_instance_id
                     ? classes.find(c => c.id === formData.class_instance_id)
                       ? `Grade ${classes.find(c => c.id === formData.class_instance_id)?.grade} - ${classes.find(c => c.id === formData.class_instance_id)?.section}`
-                      : ''
-                    : ''}
-                  placeholder="Select Class"
-                  mode="outlined"
-                  dense
-                  editable={false}
-                  pointerEvents="none"
-                  style={styles.input}
-                  right={<TextInput.Icon icon="chevron-down" />}
-                />
+                      : 'Select Class'
+                    : 'Select Class'}
+                </Text>
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
 
             {/* Content Source Toggle */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Content Source</Text>
-              <SegmentedButtons
-                value={useFileUpload ? 'upload' : 'url'}
-                onValueChange={(value) => setUseFileUpload(value === 'upload')}
-                buttons={[
-                  { value: 'url', label: 'Use URL' },
-                  { value: 'upload', label: 'Upload File' },
-                ]}
-                style={styles.segmentedButtons}
-              />
+              <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, !useFileUpload && styles.segmentBtnActive]}
+                  onPress={() => setUseFileUpload(false)}
+                >
+                  <Text style={[styles.segmentBtnText, !useFileUpload && styles.segmentBtnTextActive]}>Use URL</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentBtn, useFileUpload && styles.segmentBtnActive]}
+                  onPress={() => setUseFileUpload(true)}
+                >
+                  <Text style={[styles.segmentBtnText, useFileUpload && styles.segmentBtnTextActive]}>Upload File</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Content URL or File Upload */}
             {!useFileUpload ? (
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Content URL *</Text>
-                <TextInput
+                <RNTextInput
                   value={formData.content_url}
                   onChangeText={(text) => handleInputChange('content_url', text)}
                   placeholder="Enter URL to video or PDF content"
+                  placeholderTextColor={colors.text.secondary}
                   style={styles.input}
-                  mode="outlined"
                 />
               </View>
             ) : (
@@ -441,7 +423,7 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
                   onPress={handleFilePick}
                   disabled={uploading}
                 >
-                  <Upload size={20} color={colors.primary[600]} />
+                  <MaterialIcons name="upload" size={20} color={colors.primary[600]} />
                   <Text style={styles.fileUploadText}>
                     {selectedFile ? selectedFile.name : 'Choose File'}
                   </Text>
@@ -454,15 +436,13 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
                 {uploading && (
                   <View style={styles.uploadProgressContainer}>
                     <View style={styles.uploadProgressHeader}>
-                      <Loader2 size={16} color={colors.primary[600]} style={{ animationDuration: '1s' }} />
+                      <ActivityIndicator size={16} color={colors.primary[600]} />
                       <Text style={styles.uploadStatusText}>{uploadingStatus}</Text>
                       <Text style={styles.uploadProgressText}>{Math.round(uploadProgress)}%</Text>
                     </View>
-                    <ProgressBar
-                      progress={uploadProgress / 100}
-                      color={colors.primary[600]}
-                      style={styles.progressBar}
-                    />
+                    <View style={[styles.progressBar, { backgroundColor: colors.primary[100] }]}>
+                      <View style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: colors.primary[600], borderRadius: borderRadius.sm }} />
+                    </View>
                   </View>
                 )}
               </View>
@@ -470,22 +450,25 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
 
             {/* Action Buttons */}
             <View style={styles.actions}>
-              <Button
-                mode="outlined"
+              <TouchableOpacity
                 onPress={onDismiss}
-                style={styles.cancelButton}
+                style={[styles.cancelButton, { backgroundColor: colors.surface.secondary, borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center' }]}
               >
-                Cancel
-              </Button>
-              <Button
-                mode="contained"
+                <Text style={{ color: colors.text.primary, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={handleSubmit}
-                loading={uploading}
                 disabled={uploading}
-                style={styles.submitButton}
+                style={[styles.submitButton, { backgroundColor: colors.primary[600], borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center', opacity: uploading ? 0.6 : 1 }]}
               >
-                {editingResource ? 'Update Resource' : 'Create Resource'}
-              </Button>
+                {uploading ? (
+                  <ActivityIndicator size="small" color={colors.text.inverse} />
+                ) : (
+                  <Text style={{ color: colors.text.inverse, fontWeight: '600' }}>
+                    {editingResource ? 'Update Resource' : 'Create Resource'}
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
@@ -560,7 +543,6 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
           </View>
         </RNModal>
       </Modal>
-    </Portal>
   );
 };
 
@@ -574,24 +556,6 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     },
     scrollView: {
       maxHeight: '100%',
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: spacing.lg,
-      paddingTop: spacing.lg,
-      paddingBottom: spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border.light,
-    },
-    title: {
-      fontSize: typography.fontSize.xl,
-      fontWeight: typography.fontWeight.bold,
-      color: colors.text.primary,
-    },
-    closeButton: {
-      padding: spacing.xs,
     },
     form: {
       padding: spacing.lg,
@@ -612,6 +576,30 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     },
     segmentedButtons: {
       marginTop: spacing.xs,
+    },
+    segmentBtn: {
+      flex: 1,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      gap: spacing.xs,
+      paddingVertical: spacing.sm,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.surface.secondary,
+      borderWidth: 1,
+      borderColor: colors.border.DEFAULT,
+    },
+    segmentBtnActive: {
+      backgroundColor: colors.primary[600],
+      borderColor: colors.primary[600],
+    },
+    segmentBtnText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text.secondary,
+    },
+    segmentBtnTextActive: {
+      color: colors.text.inverse,
+      fontWeight: '600' as const,
     },
     fileUploadButton: {
       flexDirection: 'row',

@@ -6103,6 +6103,30 @@ export type CompositeTypes<
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
+// ─── Convenience type aliases ────────────────────────────────────────
+// These map friendly names used across the codebase to the generated
+// Supabase helper types so consuming code can simply import e.g. `Student`.
+
+export type User = Tables<'users'>
+export type Student = Tables<'student'>
+export type Admin = Tables<'admin'>
+export type ClassInstance = Tables<'class_instances'>
+export type Subject = Tables<'subjects'>
+export type TimetableSlot = Tables<'timetable_slots'>
+export type Attendance = Tables<'attendance'>
+export type AttendanceInsert = TablesInsert<'attendance'>
+export type Task = Tables<'tasks'>
+export type Test = Tables<'tests'>
+export type TestQuestion = Tables<'test_questions'>
+export type FeeComponentType = Tables<'fee_component_types'>
+export type FeeStudentPlan = Tables<'fee_student_plans'>
+export type FeeStudentPlanItem = Tables<'fee_student_plan_items'>
+export type FeePayment = Tables<'fee_payments'>
+export type FeePaymentInsert = TablesInsert<'fee_payments'>
+export type AcademicYear = Tables<'academic_years'>
+export type CalendarEvent = Tables<'school_calendar_events'>
+export type LearningResource = Tables<'learning_resources'>
+
 export const Constants = {
   public: {
     Enums: {

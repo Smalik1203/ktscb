@@ -4,10 +4,11 @@
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
-import { Text, Button, ActivityIndicator, Portal, Modal, TextInput } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button, Input } from '../../ui';
+import { Modal } from '../../ui/Modal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Receipt, Plus, CreditCard, Wallet, Smartphone, Calendar, Trash2, FileText, Edit2, AlertTriangle, Bell } from 'lucide-react-native';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
@@ -59,9 +60,9 @@ const isOverdue = (dueDate?: string) => {
 };
 
 const PAYMENT_METHODS = [
-  { key: 'cash', label: 'Cash', icon: Wallet },
-  { key: 'card', label: 'Card', icon: CreditCard },
-  { key: 'online', label: 'UPI/Online', icon: Smartphone },
+  { key: 'cash', label: 'Cash', icon: 'account-balance-wallet' as const },
+  { key: 'card', label: 'Card', icon: 'credit-card' as const },
+  { key: 'online', label: 'UPI/Online', icon: 'smartphone' as const },
 ];
 
 export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecorded }: InvoiceDetailModalProps) {
@@ -224,25 +225,16 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
   if (!visible) return null;
 
   return (
-    <Portal>
-      <Modal visible={visible} onDismiss={handleClose} contentContainerStyle={styles.modal}>
+    <>
+      <Modal visible={visible} onDismiss={handleClose} title="Invoice Details" contentContainerStyle={styles.modal}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Invoice Details</Text>
-            <View style={styles.headerActions}>
-              <TouchableOpacity
-                onPress={() => setShowInvoiceDocument(true)}
-                style={styles.viewInvoiceBtn}
-              >
-                <FileText size={18} color={colors.primary[600]} />
-                <Text style={styles.viewInvoiceText}>View Invoice</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-                <X size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TouchableOpacity
+            onPress={() => setShowInvoiceDocument(true)}
+            style={styles.viewInvoiceBtn}
+          >
+            <MaterialIcons name="description" size={18} color={colors.primary[600]} />
+            <Text style={styles.viewInvoiceText}>View Invoice</Text>
+          </TouchableOpacity>
 
           {isLoading ? (
             <View style={styles.loading}>
@@ -256,7 +248,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                 {(error as Error).message || 'Please try again'}
               </Text>
               <Button
-                mode="outlined"
+                variant="outline"
                 onPress={() => refetch()}
                 style={{ marginTop: spacing.md }}
               >
@@ -270,7 +262,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                 This invoice may have been deleted or you don't have access to it.
               </Text>
               <Button
-                mode="outlined"
+                variant="outline"
                 onPress={handleClose}
                 style={{ marginTop: spacing.md }}
               >
@@ -290,7 +282,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                         setEditNotes(invoice.notes || '');
                         setIsEditingDetails(true);
                       }}>
-                        <Edit2 size={16} color={colors.primary[600]} />
+                        <MaterialIcons name="edit" size={16} color={colors.primary[600]} />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -299,31 +291,29 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                 {isEditingDetails ? (
                   <View style={styles.editForm}>
                     <Text style={styles.inputLabel}>Due Date (YYYY-MM-DD)</Text>
-                    <TextInput
-                      mode="outlined"
-                      dense
+                    <Input
+                      variant="outlined"
+                      size="sm"
                       style={styles.textInput}
                       value={editDueDate}
                       onChangeText={setEditDueDate}
                       placeholder="YYYY-MM-DD"
-                      contentStyle={{ backgroundColor: colors.surface.primary }}
                     />
                     <Text style={styles.inputLabel}>Notes</Text>
-                    <TextInput
-                      mode="outlined"
-                      dense
-                      style={[styles.textInput, { height: undefined }]}
+                    <Input
+                      variant="outlined"
+                      size="sm"
+                      style={StyleSheet.flatten([styles.textInput, { height: undefined }])}
                       value={editNotes}
                       onChangeText={setEditNotes}
                       multiline
                       numberOfLines={3}
                       placeholder="Add notes..."
-                      contentStyle={{ backgroundColor: colors.surface.primary, height: 80 }}
                     />
                     <View style={[styles.formActions, { marginTop: 10 }]}>
-                      <Button mode="outlined" onPress={() => setIsEditingDetails(false)} style={{ marginRight: 8 }}>Cancel</Button>
+                      <Button variant="outline" onPress={() => setIsEditingDetails(false)} style={{ marginRight: 8 }}>Cancel</Button>
                       <Button
-                        mode="contained"
+                        variant="primary"
                         onPress={async () => {
                           try {
                             await updateInvoiceMutation.mutateAsync({
@@ -349,7 +339,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                   <>
                     {invoice.due_date && (
                       <View style={styles.dueDateRow}>
-                        <Calendar size={14} color={isOverdue(invoice.due_date) ? colors.error[600] : colors.text.secondary} />
+                        <MaterialIcons name="event" size={14} color={isOverdue(invoice.due_date) ? colors.error[600] : colors.text.secondary} />
                         <Text style={[styles.dueDateText, isOverdue(invoice.due_date) && styles.dueDateOverdue]}>
                           Due Date: {formatDate(invoice.due_date)}
                           {isOverdue(invoice.due_date) && ' (Overdue)'}
@@ -393,7 +383,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                       onPress={() => setShowAddItemsForm(true)}
                       style={styles.addItemButton}
                     >
-                      <Plus size={18} color={colors.primary[600]} />
+                      <MaterialIcons name="add" size={18} color={colors.primary[600]} />
                       <Text style={styles.addItemButtonText}>Add Item</Text>
                     </TouchableOpacity>
                   )}
@@ -412,26 +402,24 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                         {isEditing ? (
                           <View style={styles.editItemForm}>
                             <View style={styles.editItemFormRow}>
-                              <TextInput
-                                mode="outlined"
-                                dense
+                              <Input
+                                variant="outlined"
+                                size="sm"
                                 style={styles.editItemLabelInput}
                                 value={editingItemLabel}
                                 onChangeText={setEditingItemLabel}
                                 placeholder="Item name"
-                                contentStyle={{ backgroundColor: colors.surface.secondary }}
                               />
                               <View style={styles.editItemAmountWrap}>
-                                <TextInput
-                                  mode="outlined"
-                                  dense
+                                <Input
+                                  variant="outlined"
+                                  size="sm"
                                   style={styles.editItemAmountInput}
                                   value={editingItemAmount}
                                   onChangeText={setEditingItemAmount}
                                   placeholder="0"
                                   keyboardType="decimal-pad"
-                                  left={<TextInput.Affix text="₹" />}
-                                  contentStyle={{ backgroundColor: colors.surface.secondary }}
+                                  leftIcon={<Text style={{ color: colors.text.secondary }}>₹</Text>}
                                 />
                               </View>
                             </View>
@@ -497,7 +485,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                                     }}
                                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                   >
-                                    <Edit2 size={18} color={colors.primary[600]} />
+                                    <MaterialIcons name="edit" size={18} color={colors.primary[600]} />
                                   </TouchableOpacity>
                                   <TouchableOpacity
                                     style={styles.actionButton}
@@ -531,7 +519,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                                     }}
                                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                                   >
-                                    <Trash2 size={18} color={colors.error[600]} />
+                                    <MaterialIcons name="delete" size={18} color={colors.error[600]} />
                                   </TouchableOpacity>
                                 </View>
                               )}
@@ -549,26 +537,24 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                     <Text style={styles.addItemsTitle}>Add New Items</Text>
                     {newItems.map((item) => (
                       <View key={item.id} style={styles.newItemRow}>
-                        <TextInput
-                          mode="outlined"
-                          dense
+                        <Input
+                          variant="outlined"
+                          size="sm"
                           style={styles.newItemLabelInput}
                           value={item.label}
                           onChangeText={(v) => updateNewItem(item.id, 'label', v)}
                           placeholder="Item name"
-                          contentStyle={{ backgroundColor: colors.surface.primary }}
                         />
                         <View style={styles.newItemAmountWrap}>
-                          <TextInput
-                            mode="outlined"
-                            dense
+                          <Input
+                            variant="outlined"
+                            size="sm"
                             style={styles.newItemAmountInput}
                             value={item.amount}
                             onChangeText={(v) => updateNewItem(item.id, 'amount', v)}
                             placeholder="0"
                             keyboardType="decimal-pad"
-                            left={<TextInput.Affix text="₹" />}
-                            contentStyle={{ backgroundColor: colors.surface.primary }}
+                            leftIcon={<Text style={{ color: colors.text.secondary }}>₹</Text>}
                           />
                         </View>
                         <TouchableOpacity
@@ -576,7 +562,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                           disabled={newItems.length <= 1}
                           style={styles.deleteNewItemBtn}
                         >
-                          <Trash2 size={16} color={newItems.length <= 1 ? colors.neutral[300] : colors.error[500]} />
+                          <MaterialIcons name="delete" size={16} color={newItems.length <= 1 ? colors.neutral[300] : colors.error[500]} />
                         </TouchableOpacity>
                       </View>
                     ))}
@@ -584,12 +570,12 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                       onPress={addNewItemRow}
                       style={styles.addNewItemRowBtn}
                     >
-                      <Plus size={14} color={colors.primary[600]} />
+                      <MaterialIcons name="add" size={14} color={colors.primary[600]} />
                       <Text style={styles.addNewItemRowText}>Add Another Item</Text>
                     </TouchableOpacity>
                     <View style={styles.addItemsActions}>
                       <Button
-                        mode="outlined"
+                        variant="outline"
                         onPress={() => {
                           setShowAddItemsForm(false);
                           setNewItems([{ id: '1', label: '', amount: '' }]);
@@ -599,7 +585,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                         Cancel
                       </Button>
                       <Button
-                        mode="contained"
+                        variant="primary"
                         onPress={handleAddItems}
                         loading={addItemsMutation.isPending}
                         disabled={addItemsMutation.isPending}
@@ -619,7 +605,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                   {payments.map(payment => (
                     <View key={payment.id} style={styles.paymentRow}>
                       <View style={styles.paymentIcon}>
-                        <Receipt size={16} color={colors.success[600]} />
+                        <MaterialIcons name="receipt" size={16} color={colors.success[600]} />
                       </View>
                       <View style={styles.paymentInfo}>
                         <Text style={styles.paymentAmount}>{formatAmount(payment.amount_inr)}</Text>
@@ -641,7 +627,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                         style={styles.receiptBtn}
                         disabled={isGenerating}
                       >
-                        <FileText size={16} color={colors.primary[600]} />
+                        <MaterialIcons name="description" size={16} color={colors.primary[600]} />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -655,16 +641,15 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
 
                   <Text style={styles.inputLabel}>Amount</Text>
                   <View style={styles.amountInputRow}>
-                    <TextInput
-                      mode="outlined"
-                      dense
+                    <Input
+                      variant="outlined"
+                      size="sm"
                       style={styles.paymentAmountInput}
                       value={paymentAmount}
                       onChangeText={setPaymentAmount}
                       placeholder={balance.toString()}
                       keyboardType="decimal-pad"
-                      left={<TextInput.Affix text="₹" />}
-                      contentStyle={{ backgroundColor: colors.background.secondary, fontSize: 18, fontWeight: 'bold' }}
+                      leftIcon={<Text style={{ color: colors.text.secondary, fontSize: 18, fontWeight: 'bold' }}>₹</Text>}
                     />
                     <TouchableOpacity
                       style={styles.fullAmountBtn}
@@ -677,7 +662,6 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                   <Text style={styles.inputLabel}>Method</Text>
                   <View style={styles.methodRow}>
                     {PAYMENT_METHODS.map(m => {
-                      const Icon = m.icon;
                       const active = paymentMethod === m.key;
                       return (
                         <TouchableOpacity
@@ -685,7 +669,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                           style={[styles.methodBtn, active && styles.methodBtnActive]}
                           onPress={() => setPaymentMethod(m.key)}
                         >
-                          <Icon size={18} color={active ? colors.primary[600] : colors.text.secondary} />
+                          <MaterialIcons name={m.icon} size={18} color={active ? colors.primary[600] : colors.text.secondary} />
                           <Text style={[styles.methodLabel, active && styles.methodLabelActive]}>
                             {m.label}
                           </Text>
@@ -695,22 +679,21 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                   </View>
 
                   <Text style={styles.inputLabel}>Receipt # (optional)</Text>
-                  <TextInput
-                    mode="outlined"
-                    dense
+                  <Input
+                    variant="outlined"
+                    size="sm"
                     style={styles.textInput}
                     value={receiptNo}
                     onChangeText={setReceiptNo}
                     placeholder="e.g. RCP-001"
-                    contentStyle={{ backgroundColor: colors.background.secondary }}
                   />
 
                   <View style={styles.formActions}>
-                    <Button mode="outlined" onPress={() => setShowPaymentForm(false)}>
+                    <Button variant="outline" onPress={() => setShowPaymentForm(false)}>
                       Cancel
                     </Button>
                     <Button
-                      mode="contained"
+                      variant="primary"
                       onPress={handleRecordPayment}
                       loading={saving}
                       disabled={saving || !paymentAmount}
@@ -729,16 +712,16 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
               {balance > 0 && (
                 <View style={styles.footerButtonRow}>
                   <Button
-                    mode="contained"
-                    icon={() => <Receipt size={18} color="#fff" />}
+                    variant="primary"
+                    icon={<MaterialIcons name="receipt" size={18} color="#fff" />}
                     onPress={() => setShowPaymentScreen(true)}
-                    style={[styles.payBtn, { flex: 1 }]}
+                    style={StyleSheet.flatten([styles.payBtn, { flex: 1 }])}
                   >
                     Record Payment
                   </Button>
                   <Button
-                    mode="outlined"
-                    icon={() => <Bell size={18} color={colors.warning[600]} />}
+                    variant="outline"
+                    icon={<MaterialIcons name="notifications" size={18} color={colors.warning[600]} />}
                     onPress={async () => {
                       setSendingReminder(true);
                       try {
@@ -752,8 +735,6 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                     }}
                     loading={sendingReminder}
                     disabled={sendingReminder}
-                    buttonColor={colors.warning[50]}
-                    textColor={colors.warning[700]}
                     style={styles.reminderBtn}
                   >
                     Remind
@@ -762,7 +743,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
               )}
               {canDeleteInvoice && (
                 <Button
-                  mode="outlined"
+                  variant="outline"
                   onPress={() => {
                     Alert.alert(
                       'Delete Invoice',
@@ -787,11 +768,9 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
                       ]
                     );
                   }}
-                  icon={() => <Trash2 size={18} color={colors.error[600]} />}
+                  icon={<MaterialIcons name="delete" size={18} color={colors.error[600]} />}
                   loading={deleteInvoiceMutation.isPending}
                   disabled={deleteInvoiceMutation.isPending}
-                  buttonColor={colors.error[50]}
-                  textColor={colors.error[600]}
                   style={styles.deleteInvoiceButtonBottom}
                 >
                   Delete Invoice
@@ -836,7 +815,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
         }}
         isLoading={isGenerating}
       />
-    </Portal>
+    </>
   );
 }
 
@@ -853,25 +832,6 @@ const createStyles = (
     borderRadius: borderRadius.xl,
     maxHeight: '90%',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    flex: 1,
-  },
   viewInvoiceBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -887,9 +847,6 @@ const createStyles = (
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.primary[600],
-  },
-  closeBtn: {
-    padding: spacing.xs,
   },
   loading: {
     padding: spacing.xl * 2,

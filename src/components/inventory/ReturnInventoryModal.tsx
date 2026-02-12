@@ -6,9 +6,9 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { Text, Portal, Modal, ActivityIndicator } from 'react-native-paper';
-import { X, RotateCcw, AlertTriangle } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Text, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Modal } from '../../ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
 
@@ -90,26 +90,12 @@ export function ReturnInventoryModal({
     : false;
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={handleClose}
-        contentContainerStyle={styles.modal}
-      >
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <RotateCcw size={24} color={colors.primary[600]} />
-              <Text style={styles.headerTitle}>
-                {markAsLost ? 'Mark as Lost' : 'Return Item'}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <X size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-
+    <Modal
+      visible={visible}
+      onDismiss={handleClose}
+      title={markAsLost ? 'Mark as Lost' : 'Return Item'}
+    >
+      <View style={styles.container}>
           {/* Item Info */}
           <View style={styles.itemInfoCard}>
             <Text style={styles.itemName}>{itemName}</Text>
@@ -150,7 +136,7 @@ export function ReturnInventoryModal({
             {/* Warning for lost items */}
             {markAsLost && (
               <View style={styles.warningCard}>
-                <AlertTriangle size={20} color={colors.warning[600]} />
+                <MaterialIcons name="warning" size={20} color={colors.warning[600]} />
                 <Text style={styles.warningText}>
                   Marking as lost will reverse the inventory quantity and fees, but the item will be permanently marked as lost.
                 </Text>
@@ -245,7 +231,6 @@ export function ReturnInventoryModal({
           </View>
         </View>
       </Modal>
-    </Portal>
   );
 }
 
@@ -259,27 +244,6 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   container: {
     maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  closeButton: {
-    padding: spacing.xs,
   },
   itemInfoCard: {
     backgroundColor: colors.primary[50],

@@ -1,10 +1,28 @@
+/**
+ * SearchBar Component
+ * 
+ * A themed search input with clear button.
+ * Uses MaterialIcons via the Icon component.
+ * 
+ * @example
+ * ```tsx
+ * import { SearchBar } from '@/ui';
+ * 
+ * <SearchBar
+ *   value={query}
+ *   onChangeText={setQuery}
+ *   placeholder="Search students..."
+ * />
+ * ```
+ */
+
 import React from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
-import { Search, X } from 'lucide-react-native';
-import { useTheme } from '../../contexts/ThemeContext';
-import { spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useTheme } from '../contexts/ThemeContext';
+import { spacing, borderRadius, typography, shadows } from '../../lib/design-system';
 
-interface SearchBarProps {
+export interface SearchBarProps {
   value: string;
   onChangeText: (value: string) => void;
   placeholder?: string;
@@ -30,7 +48,7 @@ export function SearchBar({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface.secondary, borderColor: colors.border.light }, containerStyle]}>
-      <Search size={18} color={colors.text.tertiary} />
+      <MaterialIcons name="search" size={18} color={colors.text.tertiary} />
       <TextInput
         style={[styles.input, { color: colors.text.primary }, inputStyle]}
         placeholder={placeholder}
@@ -40,7 +58,7 @@ export function SearchBar({
       />
       {value.length > 0 && (
         <TouchableOpacity onPress={handleClear} accessibilityRole="button" accessibilityLabel="Clear search">
-          <X size={18} color={colors.text.tertiary} />
+          <MaterialIcons name="close" size={18} color={colors.text.tertiary} />
         </TouchableOpacity>
       )}
     </View>

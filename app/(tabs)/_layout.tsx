@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
-import { View } from 'react-native';
 import { Tabs, useRouter } from 'expo-router';
-import { LayoutDashboard, CalendarRange, UserCheck, CreditCard, Settings2, CalendarDays, NotebookText, CheckCircle2, FileText, TrendingUp, DollarSign, Package, MessageSquare, MessageSquareMore, Bot } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { AppNavbar } from '../../src/components/layout/AppNavbarExpo';
 import { useCapabilities } from '../../src/hooks/useCapabilities';
@@ -32,10 +31,10 @@ export default function TabLayout() {
   // Capability-based tab visibility (NOT role-based!)
   // Safe access: profile is guaranteed non-null here due to early return above
   const canManageAdmins = can('admins.create');
-  const canManageClasses = can('classes.create');
-  const canManageSubjects = can('subjects.create');
+  const canManageClasses = can('classes.manage');
+  const canManageSubjects = can('subjects.manage');
   const canManageStudents = can('students.create');
-  const canViewFinance = can('management.view') && (profile.role === 'superadmin'); // Finance is super admin only
+  const canViewFinance = can('finance.access');
   const canManageInventory = can('inventory.create');
 
   // Feedback tab title based on role
@@ -46,7 +45,6 @@ export default function TabLayout() {
   };
 
   return (
-    <>
       <Tabs
         screenOptions={{
           header: ({ options }) => (
@@ -63,7 +61,7 @@ export default function TabLayout() {
           options={{
             title: 'Dashboard',
             tabBarLabel: 'Home',
-            tabBarIcon: ({ size, color }) => <LayoutDashboard size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="dashboard" size={size} color={color} />,
           }}
         />
 
@@ -71,7 +69,7 @@ export default function TabLayout() {
           name="timetable"
           options={{
             title: 'Timetable',
-            tabBarIcon: ({ size, color }) => <CalendarRange size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="date-range" size={size} color={color} />,
           }}
         />
 
@@ -79,7 +77,7 @@ export default function TabLayout() {
           name="calendar"
           options={{
             title: 'Calendar',
-            tabBarIcon: ({ size, color }) => <CalendarDays size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="date-range" size={size} color={color} />,
           }}
         />
 
@@ -87,7 +85,7 @@ export default function TabLayout() {
           name="resources"
           options={{
             title: 'Resources',
-            tabBarIcon: ({ size, color }) => <NotebookText size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="auto-stories" size={size} color={color} />,
           }}
         />
 
@@ -95,7 +93,7 @@ export default function TabLayout() {
           name="announcements"
           options={{
             title: 'Announcements',
-            tabBarIcon: ({ size, color }) => <MessageSquare size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="chat" size={size} color={color} />,
           }}
         />
 
@@ -104,7 +102,7 @@ export default function TabLayout() {
           name="feedback"
           options={{
             title: getFeedbackTitle(),
-            tabBarIcon: ({ size, color }) => <MessageSquareMore size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="question-answer" size={size} color={color} />,
           }}
         />
 
@@ -113,7 +111,7 @@ export default function TabLayout() {
           name="fees-student"
           options={{
             title: 'Fees',
-            tabBarIcon: ({ size, color }) => <CreditCard size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="credit-card" size={size} color={color} />,
             href: null,
           }}
         />
@@ -122,7 +120,7 @@ export default function TabLayout() {
           name="syllabus"
           options={{
             title: 'Syllabus',
-            tabBarIcon: ({ size, color }) => <NotebookText size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="auto-stories" size={size} color={color} />,
           }}
         />
 
@@ -130,7 +128,7 @@ export default function TabLayout() {
           name="syllabus-student"
           options={{
             title: 'Syllabus (Student)',
-            tabBarIcon: ({ size, color }) => <NotebookText size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="auto-stories" size={size} color={color} />,
             href: null,
           }}
         />
@@ -139,7 +137,7 @@ export default function TabLayout() {
           name="attendance"
           options={{
             title: 'Attendance',
-            tabBarIcon: ({ size, color }) => <UserCheck size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="how-to-reg" size={size} color={color} />,
           }}
         />
 
@@ -147,7 +145,7 @@ export default function TabLayout() {
           name="tasks"
           options={{
             title: 'Tasks',
-            tabBarIcon: ({ size, color }) => <CheckCircle2 size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="check-circle" size={size} color={color} />,
           }}
         />
 
@@ -155,15 +153,15 @@ export default function TabLayout() {
           name="assessments"
           options={{
             title: 'Assessments',
-            tabBarIcon: ({ size, color }) => <FileText size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="description" size={size} color={color} />,
           }}
         />
 
         <Tabs.Screen
           name="progress"
           options={{
-            title: (profile?.role === 'admin' || profile?.role === 'superadmin') ? 'Student Progress' : 'My Progress',
-            tabBarIcon: ({ size, color }) => <TrendingUp size={size} color={color} />,
+            title: can('dashboard.admin_stats') ? 'Student Progress' : 'My Progress',
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="trending-up" size={size} color={color} />,
           }}
         />
 
@@ -171,7 +169,7 @@ export default function TabLayout() {
           name="chatbot"
           options={{
             title: 'Sage AI',
-            tabBarIcon: ({ size, color }) => <Bot size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="smart-toy" size={size} color={color} />,
           }}
         />
 
@@ -179,7 +177,7 @@ export default function TabLayout() {
           name="fees"
           options={{
             title: 'Fees',
-            tabBarIcon: ({ size, color }) => <CreditCard size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="credit-card" size={size} color={color} />,
           }}
         />
 
@@ -190,7 +188,7 @@ export default function TabLayout() {
           name="manage"
           options={{
             title: 'Management',
-            tabBarIcon: ({ size, color }) => <Settings2 size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="settings" size={size} color={color} />,
           }}
         />
 
@@ -199,7 +197,7 @@ export default function TabLayout() {
           name="finance"
           options={{
             title: 'Finance',
-            tabBarIcon: ({ size, color }) => <DollarSign size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="attach-money" size={size} color={color} />,
             href: canViewFinance ? '/(tabs)/finance' : null,
           }}
         />
@@ -245,11 +243,10 @@ export default function TabLayout() {
           name="inventory"
           options={{
             title: 'Inventory',
-            tabBarIcon: ({ size, color }) => <Package size={size} color={color} />,
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="inventory-2" size={size} color={color} />,
             href: canManageInventory ? '/(tabs)/inventory' : null,
           }}
         />
       </Tabs>
-    </>
   );
 }

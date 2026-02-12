@@ -6,15 +6,8 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Alert } from 'react-native';
-import { Text, SegmentedButtons, ActivityIndicator } from 'react-native-paper';
-import { 
-  ChevronRight,
-  AlertTriangle,
-  Info,
-  CheckCircle2,
-  X,
-} from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Alert, Text, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
 import type { InventoryItemInput } from '../../lib/domain-schemas';
@@ -435,16 +428,19 @@ export function InventoryItemForm({
         <>
           <View style={styles.formGroup}>
             <Text style={styles.label}>Issue To *</Text>
-            <SegmentedButtons
-              value={issueTo || ''}
-              onValueChange={(value) => setIssueTo(value as 'student' | 'staff' | 'both')}
-              buttons={[
-                { value: 'student', label: 'Student' },
-                { value: 'staff', label: 'Staff' },
-                { value: 'both', label: 'Both' },
-              ]}
-              style={styles.segmentedButtons}
-            />
+            <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
+              {(['student', 'staff', 'both'] as const).map((val) => (
+                <TouchableOpacity
+                  key={val}
+                  style={[styles.segmentBtn, issueTo === val && styles.segmentBtnActive]}
+                  onPress={() => setIssueTo(val)}
+                >
+                  <Text style={[styles.segmentBtnText, issueTo === val && styles.segmentBtnTextActive]}>
+                    {val.charAt(0).toUpperCase() + val.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           <View style={styles.toggleGroup}>
@@ -485,7 +481,7 @@ export function InventoryItemForm({
 
       {!canBeIssued && (
         <View style={styles.infoCard}>
-          <Info size={20} color={colors.text.secondary} />
+          <MaterialIcons name="info" size={20} color={colors.text.secondary} />
           <Text style={styles.infoText}>
             This item will not be available for issuing. It can only be tracked in inventory.
           </Text>
@@ -520,7 +516,7 @@ export function InventoryItemForm({
 
       {!isChargeable && (
         <View style={styles.infoCard}>
-          <Info size={20} color={colors.text.secondary} />
+          <MaterialIcons name="info" size={20} color={colors.text.secondary} />
           <Text style={styles.infoText}>
             No fee will be added when this item is issued.
           </Text>
@@ -550,7 +546,7 @@ export function InventoryItemForm({
                   Student pays once when item is issued
                 </Text>
                 {chargeType === 'one_time' && (
-                  <CheckCircle2 size={20} color={colors.primary[600]} style={styles.choiceCheckmark} />
+                  <MaterialIcons name="check-circle" size={20} color={colors.primary[600]} style={styles.choiceCheckmark} />
                 )}
               </TouchableOpacity>
 
@@ -572,7 +568,7 @@ export function InventoryItemForm({
                   Student pays deposit, refunded on return
                 </Text>
                 {chargeType === 'deposit' && (
-                  <CheckCircle2 size={20} color={colors.primary[600]} style={styles.choiceCheckmark} />
+                  <MaterialIcons name="check-circle" size={20} color={colors.primary[600]} style={styles.choiceCheckmark} />
                 )}
               </TouchableOpacity>
             </View>
@@ -592,7 +588,7 @@ export function InventoryItemForm({
 
           {mustBeReturned && chargeType === 'one_time' && (
             <View style={styles.warningCard}>
-              <AlertTriangle size={20} color={colors.warning[600]} />
+              <MaterialIcons name="warning" size={20} color={colors.warning[600]} />
               <Text style={styles.warningText}>
                 Warning: One-time charge with returnable items may cause confusion. Consider using a deposit instead.
               </Text>
@@ -629,16 +625,19 @@ export function InventoryItemForm({
           {autoAddToFees && (
             <View style={styles.formGroup}>
               <Text style={styles.label}>Fee Category *</Text>
-              <SegmentedButtons
-                value={feeCategory || ''}
-                onValueChange={(value) => setFeeCategory(value as 'books' | 'uniform' | 'misc')}
-                buttons={[
-                  { value: 'books', label: 'Books' },
-                  { value: 'uniform', label: 'Uniform' },
-                  { value: 'misc', label: 'Misc' },
-                ]}
-                style={styles.segmentedButtons}
-              />
+              <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
+                {(['books', 'uniform', 'misc'] as const).map((val) => (
+                  <TouchableOpacity
+                    key={val}
+                    style={[styles.segmentBtn, feeCategory === val && styles.segmentBtnActive]}
+                    onPress={() => setFeeCategory(val)}
+                  >
+                    <Text style={[styles.segmentBtnText, feeCategory === val && styles.segmentBtnTextActive]}>
+                      {val.charAt(0).toUpperCase() + val.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           )}
         </>
@@ -661,7 +660,8 @@ export function InventoryItemForm({
         <Text style={styles.advancedToggleText}>
           {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
         </Text>
-        <ChevronRight 
+        <MaterialIcons 
+          name="chevron-right" 
           size={20} 
           color={colors.text.secondary}
           style={[styles.chevron, showAdvanced && styles.chevronRotated]}
@@ -730,7 +730,7 @@ export function InventoryItemForm({
           style={styles.closeButton}
           disabled={submitting}
         >
-          <X size={24} color={colors.text.primary} />
+          <MaterialIcons name="close" size={24} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
 
@@ -935,6 +935,28 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   },
   segmentedButtons: {
     marginTop: spacing.sm,
+  },
+  segmentBtn: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surface.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.primary,
+  },
+  segmentBtnActive: {
+    backgroundColor: colors.primary[600],
+    borderColor: colors.primary[600],
+  },
+  segmentBtnText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text.secondary,
+  },
+  segmentBtnTextActive: {
+    color: colors.text.inverse,
+    fontWeight: '600' as const,
   },
   infoCard: {
     flexDirection: 'row',

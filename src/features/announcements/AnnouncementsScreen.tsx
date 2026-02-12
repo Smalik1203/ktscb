@@ -7,18 +7,20 @@ import {
     RefreshControl,
     ActivityIndicator,
 } from 'react-native';
-import { Plus, Megaphone } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
 import { useAnnouncementsFeed } from '../../hooks/useAnnouncements';
 import { AnnouncementCard } from './components/AnnouncementCard';
 import { CreateAnnouncementModal } from './components/CreateAnnouncementModal';
-import { LinearGradient } from 'expo-linear-gradient';
+import { FAB } from '../../ui';
 
 export default function AnnouncementsScreen() {
     const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
     const { profile } = useAuth();
+    const { can } = useCapabilities();
     const insets = useSafeAreaInsets();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [editingAnnouncement, setEditingAnnouncement] = useState<any>(null);
@@ -43,7 +45,7 @@ export default function AnnouncementsScreen() {
         setEditingAnnouncement(null);
     };
 
-    const canPost = profile?.role === 'admin' || profile?.role === 'superadmin';
+    const canPost = can('announcements.create');
     const announcements = data?.pages.flatMap((page: any) => page.announcements) || [];
 
     const renderEmpty = () => {
@@ -72,7 +74,7 @@ export default function AnnouncementsScreen() {
                         marginBottom: spacing.xl,
                     }}
                 >
-                    <Megaphone size={56} color={colors.primary[400]} strokeWidth={1.5} />
+                    <MaterialIcons name="campaign" size={56} color={colors.primary[400]} />
                 </View>
 
                 <RNText
@@ -107,10 +109,7 @@ export default function AnnouncementsScreen() {
                         onPress={() => setShowCreateModal(true)}
                         activeOpacity={0.8}
                     >
-                        <LinearGradient
-                            colors={[colors.primary[500], colors.primary[600]]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 0 }}
+                        <View
                             style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
@@ -118,14 +117,15 @@ export default function AnnouncementsScreen() {
                                 paddingHorizontal: spacing.xl,
                                 paddingVertical: spacing.md,
                                 borderRadius: borderRadius.full,
+                                backgroundColor: colors.primary[600],
                                 ...shadows.md,
                             }}
                         >
-                            <Plus size={20} color="#fff" strokeWidth={3} />
+                            <MaterialIcons name="add" size={20} color="#fff" />
                             <RNText style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>
                                 Create First Announcement
                             </RNText>
-                        </LinearGradient>
+                        </View>
                     </TouchableOpacity>
                 )}
             </View>
@@ -185,31 +185,11 @@ export default function AnnouncementsScreen() {
             />
 
             {/* Floating Action Button */}
-            {canPost && announcements.length > 0 && (
-                <TouchableOpacity
-                    onPress={() => setShowCreateModal(true)}
-                    activeOpacity={0.9}
-                    style={{
-                        position: 'absolute',
-                        bottom: spacing.xl + insets.bottom,
-                        right: spacing.lg,
-                        ...shadows.lg,
-                    }}
-                >
-                    <LinearGradient
-                        colors={[colors.primary[500], colors.primary[600]]}
-                        style={{
-                            width: 60,
-                            height: 60,
-                            borderRadius: 30,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Plus size={28} color="#fff" strokeWidth={2.5} />
-                    </LinearGradient>
-                </TouchableOpacity>
-            )}
+            <FAB
+                icon="add"
+                onPress={() => setShowCreateModal(true)}
+                visible={canPost && announcements.length > 0}
+            />
 
             {/* Create/Edit Modal */}
             <CreateAnnouncementModal

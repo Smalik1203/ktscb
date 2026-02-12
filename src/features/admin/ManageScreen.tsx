@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Platform, Dimensions } from 'react-native';
-import { Text, Card, ActivityIndicator, Avatar } from 'react-native-paper';
-import { Users, Shield, Activity, AlertCircle, UserCheck, Clock, TrendingUp, Zap, ChevronRight } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Platform, Dimensions, Text, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Avatar } from '../../ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
@@ -66,7 +66,7 @@ export default function ManageScreen() {
       <View style={styles.container}>
         <View style={styles.errorContainer}>
           <View style={styles.errorIcon}>
-            <AlertCircle size={48} color={colors.error[500]} />
+            <MaterialIcons name="error" size={48} color={colors.error[500]} />
           </View>
           <Text style={styles.errorTitle}>Unable to load data</Text>
           <Text style={styles.errorMessage}>
@@ -177,7 +177,7 @@ export default function ManageScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={[styles.cardIcon, { backgroundColor: colors.success[100] }]}>
-              <Users size={20} color={colors.success[600]} />
+              <MaterialIcons name="group" size={20} color={colors.success[600]} />
             </View>
             <View style={styles.cardHeaderText}>
               <Text style={styles.cardTitle}>Students</Text>
@@ -213,17 +213,17 @@ export default function ManageScreen() {
           {/* Status Grid */}
           <View style={styles.statusGrid}>
             <View style={[styles.statusCard, { backgroundColor: colors.success[50] }]}>
-              <UserCheck size={16} color={colors.success[600]} />
+              <MaterialIcons name="how-to-reg" size={16} color={colors.success[600]} />
               <Text style={[styles.statusValue, { color: colors.success[700] }]}>{studentActive}</Text>
               <Text style={styles.statusLabel}>Active</Text>
             </View>
             <View style={[styles.statusCard, { backgroundColor: colors.warning[50] }]}>
-              <Clock size={16} color={colors.warning[600]} />
+              <MaterialIcons name="schedule" size={16} color={colors.warning[600]} />
               <Text style={[styles.statusValue, { color: colors.warning[700] }]}>{studentInactive}</Text>
               <Text style={styles.statusLabel}>Idle</Text>
             </View>
             <View style={[styles.statusCard, { backgroundColor: colors.neutral[100] }]}>
-              <AlertCircle size={16} color={colors.neutral[500]} />
+              <MaterialIcons name="error" size={16} color={colors.neutral[500]} />
               <Text style={[styles.statusValue, { color: colors.neutral[700] }]}>{studentNeverLoggedIn}</Text>
               <Text style={styles.statusLabel}>Never</Text>
             </View>
@@ -234,7 +234,7 @@ export default function ManageScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={[styles.cardIcon, { backgroundColor: colors.primary[100] }]}>
-              <Shield size={20} color={colors.primary[600]} />
+              <MaterialIcons name="shield" size={20} color={colors.primary[600]} />
             </View>
             <View style={styles.cardHeaderText}>
               <Text style={styles.cardTitle}>Staff & Teachers</Text>
@@ -270,17 +270,17 @@ export default function ManageScreen() {
           {/* Status Grid */}
           <View style={styles.statusGrid}>
             <View style={[styles.statusCard, { backgroundColor: colors.success[50] }]}>
-              <UserCheck size={16} color={colors.success[600]} />
+              <MaterialIcons name="how-to-reg" size={16} color={colors.success[600]} />
               <Text style={[styles.statusValue, { color: colors.success[700] }]}>{adminActive}</Text>
               <Text style={styles.statusLabel}>Active</Text>
             </View>
             <View style={[styles.statusCard, { backgroundColor: colors.warning[50] }]}>
-              <Clock size={16} color={colors.warning[600]} />
+              <MaterialIcons name="schedule" size={16} color={colors.warning[600]} />
               <Text style={[styles.statusValue, { color: colors.warning[700] }]}>{adminInactive}</Text>
               <Text style={styles.statusLabel}>Idle</Text>
             </View>
             <View style={[styles.statusCard, { backgroundColor: colors.neutral[100] }]}>
-              <AlertCircle size={16} color={colors.neutral[500]} />
+              <MaterialIcons name="error" size={16} color={colors.neutral[500]} />
               <Text style={[styles.statusValue, { color: colors.neutral[700] }]}>{adminNeverLoggedIn + adminNoAccount}</Text>
               <Text style={styles.statusLabel}>Never</Text>
             </View>
@@ -292,7 +292,7 @@ export default function ManageScreen() {
           <View style={styles.card}>
             <View style={styles.recentHeader}>
               <View style={styles.recentTitleRow}>
-                <Activity size={18} color={colors.primary[500]} />
+                <MaterialIcons name="show-chart" size={18} color={colors.primary[500]} />
                 <Text style={styles.recentTitle}>Recent Activity</Text>
               </View>
               <View style={styles.liveBadge}>
@@ -306,11 +306,10 @@ export default function ManageScreen() {
                 styles.activityItem,
                 index < Math.min(recentLogins.length, 5) - 1 && styles.activityItemBorder
               ]}>
-                <Avatar.Text 
-                  size={36} 
-                  label={getInitials(login.name)}
-                  style={{ backgroundColor: login.user_type === 'student' ? colors.success[500] : colors.primary[500] }}
-                  labelStyle={{ fontSize: 14, fontWeight: '600' }}
+                <Avatar
+                  name={login.name}
+                  size="sm"
+                  backgroundColor={login.user_type === 'student' ? colors.success[100] : colors.primary[100]}
                 />
                 <View style={styles.activityInfo}>
                   <Text style={styles.activityName} numberOfLines={1}>{login.name}</Text>
@@ -333,7 +332,7 @@ export default function ManageScreen() {
             {recentLogins.length > 5 && (
               <View style={styles.viewAllRow}>
                 <Text style={styles.viewAllText}>View all activity</Text>
-                <ChevronRight size={16} color={colors.primary[500]} />
+                <MaterialIcons name="chevron-right" size={16} color={colors.primary[500]} />
               </View>
             )}
           </View>

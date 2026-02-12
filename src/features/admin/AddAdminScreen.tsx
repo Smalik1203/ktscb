@@ -1,11 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Text, Modal, Portal } from 'react-native-paper';
-import { Trash2, Edit, X } from 'lucide-react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
-import { Button, Input, EmptyState, Badge, SearchBar, SegmentedControl } from '../../components/ui';
+import { Button, Input, EmptyState, Badge, SearchBar, SegmentedControl, Modal } from '../../ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import { AccessDenied } from '../../components/common/AccessDenied';
@@ -318,10 +317,10 @@ export default function AddAdminScreen() {
 
                   <View style={styles.adminActions}>
                     <TouchableOpacity onPress={() => handleEdit(admin)} style={styles.actionButton}>
-                      <Edit size={18} color={colors.info[600]} />
+                      <MaterialIcons name="edit" size={18} color={colors.info[600]} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleDelete(admin)} style={styles.actionButton}>
-                      <Trash2 size={18} color={colors.error[600]} />
+                      <MaterialIcons name="delete" size={18} color={colors.error[600]} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -355,16 +354,15 @@ export default function AddAdminScreen() {
       )}
 
       {/* Edit Modal */}
-      <Portal>
-        <Modal
-          visible={editModalVisible}
-          onDismiss={() => setEditModalVisible(false)}
-          contentContainerStyle={styles.modal}
-        >
+      <Modal
+        visible={editModalVisible}
+        onDismiss={() => setEditModalVisible(false)}
+        contentContainerStyle={styles.modal}
+      >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Edit Admin</Text>
             <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-              <X size={24} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={24} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -409,8 +407,7 @@ export default function AddAdminScreen() {
               />
             </View>
           </View>
-        </Modal>
-      </Portal>
+      </Modal>
     </View>
   );
 }

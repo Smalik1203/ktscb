@@ -1,8 +1,17 @@
+/**
+ * CalendarMonthView
+ *
+ * Month grid with colored event-type dots, count badges, and a stronger
+ * today indicator. Designed for school ERP — fast visual parsing of
+ * exam / holiday / meeting / event days at a glance.
+ */
+
 import React, { useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, RefreshControl, RefreshControlProps } from 'react-native';
-import { Text, Chip } from 'react-native-paper';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Dimensions, RefreshControlProps, Platform,
+} from 'react-native';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
-import { spacing, borderRadius, typography } from '../../../lib/design-system';
 import { CalendarEvent } from '../../hooks/useCalendarEvents';
 
 interface CalendarMonthViewProps {
@@ -15,8 +24,23 @@ interface CalendarMonthViewProps {
 
 const { width, height } = Dimensions.get('window');
 const cellWidth = width / 7;
-// Calculate cell height to fill the screen (subtract header space ~200px, divide by exactly 6 rows)
-const cellHeight = Math.max((height - 200) / 6, 100);
+const cellHeight = Math.max((height - 220) / 6, 90);
+
+// ── Event type → color mapping (shared with CalendarScreen) ────────
+const EVENT_TYPE_COLORS: Record<string, string> = {
+  holiday: '#10b981',   // green
+  exam: '#f59e0b',      // amber
+  ptm: '#3b82f6',       // blue
+  assembly: '#8b5cf6',  // purple
+  'sports day': '#ec4899', // pink
+  'cultural event': '#ef4444', // red
+};
+
+function getTypeColor(type: string, fallback: string): string {
+  return EVENT_TYPE_COLORS[type.toLowerCase()] || fallback;
+}
+
+export { EVENT_TYPE_COLORS };
 
 export default function CalendarMonthView({
   currentDate,
@@ -25,184 +49,141 @@ export default function CalendarMonthView({
   onEventClick,
   refreshControl,
 }: CalendarMonthViewProps) {
-  const { colors, isDark } = useTheme();
-  
-  // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-  // Get events for a specific date
+  const { colors, isDark, shadows, spacing, borderRadius } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark, shadows, spacing, borderRadius), [colors, isDark, shadows, spacing, borderRadius]);
+
+  // ── Helpers ──────────────────────────────────────────────────
   const getEventsForDate = (date: Date): CalendarEvent[] => {
     const dateStr = date.toISOString().split('T')[0];
     return events.filter((event) => {
       const eventStart = new Date(event.start_date);
       const eventEnd = event.end_date ? new Date(event.end_date) : eventStart;
       const checkDate = new Date(dateStr);
-      
       return checkDate >= eventStart && checkDate <= eventEnd;
     });
   };
 
-  // Check if a date is a holiday
-  const isHolidayDate = (date: Date): boolean => {
-    const dayEvents = getEventsForDate(date);
-    return dayEvents.some((event) => event.event_type === 'holiday');
-  };
+  const isHolidayDate = (date: Date): boolean =>
+    getEventsForDate(date).some((e) => e.event_type === 'holiday');
 
-  // Check if a date is a weekend (Sunday)
-  const isWeekendDate = (date: Date): boolean => {
-    return date.getDay() === 0; // Sunday
-  };
+  const isWeekendDate = (date: Date): boolean => date.getDay() === 0;
 
-  // Generate calendar days starting from Monday
   const generateCalendarDays = (): Date[] => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    
-    // Create dates at noon to avoid timezone issues
     const firstDay = new Date(year, month, 1, 12, 0, 0);
-    
-    // Get the Monday before or on the first day
-    // JavaScript getDay(): 0=Sunday, 1=Monday, 2=Tuesday, ..., 6=Saturday
     const dayOfWeek = firstDay.getDay();
-    // Calculate days to go back to Monday
     const diff = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    
     const days: Date[] = [];
-    
-    // Always generate exactly 42 days (6 rows × 7 days) for consistent layout
-    // Start from the Monday before (or on) the 1st of the month
     for (let i = 0; i < 42; i++) {
       days.push(new Date(year, month, 1 - diff + i, 12, 0, 0));
     }
-    
     return days;
-  };
-
-  const getEventTypeColor = (type: string): string => {
-    const eventColors: { [key: string]: string } = {
-      holiday: colors.info[600],
-      assembly: colors.primary[500],
-      exam: colors.warning[500],
-      ptm: colors.success[500],
-      'sports day': colors.secondary[600],
-      'cultural event': colors.accent[500],
-    };
-    return eventColors[type.toLowerCase()] || colors.neutral[500];
   };
 
   const calendarDays = generateCalendarDays();
   const today = new Date();
-  today.setHours(12, 0, 0, 0); // Set to noon to match calendar dates
+  today.setHours(12, 0, 0, 0);
+
+  // ── Unique event-type dots for a cell (max 4) ───────────────
+  const getUniqueDots = (dayEvents: CalendarEvent[]) => {
+    const seen = new Set<string>();
+    const dots: string[] = [];
+    for (const e of dayEvents) {
+      const key = e.event_type.toLowerCase();
+      if (!seen.has(key) && dots.length < 4) {
+        seen.add(key);
+        dots.push(getTypeColor(e.event_type, colors.neutral[400]));
+      }
+    }
+    return dots;
+  };
 
   return (
     <View style={styles.container}>
-      {/* Week Headers */}
+      {/* Week day headers */}
       <View style={styles.weekHeader}>
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
-          <View key={day} style={[styles.weekHeaderCell, day === 'Sun' && styles.sundayHeader]}>
-            <Text
-              variant="labelSmall"
-              style={[
-                styles.weekHeaderText,
-                day === 'Sun' && styles.sundayHeaderText,
-              ]}
-            >
+          <View key={day} style={styles.weekHeaderCell}>
+            <Text style={[styles.weekHeaderText, day === 'Sun' && styles.sundayText]}>
               {day}
             </Text>
           </View>
         ))}
       </View>
 
-      {/* Calendar Grid - Full viewport */}
+      {/* Grid */}
       <View style={styles.gridContainer}>
-        <ScrollView 
-          showsVerticalScrollIndicator={false} 
+        <ScrollView
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
           refreshControl={refreshControl}
         >
           <View style={styles.grid}>
             {calendarDays.map((day, index) => {
-            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-            const isToday = day.toDateString() === today.toDateString();
-            const isWeekend = isWeekendDate(day);
-            const isHoliday = isHolidayDate(day);
-            const dayEvents = getEventsForDate(day);
-            const holidayEvents = dayEvents.filter((e) => e.event_type === 'holiday');
-            const regularEvents = dayEvents.filter((e) => e.event_type !== 'holiday');
+              const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+              const isToday = day.toDateString() === today.toDateString();
+              const isWeekend = isWeekendDate(day);
+              const isHoliday = isHolidayDate(day);
+              const dayEvents = getEventsForDate(day);
+              const dots = getUniqueDots(dayEvents);
+              const eventCount = dayEvents.length;
 
-            return (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.cell,
-                  isToday && styles.todayCell,
-                  isWeekend && styles.weekendCell,
-                  isHoliday && styles.holidayCell,
-                ]}
-                onPress={() => onDateClick(day)}
-                activeOpacity={0.7}
-              >
-                {/* Date Number */}
-                <View style={styles.dateHeader}>
-                  <Text
-                    variant="bodySmall"
-                    style={[
-                      styles.dateText,
-                      !isCurrentMonth && styles.dateTextMuted,
-                      isToday && styles.dateTextToday,
-                      (isWeekend || isHoliday) && styles.dateTextSpecial,
-                    ]}
-                  >
-                    {day.getDate()}
-                  </Text>
-                  {isHoliday && <Text style={styles.holidayEmoji}>🎉</Text>}
-                  {isWeekend && !isHoliday && <Text style={styles.weekendEmoji}>☀️</Text>}
-                </View>
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.cell,
+                    isWeekend && styles.weekendCell,
+                    isHoliday && styles.holidayCell,
+                    isToday && styles.todayCell,
+                  ]}
+                  onPress={() => {
+                    if (dayEvents.length === 1) onEventClick(dayEvents[0]);
+                    else onDateClick(day);
+                  }}
+                  activeOpacity={0.6}
+                >
+                  {/* Date number + count badge */}
+                  <View style={styles.dateRow}>
+                    <View style={[
+                      styles.dateCircle,
+                      isToday && styles.dateCircleToday,
+                    ]}>
+                      <Text style={[
+                        styles.dateText,
+                        !isCurrentMonth && styles.dateTextMuted,
+                        isToday && styles.dateTextToday,
+                        (isWeekend || isHoliday) && isCurrentMonth && !isToday && styles.dateTextSpecial,
+                      ]}>
+                        {day.getDate()}
+                      </Text>
+                    </View>
+                    {eventCount > 0 && isCurrentMonth && (
+                      <View style={styles.countBadge}>
+                        <Text style={styles.countBadgeText}>{eventCount}</Text>
+                      </View>
+                    )}
+                  </View>
 
-                {/* Events */}
-                <View style={styles.eventsContainer}>
-                  {/* Holidays first */}
-                  {holidayEvents.slice(0, 1).map((event, eventIndex) => (
-                    <TouchableOpacity
-                      key={`holiday-${eventIndex}`}
-                      style={[
-                        styles.eventBadge,
-                        { backgroundColor: getEventTypeColor(event.event_type) },
-                      ]}
-                      onPress={() => onEventClick(event)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.eventBadgeText} numberOfLines={1}>
-                        🎉 {event.title}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                  
-                  {/* Regular events */}
-                  {regularEvents.slice(0, 2).map((event, eventIndex) => (
-                    <TouchableOpacity
-                      key={`event-${eventIndex}`}
-                      style={[
-                        styles.eventBadge,
-                        { backgroundColor: event.color || getEventTypeColor(event.event_type) },
-                      ]}
-                      onPress={() => onEventClick(event)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.eventBadgeText} numberOfLines={1}>
-                        {event.title}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                  
-                  {dayEvents.length > 3 && (
-                    <Text style={styles.moreEventsText}>
-                      +{dayEvents.length - 3} more
+                  {/* Colored dots row */}
+                  {dots.length > 0 && isCurrentMonth && (
+                    <View style={styles.dotsRow}>
+                      {dots.map((dotColor, i) => (
+                        <View key={i} style={[styles.dot, { backgroundColor: dotColor }]} />
+                      ))}
+                    </View>
+                  )}
+
+                  {/* First event title preview (if space) */}
+                  {dayEvents.length > 0 && isCurrentMonth && (
+                    <Text style={styles.eventPreview} numberOfLines={1}>
+                      {dayEvents[0].title}
                     </Text>
                   )}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </ScrollView>
       </View>
@@ -210,120 +191,92 @@ export default function CalendarMonthView({
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.app,
-  },
+// ═══════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════
+
+const createStyles = (
+  colors: ThemeColors, isDark: boolean, shadows: any, spacing: any, borderRadius: any,
+) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background.secondary },
+
+  // ── Week header ────────────────────────────────────────────
   weekHeader: {
     flexDirection: 'row',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
     backgroundColor: colors.surface.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
+    paddingVertical: 10,
+    ...shadows.xs,
   },
-  weekHeaderCell: {
-    width: cellWidth,
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  sundayHeader: {
-    // no special background
-  },
+  weekHeaderCell: { width: cellWidth, alignItems: 'center' },
   weekHeaderText: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: 11, fontWeight: '600' as const, color: colors.text.tertiary,
+    textTransform: 'uppercase', letterSpacing: 0.5,
   },
-  sundayHeaderText: {
-    color: colors.primary[600],
-  },
-  gridContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
+  sundayText: { color: colors.error[500] },
+
+  // ── Grid ───────────────────────────────────────────────────
+  gridContainer: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: 'row', flexWrap: 'wrap',
     backgroundColor: colors.surface.primary,
     minHeight: '100%',
   },
+
+  // ── Cell ───────────────────────────────────────────────────
   cell: {
-    width: cellWidth,
-    height: cellHeight,
-    borderRightWidth: 0.5,
-    borderBottomWidth: 0.5,
-    borderColor: colors.border.light,
-    padding: 8,
+    width: cellWidth, height: cellHeight,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: isDark ? colors.neutral[700] : colors.neutral[100],
+    paddingHorizontal: 4, paddingTop: 4, paddingBottom: 2,
     backgroundColor: colors.surface.primary,
   },
   todayCell: {
-    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary[600],
+    backgroundColor: isDark ? `${colors.primary[600]}18` : colors.primary[50],
   },
   weekendCell: {
-    backgroundColor: colors.background.secondary,
+    backgroundColor: isDark ? colors.surface.secondary : colors.background.secondary,
   },
   holidayCell: {
-    backgroundColor: isDark ? colors.warning[100] : colors.warning[50],
+    backgroundColor: isDark ? `${colors.success[600]}12` : '#f0fdf4',
   },
-  dateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+
+  // ── Date number row ────────────────────────────────────────
+  dateRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 2,
+  },
+  dateCircle: {
+    width: 26, height: 26, borderRadius: 13,
+    justifyContent: 'center', alignItems: 'center',
+  },
+  dateCircleToday: {
+    backgroundColor: colors.primary[600],
   },
   dateText: {
-    fontSize: 14,
-    color: colors.text.primary,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 13, fontWeight: '600' as const, color: colors.text.primary,
   },
-  dateTextMuted: {
-    color: colors.text.tertiary,
+  dateTextMuted: { color: colors.text.tertiary, fontWeight: '400' as const },
+  dateTextToday: { color: '#fff', fontWeight: '700' as const },
+  dateTextSpecial: { color: colors.error[500] },
+
+  // ── Count badge ────────────────────────────────────────────
+  countBadge: {
+    minWidth: 16, height: 16, borderRadius: 8,
+    backgroundColor: isDark ? colors.neutral[600] : colors.neutral[200],
+    justifyContent: 'center', alignItems: 'center',
+    paddingHorizontal: 4,
   },
-  dateTextToday: {
-    color: colors.primary[600],
-    fontWeight: typography.fontWeight.bold,
-    fontSize: 15,
-  },
-  dateTextSpecial: {
-    color: colors.primary[600],
-  },
-  holidayEmoji: {
-    fontSize: 10,
-  },
-  weekendEmoji: {
-    fontSize: 8,
-  },
-  eventsContainer: {
-    flex: 1,
-    gap: 3,
-  },
-  eventBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
-    marginBottom: 2,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.border.light,
-  },
-  eventBadgeText: {
-    fontSize: 10,
-    color: colors.text.inverse,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  moreEventsText: {
-    fontSize: 9,
-    color: colors.primary[600],
-    textAlign: 'left',
-    marginTop: 2,
-    fontWeight: typography.fontWeight.medium,
+  countBadgeText: { fontSize: 9, fontWeight: '700' as const, color: colors.text.secondary },
+
+  // ── Dots ───────────────────────────────────────────────────
+  dotsRow: { flexDirection: 'row', gap: 3, marginBottom: 2, paddingLeft: 2 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+
+  // ── Event preview ──────────────────────────────────────────
+  eventPreview: {
+    fontSize: 9, fontWeight: '500' as const, color: colors.text.secondary,
+    lineHeight: 12, paddingLeft: 2,
   },
 });
-

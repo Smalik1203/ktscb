@@ -8,7 +8,7 @@
 import React from 'react';
 import { View, StyleSheet, TextInput, ScrollView, TouchableOpacity, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { BookOpen, Users, FileText, Clock, Save, X } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Heading, Body, Caption } from '../../../ui';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -76,13 +76,13 @@ export function SaveTestSheet({
                             style={[styles.closeButton, { backgroundColor: colors.neutral[100] }]}
                             onPress={onClose}
                         >
-                            <X size={20} color={colors.text.secondary} />
+                            <MaterialIcons name="close" size={20} color={colors.text.secondary} />
                         </TouchableOpacity>
 
                         {/* Header */}
                         <View style={styles.header}>
                             <View style={[styles.iconContainer, { backgroundColor: colors.success[100] }]}>
-                                <Save size={24} color={colors.success[600]} />
+                                <MaterialIcons name="save" size={24} color={colors.success[600]} />
                             </View>
                             <Heading level={3}>Save Sage Assessment</Heading>
                             <Caption color="secondary" style={{ marginTop: 4 }}>
@@ -94,7 +94,7 @@ export function SaveTestSheet({
                             {/* Test Title */}
                             <View style={styles.section}>
                                 <View style={styles.labelRow}>
-                                    <FileText size={16} color={colors.text.tertiary} />
+                                    <MaterialIcons name="description" size={16} color={colors.text.tertiary} />
                                     <Body weight="semibold" style={{ marginLeft: 8 }}>Test Title *</Body>
                                 </View>
                                 <TextInput
@@ -117,7 +117,7 @@ export function SaveTestSheet({
                             {/* Class Selection */}
                             <View style={styles.section}>
                                 <View style={styles.labelRow}>
-                                    <Users size={16} color={colors.text.tertiary} />
+                                    <MaterialIcons name="group" size={16} color={colors.text.tertiary} />
                                     <Body weight="semibold" style={{ marginLeft: 8 }}>Select Class *</Body>
                                 </View>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -151,7 +151,7 @@ export function SaveTestSheet({
                             {/* Subject Selection */}
                             <View style={styles.section}>
                                 <View style={styles.labelRow}>
-                                    <BookOpen size={16} color={colors.text.tertiary} />
+                                    <MaterialIcons name="menu-book" size={16} color={colors.text.tertiary} />
                                     <Body weight="semibold" style={{ marginLeft: 8 }}>Select Subject *</Body>
                                 </View>
                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -189,7 +189,7 @@ export function SaveTestSheet({
                                     { backgroundColor: colors.info[50], borderRadius: borderRadius.lg },
                                 ]}
                             >
-                                <Clock size={18} color={colors.info[600]} />
+                                <MaterialIcons name="schedule" size={18} color={colors.info[600]} />
                                 <View style={{ marginLeft: 12, flex: 1 }}>
                                     <Caption weight="semibold" style={{ color: colors.info[700] }}>
                                         Estimated Time
@@ -219,7 +219,7 @@ export function SaveTestSheet({
                                     end={{ x: 1, y: 0 }}
                                     style={[styles.saveButton, { borderRadius: borderRadius.xl }]}
                                 >
-                                    <Save size={20} color={colors.text.inverse} />
+                                    <MaterialIcons name="save" size={20} color={colors.text.inverse} />
                                     <Body weight="semibold" style={{ color: colors.text.inverse }}>
                                         {saving ? 'Saving...' : 'Create Sage Assessment'}
                                     </Body>

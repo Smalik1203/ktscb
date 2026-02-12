@@ -1,22 +1,12 @@
-import React, { useState, useEffect , useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, Switch, Alert, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { format } from 'date-fns';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
-  Switch,
-  Alert,
-} from 'react-native';
-import { Portal, Modal } from 'react-native-paper';
-import { X, Calendar as CalendarIcon, Clock } from 'lucide-react-native';
-import { format } from 'date-fns';
 import { TestInput, TestMode, TestWithDetails } from '../../types/test.types';
 import { DatePickerModal } from '../common/DatePickerModal';
-import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
+import { Modal, Input, Button, SegmentedControl, Menu } from '../../ui';
 
 interface CreateTestFormProps {
   visible: boolean;
@@ -44,6 +34,7 @@ export function CreateTestForm({
   const { colors, typography, spacing, borderRadius, shadows } = useTheme();
   const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
 
+  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [classInstanceId, setClassInstanceId] = useState('');
@@ -54,13 +45,17 @@ export function CreateTestForm({
   const [timeLimitMinutes, setTimeLimitMinutes] = useState('60');
   const [maxMarks, setMaxMarks] = useState('100');
   const [allowReattempts, setAllowReattempts] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showClassPicker, setShowClassPicker] = useState(false);
-  const [showSubjectPicker, setShowSubjectPicker] = useState(false);
-  const [showTypePicker, setShowTypePicker] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Load initial data if editing
+  // Picker state
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [classMenuVisible, setClassMenuVisible] = useState(false);
+  const [subjectMenuVisible, setSubjectMenuVisible] = useState(false);
+  const [typeMenuVisible, setTypeMenuVisible] = useState(false);
+
+  // Inline validation errors
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   useEffect(() => {
     if (initialData) {
       setTitle(initialData.title);
@@ -69,20 +64,14 @@ export function CreateTestForm({
       setSubjectId(initialData.subject_id);
       setTestType(initialData.test_type);
       setTestMode(initialData.test_mode);
-      if (initialData.test_date) {
-        setTestDate(new Date(initialData.test_date));
-      }
-      if (initialData.time_limit_seconds) {
-        setTimeLimitMinutes(String(Math.floor(initialData.time_limit_seconds / 60)));
-      }
-      if (initialData.max_marks) {
-        setMaxMarks(String(initialData.max_marks));
-      }
+      if (initialData.test_date) setTestDate(new Date(initialData.test_date));
+      if (initialData.time_limit_seconds) setTimeLimitMinutes(String(Math.floor(initialData.time_limit_seconds / 60)));
+      if (initialData.max_marks) setMaxMarks(String(initialData.max_marks));
       setAllowReattempts(initialData.allow_reattempts || false);
     }
   }, [initialData]);
 
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setTitle('');
     setDescription('');
     setClassInstanceId('');
@@ -93,35 +82,31 @@ export function CreateTestForm({
     setTimeLimitMinutes('60');
     setMaxMarks('100');
     setAllowReattempts(false);
-  };
+    setErrors({});
+  }, []);
 
-  const validate = () => {
-    if (!title.trim()) {
-      Alert.alert('Validation Error', 'Please enter test title');
-      return false;
-    }
-    if (!classInstanceId) {
-      Alert.alert('Validation Error', 'Please select a class');
-      return false;
-    }
-    if (!subjectId) {
-      Alert.alert('Validation Error', 'Please select a subject');
-      return false;
-    }
+  // Clear error when field changes
+  const clearError = useCallback((field: string) => {
+    setErrors((prev) => { const next = { ...prev }; delete next[field]; return next; });
+  }, []);
+
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!title.trim()) newErrors.title = 'Test title is required';
+    if (!classInstanceId) newErrors.class = 'Please select a class';
+    if (!subjectId) newErrors.subject = 'Please select a subject';
+
     if (testMode === 'online') {
       const timeLimit = parseInt(timeLimitMinutes);
-      if (isNaN(timeLimit) || timeLimit <= 0) {
-        Alert.alert('Validation Error', 'Please enter a valid time limit');
-        return false;
-      }
+      if (isNaN(timeLimit) || timeLimit <= 0) newErrors.timeLimit = 'Enter a valid time limit';
     } else {
       const marks = parseInt(maxMarks);
-      if (isNaN(marks) || marks <= 0) {
-        Alert.alert('Validation Error', 'Please enter valid max marks');
-        return false;
-      }
+      if (isNaN(marks) || marks <= 0) newErrors.maxMarks = 'Enter valid max marks';
     }
-    return true;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
@@ -153,487 +138,333 @@ export function CreateTestForm({
       resetForm();
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save test');
+      // Error handled by parent
     } finally {
       setSubmitting(false);
     }
   };
 
   const getSelectedClassName = () => {
-    const selectedClass = classes.find((c) => c.id === classInstanceId);
-    return selectedClass ? `Grade ${selectedClass.grade} - ${selectedClass.section}` : 'Select Class';
+    const cls = classes.find((c) => c.id === classInstanceId);
+    return cls ? `Grade ${cls.grade} - ${cls.section}` : '';
   };
 
   const getSelectedSubjectName = () => {
-    const selectedSubject = subjects.find((s) => s.id === subjectId);
-    return selectedSubject ? selectedSubject.subject_name : 'Select Subject';
+    const s = subjects.find((s) => s.id === subjectId);
+    return s ? s.subject_name : '';
   };
 
+  const modeOptions = [
+    { value: 'online', label: 'Online' },
+    { value: 'offline', label: 'Offline' },
+  ];
+
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onClose}
-        contentContainerStyle={styles.modal}
-      >
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>
-              {initialData ? 'Edit Test' : 'Create New Test'}
+    <Modal
+      visible={visible}
+      onDismiss={() => { resetForm(); onClose(); }}
+      contentContainerStyle={styles.modal}
+    >
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {initialData ? 'Edit Test' : 'Create New Test'}
+          </Text>
+          <Button variant="ghost" size="sm" onPress={() => { resetForm(); onClose(); }}>
+            Cancel
+          </Button>
+        </View>
+
+        {/* Form */}
+        <ScrollView style={styles.form} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          {/* Title */}
+          <Input
+            label="Test Title"
+            required
+            placeholder="e.g., Mathematics Unit Test 1"
+            value={title}
+            onChangeText={(v) => { setTitle(v); clearError('title'); }}
+            error={errors.title}
+          />
+
+          {/* Description */}
+          <Input
+            label="Description"
+            placeholder="Enter test description..."
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={3}
+            containerStyle={styles.fieldGap}
+          />
+
+          {/* Test Mode */}
+          <View style={[styles.fieldGap, styles.fieldGroup]}>
+            <Text style={styles.label}>Test Mode</Text>
+            <SegmentedControl
+              options={modeOptions}
+              value={testMode}
+              onChange={(val) => setTestMode(val as TestMode)}
+            />
+            <Text style={styles.helperText}>
+              {testMode === 'online'
+                ? 'Students take the test in the app'
+                : 'Upload marks after conducting test physically'}
             </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={colors.text.primary} />
-            </TouchableOpacity>
           </View>
 
-          {/* Form */}
-          <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
-            {/* Title */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Test Title *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Mathematics Unit Test 1"
-                value={title}
-                onChangeText={setTitle}
-                placeholderTextColor={colors.text.secondary}
-              />
-            </View>
-
-            {/* Description */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Description</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="Enter test description..."
-                value={description}
-                onChangeText={setDescription}
-                multiline
-                numberOfLines={3}
-                placeholderTextColor={colors.text.secondary}
-              />
-            </View>
-
-            {/* Class */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Class *</Text>
-              <TouchableOpacity
-                style={styles.picker}
-                onPress={() => setShowClassPicker(true)}
-              >
-                <Text style={[styles.pickerText, !classInstanceId && styles.pickerPlaceholder]}>
-                  {getSelectedClassName()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Subject */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Subject *</Text>
-              <TouchableOpacity
-                style={styles.picker}
-                onPress={() => setShowSubjectPicker(true)}
-              >
-                <Text style={[styles.pickerText, !subjectId && styles.pickerPlaceholder]}>
-                  {getSelectedSubjectName()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Test Type */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Test Type *</Text>
-              <TouchableOpacity
-                style={styles.picker}
-                onPress={() => setShowTypePicker(true)}
-              >
-                <Text style={styles.pickerText}>{testType}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Test Mode */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Test Mode *</Text>
-              <View style={styles.modeToggle}>
-                <TouchableOpacity
-                  style={[styles.modeButton, testMode === 'online' && styles.modeButtonActive]}
-                  onPress={() => setTestMode('online')}
+          {/* Class picker via Menu */}
+          <View style={[styles.fieldGap, styles.fieldGroup]}>
+            <Text style={styles.label}>
+              Class <Text style={styles.required}>*</Text>
+            </Text>
+            <Menu
+              visible={classMenuVisible}
+              onDismiss={() => setClassMenuVisible(false)}
+              anchor={
+                <Button
+                  variant="outline"
+                  size="md"
+                  onPress={() => setClassMenuVisible(true)}
+                  fullWidth
+                  style={errors.class ? styles.errorBorder : undefined}
                 >
-                  <Text style={[styles.modeButtonText, testMode === 'online' && styles.modeButtonTextActive]}>
-                    Online
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modeButton, testMode === 'offline' && styles.modeButtonActive]}
-                  onPress={() => setTestMode('offline')}
+                  {getSelectedClassName() || 'Select Class'}
+                </Button>
+              }
+            >
+              {classes.map((cls) => (
+                <Menu.Item
+                  key={cls.id}
+                  title={`Grade ${cls.grade} - ${cls.section}`}
+                  icon={classInstanceId === cls.id ? 'check' : undefined}
+                  onPress={() => { setClassInstanceId(cls.id); setClassMenuVisible(false); clearError('class'); }}
+                />
+              ))}
+            </Menu>
+            {errors.class && <Text style={styles.errorText}>{errors.class}</Text>}
+          </View>
+
+          {/* Subject picker via Menu */}
+          <View style={[styles.fieldGap, styles.fieldGroup]}>
+            <Text style={styles.label}>
+              Subject <Text style={styles.required}>*</Text>
+            </Text>
+            <Menu
+              visible={subjectMenuVisible}
+              onDismiss={() => setSubjectMenuVisible(false)}
+              anchor={
+                <Button
+                  variant="outline"
+                  size="md"
+                  onPress={() => setSubjectMenuVisible(true)}
+                  fullWidth
+                  style={errors.subject ? styles.errorBorder : undefined}
                 >
-                  <Text style={[styles.modeButtonText, testMode === 'offline' && styles.modeButtonTextActive]}>
-                    Offline
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.helperText}>
-                {testMode === 'online'
-                  ? 'Students take the test in the app'
-                  : 'Upload marks after conducting test physically'}
-              </Text>
-            </View>
+                  {getSelectedSubjectName() || 'Select Subject'}
+                </Button>
+              }
+            >
+              {subjects.map((s) => (
+                <Menu.Item
+                  key={s.id}
+                  title={s.subject_name}
+                  icon={subjectId === s.id ? 'check' : undefined}
+                  onPress={() => { setSubjectId(s.id); setSubjectMenuVisible(false); clearError('subject'); }}
+                />
+              ))}
+            </Menu>
+            {errors.subject && <Text style={styles.errorText}>{errors.subject}</Text>}
+          </View>
 
-            {/* Test Date */}
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Test Date *</Text>
-              <TouchableOpacity
-                style={styles.picker}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <CalendarIcon size={20} color={colors.text.secondary} />
-                <Text style={styles.pickerText}>
-                  {format(testDate, 'MMM dd, yyyy')}
-                </Text>
-              </TouchableOpacity>
-            </View>
+          {/* Test Type picker via Menu */}
+          <View style={[styles.fieldGap, styles.fieldGroup]}>
+            <Text style={styles.label}>Test Type</Text>
+            <Menu
+              visible={typeMenuVisible}
+              onDismiss={() => setTypeMenuVisible(false)}
+              anchor={
+                <Button variant="outline" size="md" onPress={() => setTypeMenuVisible(true)} fullWidth>
+                  {testType}
+                </Button>
+              }
+            >
+              {TEST_TYPES.map((type) => (
+                <Menu.Item
+                  key={type}
+                  title={type}
+                  icon={testType === type ? 'check' : undefined}
+                  onPress={() => { setTestType(type); setTypeMenuVisible(false); }}
+                />
+              ))}
+            </Menu>
+          </View>
 
-            {/* Online-specific fields */}
-            {testMode === 'online' && (
-              <>
-                <View style={styles.formGroup}>
-                  <Text style={styles.label}>Time Limit (minutes) *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="60"
-                    value={timeLimitMinutes}
-                    onChangeText={setTimeLimitMinutes}
-                    keyboardType="numeric"
-                    placeholderTextColor={colors.text.secondary}
-                  />
+          {/* Test Date */}
+          <View style={[styles.fieldGap, styles.fieldGroup]}>
+            <Text style={styles.label}>Test Date</Text>
+            <Button
+              variant="outline"
+              size="md"
+              onPress={() => setShowDatePicker(true)}
+              fullWidth
+            >
+              {format(testDate, 'MMM dd, yyyy')}
+            </Button>
+          </View>
+
+          {/* Online: time limit + reattempts */}
+          {testMode === 'online' && (
+            <>
+              <Input
+                label="Time Limit (minutes)"
+                required
+                placeholder="60"
+                value={timeLimitMinutes}
+                onChangeText={(v) => { setTimeLimitMinutes(v); clearError('timeLimit'); }}
+                keyboardType="numeric"
+                error={errors.timeLimit}
+                containerStyle={styles.fieldGap}
+              />
+
+              <View style={[styles.fieldGap, styles.switchRow]}>
+                <View style={styles.switchLabel}>
+                  <Text style={styles.label}>Allow Reattempts</Text>
+                  <Text style={styles.helperText}>Students can retake this test</Text>
                 </View>
-
-                <View style={styles.formGroup}>
-                  <View style={styles.switchRow}>
-                    <View style={styles.switchLabel}>
-                      <Text style={styles.label}>Allow Reattempts</Text>
-                      <Text style={styles.helperText}>
-                        Students can retake this test multiple times
-                      </Text>
-                    </View>
-                    <Switch
-                      value={allowReattempts}
-                      onValueChange={setAllowReattempts}
-                      trackColor={{ false: colors.neutral[300], true: colors.primary[300] }}
-                      thumbColor={allowReattempts ? colors.primary[600] : colors.neutral[400]}
-                    />
-                  </View>
-                </View>
-              </>
-            )}
-
-            {/* Offline-specific fields */}
-            {testMode === 'offline' && (
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Maximum Marks *</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="100"
-                  value={maxMarks}
-                  onChangeText={setMaxMarks}
-                  keyboardType="numeric"
-                  placeholderTextColor={colors.text.secondary}
+                <Switch
+                  value={allowReattempts}
+                  onValueChange={setAllowReattempts}
+                  trackColor={{ false: colors.neutral[300], true: colors.primary[300] }}
+                  thumbColor={allowReattempts ? colors.primary[600] : colors.neutral[400]}
                 />
               </View>
-            )}
-          </ScrollView>
-
-          {/* Footer */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onClose}
-              disabled={submitting}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-              onPress={handleSubmit}
-              disabled={submitting}
-            >
-              <Text style={styles.submitButtonText}>
-                {submitting ? 'Saving...' : initialData ? 'Update Test' : 'Create Test'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Class Picker Modal */}
-          {showClassPicker && (
-            <Modal
-              visible={showClassPicker}
-              onDismiss={() => setShowClassPicker(false)}
-              contentContainerStyle={styles.pickerModal}
-            >
-              <Text style={styles.pickerTitle}>Select Class</Text>
-              <ScrollView>
-                {classes.map((cls) => (
-                  <TouchableOpacity
-                    key={cls.id}
-                    style={[styles.pickerItem, classInstanceId === cls.id && styles.pickerItemSelected]}
-                    onPress={() => {
-                      setClassInstanceId(cls.id);
-                      setShowClassPicker(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerItemText, classInstanceId === cls.id && styles.pickerItemTextSelected]}>
-                      Grade {cls.grade} - {cls.section}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </Modal>
+            </>
           )}
 
-          {/* Subject Picker Modal */}
-          {showSubjectPicker && (
-            <Modal
-              visible={showSubjectPicker}
-              onDismiss={() => setShowSubjectPicker(false)}
-              contentContainerStyle={styles.pickerModal}
-            >
-              <Text style={styles.pickerTitle}>Select Subject</Text>
-              <ScrollView>
-                {subjects.map((subject) => (
-                  <TouchableOpacity
-                    key={subject.id}
-                    style={[styles.pickerItem, subjectId === subject.id && styles.pickerItemSelected]}
-                    onPress={() => {
-                      setSubjectId(subject.id);
-                      setShowSubjectPicker(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerItemText, subjectId === subject.id && styles.pickerItemTextSelected]}>
-                      {subject.subject_name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </Modal>
+          {/* Offline: max marks */}
+          {testMode === 'offline' && (
+            <Input
+              label="Maximum Marks"
+              required
+              placeholder="100"
+              value={maxMarks}
+              onChangeText={(v) => { setMaxMarks(v); clearError('maxMarks'); }}
+              keyboardType="numeric"
+              error={errors.maxMarks}
+              containerStyle={styles.fieldGap}
+            />
           )}
 
-          {/* Type Picker Modal */}
-          {showTypePicker && (
-            <Modal
-              visible={showTypePicker}
-              onDismiss={() => setShowTypePicker(false)}
-              contentContainerStyle={styles.pickerModal}
-            >
-              <Text style={styles.pickerTitle}>Select Test Type</Text>
-              <ScrollView>
-                {TEST_TYPES.map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[styles.pickerItem, testType === type && styles.pickerItemSelected]}
-                    onPress={() => {
-                      setTestType(type);
-                      setShowTypePicker(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerItemText, testType === type && styles.pickerItemTextSelected]}>
-                      {type}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </Modal>
-          )}
+          {/* Bottom spacer for scroll */}
+          <View style={{ height: spacing.lg }} />
+        </ScrollView>
 
-          {/* Date Picker */}
-          <DatePickerModal
-            visible={showDatePicker}
-            onDismiss={() => setShowDatePicker(false)}
-            onConfirm={(date) => {
-              setTestDate(date);
-              setShowDatePicker(false);
-            }}
-            initialDate={testDate}
-            title="Select Test Date"
-          />
+        {/* Footer buttons */}
+        <View style={styles.footer}>
+          <Button
+            variant="outline"
+            onPress={() => { resetForm(); onClose(); }}
+            disabled={submitting}
+            style={styles.flex1}
+          >
+            Cancel
+          </Button>
+          <Button
+            onPress={handleSubmit}
+            loading={submitting}
+            disabled={submitting}
+            style={styles.flex1}
+          >
+            {initialData ? 'Update Test' : 'Create Test'}
+          </Button>
         </View>
-      </Modal>
-    </Portal>
+
+        {/* Date Picker */}
+        <DatePickerModal
+          visible={showDatePicker}
+          onDismiss={() => setShowDatePicker(false)}
+          onConfirm={(date) => { setTestDate(date); setShowDatePicker(false); }}
+          initialDate={testDate}
+          title="Select Test Date"
+        />
+      </View>
+    </Modal>
   );
 }
 
 const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
   StyleSheet.create({
-  modal: {
-    margin: spacing.md,
-    maxHeight: '90%',
-  },
-  container: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    ...shadows.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.DEFAULT,
-  },
-  title: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  closeButton: {
-    padding: spacing.xs,
-  },
-  form: {
-    padding: spacing.lg,
-    maxHeight: 500,
-  },
-  formGroup: {
-    marginBottom: spacing.lg,
-  },
-  label: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  input: {
-    backgroundColor: colors.surface.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  picker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface.secondary,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-  },
-  pickerText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  pickerPlaceholder: {
-    color: colors.text.secondary,
-  },
-  modeToggle: {
-    flexDirection: 'row',
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  modeButton: {
-    flex: 1,
-    padding: spacing.md,
-    alignItems: 'center',
-    backgroundColor: colors.surface.secondary,
-  },
-  modeButtonActive: {
-    backgroundColor: colors.primary[600],
-  },
-  modeButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.secondary,
-  },
-  modeButtonTextActive: {
-    color: colors.text.inverse,
-  },
-  helperText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  switchLabel: {
-    flex: 1,
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.DEFAULT,
-  },
-  cancelButton: {
-    flex: 1,
-    padding: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    backgroundColor: colors.surface.secondary,
-  },
-  cancelButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.primary,
-  },
-  submitButton: {
-    flex: 1,
-    padding: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary[600],
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-  },
-  pickerModal: {
-    backgroundColor: colors.surface.primary,
-    margin: spacing.xl,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    maxHeight: '70%',
-  },
-  pickerTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.md,
-  },
-  pickerItem: {
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.xs,
-  },
-  pickerItemSelected: {
-    backgroundColor: colors.primary[100],
-  },
-  pickerItemText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
-  },
-  pickerItemTextSelected: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.primary[600],
-  },
-});
+    modal: {
+      margin: spacing.md,
+      maxHeight: '90%',
+    },
+    container: {
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.lg,
+      ...shadows.lg,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: spacing.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border.DEFAULT,
+    },
+    headerTitle: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text.primary,
+    },
+    form: {
+      padding: spacing.lg,
+      maxHeight: 500,
+    },
+    fieldGap: {
+      marginTop: spacing.md,
+    },
+    fieldGroup: {
+      gap: spacing.xs,
+    },
+    label: {
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+    },
+    required: {
+      color: colors.error[500],
+    },
+    helperText: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.secondary,
+      marginTop: spacing.xs / 2,
+    },
+    errorBorder: {
+      borderColor: colors.error[500],
+    },
+    errorText: {
+      fontSize: typography.fontSize.xs,
+      color: colors.error[500],
+      marginTop: spacing.xs / 2,
+    },
+    switchRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    switchLabel: {
+      flex: 1,
+    },
+    footer: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      padding: spacing.lg,
+      borderTopWidth: 1,
+      borderTopColor: colors.border.DEFAULT,
+    },
+    flex1: {
+      flex: 1,
+    },
+  });

@@ -5,9 +5,9 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Modal, Text, Button, Card } from 'react-native-paper';
-import { AlertTriangle, X, ArrowRight, Clock } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Modal } from '../../ui';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { TimetableSlot } from '../../utils/timetableConflict';
 import { formatTimeForDisplay } from '../../utils/timeParser';
@@ -44,39 +44,25 @@ export function ConflictResolutionModal({
   const hasShifts = affectedSlots.length > 0 && shiftDelta !== 0;
 
   return (
-    <Modal
-      visible={visible}
-      onDismiss={onDismiss}
-      contentContainerStyle={styles.modalContainer}
-    >
-      <View style={styles.header}>
+    <Modal visible={visible} onDismiss={onDismiss} title="Time Conflict Detected">
+      <View style={styles.warningBanner}>
         <View style={styles.headerIcon}>
-          <AlertTriangle size={24} color={colors.warning[600]} />
+          <MaterialIcons name="warning" size={24} color={colors.warning[600]} />
         </View>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>Time Conflict Detected</Text>
-          <Text style={styles.subtitle}>
-            {hasConflicts
-              ? `${conflicts.length} slot(s) conflict with your new slot`
-              : 'This change will affect other slots'}
-          </Text>
-        </View>
-        <Button
-          mode="text"
-          onPress={onDismiss}
-          icon={() => <X size={20} color={colors.text.secondary} />}
-        >
-          Close
-        </Button>
+        <Text style={styles.subtitle}>
+          {hasConflicts
+            ? `${conflicts.length} slot(s) conflict with your new slot`
+            : 'This change will affect other slots'}
+        </Text>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={true}>
+      <ScrollView showsVerticalScrollIndicator={true}>
         {/* New Slot Preview */}
-        <Card style={styles.previewCard}>
+        <View style={styles.previewCard}>
           <Text style={styles.sectionTitle}>New Slot</Text>
           <View style={styles.slotPreview}>
             <View style={styles.timeRange}>
-              <Clock size={16} color={colors.primary[600]} />
+              <MaterialIcons name="schedule" size={16} color={colors.primary[600]} />
               <Text style={styles.timeText}>
                 {formatTimeForDisplay(newSlotInfo.start_time)} - {formatTimeForDisplay(newSlotInfo.end_time)}
               </Text>
@@ -87,16 +73,16 @@ export function ConflictResolutionModal({
                 : `Break: ${newSlotInfo.name || 'Unnamed'}`}
             </Text>
           </View>
-        </Card>
+        </View>
 
         {/* Conflicting Slots */}
         {hasConflicts && (
-          <Card style={styles.conflictCard}>
+          <View style={styles.conflictCard}>
             <Text style={styles.sectionTitle}>Conflicting Slots</Text>
             {conflicts.map((slot) => (
               <View key={slot.id} style={styles.conflictItem}>
                 <View style={styles.timeRange}>
-                  <Clock size={14} color={colors.error[600]} />
+                  <MaterialIcons name="schedule" size={14} color={colors.error[600]} />
                   <Text style={styles.conflictTime}>
                     {formatTimeForDisplay(slot.start_time)} - {formatTimeForDisplay(slot.end_time)}
                   </Text>
@@ -106,12 +92,12 @@ export function ConflictResolutionModal({
                 </Text>
               </View>
             ))}
-          </Card>
+          </View>
         )}
 
         {/* Affected Slots (Shifts) */}
         {hasShifts && (
-          <Card style={styles.shiftCard}>
+          <View style={styles.shiftCard}>
             <Text style={styles.sectionTitle}>
               Slots That Will Be Shifted ({affectedSlots.length})
             </Text>
@@ -122,12 +108,12 @@ export function ConflictResolutionModal({
               <View key={slot.id} style={styles.shiftItem}>
                 <View style={styles.shiftTimeRow}>
                   <View style={styles.timeRange}>
-                    <Clock size={14} color={colors.info[600]} />
+                    <MaterialIcons name="schedule" size={14} color={colors.info[600]} />
                     <Text style={styles.oldTime}>
                       {formatTimeForDisplay(slot.start_time)} - {formatTimeForDisplay(slot.end_time)}
                     </Text>
                   </View>
-                  <ArrowRight size={16} color={colors.text.secondary} />
+                  <MaterialIcons name="arrow-forward" size={16} color={colors.text.secondary} />
                   <Text style={styles.newTime}>
                     {formatTimeForDisplay(newStart)} - {formatTimeForDisplay(newEnd)}
                   </Text>
@@ -142,46 +128,39 @@ export function ConflictResolutionModal({
                 ... and {affectedSlots.length - 5} more slot(s)
               </Text>
             )}
-          </Card>
+          </View>
         )}
 
         {/* Resolution Options */}
         <View style={styles.optionsContainer}>
           <Text style={styles.optionsTitle}>Choose an action:</Text>
 
-          <Button
-            mode="outlined"
+          <TouchableOpacity
             onPress={() => onResolve('abort')}
-            style={styles.optionButton}
-            textColor={colors.text.primary}
-            icon={() => <X size={18} color={colors.text.primary} />}
+            style={[styles.optionButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.border.light, paddingVertical: 12, borderRadius: 8 }]}
           >
-            Cancel - Don't Add Slot
-          </Button>
+            <MaterialIcons name="close" size={18} color={colors.text.primary} />
+            <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 14 }}>Cancel - Don't Add Slot</Text>
+          </TouchableOpacity>
 
           {hasConflicts && (
-            <Button
-              mode="outlined"
+            <TouchableOpacity
               onPress={() => onResolve('replace')}
-              style={styles.optionButton}
-              textColor={colors.warning[600]}
-              icon={() => <AlertTriangle size={18} color={colors.warning[600]} />}
+              style={[styles.optionButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.warning[300], paddingVertical: 12, borderRadius: 8 }]}
             >
-              Replace Conflicting Slots
-            </Button>
+              <MaterialIcons name="warning" size={18} color={colors.warning[600]} />
+              <Text style={{ color: colors.warning[600], fontWeight: '600', fontSize: 14 }}>Replace Conflicting Slots</Text>
+            </TouchableOpacity>
           )}
 
           {hasShifts && (
-            <Button
-              mode="contained"
+            <TouchableOpacity
               onPress={() => onResolve('shift')}
-              style={[styles.optionButton, styles.shiftButton]}
-              buttonColor={colors.primary[600]}
-              textColor={colors.text.inverse}
-              icon={() => <ArrowRight size={18} color={colors.text.inverse} />}
+              style={[styles.optionButton, styles.shiftButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary[600], paddingVertical: 12, borderRadius: 8 }]}
             >
-              Shift {affectedSlots.length} Slot(s) Forward
-            </Button>
+              <MaterialIcons name="arrow-forward" size={18} color={colors.text.inverse} />
+              <Text style={{ color: colors.text.inverse, fontWeight: '600', fontSize: 14 }}>Shift {affectedSlots.length} Slot(s) Forward</Text>
+            </TouchableOpacity>
           )}
         </View>
       </ScrollView>
@@ -197,20 +176,10 @@ const createStyles = (
   shadows: any
 ) =>
   StyleSheet.create({
-    modalContainer: {
-      backgroundColor: colors.surface.primary,
-      margin: spacing.lg,
-      borderRadius: borderRadius.xl,
-      maxHeight: '85%',
-      overflow: 'hidden',
-      ...shadows.lg,
-    },
-    header: {
+    warningBanner: {
       flexDirection: 'row',
       alignItems: 'center',
-      padding: spacing.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border.light,
+      marginBottom: spacing.md,
     },
     headerIcon: {
       width: 48,
@@ -221,22 +190,10 @@ const createStyles = (
       alignItems: 'center',
       marginRight: spacing.md,
     },
-    headerContent: {
-      flex: 1,
-    },
-    title: {
-      fontSize: typography.fontSize.xl,
-      fontWeight: typography.fontWeight.bold,
-      color: colors.text.primary,
-      marginBottom: spacing.xs,
-    },
     subtitle: {
       fontSize: typography.fontSize.sm,
       color: colors.text.secondary,
-    },
-    content: {
       flex: 1,
-      padding: spacing.lg,
     },
     previewCard: {
       backgroundColor: colors.primary[50],

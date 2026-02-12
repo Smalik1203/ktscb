@@ -17,38 +17,13 @@ import {
   Animated,
   Share,
   Alert,
+  Text,
+  ActivityIndicator,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { Text, ActivityIndicator, Card, ProgressBar } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Award,
-  BookOpen,
-  Target,
-  Download,
-  Calendar,
-  Clock,
-  CheckCircle,
-  XCircle,
-  BarChart3,
-  ArrowUpRight,
-  ArrowDownRight,
-  FileText,
-  Sparkles,
-  ChevronDown,
-  X,
-  Search,
-  User,
-  ArrowLeft,
-  Edit3,
-  RefreshCw,
-  MessageSquare,
-  Copy,
-  Share2,
-} from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Card, ProgressBar, LoadingView, ErrorView } from '../../ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
@@ -58,7 +33,6 @@ import type { ThemeColors } from '../../theme/types';
 import { useStudentProgress, SubjectProgress, TestResult } from '../../hooks/useStudentProgress';
 import { useProgressReport, useProgressReportViewer } from '../../hooks/useProgressReport';
 import { ProgressReportViewer } from '../../components/assessments/ProgressReportViewer';
-import { LoadingView, ErrorView } from '../../components/ui';
 import { spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
 import { useReportComment } from '../../hooks/useReportComment';
 
@@ -130,8 +104,8 @@ export default function ProgressTrackingScreen() {
     generateComment,
     regenerate: regenerateComment,
   } = useReportComment({
-    studentId: isAdmin ? selectedStudentId : profile?.id,
-    classInstanceId: isAdmin ? selectedStudent?.class_instance_id : undefined,
+    studentId: isAdmin ? selectedStudentId : profile?.auth_id,
+    classInstanceId: isAdmin ? selectedStudent?.class_instance_id ?? undefined : undefined,
     autoGenerate: false, // Don't auto-generate, user has to click
   });
 
@@ -185,11 +159,11 @@ export default function ProgressTrackingScreen() {
   const getTrendIcon = useCallback((trend: 'up' | 'down' | 'stable') => {
     switch (trend) {
       case 'up':
-        return <TrendingUp size={16} color={colors.success[600]} />;
+        return <MaterialIcons name="trending-up" size={16} color={colors.success[600]} />;
       case 'down':
-        return <TrendingDown size={16} color={colors.error[600]} />;
+        return <MaterialIcons name="trending-down" size={16} color={colors.error[600]} />;
       default:
-        return <Minus size={16} color={colors.text.secondary} />;
+        return <MaterialIcons name="remove" size={16} color={colors.text.secondary} />;
     }
   }, [colors]);
 
@@ -231,7 +205,7 @@ export default function ProgressTrackingScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.filterIcon}>
-                <BookOpen size={16} color={colors.text.inverse} />
+                <MaterialIcons name="menu-book" size={16} color={colors.text.inverse} />
               </View>
               <View style={styles.filterContent}>
                 <Text style={styles.filterLabel}>Class</Text>
@@ -239,7 +213,7 @@ export default function ProgressTrackingScreen() {
                   {getSelectedClassName()}
                 </Text>
               </View>
-              <ChevronDown size={16} color={colors.text.secondary} />
+              <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -247,7 +221,7 @@ export default function ProgressTrackingScreen() {
         {/* No Class Selected */}
         {!selectedClassId && (
           <View style={styles.emptyContainer}>
-            <BookOpen size={64} color={colors.text.secondary} />
+            <MaterialIcons name="menu-book" size={64} color={colors.text.secondary} />
             <Text style={styles.emptyTitle}>Select a Class</Text>
             <Text style={styles.emptyText}>Choose a class to view student progress</Text>
           </View>
@@ -258,7 +232,7 @@ export default function ProgressTrackingScreen() {
           <View style={styles.studentListContainer}>
             {/* Search Bar */}
             <View style={styles.searchContainer}>
-              <Search size={20} color={colors.text.secondary} />
+              <MaterialIcons name="search" size={20} color={colors.text.secondary} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search students..."
@@ -268,7 +242,7 @@ export default function ProgressTrackingScreen() {
               />
               {studentSearch.length > 0 && (
                 <TouchableOpacity onPress={() => setStudentSearch('')}>
-                  <X size={18} color={colors.text.secondary} />
+                  <MaterialIcons name="close" size={18} color={colors.text.secondary} />
                 </TouchableOpacity>
               )}
             </View>
@@ -285,7 +259,7 @@ export default function ProgressTrackingScreen() {
               </View>
             ) : filteredStudents.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <User size={48} color={colors.text.secondary} />
+                <MaterialIcons name="person" size={48} color={colors.text.secondary} />
                 <Text style={styles.emptyTitle}>No Students Found</Text>
                 <Text style={styles.emptyText}>
                   {studentSearch ? 'Try a different search term' : 'No students in this class'}
@@ -313,7 +287,7 @@ export default function ProgressTrackingScreen() {
                       <Text style={styles.studentCode}>{student.student_code}</Text>
                     </View>
                     <View style={styles.studentArrow}>
-                      <BarChart3 size={20} color={colors.primary[600]} />
+                      <MaterialIcons name="bar-chart" size={20} color={colors.primary[600]} />
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -404,12 +378,12 @@ export default function ProgressTrackingScreen() {
         {/* Back button for admin */}
         {isAdmin && selectedStudentId && (
           <TouchableOpacity style={styles.backButton} onPress={handleBackToList}>
-            <ArrowLeft size={24} color={colors.text.primary} />
+            <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
             <Text style={styles.backButtonText}>Back to Students</Text>
           </TouchableOpacity>
         )}
         <View style={styles.emptyContainer}>
-          <BarChart3 size={64} color={colors.text.secondary} />
+          <MaterialIcons name="bar-chart" size={64} color={colors.text.secondary} />
           <Text style={styles.emptyTitle}>No Progress Data</Text>
           <Text style={styles.emptyText}>Complete some assessments to see progress here.</Text>
         </View>
@@ -424,7 +398,7 @@ export default function ProgressTrackingScreen() {
       {/* Back button for admin */}
       {isAdmin && selectedStudentId && (
         <TouchableOpacity style={styles.backButton} onPress={handleBackToList}>
-          <ArrowLeft size={24} color={colors.text.primary} />
+          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
           <Text style={styles.backButtonText}>Back to Students</Text>
         </TouchableOpacity>
       )}
@@ -464,7 +438,7 @@ export default function ProgressTrackingScreen() {
           activeOpacity={0.8}
         >
           <View style={styles.downloadReportIcon}>
-            <FileText size={20} color={colors.text.inverse} />
+            <MaterialIcons name="description" size={20} color={colors.text.inverse} />
           </View>
           <View style={styles.downloadReportContent}>
             <Text style={styles.downloadReportTitle}>Download Progress Report</Text>
@@ -473,7 +447,7 @@ export default function ProgressTrackingScreen() {
           {isReportGenerating ? (
             <ActivityIndicator size="small" color={colors.primary[600]} />
           ) : (
-            <Download size={20} color={colors.primary[600]} />
+            <MaterialIcons name="download" size={20} color={colors.primary[600]} />
           )}
         </TouchableOpacity>
 
@@ -481,7 +455,7 @@ export default function ProgressTrackingScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <View style={[styles.statIconContainer, { backgroundColor: colors.primary[100] }]}>
-              <BookOpen size={18} color={colors.primary[600]} />
+              <MaterialIcons name="menu-book" size={18} color={colors.primary[600]} />
             </View>
             <Text style={styles.statValue}>{stats.total_tests}</Text>
             <Text style={styles.statLabel}>Tests Taken</Text>
@@ -489,7 +463,7 @@ export default function ProgressTrackingScreen() {
 
           <View style={styles.statCard}>
             <View style={[styles.statIconContainer, { backgroundColor: colors.success[100] }]}>
-              <Target size={18} color={colors.success[600]} />
+              <MaterialIcons name="gps-fixed" size={18} color={colors.success[600]} />
             </View>
             <Text style={styles.statValue}>{stats.overall_average.toFixed(1)}%</Text>
             <Text style={styles.statLabel}>Average Score</Text>
@@ -497,7 +471,7 @@ export default function ProgressTrackingScreen() {
 
           <View style={styles.statCard}>
             <View style={[styles.statIconContainer, { backgroundColor: colors.warning[100] }]}>
-              <Calendar size={18} color={colors.warning[600]} />
+              <MaterialIcons name="event" size={18} color={colors.warning[600]} />
             </View>
             <Text style={styles.statValue}>{stats.tests_this_month}</Text>
             <Text style={styles.statLabel}>This Month</Text>
@@ -508,7 +482,7 @@ export default function ProgressTrackingScreen() {
         <Card style={styles.overviewCard}>
           <View style={styles.overviewHeader}>
             <View style={styles.overviewTitleRow}>
-              <Sparkles size={20} color={colors.primary[600]} />
+              <MaterialIcons name="auto-awesome" size={20} color={colors.primary[600]} />
               <Text style={styles.overviewTitle}>Performance Overview</Text>
             </View>
             {stats.improvement_rate !== 0 && (
@@ -517,9 +491,9 @@ export default function ProgressTrackingScreen() {
                 { backgroundColor: stats.improvement_rate > 0 ? colors.success[100] : colors.error[100] }
               ]}>
                 {stats.improvement_rate > 0 ? (
-                  <ArrowUpRight size={14} color={colors.success[600]} />
+                  <MaterialIcons name="north-east" size={14} color={colors.success[600]} />
                 ) : (
-                  <ArrowDownRight size={14} color={colors.error[600]} />
+                  <MaterialIcons name="south-east" size={14} color={colors.error[600]} />
                 )}
                 <Text style={[
                   styles.improvementText,
@@ -557,7 +531,7 @@ export default function ProgressTrackingScreen() {
         {attendance && (
           <Card style={styles.attendanceCard}>
             <View style={styles.attendanceHeader}>
-              <Clock size={20} color={colors.primary[600]} />
+              <MaterialIcons name="schedule" size={20} color={colors.primary[600]} />
               <Text style={styles.attendanceTitle}>Attendance</Text>
               <Text style={[
                 styles.attendancePercentage,
@@ -567,21 +541,21 @@ export default function ProgressTrackingScreen() {
               </Text>
             </View>
             <ProgressBar
-              progress={attendance.percentage / 100}
-              color={attendance.percentage >= 75 ? colors.success[600] : colors.error[600]}
+              progress={attendance.percentage}
+              fillColor={attendance.percentage >= 75 ? colors.success[600] : colors.error[600]}
               style={styles.attendanceProgress}
             />
             <View style={styles.attendanceStats}>
               <View style={styles.attendanceStatItem}>
-                <CheckCircle size={14} color={colors.success[600]} />
+                <MaterialIcons name="check-circle" size={14} color={colors.success[600]} />
                 <Text style={styles.attendanceStatText}>Present: {attendance.present}</Text>
               </View>
               <View style={styles.attendanceStatItem}>
-                <XCircle size={14} color={colors.error[600]} />
+                <MaterialIcons name="cancel" size={14} color={colors.error[600]} />
                 <Text style={styles.attendanceStatText}>Absent: {attendance.absent}</Text>
               </View>
               <View style={styles.attendanceStatItem}>
-                <Calendar size={14} color={colors.text.secondary} />
+                <MaterialIcons name="event" size={14} color={colors.text.secondary} />
                 <Text style={styles.attendanceStatText}>Total: {attendance.total}</Text>
               </View>
             </View>
@@ -601,7 +575,7 @@ export default function ProgressTrackingScreen() {
             activeOpacity={0.8}
           >
             <View style={[styles.aiInsightsIcon, { backgroundColor: colors.primary[100] }]}>
-              <Sparkles size={18} color={colors.primary[600]} />
+              <MaterialIcons name="auto-awesome" size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.aiInsightsContent}>
               <Text style={styles.aiInsightsTitle}>Sage's Insight</Text>
@@ -612,7 +586,7 @@ export default function ProgressTrackingScreen() {
             {isCommentGenerating ? (
               <ActivityIndicator size="small" color={colors.primary[600]} />
             ) : (
-              <ChevronDown size={20} color={colors.primary[600]} style={{ transform: [{ rotate: '-90deg' }] }} />
+              <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.primary[600]} style={{ transform: [{ rotate: '-90deg' }] }} />
             )}
           </TouchableOpacity>
         )}
@@ -635,7 +609,7 @@ export default function ProgressTrackingScreen() {
 
               <View style={styles.commentModalHeader}>
                 <View style={[styles.commentModalIconBg, { backgroundColor: colors.primary[100] }]}>
-                  <Sparkles size={24} color={colors.primary[600]} />
+                  <MaterialIcons name="auto-awesome" size={24} color={colors.primary[600]} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.commentModalTitle}>Sage's Insight</Text>
@@ -644,7 +618,7 @@ export default function ProgressTrackingScreen() {
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => setShowCommentModal(false)}>
-                  <X size={24} color={colors.text.secondary} />
+                  <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                 </TouchableOpacity>
               </View>
 
@@ -668,7 +642,7 @@ export default function ProgressTrackingScreen() {
 
                   <View style={styles.commentModalChips}>
                     <View style={[styles.commentModalChip, { backgroundColor: colors.primary[50] }]}>
-                      <FileText size={12} color={colors.primary[600]} />
+                      <MaterialIcons name="description" size={12} color={colors.primary[600]} />
                       <Text style={[styles.commentModalChipText, { color: colors.primary[700] }]}>
                         {reportComment.wordCount} words
                       </Text>
@@ -696,7 +670,7 @@ export default function ProgressTrackingScreen() {
                       }}
                       activeOpacity={0.7}
                     >
-                      <Copy size={18} color={colors.primary[600]} />
+                      <MaterialIcons name="content-copy" size={18} color={colors.primary[600]} />
                       <Text style={styles.commentModalActionText}>Copy</Text>
                     </TouchableOpacity>
 
@@ -713,7 +687,7 @@ export default function ProgressTrackingScreen() {
                       }}
                       activeOpacity={0.7}
                     >
-                      <Share2 size={18} color={colors.primary[600]} />
+                      <MaterialIcons name="share" size={18} color={colors.primary[600]} />
                       <Text style={styles.commentModalActionText}>Share</Text>
                     </TouchableOpacity>
 
@@ -723,7 +697,7 @@ export default function ProgressTrackingScreen() {
                       disabled={isCommentGenerating}
                       activeOpacity={0.7}
                     >
-                      <RefreshCw size={18} color={colors.primary[600]} />
+                      <MaterialIcons name="refresh" size={18} color={colors.primary[600]} />
                       <Text style={styles.commentModalActionText}>Regenerate</Text>
                     </TouchableOpacity>
                   </View>
@@ -741,7 +715,7 @@ export default function ProgressTrackingScreen() {
 
         {/* Subject-wise Progress */}
         <View style={styles.sectionHeader}>
-          <BookOpen size={20} color={colors.primary[600]} />
+          <MaterialIcons name="menu-book" size={20} color={colors.primary[600]} />
           <Text style={styles.sectionTitle}>Subject-wise Progress</Text>
         </View>
 
@@ -765,8 +739,8 @@ export default function ProgressTrackingScreen() {
                 </View>
               </View>
               <ProgressBar
-                progress={subject.average_percentage / 100}
-                color={subject.average_percentage >= 60 ? colors.success[600] : colors.error[600]}
+                progress={subject.average_percentage}
+                fillColor={subject.average_percentage >= 60 ? colors.success[600] : colors.error[600]}
                 style={styles.subjectProgress}
               />
             </Card>
@@ -777,7 +751,7 @@ export default function ProgressTrackingScreen() {
         {reportData?.data?.syllabus?.by_subject && reportData.data.syllabus.by_subject.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
-              <BookOpen size={20} color={colors.primary[600]} />
+              <MaterialIcons name="menu-book" size={20} color={colors.primary[600]} />
               <Text style={styles.sectionTitle}>Class Syllabus Progress</Text>
             </View>
             {reportData.data.syllabus.by_subject.map((subj: any) => {
@@ -797,8 +771,8 @@ export default function ProgressTrackingScreen() {
                     </Text>
                   </View>
                   <ProgressBar
-                    progress={progressPct / 100}
-                    color={progressPct >= 75 ? colors.success[600] : progressPct >= 50 ? colors.warning[600] : colors.error[600]}
+                    progress={progressPct}
+                    fillColor={progressPct >= 75 ? colors.success[600] : progressPct >= 50 ? colors.warning[600] : colors.error[600]}
                     style={styles.syllabusProgressBar}
                   />
                   <View style={styles.syllabusStats}>
@@ -814,7 +788,7 @@ export default function ProgressTrackingScreen() {
 
         {/* Recent Tests */}
         <View style={styles.sectionHeader}>
-          <Award size={20} color={colors.primary[600]} />
+          <MaterialIcons name="emoji-events" size={20} color={colors.primary[600]} />
           <Text style={styles.sectionTitle}>Recent Tests</Text>
         </View>
 

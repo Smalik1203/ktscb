@@ -1,11 +1,11 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable } from 'react-native';
-import { BookOpen, Calendar, Clock, Play, RotateCcw, CheckCircle, AlertCircle, Monitor, FileCheck } from 'lucide-react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { format } from 'date-fns';
 import { useRouter } from 'expo-router';
 import { TestWithDetails, TestAttempt } from '../../types/test.types';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
-import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
+import { Card, Badge, Chip, ProgressBar, Button } from '../../ui';
 
 interface StudentTestCardProps {
   test: TestWithDetails;
@@ -15,96 +15,45 @@ interface StudentTestCardProps {
 
 export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
   const router = useRouter();
-  const { colors, isDark } = useTheme();
-  
-  // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const { colors, isDark, spacing, typography, borderRadius } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark, spacing, typography, borderRadius), [colors, isDark]);
 
-  const getTestStatus = () => {
-    if (!attempt) return 'not_started';
-    if (attempt.status === 'completed') return 'completed';
-    if (attempt.status === 'in_progress') return 'in_progress';
-    return 'not_started';
-  };
-
-  const status = getTestStatus();
+  // --- Derived state ---
   const isOnline = test.test_mode === 'online';
+  const status = !attempt ? 'not_started' : (attempt.status === 'completed' ? 'completed' : attempt.status === 'in_progress' ? 'in_progress' : 'not_started');
 
-  const getStatusConfig = () => {
+  const statusConfig = useMemo(() => {
     switch (status) {
       case 'completed':
-        return {
-          icon: CheckCircle,
-          color: colors.success[600],
-          backgroundColor: colors.success[50],
-          label: 'Completed',
-          buttonText: 'View Results',
-          buttonColor: colors.success[600],
-        };
+        return { variant: 'success' as const, label: 'Completed', icon: 'check-circle' as const };
       case 'in_progress':
-        return {
-          icon: RotateCcw,
-          color: colors.warning[600],
-          backgroundColor: colors.warning[50],
-          label: 'In Progress',
-          buttonText: 'Continue Test',
-          buttonColor: colors.warning[600],
-        };
+        return { variant: 'warning' as const, label: 'In Progress', icon: 'replay' as const };
       default:
-        return {
-          icon: Play,
-          color: colors.primary[600],
-          backgroundColor: colors.primary[50],
-          label: 'Not Started',
-          buttonText: 'Start Test',
-          buttonColor: colors.primary[600],
-        };
+        return { variant: 'primary' as const, label: 'Not Started', icon: 'play-arrow' as const };
     }
-  };
+  }, [status]);
 
-  const statusConfig = getStatusConfig();
-  const StatusIcon = statusConfig.icon;
+  // Card tint based on status
+  const cardTintStyle = useMemo(() => {
+    if (status === 'completed') return { borderLeftWidth: 3, borderLeftColor: colors.success[500] };
+    if (status === 'in_progress') return { borderLeftWidth: 3, borderLeftColor: colors.warning[500] };
+    return {};
+  }, [status, colors]);
 
-  const handleStartTest = () => {
-    if (!isOnline) return;
-
-    router.push({
-      pathname: `/test/${test.id}/take` as any,
-      params: {
-        testTitle: test.title,
-        timeLimit: test.time_limit_seconds || '',
-      },
-    });
-  };
-
-  const handleViewResults = () => {
-    if (!isOnline) return;
-
-    router.push({
-      pathname: `/test/${test.id}/results` as any,
-      params: {
-        testTitle: test.title,
-      },
-    });
-  };
-
+  // Test availability
   const isTestAvailable = () => {
     if (test.status !== 'active') return false;
     if (!isOnline) return false;
     if (test.test_date) {
-      const testDate = new Date(test.test_date);
       const now = new Date();
-      if (now < testDate) return false;
-    }
-    if (status === 'completed' && !test.allow_reattempts) {
-      return true; // Can view results
+      if (now < new Date(test.test_date)) return false;
     }
     return true;
   };
-
   const canTakeTest = isTestAvailable();
 
-  const getScoreDisplay = () => {
+  // Score
+  const scoreDisplay = useMemo(() => {
     if (isOnline && status === 'completed' && attempt) {
       const score = attempt.earned_points || 0;
       const total = attempt.total_points || 0;
@@ -118,345 +67,215 @@ export function StudentTestCard({ test, attempt, mark }: StudentTestCardProps) {
       return { score, total, percentage };
     }
     return null;
+  }, [isOnline, status, attempt, mark]);
+
+  // --- Handlers ---
+  const handleCardPress = () => {
+    if (isOnline) {
+      if (status === 'completed') {
+        router.push({ pathname: `/test/${test.id}/results` as any, params: { testTitle: test.title } });
+      } else if (status === 'in_progress' && canTakeTest) {
+        router.push({ pathname: `/test/${test.id}/take` as any, params: { testTitle: test.title, timeLimit: test.time_limit_seconds || '' } });
+      } else if (canTakeTest) {
+        router.push({ pathname: `/test/${test.id}/take` as any, params: { testTitle: test.title, timeLimit: test.time_limit_seconds || '' } });
+      }
+    }
   };
 
-  const scoreDisplay = getScoreDisplay();
-  const modeIcon = isOnline ? Monitor : FileCheck;
-  const modeColor = isOnline ? colors.primary[600] : colors.secondary[600];
-  const modeBg = isOnline ? colors.primary[50] : colors.secondary[50];
+  const getProgressVariant = (pct: number) => {
+    if (pct >= 80) return 'success' as const;
+    if (pct >= 50) return 'warning' as const;
+    return 'error' as const;
+  };
 
   return (
-    <View style={styles.card}>
-      <Pressable
-        android_ripple={{ color: colors.primary[100] }}
-        style={({ pressed }) => [
-          styles.cardPressable,
-          pressed && styles.cardPressed
-        ]}
-      >
-        <View style={styles.cardInner}>
-          {/* Icon */}
-          <View style={[styles.testIcon, { backgroundColor: modeBg }]}>
-            {React.createElement(modeIcon, { size: 20, color: modeColor })}
+    <Card
+      variant="outlined"
+      padding="md"
+      onPress={(isOnline && canTakeTest) || status === 'completed' ? handleCardPress : undefined}
+      style={cardTintStyle}
+      accessibilityLabel={`${test.title} - ${statusConfig.label}`}
+    >
+      {/* Top row: title + status badge */}
+      <View style={styles.topRow}>
+        <Text style={styles.title} numberOfLines={2}>{test.title}</Text>
+        <Badge variant={statusConfig.variant} size="sm">{statusConfig.label}</Badge>
+      </View>
+
+      {/* Metadata chips */}
+      <View style={styles.chipRow}>
+        <Chip
+          size="sm"
+          variant={isOnline ? 'primary' : 'secondary'}
+          icon={<MaterialIcons name={isOnline ? 'desktop-windows' : 'fact-check'} size={12} color={isOnline ? colors.primary[600] : colors.secondary[600]} />}
+          compact
+        >
+          {isOnline ? 'Online' : 'Offline'}
+        </Chip>
+
+        {test.subject_name ? (
+          <Chip
+            size="sm"
+            compact
+            icon={<MaterialIcons name="menu-book" size={12} color={colors.text.secondary} />}
+          >
+            {test.subject_name}
+          </Chip>
+        ) : null}
+
+        {test.test_date ? (
+          <Chip
+            size="sm"
+            compact
+            icon={<MaterialIcons name="event" size={12} color={colors.text.secondary} />}
+          >
+            {format(new Date(test.test_date), 'MMM dd')}
+          </Chip>
+        ) : null}
+
+        {test.time_limit_seconds && isOnline ? (
+          <Chip
+            size="sm"
+            compact
+            icon={<MaterialIcons name="schedule" size={12} color={colors.text.secondary} />}
+          >
+            {Math.floor(test.time_limit_seconds / 60)}m
+          </Chip>
+        ) : null}
+      </View>
+
+      {/* Score bar */}
+      {scoreDisplay && (
+        <View style={styles.scoreSection}>
+          <View style={styles.scoreHeader}>
+            <Text style={styles.scoreLabel}>Score</Text>
+            <Text style={styles.scoreValue}>{scoreDisplay.score}/{scoreDisplay.total} ({scoreDisplay.percentage}%)</Text>
           </View>
-
-          {/* Content */}
-          <View style={styles.testDetails}>
-            <View style={styles.titleRow}>
-              <Text style={styles.testTitle} numberOfLines={2}>
-                {test.title}
-              </Text>
-              <View style={[styles.statusBadge, { backgroundColor: statusConfig.backgroundColor }]}>
-                <StatusIcon size={14} color={statusConfig.color} />
-                <Text style={[styles.statusText, { color: statusConfig.color }]}>
-                  {statusConfig.label}
-                </Text>
-              </View>
-            </View>
-
-            {/* Meta Info */}
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <BookOpen size={14} color={colors.text.secondary} />
-                <Text style={styles.metaText}>{test.subject_name}</Text>
-              </View>
-              {test.test_date && (
-                <>
-                  <View style={styles.metaDot} />
-                  <View style={styles.metaItem}>
-                    <Calendar size={14} color={colors.text.secondary} />
-                    <Text style={styles.metaText}>
-                      {format(new Date(test.test_date), 'MMM dd')}
-                    </Text>
-                  </View>
-                </>
-              )}
-              {test.time_limit_seconds && isOnline && (
-                <>
-                  <View style={styles.metaDot} />
-                  <View style={styles.metaItem}>
-                    <Clock size={14} color={colors.text.secondary} />
-                    <Text style={styles.metaText}>
-                      {Math.floor(test.time_limit_seconds / 60)}m
-                    </Text>
-                  </View>
-                </>
-              )}
-            </View>
-
-            {/* Score Display */}
-            {scoreDisplay && (
-              <View style={styles.scoreSection}>
-                <View style={styles.scoreRow}>
-                  <Text style={styles.scoreLabel}>Score:</Text>
-                  <View style={styles.scoreDisplay}>
-                    <Text style={styles.scoreValue}>
-                      {scoreDisplay.score}/{scoreDisplay.total}
-                    </Text>
-                    <View style={styles.percentageBadge}>
-                      <Text style={styles.percentageText}>{scoreDisplay.percentage}%</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Action Button */}
-            {isOnline ? (
-              canTakeTest ? (
-                status === 'completed' && test.allow_reattempts ? (
-                  <View style={styles.buttonRow}>
-                    <TouchableOpacity
-                      style={styles.secondaryButton}
-                      onPress={handleViewResults}
-                    >
-                      <CheckCircle size={18} color={colors.success[600]} />
-                      <Text style={styles.secondaryButtonText}>View Result</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.primaryButton, { backgroundColor: colors.primary[600] }]}
-                      onPress={handleStartTest}
-                    >
-                      <RotateCcw size={18} color={colors.text.inverse} />
-                      <Text style={styles.primaryButtonText}>Retake</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : status === 'completed' ? (
-                  <TouchableOpacity
-                    style={[styles.primaryButton, { backgroundColor: colors.success[600] }]}
-                    onPress={handleViewResults}
-                  >
-                    <CheckCircle size={18} color={colors.text.inverse} />
-                    <Text style={styles.primaryButtonText}>View Result</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.primaryButton, { backgroundColor: statusConfig.buttonColor }]}
-                    onPress={handleStartTest}
-                  >
-                    <StatusIcon size={18} color={colors.text.inverse} />
-                    <Text style={styles.primaryButtonText}>{statusConfig.buttonText}</Text>
-                  </TouchableOpacity>
-                )
-              ) : (
-                <View style={styles.unavailableBadge}>
-                  <AlertCircle size={14} color={colors.text.secondary} />
-                  <Text style={styles.unavailableText}>
-                    {test.status !== 'active' ? 'Test not active' : 'Not available yet'}
-                  </Text>
-                </View>
-              )
-            ) : (
-              <View style={styles.offlineBadge}>
-                {mark ? (
-                  <>
-                    <CheckCircle size={14} color={colors.success[600]} />
-                    <Text style={styles.offlineText}>
-                      Marks uploaded
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle size={14} color={colors.text.secondary} />
-                    <Text style={styles.offlineText}>
-                      Offline test - marks pending
-                    </Text>
-                  </>
-                )}
-              </View>
-            )}
-          </View>
+          <ProgressBar
+            progress={scoreDisplay.percentage}
+            variant={getProgressVariant(scoreDisplay.percentage)}
+            size="sm"
+          />
         </View>
-      </Pressable>
-    </View>
+      )}
+
+      {/* Action area */}
+      {isOnline ? (
+        canTakeTest ? (
+          status === 'completed' && test.allow_reattempts ? (
+            <View style={styles.buttonRow}>
+              <Button
+                variant="outline"
+                size="sm"
+                onPress={() => router.push({ pathname: `/test/${test.id}/results` as any, params: { testTitle: test.title } })}
+                style={styles.flex1}
+              >
+                View Result
+              </Button>
+              <Button
+                size="sm"
+                onPress={() => router.push({ pathname: `/test/${test.id}/take` as any, params: { testTitle: test.title, timeLimit: test.time_limit_seconds || '' } })}
+                style={styles.flex1}
+              >
+                Retake
+              </Button>
+            </View>
+          ) : status === 'completed' ? null /* Card press handles it */ : (
+            <Button
+              size="sm"
+              onPress={handleCardPress}
+              fullWidth
+            >
+              {status === 'in_progress' ? 'Continue Test' : 'Start Test'}
+            </Button>
+          )
+        ) : (
+          <View style={styles.unavailableRow}>
+            <MaterialIcons name="lock" size={14} color={colors.text.tertiary} />
+            <Text style={styles.unavailableText}>
+              {test.status !== 'active' ? 'Test not active' : 'Not available yet'}
+            </Text>
+          </View>
+        )
+      ) : (
+        !mark ? (
+          <View style={styles.pendingRow}>
+            <MaterialIcons name="hourglass-empty" size={14} color={colors.warning[600]} />
+            <Text style={styles.pendingText}>Marks pending</Text>
+          </View>
+        ) : null
+      )}
+    </Card>
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
-  card: {
-    marginBottom: spacing.sm,
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-  },
-  cardPressable: {
-    backgroundColor: colors.surface.primary,
-  },
-  cardPressed: {
-    opacity: 0.7,
-  },
-  cardInner: {
+const createStyles = (colors: ThemeColors, isDark: boolean, spacing: any, typography: any, borderRadius: any) => StyleSheet.create({
+  topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  testIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
-  testDetails: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: spacing.xs,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  testTitle: {
+  title: {
     flex: 1,
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
     color: colors.text.primary,
     lineHeight: typography.fontSize.base * 1.4,
   },
-  statusBadge: {
+  chipRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs / 2,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    borderRadius: borderRadius.sm,
-    flexShrink: 0,
-  },
-  statusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     flexWrap: 'wrap',
     gap: spacing.xs,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs / 2,
-  },
-  metaText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
-    fontWeight: typography.fontWeight.medium,
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.text.tertiary,
+    marginBottom: spacing.sm,
   },
   scoreSection: {
-    paddingTop: spacing.xs,
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
   },
-  scoreRow: {
+  scoreHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: isDark ? colors.success[100] : colors.success[50],
-    padding: spacing.sm,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.success[200],
+    alignItems: 'center',
   },
   scoreLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.success[700],
+    fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.medium,
-  },
-  scoreDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    color: colors.text.secondary,
   },
   scoreValue: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.success[700],
-  },
-  percentageBadge: {
-    backgroundColor: colors.success[600],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs / 2,
-    borderRadius: borderRadius.sm,
-  },
-  percentageText: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
-    color: colors.text.inverse,
+    color: colors.text.primary,
   },
   buttonRow: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  primaryButton: {
+  flex1: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    ...shadows.sm,
   },
-  primaryButtonText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.inverse,
-  },
-  secondaryButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.md,
-    backgroundColor: isDark ? colors.success[100] : colors.success[50],
-    borderWidth: 1.5,
-    borderColor: colors.success[600],
-  },
-  secondaryButtonText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.success[600],
-  },
-  unavailableBadge: {
+  unavailableRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    padding: spacing.sm,
-    backgroundColor: colors.neutral[100],
-    borderRadius: borderRadius.md,
+    paddingVertical: spacing.xs,
   },
   unavailableText: {
     fontSize: typography.fontSize.sm,
-    color: colors.text.secondary,
+    color: colors.text.tertiary,
     fontWeight: typography.fontWeight.medium,
   },
-  offlineBadge: {
+  pendingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    padding: spacing.sm,
-    backgroundColor: isDark ? colors.warning[100] : colors.warning[50],
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.warning[200],
+    paddingVertical: spacing.xs,
   },
-  offlineText: {
-    flex: 1,
+  pendingText: {
     fontSize: typography.fontSize.sm,
-    color: colors.warning[700],
+    color: colors.warning[600],
     fontWeight: typography.fontWeight.medium,
   },
 });

@@ -17,10 +17,11 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
-import { CheckCircle, AlertCircle, Info, X } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Body, Caption } from '../../ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { MaterialIconName } from '../../ui/iconMap';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -109,28 +110,28 @@ function ToastItem({
     }, [slideAnim, opacityAnim, toast.id, onHide]);
 
     // Get toast styling based on type
-    const getToastStyle = () => {
+    const getToastStyle = (): { backgroundColor: string; borderColor: string; iconColor: string; iconName: MaterialIconName } => {
         switch (toast.type) {
             case 'success':
                 return {
                     backgroundColor: colors.success[50],
                     borderColor: colors.success[200],
                     iconColor: colors.success[600],
-                    Icon: CheckCircle,
+                    iconName: 'check-circle',
                 };
             case 'error':
                 return {
                     backgroundColor: colors.error[50],
                     borderColor: colors.error[200],
                     iconColor: colors.error[600],
-                    Icon: AlertCircle,
+                    iconName: 'error',
                 };
             case 'warning':
                 return {
                     backgroundColor: colors.warning[50],
                     borderColor: colors.warning[200],
                     iconColor: colors.warning[600],
-                    Icon: AlertCircle,
+                    iconName: 'warning',
                 };
             case 'info':
             default:
@@ -138,13 +139,12 @@ function ToastItem({
                     backgroundColor: colors.info[50],
                     borderColor: colors.info[200],
                     iconColor: colors.info[600],
-                    Icon: Info,
+                    iconName: 'info',
                 };
         }
     };
 
     const style = getToastStyle();
-    const Icon = style.Icon;
 
     return (
         <Animated.View
@@ -163,7 +163,7 @@ function ToastItem({
             ]}
         >
             <View style={styles.toastContent}>
-                <Icon size={20} color={style.iconColor} />
+                <MaterialIcons name={style.iconName} size={20} color={style.iconColor} />
                 <View style={styles.toastTextContainer}>
                     <Body weight="medium" style={{ color: colors.text.primary }}>
                         {toast.message}
@@ -179,7 +179,7 @@ function ToastItem({
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     style={{ marginLeft: spacing.sm }}
                 >
-                    <X size={18} color={colors.text.tertiary} />
+                    <MaterialIcons name="close" size={18} color={colors.text.tertiary} />
                 </TouchableOpacity>
             </View>
             {toast.action && (

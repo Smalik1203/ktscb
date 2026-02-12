@@ -1,8 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bot, MessageCircle, Sparkles } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import { spacing, borderRadius, typography } from '../../../lib/design-system';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +19,7 @@ export function ChatbotScreen() {
                 ]}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Hero Section */}
+                {/* Illustration */}
                 <View style={styles.heroSection}>
                     <LinearGradient
                         colors={isDark
@@ -31,22 +30,14 @@ export function ChatbotScreen() {
                         end={{ x: 1, y: 1 }}
                         style={styles.iconContainer}
                     >
-                        <Bot size={48} color="#FFFFFF" />
+                        <MaterialIcons name="smart-toy" size={48} color="#FFFFFF" />
                     </LinearGradient>
-
-                    <Text style={[styles.title, { color: colors.text.primary }]}>
-                        Sage AI Assistant
-                    </Text>
-
-                    <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
-                        Your personal learning companion
-                    </Text>
                 </View>
 
                 {/* Feature Cards */}
                 <View style={styles.featuresSection}>
                     <FeatureCard
-                        icon={MessageCircle}
+                        icon="chat-bubble"
                         title="Ask Questions"
                         description="Get instant answers about your subjects, homework, and more"
                         colors={colors}
@@ -54,7 +45,7 @@ export function ChatbotScreen() {
                     />
 
                     <FeatureCard
-                        icon={Sparkles}
+                        icon="auto-awesome"
                         title="Study Help"
                         description="Get explanations, summaries, and study tips tailored to your curriculum"
                         colors={colors}
@@ -64,7 +55,7 @@ export function ChatbotScreen() {
 
                 {/* Coming Soon Badge */}
                 <View style={[styles.comingSoonBadge, { backgroundColor: colors.primary[50] }]}>
-                    <Sparkles size={16} color={colors.primary[600]} />
+                    <MaterialIcons name="auto-awesome" size={16} color={colors.primary[600]} />
                     <Text style={[styles.comingSoonText, { color: colors.primary[600] }]}>
                         Coming Soon
                     </Text>
@@ -79,14 +70,14 @@ export function ChatbotScreen() {
 }
 
 interface FeatureCardProps {
-    icon: any;
+    icon: string;
     title: string;
     description: string;
     colors: any;
     isDark: boolean;
 }
 
-function FeatureCard({ icon: Icon, title, description, colors, isDark }: FeatureCardProps) {
+function FeatureCard({ icon, title, description, colors, isDark }: FeatureCardProps) {
     return (
         <View style={[
             styles.featureCard,
@@ -96,7 +87,7 @@ function FeatureCard({ icon: Icon, title, description, colors, isDark }: Feature
             }
         ]}>
             <View style={[styles.featureIconContainer, { backgroundColor: colors.primary[50] }]}>
-                <Icon size={24} color={colors.primary[600]} />
+                <MaterialIcons name={icon as any} size={24} color={colors.primary[600]} />
             </View>
             <View style={styles.featureContent}>
                 <Text style={[styles.featureTitle, { color: colors.text.primary }]}>
@@ -129,17 +120,6 @@ const styles = StyleSheet.create({
         borderRadius: 50,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: spacing.lg,
-    },
-    title: {
-        fontSize: typography.fontSize['2xl'],
-        fontWeight: typography.fontWeight.bold as any,
-        marginBottom: spacing.xs,
-        textAlign: 'center',
-    },
-    subtitle: {
-        fontSize: typography.fontSize.base,
-        textAlign: 'center',
     },
     featuresSection: {
         width: '100%',

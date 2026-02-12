@@ -17,14 +17,13 @@ import { IssueInventoryModal } from '../../components/inventory/IssueInventoryMo
 import { ReturnInventoryModal } from '../../components/inventory/ReturnInventoryModal';
 import { IssueDetailsModal } from '../../components/inventory/IssueDetailsModal';
 import { InventoryItemForm } from '../../components/inventory/InventoryItemForm';
-import { LoadingView, ErrorView } from '../../components/ui';
-import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
+import { LoadingView, ErrorView, EmptyStateIllustration, FAB } from '../../ui';
+import { AccessDenied } from '../../components/common/AccessDenied';
 import { spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
 import type { InventoryItemInput } from '../../lib/domain-schemas';
 import { isOnline } from '../../utils/offline';
-import { Package, Plus, RotateCcw, List, ChevronRight } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Text, TouchableOpacity } from 'react-native';
-import { Card } from 'react-native-paper';
 
 const DRAFT_STORAGE_KEY = 'inventory_item_draft';
 
@@ -238,9 +237,9 @@ export default function InventoryItemMasterScreen() {
 
   if (!canCreate) {
     return (
-      <ErrorView
-        message="Access Denied"
-        details="You don't have permission to create inventory items. Please contact your administrator."
+      <AccessDenied
+        message="You don't have permission to manage inventory."
+        capability="inventory.create"
       />
     );
   }
@@ -248,18 +247,18 @@ export default function InventoryItemMasterScreen() {
   if (!profile?.school_code) {
     return (
       <ErrorView
-        message="School Not Found"
-        details="Unable to determine your school. Please contact support."
+        title="School Not Found"
+        message="Unable to determine your school. Please contact support."
       />
     );
   }
 
   if (!user?.id) {
-    return <ErrorView message="Authentication Error" details="Please log in again." />;
+    return <ErrorView title="Authentication Error" message="Please log in again." />;
   }
 
   if (itemsError) {
-    return <ErrorView message="Failed to load inventory items" details={itemsError.message} />;
+    return <ErrorView title="Failed to load inventory items" message={itemsError.message} />;
   }
 
   // Show form
@@ -305,8 +304,8 @@ export default function InventoryItemMasterScreen() {
   };
 
   const renderItem = ({ item }: { item: any }) => (
-    <Card style={styles.itemCard}>
-      <Card.Content>
+    <View style={styles.itemCard}>
+      <View style={{ padding: spacing.md }}>
         <TouchableOpacity
           onPress={() => canManage && item.can_be_issued && handleIssuePress(item)}
           disabled={!canManage || !item.can_be_issued}
@@ -345,20 +344,20 @@ export default function InventoryItemMasterScreen() {
               style={styles.issueButton}
               onPress={() => handleIssuePress(item)}
             >
-              <Package size={16} color={colors.primary[600]} />
+              <MaterialIcons name="inventory-2" size={16} color={colors.primary[600]} />
               <Text style={styles.issueButtonText}>Issue</Text>
             </TouchableOpacity>
           )}
         </TouchableOpacity>
-      </Card.Content>
-    </Card>
+      </View>
+    </View>
   );
 
   return (
     <View style={styles.container}>
       {hasDraft && (
         <View style={styles.draftBanner}>
-          <Package size={20} color={colors.warning[600]} />
+          <MaterialIcons name="inventory-2" size={20} color={colors.warning[600]} />
           <View style={styles.draftBannerContent}>
             <Text style={styles.draftBannerTitle}>Draft Saved</Text>
             <Text style={styles.draftBannerText}>
@@ -390,7 +389,7 @@ export default function InventoryItemMasterScreen() {
           style={[styles.tab, activeTab === 'items' && styles.tabActive]}
           onPress={() => setActiveTab('items')}
         >
-          <Package size={18} color={activeTab === 'items' ? colors.primary[600] : colors.text.secondary} />
+          <MaterialIcons name="inventory-2" size={18} color={activeTab === 'items' ? colors.primary[600] : colors.text.secondary} />
           <Text style={[styles.tabText, activeTab === 'items' && styles.tabTextActive]}>
             Items ({items.length})
           </Text>
@@ -399,7 +398,7 @@ export default function InventoryItemMasterScreen() {
           style={[styles.tab, activeTab === 'issued' && styles.tabActive]}
           onPress={() => setActiveTab('issued')}
         >
-          <List size={18} color={activeTab === 'issued' ? colors.primary[600] : colors.text.secondary} />
+          <MaterialIcons name="list" size={18} color={activeTab === 'issued' ? colors.primary[600] : colors.text.secondary} />
           <Text style={[styles.tabText, activeTab === 'issued' && styles.tabTextActive]}>
             Issued ({issues.length})
           </Text>
@@ -419,22 +418,13 @@ export default function InventoryItemMasterScreen() {
                   style={styles.createButton}
                   onPress={handleNewItem}
                 >
-                  <Plus size={20} color={colors.text.inverse} />
+                  <MaterialIcons name="add" size={20} color={colors.text.inverse} />
                   <Text style={styles.createButtonText}>Create Item</Text>
                 </TouchableOpacity>
               }
             />
           ) : (
         <>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Inventory Items</Text>
-            <TouchableOpacity
-              style={styles.fab}
-              onPress={handleNewItem}
-            >
-              <Plus size={24} color={colors.text.inverse} />
-            </TouchableOpacity>
-          </View>
           <FlatList
             data={items}
             renderItem={renderItem}
@@ -450,7 +440,7 @@ export default function InventoryItemMasterScreen() {
                     style={styles.createButton}
                     onPress={handleNewItem}
                   >
-                    <Plus size={20} color={colors.text.inverse} />
+                    <MaterialIcons name="add" size={20} color={colors.text.inverse} />
                     <Text style={styles.createButtonText}>Create Item</Text>
                   </TouchableOpacity>
                 }
@@ -479,8 +469,8 @@ export default function InventoryItemMasterScreen() {
               keyExtractor={(item) => item.inventory_item_id}
               renderItem={({ item: groupedItem }) => {
                 return (
-                  <Card style={styles.issueCard}>
-                    <Card.Content>
+                  <View style={styles.issueCard}>
+                    <View style={{ padding: spacing.md }}>
                       <TouchableOpacity
                         onPress={() => {
                           setSelectedItemIssues(groupedItem.issues);
@@ -515,11 +505,11 @@ export default function InventoryItemMasterScreen() {
                               </Text>
                             )}
                           </View>
-                          <ChevronRight size={20} color={colors.text.secondary} />
+                          <MaterialIcons name="chevron-right" size={20} color={colors.text.secondary} />
                         </View>
                       </TouchableOpacity>
-                    </Card.Content>
-                  </Card>
+                    </View>
+                  </View>
                 );
               }}
               contentContainerStyle={styles.listContent}
@@ -561,6 +551,9 @@ export default function InventoryItemMasterScreen() {
           }}
         />
       )}
+
+      {/* Floating Add Button */}
+      <FAB icon="add" onPress={handleNewItem} visible={activeTab === 'items' && !itemsLoading} />
 
       {/* Issue Details Modal */}
       {showIssueDetails && (
@@ -646,31 +639,6 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
     color: colors.text.inverse,
     fontSize: typography.fontSize.base,
     fontWeight: typography.fontWeight.semibold,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surface.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  fab: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary[600],
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.lg,
-    elevation: 8,
   },
   listContent: {
     padding: spacing.lg,

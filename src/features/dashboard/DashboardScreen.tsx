@@ -5,17 +5,10 @@
  * NO hardcoded colors, spacing, or typography - all from theme tokens.
  */
 
-import React from 'react';
+import React, { ComponentProps } from 'react';
 import { View, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Text as RNText, Platform } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import {
-  CalendarRange, UserCheck, CreditCard, NotebookText, UsersRound,
-  LineChart, TrendingUp, Activity, CalendarDays,
-  Target, AlertCircle, FolderOpen, ArrowUpRight,
-  ArrowDownRight, ChevronRight, UserPlus, List, Layers,
-  ReceiptText, ClipboardList, GraduationCap, Building2, School,
-  FileText, CheckCircle2, Clock
-} from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
 
 // Theme & Context
@@ -47,13 +40,12 @@ import {
 
 // Legacy components (to be migrated)
 import { ThreeStateView } from '../../components/common/ThreeStateView';
-import { ProgressRing } from '../../components/ui/ProgressRing';
+import { ProgressRing } from '../../ui';
 
 // New Dashboard Components
 import { InsightCard, ActionRequiredBanner, SparklineCard, StreakBadge, type ActionItem } from '../../components/dashboard';
 import { log } from '../../lib/logger';
 import { useNotificationContext } from '../../contexts/NotificationContext';
-import { Bell, RefreshCw } from 'lucide-react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -213,7 +205,7 @@ function PushNotificationDebug() {
               gap: spacing.xs,
             }}
           >
-            <RefreshCw size={16} color={colors.text.inverse} />
+            <MaterialIcons name="refresh" size={16} color={colors.text.inverse} />
             <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
               Re-register
             </RNText>
@@ -235,7 +227,7 @@ function PushNotificationDebug() {
               gap: spacing.xs,
             }}
           >
-            <RefreshCw size={16} color={colors.text.inverse} />
+            <MaterialIcons name="refresh" size={16} color={colors.text.inverse} />
             <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
               Force Sync
             </RNText>
@@ -259,7 +251,7 @@ function PushNotificationDebug() {
               gap: spacing.xs,
             }}
           >
-            <Bell size={16} color={colors.text.inverse} />
+            <MaterialIcons name="notifications" size={16} color={colors.text.inverse} />
             <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
               Test Local
             </RNText>
@@ -280,13 +272,13 @@ function PushNotificationDebug() {
 
 interface QuickActionProps {
   title: string;
-  icon: React.ElementType;
+  icon: ComponentProps<typeof MaterialIcons>['name'];
   color: string;
   bgColor: string;
   onPress: () => void;
 }
 
-function QuickAction({ title, icon: Icon, color, bgColor, onPress }: QuickActionProps) {
+function QuickAction({ title, icon, color, bgColor, onPress }: QuickActionProps) {
   const { spacing, shadows, colors: themeColors, typography } = useTheme();
 
   return (
@@ -313,7 +305,7 @@ function QuickAction({ title, icon: Icon, color, bgColor, onPress }: QuickAction
         marginBottom: spacing.xs,
         // ...shadows.sm, // Subtle shadow
       }}>
-        <Icon size={24} color={color} strokeWidth={2.5} />
+        <MaterialIcons name={icon} size={24} color={color} />
       </View>
       <RNText
         style={{
@@ -336,7 +328,7 @@ interface StatCardProps {
   title: string;
   value: string;
   change: string;
-  icon: React.ElementType;
+  icon: ComponentProps<typeof MaterialIcons>['name'];
   color: string;
   bgColor: string;
   onPress?: () => void;
@@ -346,7 +338,7 @@ interface StatCardProps {
 }
 
 function StatCard({
-  title, value, change, icon: Icon, color, bgColor,
+  title, value, change, icon, color, bgColor,
   onPress, showProgress, progressValue, trend
 }: StatCardProps) {
   const { colors, spacing, borderRadius, shadows, typography } = useTheme();
@@ -377,18 +369,18 @@ function StatCard({
           justifyContent: 'center',
           alignItems: 'center',
         }}>
-          <Icon size={20} color={color} strokeWidth={2.5} />
+          <MaterialIcons name={icon} size={20} color={color} />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
           {/* Trend or Arrow */}
           {trend ? (
             trend === 'up' ? (
-              <ArrowUpRight size={16} color={colors.success[600]} />
+              <MaterialIcons name="trending-up" size={16} color={colors.success[600]} />
             ) : (
-              <ArrowDownRight size={16} color={colors.error[600]} />
+              <MaterialIcons name="trending-down" size={16} color={colors.error[600]} />
             )
           ) : onPress && (
-            <ChevronRight size={16} color={colors.text.tertiary} />
+            <MaterialIcons name="chevron-right" size={16} color={colors.text.tertiary} />
           )}
         </View>
       </View>
@@ -471,14 +463,14 @@ function StatCardSkeleton() {
 }
 
 interface EmptyStateProps {
-  icon: React.ElementType;
+  icon: ComponentProps<typeof MaterialIcons>['name'];
   title: string;
   message: string;
   actionLabel?: string;
   onAction?: () => void;
 }
 
-function DashboardEmptyState({ icon: Icon, title, message, actionLabel, onAction }: EmptyStateProps) {
+function DashboardEmptyState({ icon, title, message, actionLabel, onAction }: EmptyStateProps) {
   const { colors, spacing, borderRadius } = useTheme();
 
   return (
@@ -492,7 +484,7 @@ function DashboardEmptyState({ icon: Icon, title, message, actionLabel, onAction
         alignItems: 'center',
         marginBottom: spacing.md,
       }}>
-        <Icon size={40} color={colors.primary[400]} />
+        <MaterialIcons name={icon} size={40} color={colors.primary[400]} />
       </View>
       <Heading level={5} align="center">{title}</Heading>
       <Body color="secondary" align="center" style={{ marginVertical: spacing.sm }}>
@@ -566,16 +558,16 @@ export default function DashboardScreen() {
 
   // Quick actions data - filtered by capabilities (NOT roles)
   const quickActionsMap = [
-    { title: 'Timetable', icon: CalendarRange, color: colors.primary.main, bgColor: colors.primary[50], route: '/(tabs)/timetable', visible: can('timetable.read') },
-    { title: 'Calendar', icon: CalendarDays, color: colors.info.main, bgColor: colors.info[50], route: '/(tabs)/calendar', visible: can('calendar.read') },
-    { title: 'Resources', icon: FolderOpen, color: colors.accent.main, bgColor: colors.accent[50], route: '/(tabs)/resources', visible: can('resources.read') },
-    { title: 'Syllabus', icon: NotebookText, color: colors.secondary.main, bgColor: colors.secondary[50], route: canViewOwnDataOnly ? '/(tabs)/syllabus-student' : '/(tabs)/syllabus', visible: canViewSyllabus },
-    { title: 'Attendance', icon: UserCheck, color: colors.success.main, bgColor: colors.success[50], route: '/(tabs)/attendance', visible: can('attendance.read') || can('attendance.read_own') },
-    { title: 'Fees', icon: CreditCard, color: colors.warning.main, bgColor: colors.warning[50], route: canViewOwnDataOnly ? '/(tabs)/fees-student' : '/(tabs)/fees', visible: canViewFees },
-    { title: 'Assessments', icon: GraduationCap, color: colors.error.main, bgColor: colors.error[50], route: '/(tabs)/assessments', visible: can('assessments.read') || can('assessments.read_own') },
-    { title: 'Tasks', icon: ClipboardList, color: colors.secondary.main, bgColor: colors.secondary[50], route: '/(tabs)/tasks', visible: canViewTasks },
-    { title: 'Payments', icon: ReceiptText, color: colors.warning.main, bgColor: colors.warning[50], route: '/(tabs)/payments', visible: canViewPayments },
-    { title: 'Management', icon: Building2, color: colors.neutral[600], bgColor: colors.neutral[50], route: '/(tabs)/manage', visible: canViewManagement },
+    { title: 'Timetable', icon: 'event' as ComponentProps<typeof MaterialIcons>['name'], color: colors.primary.main, bgColor: colors.primary[50], route: '/(tabs)/timetable', visible: can('timetable.read') },
+    { title: 'Calendar', icon: 'event' as ComponentProps<typeof MaterialIcons>['name'], color: colors.info.main, bgColor: colors.info[50], route: '/(tabs)/calendar', visible: can('calendar.read') },
+    { title: 'Resources', icon: 'folder-open' as ComponentProps<typeof MaterialIcons>['name'], color: colors.accent.main, bgColor: colors.accent[50], route: '/(tabs)/resources', visible: can('resources.read') },
+    { title: 'Syllabus', icon: 'menu-book' as ComponentProps<typeof MaterialIcons>['name'], color: colors.secondary.main, bgColor: colors.secondary[50], route: canViewOwnDataOnly ? '/(tabs)/syllabus-student' : '/(tabs)/syllabus', visible: canViewSyllabus },
+    { title: 'Attendance', icon: 'how-to-reg' as ComponentProps<typeof MaterialIcons>['name'], color: colors.success.main, bgColor: colors.success[50], route: '/(tabs)/attendance', visible: can('attendance.read') || can('attendance.read_own') },
+    { title: 'Fees', icon: 'credit-card' as ComponentProps<typeof MaterialIcons>['name'], color: colors.warning.main, bgColor: colors.warning[50], route: canViewOwnDataOnly ? '/(tabs)/fees-student' : '/(tabs)/fees', visible: canViewFees },
+    { title: 'Assessments', icon: 'school' as ComponentProps<typeof MaterialIcons>['name'], color: colors.error.main, bgColor: colors.error[50], route: '/(tabs)/assessments', visible: can('assessments.read') || can('assessments.read_own') },
+    { title: 'Tasks', icon: 'assignment' as ComponentProps<typeof MaterialIcons>['name'], color: colors.secondary.main, bgColor: colors.secondary[50], route: '/(tabs)/tasks', visible: canViewTasks },
+    { title: 'Payments', icon: 'receipt' as ComponentProps<typeof MaterialIcons>['name'], color: colors.warning.main, bgColor: colors.warning[50], route: '/(tabs)/payments', visible: canViewPayments },
+    { title: 'Management', icon: 'business' as ComponentProps<typeof MaterialIcons>['name'], color: colors.neutral[600], bgColor: colors.neutral[50], route: '/(tabs)/manage', visible: canViewManagement },
   ];
 
   // Filter quick actions based on capabilities (NOT roles)
@@ -597,7 +589,7 @@ export default function DashboardScreen() {
       title: "Today's Classes",
       value: typedStats.todaysClasses.toString(),
       change: typedStats.todaysClasses > 0 ? `${typedStats.todaysClasses} scheduled` : 'No classes',
-      icon: CalendarRange,
+      icon: 'event' as ComponentProps<typeof MaterialIcons>['name'],
       color: colors.primary.main,
       bgColor: colors.primary[50],
       route: '/(tabs)/timetable',
@@ -608,7 +600,7 @@ export default function DashboardScreen() {
       change: canViewOwnDataOnly
         ? (typedStats.attendancePercentage >= 90 ? 'Excellent' : typedStats.attendancePercentage >= 80 ? 'Good' : typedStats.attendancePercentage >= 75 ? 'Fair' : 'Low')
         : 'in class',
-      icon: canViewOwnDataOnly ? TrendingUp : UsersRound,
+      icon: (canViewOwnDataOnly ? 'trending-up' : 'group') as ComponentProps<typeof MaterialIcons>['name'],
       color: canViewOwnDataOnly
         ? (typedStats.attendancePercentage >= 90 ? colors.success.main : typedStats.attendancePercentage >= 80 ? colors.info.main : typedStats.attendancePercentage >= 75 ? colors.warning.main : colors.error.main)
         : colors.info.main,
@@ -624,7 +616,7 @@ export default function DashboardScreen() {
       title: 'Tasks',
       value: typedStats.pendingAssignments.toString(),
       change: typedStats.pendingAssignments > 0 ? 'Pending' : 'All done',
-      icon: FileText,
+      icon: 'description' as ComponentProps<typeof MaterialIcons>['name'],
       color: typedStats.pendingAssignments > 0 ? colors.warning.main : colors.success.main,
       bgColor: typedStats.pendingAssignments > 0 ? colors.warning[50] : colors.success[50],
       route: '/(tabs)/tasks',
@@ -633,7 +625,7 @@ export default function DashboardScreen() {
       title: 'Upcoming Tests',
       value: typedStats.upcomingTests.toString(),
       change: typedStats.upcomingTests > 0 ? 'This week' : 'None',
-      icon: Target,
+      icon: 'gps-fixed' as ComponentProps<typeof MaterialIcons>['name'],
       color: typedStats.upcomingTests > 0 ? colors.error.main : colors.success.main,
       bgColor: typedStats.upcomingTests > 0 ? colors.error[50] : colors.success[50],
       route: '/(tabs)/assessments',
@@ -729,7 +721,7 @@ export default function DashboardScreen() {
         </Animated.View>
 
         {/* SuperAdmin: 2 Large Hero Cards */}
-        {profile?.role === 'superadmin' ? (
+        {can('finance.access') ? (
           <Animated.View
             entering={FadeInDown.delay(150).springify()}
             style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg, gap: spacing.md }}
@@ -766,7 +758,7 @@ export default function DashboardScreen() {
                       marginTop: spacing.xs,
                       alignSelf: 'flex-start'
                     }}>
-                      <Clock size={12} color={colors.warning[700]} style={{ marginRight: 4 }} />
+                      <MaterialIcons name="schedule" size={12} color={colors.warning[700]} style={{ marginRight: 4 }} />
                       <RNText style={{ fontSize: typography.fontSize.xs, color: colors.warning[800], fontWeight: typography.fontWeight.medium }}>
                         Marking in progress ({typedStats?.markedClassesCount || 0}/{typedStats?.totalClassesCount || 0})
                       </RNText>
@@ -781,7 +773,7 @@ export default function DashboardScreen() {
                   justifyContent: 'center',
                   alignItems: 'center'
                 }}>
-                  <UserCheck size={32} color={colors.success[600]} strokeWidth={2.5} />
+                  <MaterialIcons name="how-to-reg" size={32} color={colors.success[600]} />
                 </View>
               </View>
 
@@ -836,7 +828,7 @@ export default function DashboardScreen() {
                   justifyContent: 'center',
                   alignItems: 'center'
                 }}>
-                  <CalendarDays size={32} color={colors.primary[600]} strokeWidth={2.5} />
+                  <MaterialIcons name="event" size={32} color={colors.primary[600]} />
                 </View>
               </View>
 
@@ -944,7 +936,7 @@ export default function DashboardScreen() {
                   alignItems: 'center',
                   gap: spacing.sm,
                 }}>
-                  <AlertCircle size={20} color={colors.warning[700]} />
+                  <MaterialIcons name="error" size={20} color={colors.warning[700]} />
                   <View style={{ flex: 1 }}>
                     <RNText style={{
                       fontSize: typography.fontSize.sm,
@@ -999,9 +991,9 @@ export default function DashboardScreen() {
                   borderColor: colors.border.light,
                 }}>
                   {[
-                    { icon: UserCheck, label: 'Class Attendance', value: `${typedStats?.attendancePercentage || 0}% Today`, color: colors.success[600] },
-                    { icon: FolderOpen, label: 'Resources Shared', value: 'View resources →', color: colors.info[600] },
-                    { icon: LineChart, label: 'Class Performance', value: 'View analytics →', color: colors.secondary[600] },
+                    { icon: 'how-to-reg' as ComponentProps<typeof MaterialIcons>['name'], label: 'Class Attendance', value: `${typedStats?.attendancePercentage || 0}% Today`, color: colors.success[600] },
+                    { icon: 'folder-open' as ComponentProps<typeof MaterialIcons>['name'], label: 'Resources Shared', value: 'View resources →', color: colors.info[600] },
+                    { icon: 'show-chart' as ComponentProps<typeof MaterialIcons>['name'], label: 'Class Performance', value: 'View analytics →', color: colors.secondary[600] },
                   ].map((item, index, arr) => (
                     <React.Fragment key={index}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm }}>
@@ -1016,7 +1008,7 @@ export default function DashboardScreen() {
                           alignItems: 'center',
                           marginRight: spacing.sm,
                         }}>
-                          <item.icon size={18} color={item.color} />
+                          <MaterialIcons name={item.icon} size={18} color={item.color} />
                         </View>
                         <View style={{ flex: 1 }}>
                           <RNText style={{
@@ -1269,7 +1261,7 @@ export default function DashboardScreen() {
                 </Stack>
               ) : (
                 <DashboardEmptyState
-                  icon={CreditCard}
+                  icon="credit-card"
                   title="Fee plan not set up yet"
                   message="Your school will assign your fee structure soon. You'll be notified once it's ready."
                   actionLabel="Learn More"
@@ -1292,7 +1284,7 @@ export default function DashboardScreen() {
               </Stack>
             ) : dashboardError ? (
               <Stack align="center" padding="lg">
-                <AlertCircle size={32} color={colors.error.main} />
+                <MaterialIcons name="error" size={32} color={colors.error.main} />
                 <Body color="error" align="center" style={{ marginTop: spacing.sm }}>
                   Failed to load events. Pull down to refresh.
                 </Body>
@@ -1318,7 +1310,7 @@ export default function DashboardScreen() {
                     <Stack spacing="xs" flex>
                       <Body weight="semibold">{event.title}</Body>
                       <Row spacing="xs" align="center">
-                        <CalendarDays size={14} color={colors.text.tertiary} />
+                        <MaterialIcons name="event" size={14} color={colors.text.tertiary} />
                         <Caption color="tertiary">
                           {new Date(event.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                         </Caption>
@@ -1330,7 +1322,7 @@ export default function DashboardScreen() {
               </Stack>
             ) : (
               <DashboardEmptyState
-                icon={CalendarDays}
+                icon="event"
                 title="Nothing planned yet 📅"
                 message="No upcoming events in the next 30 days. Enjoy your regular schedule!"
                 actionLabel="View Full Calendar"
@@ -1341,7 +1333,7 @@ export default function DashboardScreen() {
         </SectionBlock>
 
         {/* Push Notification Debug - Superadmin only */}
-        {profile?.role === 'superadmin' && <PushNotificationDebug />}
+        {can('finance.access') && <PushNotificationDebug />}
 
         {/* Recent Activity - Hidden for superadmin */}
         {profile?.role !== 'superadmin' && (
@@ -1355,23 +1347,23 @@ export default function DashboardScreen() {
                   <Skeleton width="65%" height={16} variant="rounded" />
                 </Stack>
               ) : dashboardError ? (
-                <Stack align="center" padding="lg">
-                  <AlertCircle size={32} color={colors.error.main} />
-                  <Body color="error" align="center" style={{ marginTop: spacing.sm }}>
-                    Failed to load activity. Pull down to refresh.
-                  </Body>
-                </Stack>
+              <Stack align="center" padding="lg">
+                <MaterialIcons name="error" size={32} color={colors.error.main} />
+                <Body color="error" align="center" style={{ marginTop: spacing.sm }}>
+                  Failed to load activity. Pull down to refresh.
+                </Body>
+              </Stack>
               ) : Array.isArray(recentActivity) && recentActivity.length > 0 ? (
                 <Stack spacing="none">
                   {recentActivity.map((activity, index) => {
-                    const getActivityIcon = (type: string) => {
+                    const getActivityIconName = (type: string): ComponentProps<typeof MaterialIcons>['name'] => {
                       switch (type) {
-                        case 'attendance': return UserCheck;
+                        case 'attendance': return 'how-to-reg';
                         case 'assignment':
-                        case 'task': return NotebookText;
-                        case 'test': return Target;
-                        case 'event': return CalendarDays;
-                        default: return Activity;
+                        case 'task': return 'menu-book';
+                        case 'test': return 'gps-fixed';
+                        case 'event': return 'event';
+                        default: return 'timeline';
                       }
                     };
 
@@ -1386,7 +1378,7 @@ export default function DashboardScreen() {
                       }
                     };
 
-                    const ActivityIcon = getActivityIcon(activity.type);
+                    const activityIconName = getActivityIconName(activity.type);
                     const activityColor = getActivityColor(activity.color);
 
                     return (
@@ -1408,7 +1400,7 @@ export default function DashboardScreen() {
                           justifyContent: 'center',
                           alignItems: 'center',
                         }}>
-                          <ActivityIcon size={16} color={activityColor.icon} />
+                          <MaterialIcons name={activityIconName} size={16} color={activityColor.icon} />
                         </View>
                         <Stack spacing="none" flex>
                           <Body weight="semibold">{activity.title}</Body>
@@ -1420,7 +1412,7 @@ export default function DashboardScreen() {
                 </Stack>
               ) : (
                 <DashboardEmptyState
-                  icon={Activity}
+                  icon="timeline"
                   title="👀 Nothing yet"
                   message="Your activity feed will light up here soon. Check back after your first class!"
                 />

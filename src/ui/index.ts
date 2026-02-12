@@ -95,6 +95,15 @@ export type {
 } from './Text';
 
 // ============================================================================
+// ICON COMPONENT
+// ============================================================================
+
+export { Icon } from './Icon';
+export type { IconProps } from './Icon';
+export type { MaterialIconName } from './iconMap';
+export { LUCIDE_TO_MATERIAL } from './iconMap';
+
+// ============================================================================
 // INTERACTIVE COMPONENTS
 // ============================================================================
 
@@ -104,12 +113,18 @@ export type { ButtonProps, ButtonVariant, ButtonSize } from './Button';
 export { IconButton } from './IconButton';
 export type { IconButtonProps, IconButtonVariant, IconButtonSize } from './IconButton';
 
+export { FAB } from './FAB';
+export type { FABProps, FABGroupProps, FABGroupAction, FABSize, FABVariant } from './FAB';
+
 // ============================================================================
 // FORM COMPONENTS
 // ============================================================================
 
 export { Input } from './Input';
 export type { InputProps, InputVariant, InputSize } from './Input';
+
+export { Checkbox } from './Checkbox';
+export type { CheckboxProps, CheckboxSize } from './Checkbox';
 
 // ============================================================================
 // DISPLAY COMPONENTS
@@ -138,9 +153,35 @@ export { Skeleton, SkeletonText, SkeletonAvatar, SkeletonCard } from './Skeleton
 export type { SkeletonProps, SkeletonTextProps, SkeletonAvatarProps, SkeletonCardProps } from './Skeleton';
 
 // ============================================================================
-// STATE COMPONENTS (from existing)
+// OVERLAY COMPONENTS
 // ============================================================================
 
-export { EmptyState } from '../components/ui/EmptyState';
-export { LoadingView } from '../components/ui/LoadingView';
-export { ErrorView } from '../components/ui/ErrorView';
+export { Portal, PortalProvider } from './Portal';
+export { Modal } from './Modal';
+export type { ModalProps, ModalSize } from './Modal';
+export { Menu } from './Menu';
+export type { MenuProps } from './Menu';
+export { ToastProvider, useToast } from './Toast';
+export type { ToastConfig, ToastType } from './Toast';
+
+// ============================================================================
+// STATE COMPONENTS
+// ============================================================================
+
+export { EmptyState } from './EmptyState';
+export type { EmptyStateProps } from './EmptyState';
+export { LoadingView } from './LoadingView';
+export type { LoadingViewProps } from './LoadingView';
+export { ErrorView } from './ErrorView';
+export type { ErrorViewProps } from './ErrorView';
+export { EmptyStateIllustration } from './EmptyStateIllustration';
+export { SuccessAnimation } from './SuccessAnimation';
+export type { SuccessAnimationProps } from './SuccessAnimation';
+export { NetworkStatus } from './NetworkStatus';
+export { ProgressRing } from './ProgressRing';
+export type { ProgressRingProps } from './ProgressRing';
+export { SegmentedControl } from './SegmentedControl';
+export type { SegmentedControlProps, SegmentOption } from './SegmentedControl';
+
+export { SearchBar } from './SearchBar';
+export type { SearchBarProps } from './SearchBar';

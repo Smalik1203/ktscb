@@ -1,11 +1,23 @@
-import React, { useEffect, useRef , useMemo } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
-import type { ThemeColors } from '../../theme/types';
+/**
+ * ProgressRing Component
+ * 
+ * Circular progress indicator using SVG.
+ * 
+ * @example
+ * ```tsx
+ * <ProgressRing progress={75} />
+ * <ProgressRing progress={50} size={60} color={colors.success.main} />
+ * ```
+ */
+
+import React, { useEffect, useRef, useMemo } from 'react';
 import { View, StyleSheet, Animated, Text } from 'react-native';
-import { typography, spacing, colors } from '../../../lib/design-system';
+import { useTheme } from '../contexts/ThemeContext';
 import Svg, { Circle } from 'react-native-svg';
 
-interface ProgressRingProps {
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+export interface ProgressRingProps {
   progress: number; // 0-100
   size?: number;
   strokeWidth?: number;
@@ -15,8 +27,6 @@ interface ProgressRingProps {
   label?: string;
   animated?: boolean;
 }
-
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 export function ProgressRing({
   progress,
@@ -28,11 +38,9 @@ export function ProgressRing({
   label,
   animated = true,
 }: ProgressRingProps) {
-  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
-  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
-  
-  // Use theme colors as defaults
-  const ringColor = color ?? colors.primary[600];
+  const { colors, typography } = useTheme();
+
+  const ringColor = color ?? colors.primary.main;
   const ringBackgroundColor = backgroundColor ?? colors.neutral[200];
   const animatedValue = useRef(new Animated.Value(0)).current;
 
@@ -51,7 +59,7 @@ export function ProgressRing({
     } else {
       animatedValue.setValue(normalizedProgress);
     }
-  }, [normalizedProgress]);
+  }, [normalizedProgress, animated, animatedValue]);
 
   const strokeDashoffset = animatedValue.interpolate({
     inputRange: [0, 100],
@@ -61,7 +69,6 @@ export function ProgressRing({
   return (
     <View style={[styles.container, { width: size, height: size }]}>
       <Svg width={size} height={size}>
-        {/* Background circle */}
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -70,8 +77,6 @@ export function ProgressRing({
           strokeWidth={strokeWidth}
           fill="none"
         />
-
-        {/* Progress circle */}
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
@@ -86,16 +91,32 @@ export function ProgressRing({
           origin={`${size / 2}, ${size / 2}`}
         />
       </Svg>
-
-      {/* Center content */}
       <View style={styles.centerContent}>
         {showPercentage && (
-          <Text style={[styles.percentage, { fontSize: size * 0.25 }]}>
+          <Text
+            style={[
+              styles.percentage,
+              {
+                fontSize: size * 0.25,
+                fontWeight: typography.fontWeight.bold as any,
+                color: colors.text.primary,
+              },
+            ]}
+          >
             {Math.round(normalizedProgress)}%
           </Text>
         )}
         {label && (
-          <Text style={[styles.label, { fontSize: size * 0.12 }]}>
+          <Text
+            style={[
+              styles.label,
+              {
+                fontSize: size * 0.12,
+                fontWeight: typography.fontWeight.medium as any,
+                color: colors.text.tertiary,
+              },
+            ]}
+          >
             {label}
           </Text>
         )}
@@ -104,8 +125,7 @@ export function ProgressRing({
   );
 }
 
-const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
-  StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     position: 'relative',
     justifyContent: 'center',
@@ -116,13 +136,8 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     justifyContent: 'center',
     alignItems: 'center',
   },
-  percentage: {
-    fontWeight: typography.fontWeight.bold as any,
-    color: colors.text.primary,
-  },
+  percentage: {},
   label: {
-    fontWeight: typography.fontWeight.medium as any,
-    color: colors.text.tertiary,
     marginTop: 2,
   },
 });

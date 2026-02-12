@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Card, Menu, IconButton } from 'react-native-paper';
-import { Clock, Eye, FileText, MoreVertical, BarChart3, HelpCircle, Hash, TrendingUp, Calendar, Trash2, Edit } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Card, Menu, Badge, ProgressBar, Chip } from '../../ui';
 import { format } from 'date-fns';
 import { TestWithDetails } from '../../types/test.types';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
-import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 
 interface TestCardProps {
   test: TestWithDetails;
@@ -26,105 +25,137 @@ export function TestCard({
   onUploadMarks,
   showActions = true,
 }: TestCardProps) {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, spacing, typography, borderRadius } = useTheme();
   const [menuVisible, setMenuVisible] = useState(false);
-  
-  // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
-
-  const handleDelete = () => {
-    setMenuVisible(false);
-    onDelete?.();
-  };
+  const styles = useMemo(() => createStyles(colors, isDark, spacing, typography, borderRadius), [colors, isDark]);
 
   const closeMenu = () => setMenuVisible(false);
-
   const isOnline = test.test_mode === 'online';
-  const completionRate = isOnline && test.total_students 
+
+  // Completion rate
+  const completionRate = isOnline && test.total_students
     ? Math.round((test.attempts_count || 0) / test.total_students * 100)
-    : test.total_students 
-    ? Math.round((test.marks_uploaded || 0) / test.total_students * 100)
-    : 0;
+    : test.total_students
+      ? Math.round((test.marks_uploaded || 0) / test.total_students * 100)
+      : 0;
+
+  const completionCount = isOnline
+    ? `${test.attempts_count || 0}/${test.total_students || 0}`
+    : `${test.marks_uploaded || 0}/${test.total_students || 0}`;
+
+  // Status
+  const isPublished = test.status === 'active';
+  const isDraft = test.status === 'draft';
 
   return (
-    <Card style={styles.card} onPress={onPress}>
+    <Card style={styles.card} onPress={onPress} padding="none">
       <View style={styles.cardContent}>
-        {/* Top Row: Title & Menu */}
+        {/* Row 1: Title + badges + menu */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.title} numberOfLines={1}>
-              {test.title}
-            </Text>
-            <View style={styles.subHeader}>
-              <Text style={styles.subjectText}>{test.subject_name}</Text>
-              {test.class_name && (
-                <>
-                  <Text style={styles.dotSeparator}>•</Text>
-                  <Text style={styles.classText}>{test.class_name}</Text>
-                </>
-              )}
-            </View>
+            <Text style={styles.title} numberOfLines={2}>{test.title}</Text>
           </View>
 
-          {showActions && (
-            <Menu
-              visible={menuVisible}
-              onDismiss={closeMenu}
-              anchor={
-                <IconButton
-                  icon={() => <MoreVertical size={20} color={colors.text.tertiary} />}
-                  size={20}
-                  onPress={() => setMenuVisible(true)}
-                  style={styles.menuButton}
-                />
-              }
+          <View style={styles.headerRight}>
+            {/* Status badge */}
+            <Badge
+              variant={isPublished ? 'success' : isDraft ? 'warning' : 'default'}
+              size="xs"
             >
-              <Menu.Item 
-                onPress={() => { closeMenu(); onPress?.(); }} 
-                title={isOnline ? "View Questions" : "Manage Marks"} 
-                leadingIcon={() => <Eye size={16} />} 
-              />
-              {onEdit && <Menu.Item onPress={() => { closeMenu(); onEdit(); }} title="Edit" leadingIcon={() => <Edit size={16} />} />}
-              {onDelete && <Menu.Item onPress={handleDelete} title="Delete" leadingIcon={() => <Trash2 size={16} />} />}
-            </Menu>
-          )}
+              {isPublished ? 'Published' : isDraft ? 'Draft' : test.status}
+            </Badge>
+
+            {showActions && (
+              <Menu
+                visible={menuVisible}
+                onDismiss={closeMenu}
+                anchor={
+                  <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.menuButton}>
+                    <MaterialIcons name="more-vert" size={20} color={colors.text.tertiary} />
+                  </TouchableOpacity>
+                }
+              >
+                <Menu.Item
+                  onPress={() => { closeMenu(); onPress?.(); }}
+                  title={isOnline ? 'View Questions' : 'Manage Marks'}
+                  icon="visibility"
+                />
+                {onManageQuestions && isOnline && (
+                  <Menu.Item onPress={() => { closeMenu(); onManageQuestions(); }} title="Manage Questions" icon="quiz" />
+                )}
+                {onUploadMarks && !isOnline && (
+                  <Menu.Item onPress={() => { closeMenu(); onUploadMarks(); }} title="Upload Marks" icon="upload" />
+                )}
+                {onEdit && <Menu.Item onPress={() => { closeMenu(); onEdit(); }} title="Edit" icon="edit" />}
+                {onDelete && <Menu.Item onPress={() => { closeMenu(); onDelete(); }} title="Delete" icon="delete" destructive />}
+              </Menu>
+            )}
+          </View>
         </View>
 
-        {/* Stats Row - Single Line */}
-        <View style={styles.statsRow}>
-          {isOnline ? (
-            <>
-              <Text style={styles.statText}>{test.question_count || 0} Questions</Text>
-              {(test.attempts_count || 0) > 0 && (
-                <>
-                  <Text style={styles.statSeparator}>•</Text>
-                  <Text style={styles.statText}>{test.attempts_count} Attempts</Text>
-                </>
-              )}
-              {test.time_limit_seconds && (
-                <>
-                  <Text style={styles.statSeparator}>•</Text>
-                  <Text style={styles.statText}>{Math.floor(test.time_limit_seconds / 60)}m</Text>
-                </>
-              )}
-            </>
-          ) : (
-            <>
+        {/* Row 2: Meta chips (subject, class, date, mode) */}
+        <View style={styles.chipRow}>
+          {/* Mode indicator */}
+          <Chip
+            size="sm"
+            variant={isOnline ? 'primary' : 'secondary'}
+            compact
+            icon={<MaterialIcons name={isOnline ? 'desktop-windows' : 'fact-check'} size={12} color={isOnline ? colors.primary[600] : colors.secondary[600]} />}
+          >
+            {isOnline ? 'Online' : 'Offline'}
+          </Chip>
+
+          {test.subject_name ? (
+            <Chip size="sm" compact>
+              {test.subject_name}
+            </Chip>
+          ) : null}
+
+          {test.class_name ? (
+            <Chip size="sm" compact>
+              {test.class_name}
+            </Chip>
+          ) : null}
+
+          {test.test_date ? (
+            <Chip
+              size="sm"
+              compact
+              icon={<MaterialIcons name="event" size={12} color={colors.text.secondary} />}
+            >
+              {format(new Date(test.test_date), 'MMM dd, yyyy')}
+            </Chip>
+          ) : null}
+        </View>
+
+        {/* Row 3: Stats + progress bar */}
+        <View style={styles.statsSection}>
+          <View style={styles.statsRow}>
+            {isOnline ? (
+              <>
+                <Text style={styles.statText}>{test.question_count || 0} Qs</Text>
+                {test.time_limit_seconds ? (
+                  <>
+                    <Text style={styles.statDot}> · </Text>
+                    <Text style={styles.statText}>{Math.floor(test.time_limit_seconds / 60)}m</Text>
+                  </>
+                ) : null}
+              </>
+            ) : (
               <Text style={styles.statText}>Max: {test.max_marks || 100}</Text>
-              {(test.total_students || 0) > 0 && (
-                <>
-                  <Text style={styles.statSeparator}>•</Text>
-                  <Text style={styles.statText}>{test.marks_uploaded || 0}/{test.total_students} Graded</Text>
-                </>
-              )}
-            </>
-          )}
-          
-          {/* Progress pushes to the right */}
-          {completionRate > 0 && (
-            <View style={styles.progressContainer}>
-              <Text style={styles.progressText}>{completionRate}%</Text>
-            </View>
+            )}
+            {(test.total_students || 0) > 0 && (
+              <Text style={styles.completionText}>{completionCount} done</Text>
+            )}
+          </View>
+
+          {/* Progress bar for completion rate */}
+          {(test.total_students || 0) > 0 && (
+            <ProgressBar
+              progress={completionRate}
+              variant={completionRate >= 100 ? 'success' : completionRate >= 50 ? 'primary' : 'warning'}
+              size="xs"
+            />
           )}
         </View>
       </View>
@@ -132,15 +163,9 @@ export function TestCard({
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean, spacing: any, typography: any, borderRadius: any) => StyleSheet.create({
   card: {
     marginBottom: spacing.sm,
-    backgroundColor: colors.surface.primary,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    ...shadows.none,
-    elevation: 0,
   },
   cardContent: {
     padding: spacing.md,
@@ -149,64 +174,52 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: spacing.xs,
   },
   headerLeft: {
     flex: 1,
     marginRight: spacing.sm,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  subHeader: {
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
   },
-  subjectText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    fontWeight: '500',
-  },
-  classText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-  },
-  dotSeparator: {
-    fontSize: 13,
-    color: colors.text.tertiary,
-    marginHorizontal: 6,
+  title: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+    lineHeight: typography.fontSize.base * 1.4,
   },
   menuButton: {
-    margin: -8,
-    marginTop: -4,
+    padding: 4,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  statsSection: {
+    gap: spacing.xs,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   statText: {
-    fontSize: 13,
+    fontSize: typography.fontSize.xs,
     color: colors.text.tertiary,
-    fontWeight: '400',
+    fontWeight: typography.fontWeight.medium,
   },
-  statSeparator: {
-    fontSize: 13,
+  statDot: {
+    fontSize: typography.fontSize.xs,
     color: colors.text.tertiary,
-    marginHorizontal: 6,
   },
-  progressContainer: {
+  completionText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeight.medium,
     marginLeft: 'auto',
-    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  progressText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.primary[700],
   },
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button } from 'react-native-paper';
-import { BookMarked, X } from 'lucide-react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Modal } from '../../ui';
 import { colors, spacing, typography, borderRadius } from '../../../lib/design-system';
 
 interface AddChapterTopicModalProps {
@@ -45,7 +45,6 @@ export function AddChapterTopicModal({
   };
 
   return (
-    <Portal>
       <Modal
         visible={visible}
         onDismiss={onDismiss}
@@ -54,7 +53,7 @@ export function AddChapterTopicModal({
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.headerIconCircle}>
-              <BookMarked size={24} color={colors.primary[600]} />
+              <MaterialIcons name="bookmark" size={24} color={colors.primary[600]} />
             </View>
             <View>
               <Text style={styles.headerTitle}>
@@ -68,7 +67,7 @@ export function AddChapterTopicModal({
             </View>
           </View>
           <TouchableOpacity onPress={onDismiss} style={styles.closeButton}>
-            <X size={24} color={colors.text.secondary} />
+            <MaterialIcons name="close" size={24} color={colors.text.secondary} />
           </TouchableOpacity>
         </View>
 
@@ -86,13 +85,11 @@ export function AddChapterTopicModal({
               Title <Text style={styles.required}>*</Text>
             </Text>
             <TextInput
-              mode="outlined"
               value={title}
               onChangeText={setTitle}
               placeholder={`Enter ${mode === 'chapter' ? 'chapter' : 'topic'} title`}
+              placeholderTextColor={colors.text.secondary}
               style={styles.input}
-              outlineColor={colors.border.light}
-              activeOutlineColor={colors.primary[600]}
             />
           </View>
 
@@ -100,15 +97,13 @@ export function AddChapterTopicModal({
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>Description</Text>
             <TextInput
-              mode="outlined"
               value={description}
               onChangeText={setDescription}
               placeholder={`Enter ${mode === 'chapter' ? 'chapter' : 'topic'} description (optional)`}
+              placeholderTextColor={colors.text.secondary}
               style={styles.textArea}
               multiline
               numberOfLines={4}
-              outlineColor={colors.border.light}
-              activeOutlineColor={colors.primary[600]}
             />
             <Text style={styles.charCount}>
               {description.length} / 500
@@ -118,29 +113,26 @@ export function AddChapterTopicModal({
 
         {/* Footer Actions */}
         <View style={styles.footer}>
-          <Button
-            mode="outlined"
+          <TouchableOpacity
             onPress={onDismiss}
             style={styles.cancelButton}
             disabled={busy}
           >
-            Cancel
-          </Button>
-          <Button
-            mode="contained"
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={handleSubmit}
-            style={styles.submitButton}
-            labelStyle={styles.submitButtonLabel}
-            loading={busy}
+            style={[styles.submitButton, (busy || !title.trim()) && styles.submitButtonDisabled]}
             disabled={busy || !title.trim()}
-            buttonColor="#4f46e5"
-            textColor={colors.surface.primary}
           >
-            Create
-          </Button>
+            {busy ? (
+              <ActivityIndicator size="small" color={colors.surface.primary} />
+            ) : (
+              <Text style={styles.submitButtonLabel}>Create</Text>
+            )}
+          </TouchableOpacity>
         </View>
       </Modal>
-    </Portal>
   );
 }
 
@@ -219,12 +211,22 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.surface.primary,
     fontSize: typography.fontSize.base,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    color: colors.text.primary,
   },
   textArea: {
     backgroundColor: colors.surface.primary,
     minHeight: 100,
     fontSize: typography.fontSize.base,
     textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    color: colors.text.primary,
   },
   charCount: {
     fontSize: typography.fontSize.xs,
@@ -245,14 +247,32 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     borderColor: colors.border.DEFAULT,
+    borderWidth: 1,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
+    color: colors.text.primary,
   },
   submitButton: {
     flex: 1,
-    elevation: 2,
     backgroundColor: '#4f46e5',
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   submitButtonLabel: {
     color: colors.surface.primary,
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold as any,
   },
 });
 

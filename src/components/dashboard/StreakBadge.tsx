@@ -5,8 +5,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
+import { View, StyleSheet, Text as RNText } from 'react-native';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -16,7 +15,7 @@ import Animated, {
     withTiming,
     FadeIn,
 } from 'react-native-reanimated';
-import { Flame, Calendar, CheckCircle2, Star } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export type StreakType = 'attendance' | 'tasks' | 'login';
@@ -79,7 +78,7 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
         switch (type) {
             case 'attendance':
                 return {
-                    icon: Calendar,
+                    icon: 'event' as const,
                     color: colors.success[600],
                     bgColor: colors.success[50],
                     borderColor: colors.success[200],
@@ -87,7 +86,7 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
                 };
             case 'tasks':
                 return {
-                    icon: CheckCircle2,
+                    icon: 'check-circle' as const,
                     color: colors.primary[600],
                     bgColor: colors.primary[50],
                     borderColor: colors.primary[200],
@@ -95,7 +94,7 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
                 };
             case 'login':
                 return {
-                    icon: Star,
+                    icon: 'star' as const,
                     color: colors.warning[600],
                     bgColor: colors.warning[50],
                     borderColor: colors.warning[200],
@@ -103,7 +102,7 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
                 };
             default:
                 return {
-                    icon: Flame,
+                    icon: 'local-fire-department' as const,
                     color: colors.error[600],
                     bgColor: colors.error[50],
                     borderColor: colors.error[200],
@@ -113,7 +112,6 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
     };
 
     const config = getTypeConfig();
-    const Icon = config.icon;
     const displayLabel = label || config.defaultLabel;
 
     if (count === 0) return null;
@@ -135,8 +133,8 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
                     },
                 ]}
             >
-                <Flame size={14} color={colors.error[500]} strokeWidth={2.5} />
-                <Text
+                <MaterialIcons name="local-fire-department" size={14} color={colors.error[500]} />
+                <RNText
                     style={[
                         styles.compactText,
                         {
@@ -147,7 +145,7 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
                     ]}
                 >
                     {count}
-                </Text>
+                </RNText>
             </Animated.View>
         );
     }
@@ -170,8 +168,8 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
             {/* Fire Icon with Count */}
             <View style={styles.mainContent}>
                 <View style={styles.iconRow}>
-                    <Flame size={28} color={colors.error[500]} strokeWidth={2} />
-                    <Text
+                    <MaterialIcons name="local-fire-department" size={28} color={colors.error[500]} />
+                    <RNText
                         style={[
                             styles.countText,
                             {
@@ -182,9 +180,9 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
                         ]}
                     >
                         {count}
-                    </Text>
+                    </RNText>
                 </View>
-                <Text
+                <RNText
                     style={[
                         styles.labelText,
                         {
@@ -195,7 +193,7 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
                     ]}
                 >
                     {displayLabel}
-                </Text>
+                </RNText>
             </View>
 
             {/* Milestone Badge */}
@@ -212,9 +210,9 @@ export const StreakBadge = React.memo<StreakBadgeProps>(({
                         },
                     ]}
                 >
-                    <Text style={[styles.milestoneText, { color: colors.text.inverse }]}>
+                    <RNText style={[styles.milestoneText, { color: colors.text.inverse }]}>
                         🎉 Milestone!
-                    </Text>
+                    </RNText>
                 </View>
             )}
         </Animated.View>

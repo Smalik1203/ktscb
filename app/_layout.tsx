@@ -3,10 +3,9 @@ import { Stack } from 'expo-router/stack';
 import { Drawer } from 'expo-router/drawer';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { PaperProvider, MD3DarkTheme, MD3LightTheme } from 'react-native-paper';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import * as SystemUI from 'expo-system-ui';
 import { queryClient } from '../src/lib/queryClient';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
@@ -14,7 +13,7 @@ import { ClassSelectionProvider } from '../src/contexts/ClassSelectionContext';
 import { ThemeProvider, useTheme } from '../src/contexts/ThemeContext';
 import { useFrameworkReady } from '../hooks/useFrameworkReady';
 import ErrorBoundary from '../src/components/ErrorBoundary';
-import { NetworkStatus } from '../src/components/ui/NetworkStatus';
+import { NetworkStatus, PortalProvider } from '../src/ui';
 import { ToastProvider } from '../src/components/common';
 import { DrawerContent } from '../src/components/layout/DrawerContent';
 import { initSentry } from '../src/lib/sentry';
@@ -108,25 +107,8 @@ function AppContent() {
     SystemUI.setBackgroundColorAsync(colors.background.app);
   }, [colors.background.app]);
 
-  // Create Paper theme based on dark mode
-  const paperTheme = useMemo(() => {
-    const baseTheme = isDark ? MD3DarkTheme : MD3LightTheme;
-    return {
-      ...baseTheme,
-      colors: {
-        ...baseTheme.colors,
-        primary: colors.primary[600],
-        background: colors.background.app,
-        surface: colors.surface.primary,
-        onSurface: colors.text.primary,
-        onSurfaceVariant: colors.text.secondary,
-        outline: colors.border.DEFAULT,
-      },
-    };
-  }, [isDark, colors]);
-
   return (
-    <PaperProvider theme={paperTheme}>
+    <PortalProvider>
       <BottomSheetModalProvider>
         <AuthProvider>
           <ClassSelectionProvider>
@@ -140,7 +122,7 @@ function AppContent() {
           </ClassSelectionProvider>
         </AuthProvider>
       </BottomSheetModalProvider>
-    </PaperProvider>
+    </PortalProvider>
   );
 }
 

@@ -1,11 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Search, X } from 'lucide-react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, StyleSheet, FlatList } from 'react-native';
 import { TestCard } from './TestCard';
 import { StudentTestCard } from './StudentTestCard';
 import { TestWithDetails, TestAttempt } from '../../types/test.types';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
-import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
+import { SearchBar, EmptyStateIllustration, Chip, SkeletonCard } from '../../ui';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+
+type StudentFilter = 'all' | 'upcoming' | 'completed';
+type AdminSort = 'date_desc' | 'date_asc' | 'name_asc';
 
 interface TestListProps {
   tests: TestWithDetails[];
@@ -35,233 +38,229 @@ export function TestList({
   isStudentView = false,
   studentAttempts = [],
   studentMarks = {},
-  headerComponent,
   filteredCount,
 }: TestListProps) {
-  const { colors, isDark } = useTheme();
+  const { colors, isDark, spacing, typography, borderRadius } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const [studentFilter, setStudentFilter] = useState<StudentFilter>('all');
+  const [adminSort, setAdminSort] = useState<AdminSort>('date_desc');
 
-  // Filter and search tests
-  const filteredTests = useMemo(() => {
-    return tests.filter((test) => {
-      // Search filter only
-      const matchesSearch =
-        searchQuery === '' ||
-        test.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        test.subject_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        test.class_name?.toLowerCase().includes(searchQuery.toLowerCase());
+  const styles = useMemo(() => createStyles(colors, isDark, spacing, typography, borderRadius), [colors, isDark]);
 
-      return matchesSearch;
-    });
-  }, [tests, searchQuery]);
+  // Search + filter + sort
+  const processedTests = useMemo(() => {
+    let result = tests;
 
-  // Flatten data for FlatList (no section headers)
-  const flatListData = useMemo(() => {
-    return filteredTests.map(test => ({ type: 'item' as const, data: test }));
-  }, [filteredTests]);
+    // Search
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((t) =>
+        t.title.toLowerCase().includes(q) ||
+        t.subject_name?.toLowerCase().includes(q) ||
+        t.class_name?.toLowerCase().includes(q)
+      );
+    }
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyStateTitle}>No Tests Found</Text>
-      <Text style={styles.emptyStateText}>
-        {searchQuery
-          ? 'Try adjusting your search'
-          : 'Create your first test to get started'}
-      </Text>
-    </View>
-  );
+    // Student filter
+    if (isStudentView && studentFilter !== 'all') {
+      result = result.filter((t) => {
+        const attempt = studentAttempts.find((a) => a.test_id === t.id);
+        const mark = studentMarks[t.id];
+        if (studentFilter === 'completed') {
+          return attempt?.status === 'completed' || !!mark;
+        }
+        // upcoming = not completed
+        return attempt?.status !== 'completed' && !mark;
+      });
+    }
 
-  const renderTestCard = (item: TestWithDetails) => {
+    // Admin sort
+    if (!isStudentView) {
+      result = [...result].sort((a, b) => {
+        switch (adminSort) {
+          case 'date_asc':
+            return (a.test_date || '').localeCompare(b.test_date || '');
+          case 'name_asc':
+            return a.title.localeCompare(b.title);
+          case 'date_desc':
+          default:
+            return (b.test_date || '').localeCompare(a.test_date || '');
+        }
+      });
+    }
+
+    return result;
+  }, [tests, searchQuery, studentFilter, adminSort, isStudentView, studentAttempts, studentMarks]);
+
+  const renderTestCard = useCallback((item: TestWithDetails) => {
     if (isStudentView) {
       const attempt = studentAttempts.find((a) => a.test_id === item.id);
       const mark = studentMarks[item.id];
       return <StudentTestCard test={item} attempt={attempt} mark={mark} />;
     }
-
     return (
       <TestCard
         test={item}
         onPress={() => onTestPress?.(item)}
-        onEdit={() => onTestEdit?.(item)}
-        onDelete={() => onTestDelete?.(item)}
-        onManageQuestions={() => onManageQuestions?.(item)}
-        onUploadMarks={() => onUploadMarks?.(item)}
+        onEdit={onTestEdit ? () => onTestEdit(item) : undefined}
+        onDelete={onTestDelete ? () => onTestDelete(item) : undefined}
+        onManageQuestions={onManageQuestions ? () => onManageQuestions(item) : undefined}
+        onUploadMarks={onUploadMarks ? () => onUploadMarks(item) : undefined}
         showActions={showActions}
       />
     );
-  };
+  }, [isStudentView, studentAttempts, studentMarks, onTestPress, onTestEdit, onTestDelete, onManageQuestions, onUploadMarks, showActions]);
 
-  const renderItem = ({ item }: { item: { type: 'item'; data: any } }) => {
+  const renderItem = useCallback(({ item }: { item: TestWithDetails }) => {
+    return <View style={styles.testItem}>{renderTestCard(item)}</View>;
+  }, [renderTestCard, styles]);
+
+  if (loading) {
     return (
-      <View style={styles.testItem}>
-        {renderTestCard(item.data)}
+      <View style={styles.container}>
+        <View style={styles.skeletonContainer}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </View>
       </View>
     );
-  };
+  }
 
   return (
     <View style={styles.container}>
-      {/* Prominent Search Bar - Always visible and anchored */}
+      {/* Search bar */}
       {tests.length > 0 && (
         <View style={styles.searchSection}>
-          <View style={styles.searchRow}>
-            <View style={styles.searchContainer}>
-              <Search size={18} color={colors.primary[600]} style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search assessments..."
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholderTextColor={colors.text.tertiary}
-              />
-              {searchQuery ? (
-                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
-                  <X size={18} color={colors.text.secondary} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            {filteredCount !== undefined && filteredCount > 0 && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{filteredCount}</Text>
-              </View>
-            )}
-          </View>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search assessments..."
+            onClear={() => setSearchQuery('')}
+          />
         </View>
       )}
 
-      {/* Test List */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading tests...</Text>
-        </View>
-      ) : (
-        <>
-          {flatListData.length === 0 ? (
-            renderEmptyState()
+      {/* Filter chips (student view) / Sort chips (admin view) */}
+      {tests.length > 0 && (
+        <View style={styles.chipRow}>
+          {isStudentView ? (
+            <>
+              <Chip
+                size="sm"
+                selected={studentFilter === 'all'}
+                onPress={() => setStudentFilter('all')}
+                variant={studentFilter === 'all' ? 'primary' : 'default'}
+              >
+                All ({tests.length})
+              </Chip>
+              <Chip
+                size="sm"
+                selected={studentFilter === 'upcoming'}
+                onPress={() => setStudentFilter('upcoming')}
+                variant={studentFilter === 'upcoming' ? 'info' : 'default'}
+              >
+                Upcoming
+              </Chip>
+              <Chip
+                size="sm"
+                selected={studentFilter === 'completed'}
+                onPress={() => setStudentFilter('completed')}
+                variant={studentFilter === 'completed' ? 'success' : 'default'}
+              >
+                Completed
+              </Chip>
+            </>
           ) : (
-            <FlatList
-              data={flatListData}
-              renderItem={renderItem}
-              keyExtractor={(item, index) => `test-${item.data.id}-${index}`}
-              style={styles.scrollView}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              removeClippedSubviews={true}
-              initialNumToRender={10}
-              maxToRenderPerBatch={10}
-              windowSize={10}
-              ListEmptyComponent={renderEmptyState}
-            />
+            <>
+              <Chip
+                size="sm"
+                selected={adminSort === 'date_desc'}
+                onPress={() => setAdminSort('date_desc')}
+                variant={adminSort === 'date_desc' ? 'primary' : 'default'}
+                icon={<MaterialIcons name="arrow-downward" size={12} color={adminSort === 'date_desc' ? colors.primary[600] : colors.text.secondary} />}
+              >
+                Newest
+              </Chip>
+              <Chip
+                size="sm"
+                selected={adminSort === 'date_asc'}
+                onPress={() => setAdminSort('date_asc')}
+                variant={adminSort === 'date_asc' ? 'primary' : 'default'}
+                icon={<MaterialIcons name="arrow-upward" size={12} color={adminSort === 'date_asc' ? colors.primary[600] : colors.text.secondary} />}
+              >
+                Oldest
+              </Chip>
+              <Chip
+                size="sm"
+                selected={adminSort === 'name_asc'}
+                onPress={() => setAdminSort('name_asc')}
+                variant={adminSort === 'name_asc' ? 'primary' : 'default'}
+                icon={<MaterialIcons name="sort-by-alpha" size={12} color={adminSort === 'name_asc' ? colors.primary[600] : colors.text.secondary} />}
+              >
+                A-Z
+              </Chip>
+            </>
           )}
-        </>
+        </View>
+      )}
+
+      {/* List */}
+      {processedTests.length === 0 ? (
+        <EmptyStateIllustration
+          type="tests"
+          title={searchQuery ? 'No results' : isStudentView && studentFilter !== 'all' ? `No ${studentFilter} tests` : 'No tests'}
+          description={searchQuery
+            ? 'Try adjusting your search'
+            : 'No assessments available'
+          }
+        />
+      ) : (
+        <FlatList
+          data={processedTests}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          style={styles.flatList}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={true}
+          initialNumToRender={10}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+        />
       )}
     </View>
   );
 }
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean, spacing: any, typography: any, borderRadius: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background.app,
   },
-  scrollView: {
-    flex: 1,
-  },
   searchSection: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xs,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
-    backgroundColor: colors.background.app,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
   },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  searchContainer: {
+  flatList: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1.5,
-    borderColor: colors.border.DEFAULT,
-    ...shadows.sm,
-    elevation: 2,
-  },
-  countBadge: {
-    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    minWidth: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    alignSelf: 'stretch',
-  },
-  countBadgeText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary[600],
-    lineHeight: typography.fontSize.sm,
-  },
-  searchIcon: {
-    marginRight: spacing.sm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.primary,
-    padding: 0,
-  },
-  clearButton: {
-    padding: spacing.xs,
-    marginLeft: spacing.xs,
   },
   listContent: {
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
     paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl * 2,
+    gap: spacing.sm,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
+  skeletonContainer: {
+    padding: spacing.md,
+    gap: spacing.sm,
   },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-  },
-  emptyState: {
-    paddingVertical: spacing.xl * 2,
-    alignItems: 'center',
-  },
-  emptyStateTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
-  },
-  emptyStateText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  testItem: {
-    marginBottom: spacing.sm,
-  },
+  testItem: {},
 });

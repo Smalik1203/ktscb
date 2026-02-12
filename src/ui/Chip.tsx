@@ -25,7 +25,7 @@
 
 import React, { useCallback } from 'react';
 import { View, TouchableOpacity, ViewStyle, TextStyle, StyleSheet } from 'react-native';
-import { X } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../contexts/ThemeContext';
 import { Text } from './Text';
 
@@ -48,8 +48,12 @@ export interface ChipProps {
   icon?: React.ReactNode;
   /** Disabled state */
   disabled?: boolean;
+  /** Compact mode (reduced padding) */
+  compact?: boolean;
   /** Custom style */
   style?: ViewStyle;
+  /** Custom text style */
+  textStyle?: TextStyle;
   /** Test ID */
   testID?: string;
 }
@@ -64,6 +68,7 @@ export function Chip({
   icon,
   disabled = false,
   style,
+  textStyle,
   testID,
 }: ChipProps) {
   const { colors, spacing, borderRadius, typography } = useTheme();
@@ -207,7 +212,7 @@ export function Chip({
       <Text
         size={size === 'sm' ? 'xs' : size === 'lg' ? 'base' : 'sm'}
         weight="medium"
-        style={{ color: textColor }}
+        style={StyleSheet.flatten([{ color: textColor }, textStyle])}
       >
         {children}
       </Text>
@@ -219,7 +224,7 @@ export function Chip({
           accessibilityRole="button"
           accessibilityLabel="Remove"
         >
-          <X size={sizeStyles.iconSize} color={textColor} />
+          <MaterialIcons name="close" size={sizeStyles.iconSize} color={textColor} />
         </TouchableOpacity>
       )}
     </>

@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking, Dimensions, Modal, Platform } from 'react-native';
-import { Text, Card, Button, Chip, Checkbox, ActivityIndicator, Searchbar, Menu, IconButton, Portal, Modal as PaperModal } from 'react-native-paper';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, Linking, Dimensions, Modal, Platform, ActivityIndicator, TextInput as RNTextInput } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button, Card, Chip, IconButton, Menu, Modal as ThemedModal, FAB } from '../../ui';
 import { File, Paths } from 'expo-file-system';
 import { WebView } from 'react-native-webview';
 import { Stack } from 'expo-router';
-import { ClipboardList, Plus, Calendar, AlertCircle, CheckCircle, Clock, Edit, Trash2, MoreVertical, Users, BookOpen, AlertTriangle, X, BarChart3, FileCheck, FileText, Download, Sparkles, Mic } from 'lucide-react-native';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
@@ -16,7 +16,7 @@ import { TaskFormModal } from '../../components/tasks/TaskFormModal';
 import { TaskSubmissionModal } from '../../components/tasks/TaskSubmissionModal';
 import { StudentTaskCard } from '../../components/tasks/StudentTaskCard';
 import { VoiceTaskCreator } from '../../components/tasks/VoiceTaskCreator';
-import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
+import { EmptyStateIllustration } from '../../ui';
 import { PDFViewer } from '../../components/resources/PDFViewer';
 import type { Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
 
@@ -65,8 +65,7 @@ function TaskDetailModal({ visible, onDismiss, task, classes, subjects, colors, 
   };
 
   return (
-    <Portal>
-      <PaperModal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.detailModal}>
+    <ThemedModal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.detailModal}>
         <View style={styles.detailModalHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.detailModalTitle}>{task.title}</Text>
@@ -84,9 +83,9 @@ function TaskDetailModal({ visible, onDismiss, task, classes, subjects, colors, 
             </View>
           </View>
           <IconButton
-            icon={() => <X size={24} color={colors.text.primary} />}
+            icon={<MaterialIcons name="close" size={24} color={colors.text.primary} />}
             onPress={onDismiss}
-            size={24}
+            accessibilityLabel="Close"
           />
         </View>
 
@@ -97,8 +96,8 @@ function TaskDetailModal({ visible, onDismiss, task, classes, subjects, colors, 
               <View style={styles.detailInfoItem}>
                 <Text style={styles.detailLabel}>Priority</Text>
                 <Chip
-                  style={[styles.priorityChip, { backgroundColor: getPriorityColor(task.priority) + '20' }]}
-                  textStyle={[styles.priorityChipText, { color: getPriorityColor(task.priority) }]}
+                  style={StyleSheet.flatten([styles.priorityChip, { backgroundColor: getPriorityColor(task.priority) + '20' }])}
+                  textStyle={StyleSheet.flatten([styles.priorityChipText, { color: getPriorityColor(task.priority) }])}
                 >
                   {task.priority.toUpperCase()}
                 </Chip>
@@ -111,7 +110,7 @@ function TaskDetailModal({ visible, onDismiss, task, classes, subjects, colors, 
               <View style={styles.detailDateItem}>
                 <Text style={styles.detailLabel}>Assigned Date</Text>
                 <View style={styles.detailDateValue}>
-                  <Calendar size={14} color={colors.primary[600]} />
+                  <MaterialIcons name="event" size={14} color={colors.primary[600]} />
                   <Text style={styles.detailValueText}>
                     {new Date(task.assigned_date).toLocaleDateString('en-US', {
                       month: 'short',
@@ -123,7 +122,7 @@ function TaskDetailModal({ visible, onDismiss, task, classes, subjects, colors, 
               <View style={styles.detailDateItem}>
                 <Text style={styles.detailLabel}>Due Date</Text>
                 <View style={styles.detailDateValue}>
-                  <Clock size={14} color={colors.error[600]} />
+                  <MaterialIcons name="schedule" size={14} color={colors.error[600]} />
                   <Text style={styles.detailValueText}>
                     {new Date(task.due_date).toLocaleDateString('en-US', {
                       month: 'short',
@@ -163,18 +162,17 @@ function TaskDetailModal({ visible, onDismiss, task, classes, subjects, colors, 
                   style={styles.attachmentItem}
                   onPress={() => handleDownloadAttachment(attachment)}
                 >
-                  <FileText size={20} color={colors.primary[600]} />
+                  <MaterialIcons name="description" size={20} color={colors.primary[600]} />
                   <Text style={styles.attachmentItemName} numberOfLines={1}>
                     {attachment.name}
                   </Text>
-                  <Download size={18} color={colors.primary[600]} />
+                  <MaterialIcons name="download" size={18} color={colors.primary[600]} />
                 </TouchableOpacity>
               ))}
             </View>
           )}
         </ScrollView>
-      </PaperModal>
-    </Portal>
+    </ThemedModal>
   );
 }
 
@@ -209,17 +207,16 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
   };
 
   return (
-    <Portal>
-      <PaperModal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.progressModal}>
+    <ThemedModal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.progressModal}>
         <View style={styles.progressModalHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.progressModalTitle}>Task Progress</Text>
             <Text style={styles.progressModalSubtitle}>{task.title}</Text>
           </View>
           <IconButton
-            icon={() => <X size={24} color={colors.text.primary} />}
+            icon={<MaterialIcons name="close" size={24} color={colors.text.primary} />}
             onPress={onDismiss}
-            size={24}
+            accessibilityLabel="Close"
           />
         </View>
 
@@ -227,22 +224,22 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
           {/* Progress Stats */}
           <View style={styles.progressStatsContainer}>
             <View style={styles.progressStatCard}>
-              <Users size={24} color={colors.primary[600]} />
+              <MaterialIcons name="group" size={24} color={colors.primary[600]} />
               <Text style={styles.progressStatValue}>{totalStudents}</Text>
               <Text style={styles.progressStatLabel}>Total Students</Text>
             </View>
             <View style={styles.progressStatCard}>
-              <FileCheck size={24} color={colors.success[600]} />
+              <MaterialIcons name="fact-check" size={24} color={colors.success[600]} />
               <Text style={styles.progressStatValue}>{submittedCount}</Text>
               <Text style={styles.progressStatLabel}>Submitted</Text>
             </View>
             <View style={styles.progressStatCard}>
-              <CheckCircle size={24} color={colors.info[600]} />
+              <MaterialIcons name="check-circle" size={24} color={colors.info[600]} />
               <Text style={styles.progressStatValue}>{gradedCount}</Text>
               <Text style={styles.progressStatLabel}>Graded</Text>
             </View>
             <View style={styles.progressStatCard}>
-              <BarChart3 size={24} color={colors.warning[600]} />
+              <MaterialIcons name="bar-chart" size={24} color={colors.warning[600]} />
               <Text style={styles.progressStatValue}>{completionRate}%</Text>
               <Text style={styles.progressStatLabel}>Completion</Text>
             </View>
@@ -258,7 +255,7 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
           ) : submissions && submissions.length > 0 ? (
             submissions.map((submission: any) => (
               <Card key={submission.id} style={styles.submissionCard}>
-                <Card.Content>
+                <View>
                   <View style={styles.submissionHeader}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.submissionStudentName}>
@@ -269,10 +266,10 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
                       </Text>
                     </View>
                     <Chip
-                      style={[
+                      style={StyleSheet.flatten([
                         styles.submissionStatusChip,
                         { backgroundColor: getSubmissionStatusColor(submission.status) }
-                      ]}
+                      ])}
                       textStyle={styles.submissionStatusText}
                     >
                       {formatSubmissionStatus(submission.status)}
@@ -281,7 +278,7 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
 
                   {submission.submitted_at && (
                     <View style={styles.submissionMeta}>
-                      <Clock size={12} color={colors.text.secondary} />
+                      <MaterialIcons name="schedule" size={12} color={colors.text.secondary} />
                       <Text style={styles.submissionDate}>
                         Submitted: {new Date(submission.submitted_at).toLocaleDateString()}
                       </Text>
@@ -295,12 +292,12 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
                       </Text>
                     </View>
                   )}
-                </Card.Content>
+                </View>
               </Card>
             ))
           ) : (
             <View style={styles.progressEmptyState}>
-              <AlertCircle size={48} color={colors.text.tertiary} />
+              <MaterialIcons name="error" size={48} color={colors.text.tertiary} />
               <Text style={styles.progressEmptyText}>
                 {task.class_instance_id
                   ? 'No students found in this class'
@@ -309,8 +306,7 @@ function TaskProgressModal({ visible, onDismiss, task, colors, styles }: TaskPro
             </View>
           )}
         </ScrollView>
-      </PaperModal>
-    </Portal>
+    </ThemedModal>
   );
 }
 
@@ -328,7 +324,7 @@ function formatSubmissionStatus(status: string): string {
 export default function TasksScreen() {
   const { profile } = useAuth();
   const { colors, isDark, typography, spacing, borderRadius } = useTheme();
-  const { can, isReady: capabilitiesReady } = useCapabilities();
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
 
   // Capability-based access control
   const canViewOwnTasks = can('tasks.read_own');
@@ -701,13 +697,13 @@ export default function TasksScreen() {
   };
 
   // Show access denied if user has no task-related capabilities
-  if (capabilitiesReady && !canViewOwnTasks && !canManageTasks) {
+  if (!capabilitiesLoading && !canViewOwnTasks && !canManageTasks) {
     return (
       <>
         <Stack.Screen options={{ title: 'Tasks', headerShown: true }} />
         <AccessDenied
           message="You don't have permission to view tasks."
-          requiredCapability="tasks.read_own"
+          capability="tasks.read_own"
         />
       </>
     );
@@ -739,7 +735,7 @@ export default function TasksScreen() {
                 onPress={() => setShowSubjectModal(true)}
               >
                 <View style={styles.filterIcon}>
-                  <BookOpen size={16} color={colors.text.inverse} />
+                  <MaterialIcons name="menu-book" size={16} color={colors.text.inverse} />
                 </View>
                 <View style={styles.filterContent}>
                   <Text style={styles.filterValue} numberOfLines={1}>
@@ -760,7 +756,7 @@ export default function TasksScreen() {
                 onPress={() => setShowPriorityModal(true)}
               >
                 <View style={styles.filterIcon}>
-                  <AlertTriangle size={16} color={colors.text.inverse} />
+                  <MaterialIcons name="warning" size={16} color={colors.text.inverse} />
                 </View>
                 <View style={styles.filterContent}>
                   <Text style={styles.filterValue} numberOfLines={1}>
@@ -783,7 +779,7 @@ export default function TasksScreen() {
                     onPress={() => setShowClassModal(true)}
                   >
                     <View style={styles.filterIcon}>
-                      <Users size={16} color={colors.text.inverse} />
+                      <MaterialIcons name="group" size={16} color={colors.text.inverse} />
                     </View>
                     <View style={styles.filterContent}>
                       <Text style={styles.filterValue} numberOfLines={1}>
@@ -808,7 +804,7 @@ export default function TasksScreen() {
                 <Card style={styles.statCard}>
                   <View style={styles.statContent}>
                     <View style={[styles.statIcon, { backgroundColor: colors.primary[50] }]}>
-                      <ClipboardList size={20} color={colors.primary[600]} />
+                      <MaterialIcons name="assignment" size={20} color={colors.primary[600]} />
                     </View>
                     <Text style={styles.statValue}>{stats.total}</Text>
                     <Text style={styles.statLabel}>Total Tasks</Text>
@@ -818,7 +814,7 @@ export default function TasksScreen() {
                 <Card style={styles.statCard}>
                   <View style={styles.statContent}>
                     <View style={[styles.statIcon, { backgroundColor: colors.warning[50] }]}>
-                      <Clock size={20} color={colors.warning[600]} />
+                      <MaterialIcons name="schedule" size={20} color={colors.warning[600]} />
                     </View>
                     <Text style={styles.statValue}>{stats.upcoming}</Text>
                     <Text style={styles.statLabel}>Upcoming</Text>
@@ -828,7 +824,7 @@ export default function TasksScreen() {
                 <Card style={styles.statCard}>
                   <View style={styles.statContent}>
                     <View style={[styles.statIcon, { backgroundColor: colors.error[50] }]}>
-                      <AlertCircle size={20} color={colors.error[600]} />
+                      <MaterialIcons name="error" size={20} color={colors.error[600]} />
                     </View>
                     <Text style={styles.statValue}>{stats.overdue}</Text>
                     <Text style={styles.statLabel}>Overdue</Text>
@@ -849,11 +845,11 @@ export default function TasksScreen() {
           {/* Error State */}
           {error && !isLoading && (
             <View style={styles.errorContainer}>
-              <AlertCircle size={48} color={colors.error[600]} />
+              <MaterialIcons name="error" size={48} color={colors.error[600]} />
               <Text style={styles.errorText}>Failed to load tasks</Text>
               <Text style={styles.errorDetails}>{error.message || 'Please check your connection and try again'}</Text>
               <Button
-                mode="contained"
+                variant="primary"
                 onPress={() => {
                   if (isStudentView) {
                     refetchStudent();
@@ -883,10 +879,10 @@ export default function TasksScreen() {
               action={
                 canManageTasks && !searchQuery ? (
                   <Button
-                    mode="contained"
+                    variant="primary"
                     onPress={handleCreateTask}
                     style={styles.emptyButton}
-                    icon={() => <Plus size={20} color="white" />}
+                    icon={<MaterialIcons name="add" size={20} color="white" />}
                   >
                     Create First Task
                   </Button>
@@ -907,13 +903,21 @@ export default function TasksScreen() {
 
               {/* Search Bar */}
               <View style={styles.searchSection}>
-                <Searchbar
-                  placeholder="Search tasks..."
-                  onChangeText={setSearchQuery}
-                  value={searchQuery}
-                  style={styles.searchBar}
-                  iconColor={colors.primary[600]}
-                />
+                <View style={[styles.searchBar, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 }]}>
+                  <MaterialIcons name="search" size={20} color={colors.primary[600]} />
+                  <RNTextInput
+                    placeholder="Search tasks..."
+                    onChangeText={setSearchQuery}
+                    value={searchQuery}
+                    style={{ flex: 1, paddingHorizontal: 8, fontSize: 14, color: colors.text.primary }}
+                    placeholderTextColor={colors.text.tertiary}
+                  />
+                  {searchQuery ? (
+                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                      <MaterialIcons name="close" size={18} color={colors.text.secondary} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
               </View>
 
               {isStudentView ? (
@@ -1003,12 +1007,12 @@ export default function TasksScreen() {
                               onDismiss={() => toggleTaskMenu(task.id)}
                               anchor={
                                 <IconButton
-                                  icon={() => <MoreVertical size={20} color={colors.text.secondary} />}
-                                  size={20}
+                                  icon={<MaterialIcons name="more-vert" size={20} color={colors.text.secondary} />}
                                   onPress={() => {
                                     toggleTaskMenu(task.id);
                                   }}
                                   style={styles.menuButton}
+                                  accessibilityLabel="Task menu"
                                 />
                               }
                             >
@@ -1017,29 +1021,30 @@ export default function TasksScreen() {
                                   <Menu.Item
                                     onPress={() => handleViewAttachments(task)}
                                     title="View Attachments"
-                                    leadingIcon={() => <FileText size={16} color={colors.primary[600]} />}
+                                    icon="description"
                                   />
                                   <Menu.Item
                                     onPress={() => handleDownloadAttachments(task)}
                                     title="Download File(s)"
-                                    leadingIcon={() => <Download size={16} color={colors.primary[600]} />}
+                                    icon="download"
                                   />
                                 </>
                               )}
                               <Menu.Item
                                 onPress={() => handleViewProgress(task)}
                                 title="View Progress"
-                                leadingIcon={() => <BarChart3 size={16} color={colors.primary[600]} />}
+                                icon="bar-chart"
                               />
                               <Menu.Item
                                 onPress={() => handleEditTask(task)}
                                 title="Edit"
-                                leadingIcon={() => <Edit size={16} color={colors.text.primary} />}
+                                icon="edit"
                               />
                               <Menu.Item
                                 onPress={() => handleDeleteTask(task.id)}
                                 title="Delete"
-                                leadingIcon={() => <Trash2 size={16} color={colors.error[600]} />}
+                                icon="delete"
+                                destructive
                               />
                             </Menu>
                           </View>
@@ -1052,12 +1057,12 @@ export default function TasksScreen() {
                         <View style={styles.taskMetaRow}>
                           {task.subjects && (
                             <View style={styles.taskMetaChip}>
-                              <BookOpen size={14} color={colors.primary[600]} />
+                              <MaterialIcons name="menu-book" size={14} color={colors.primary[600]} />
                               <Text style={styles.taskMetaChipText}>{task.subjects.subject_name}</Text>
                             </View>
                           )}
                           <View style={[styles.taskMetaChip, { backgroundColor: getPriorityColor(task.priority) + '15' }]}>
-                            <AlertCircle size={14} color={getPriorityColor(task.priority)} />
+                            <MaterialIcons name="error" size={14} color={getPriorityColor(task.priority)} />
                             <Text style={[styles.taskMetaChipText, { color: getPriorityColor(task.priority) }]}>
                               {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)} Priority
                             </Text>
@@ -1067,7 +1072,7 @@ export default function TasksScreen() {
                         {/* Row 2: Due Date and Additional Info */}
                         <View style={styles.taskMetaRow}>
                           <View style={styles.taskMetaItem}>
-                            <Clock size={14} color={dueDateStatus.status === 'overdue' ? colors.error[600] : colors.warning[600]} />
+                            <MaterialIcons name="schedule" size={14} color={dueDateStatus.status === 'overdue' ? colors.error[600] : colors.warning[600]} />
                             <Text style={styles.taskMetaLabel}>Due:</Text>
                             <Text style={[
                               styles.taskMetaValue,
@@ -1080,7 +1085,7 @@ export default function TasksScreen() {
                             <>
                               <View style={styles.taskMetaDivider} />
                               <View style={styles.taskMetaItem}>
-                                <Users size={14} color={colors.text.tertiary} />
+                                <MaterialIcons name="group" size={14} color={colors.text.tertiary} />
                                 <Text style={styles.taskMetaValue}>
                                   Grade {task.class_instances.grade}-{task.class_instances.section}
                                 </Text>
@@ -1091,7 +1096,7 @@ export default function TasksScreen() {
                             <>
                               <View style={styles.taskMetaDivider} />
                               <View style={styles.taskMetaItem}>
-                                <FileText size={14} color={colors.text.tertiary} />
+                                <MaterialIcons name="description" size={14} color={colors.text.tertiary} />
                                 <Text style={styles.taskMetaValue}>
                                   {task.attachments.length} {task.attachments.length === 1 ? 'file' : 'files'}
                                 </Text>
@@ -1102,7 +1107,7 @@ export default function TasksScreen() {
                             <>
                               <View style={styles.taskMetaDivider} />
                               <View style={styles.taskMetaItem}>
-                                <FileCheck size={14} color={colors.success[600]} />
+                                <MaterialIcons name="fact-check" size={14} color={colors.success[600]} />
                                 <Text style={styles.taskMetaValue}>
                                   {task._count.submissions} submitted
                                 </Text>
@@ -1324,15 +1329,14 @@ export default function TasksScreen() {
         )}
 
         {/* Simple Attachments Modal */}
-        <Portal>
-          <PaperModal
-            visible={attachmentsModalVisible}
-            onDismiss={() => {
-              setAttachmentsModalVisible(false);
-              setSelectedTaskForAttachments(null);
-            }}
-            contentContainerStyle={styles.simpleAttachmentsModal}
-          >
+        <ThemedModal
+          visible={attachmentsModalVisible}
+          onDismiss={() => {
+            setAttachmentsModalVisible(false);
+            setSelectedTaskForAttachments(null);
+          }}
+          contentContainerStyle={styles.simpleAttachmentsModal}
+        >
             {selectedTaskForAttachments?.attachments && selectedTaskForAttachments.attachments.length > 0 && (
               selectedTaskForAttachments.attachments.map((attachment: any, index: number) => (
                 <TouchableOpacity
@@ -1395,7 +1399,7 @@ export default function TasksScreen() {
                   }}
                 >
                   <View style={styles.attachmentIconContainer}>
-                    <FileText size={20} color={colors.primary[600]} />
+                    <MaterialIcons name="description" size={20} color={colors.primary[600]} />
                   </View>
                   <Text style={styles.simpleAttachmentName} numberOfLines={2}>
                     {attachment.name}
@@ -1403,30 +1407,28 @@ export default function TasksScreen() {
                 </TouchableOpacity>
               ))
             )}
-          </PaperModal>
-        </Portal>
+        </ThemedModal>
 
         {/* File Viewer Modal */}
-        <Portal>
-          <PaperModal
-            visible={fileViewerVisible}
-            onDismiss={() => {
-              setFileViewerVisible(false);
-              setSelectedFile(null);
-            }}
-            contentContainerStyle={styles.fileViewerModal}
-          >
+        <ThemedModal
+          visible={fileViewerVisible}
+          onDismiss={() => {
+            setFileViewerVisible(false);
+            setSelectedFile(null);
+          }}
+          contentContainerStyle={styles.fileViewerModal}
+        >
             <View style={styles.fileViewerHeader}>
               <Text style={styles.fileViewerTitle} numberOfLines={1}>
                 {selectedFile?.name || 'File Preview'}
               </Text>
               <IconButton
-                icon={() => <X size={24} color={colors.text.primary} />}
+                icon={<MaterialIcons name="close" size={24} color={colors.text.primary} />}
                 onPress={() => {
                   setFileViewerVisible(false);
                   setSelectedFile(null);
                 }}
-                size={20}
+                accessibilityLabel="Close"
               />
             </View>
             {selectedFile && (
@@ -1484,53 +1486,17 @@ export default function TasksScreen() {
                 )}
               </View>
             )}
-          </PaperModal>
-        </Portal>
+        </ThemedModal>
 
         {/* Create Task FAB (Admin/Teacher only) */}
-        {canManageTasks && (
-          <View style={styles.fabContainer}>
-            {fabMenuVisible && (
-              <View style={styles.fabMenu}>
-                <TouchableOpacity
-                  style={styles.fabMenuItem}
-                  onPress={() => {
-                    setFabMenuVisible(false);
-                    setVoiceCreatorVisible(true);
-                  }}
-                >
-                  <View style={[styles.fabMenuIcon, { backgroundColor: colors.primary[100] }]}>
-                    <Sparkles size={20} color={colors.primary[600]} />
-                  </View>
-                  <Text style={styles.fabMenuText}>Sage ✨</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.fabMenuItem}
-                  onPress={() => {
-                    setFabMenuVisible(false);
-                    handleCreateTask();
-                  }}
-                >
-                  <View style={[styles.fabMenuIcon, { backgroundColor: colors.neutral[100] }]}>
-                    <Edit size={20} color={colors.neutral[700]} />
-                  </View>
-                  <Text style={styles.fabMenuText}>Traditional Form</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <TouchableOpacity
-              style={[styles.fab, fabMenuVisible && styles.fabActive]}
-              onPress={() => setFabMenuVisible(!fabMenuVisible)}
-            >
-              {fabMenuVisible ? (
-                <X size={24} color="white" />
-              ) : (
-                <Plus size={24} color="white" />
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
+        <FAB.Group
+          icon="add"
+          visible={canManageTasks}
+          actions={[
+            { icon: 'auto-awesome', label: 'Sage', onPress: () => setVoiceCreatorVisible(true) },
+            { icon: 'edit', label: 'Traditional Form', onPress: handleCreateTask },
+          ]}
+        />
 
         {/* Voice Task Creator Modal */}
         <VoiceTaskCreator
@@ -1984,62 +1950,6 @@ const createStyles = (colors: ThemeColors, isDark: boolean, typography: Typograp
     fontSize: typography.fontSize.lg,
     color: colors.primary[600],
     fontWeight: typography.fontWeight.bold as any,
-  },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    zIndex: 1000,
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary[600],
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-  },
-  fabActive: {
-    backgroundColor: colors.neutral[600],
-  },
-  fabMenu: {
-    position: 'absolute',
-    bottom: 66,
-    right: 0,
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.sm,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    gap: spacing.xs,
-  },
-  fabMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-    minWidth: 160,
-  },
-  fabMenuIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  fabMenuText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium as any,
-    color: colors.text.primary,
   },
   // Progress Modal Styles
   progressModal: {

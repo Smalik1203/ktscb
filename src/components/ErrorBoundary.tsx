@@ -1,7 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
-import { AlertCircle } from 'lucide-react-native';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 interface Props {
   children: ReactNode;
@@ -97,20 +96,20 @@ class ErrorBoundary extends Component<Props, State> {
         <View style={styles.container}>
           <View style={styles.content}>
             <View style={styles.iconContainer}>
-              <AlertCircle size={80} color={ERROR_COLORS.error} />
+              <MaterialIcons name="error" size={80} color={ERROR_COLORS.error} />
             </View>
             
-            <Text variant="headlineMedium" style={styles.title}>
+            <Text style={styles.title}>
               Oops! Something went wrong
             </Text>
             
-            <Text variant="bodyLarge" style={styles.message}>
+            <Text style={styles.message}>
               The app encountered an unexpected error. Don&apos;t worry, your data is safe.
             </Text>
 
             {__DEV__ && this.state.error && (
               <View style={styles.errorDetails}>
-                <Text variant="titleSmall" style={styles.errorDetailsTitle}>
+                <Text style={styles.errorDetailsTitle}>
                   Error Details (Dev Only):
                 </Text>
                 <Text style={styles.errorDetailsText}>

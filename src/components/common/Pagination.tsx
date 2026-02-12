@@ -1,9 +1,8 @@
 import React, { useState , useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { View, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { View, TouchableOpacity, TextInput, StyleSheet, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 
 interface PaginationProps {
@@ -100,7 +99,8 @@ export function Pagination({
           disabled={currentPage === 1}
           style={[styles.arrowButton, currentPage === 1 && styles.arrowButtonDisabled]}
         >
-          <ChevronLeft 
+          <MaterialIcons 
+            name="chevron-left" 
             size={20} 
             color={currentPage === 1 ? colors.text.tertiary : colors.text.primary} 
           />
@@ -135,7 +135,8 @@ export function Pagination({
           disabled={currentPage === totalPages}
           style={[styles.arrowButton, currentPage === totalPages && styles.arrowButtonDisabled]}
         >
-          <ChevronRight 
+          <MaterialIcons 
+            name="chevron-right" 
             size={20} 
             color={currentPage === totalPages ? colors.text.tertiary : colors.text.primary} 
           />

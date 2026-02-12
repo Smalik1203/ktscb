@@ -67,15 +67,15 @@ export function mapDbPaymentToDomain(
 ): DomainInvoicePayment {
   return {
     id: dbPayment.id,
-    invoice_id: dbPayment.invoice_id,
+    invoice_id: dbPayment.invoice_id ?? '',
     invoice_item_id: dbPayment.invoice_item_id,
     amount_inr: Number(dbPayment.amount_inr),
     payment_method: dbPayment.payment_method as DomainInvoicePayment['payment_method'],
     payment_date: dbPayment.payment_date,
     receipt_number: dbPayment.receipt_number,
     remarks: dbPayment.remarks,
-    recorded_by_user_id: dbPayment.recorded_by_user_id,
-    recorded_at: dbPayment.recorded_at,
+    recorded_by_user_id: dbPayment.recorded_by_user_id ?? '',
+    recorded_at: dbPayment.recorded_at ?? '',
     recorded_by_name: recordedByName,
   };
 }

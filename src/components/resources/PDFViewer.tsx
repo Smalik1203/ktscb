@@ -15,8 +15,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Text } from 'react-native-paper';
-import { X, AlertCircle, RefreshCw } from 'lucide-react-native';
+import { Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { WebView } from 'react-native-webview';
 
 interface PDFViewerProps {
@@ -195,7 +195,7 @@ export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
           </Text>
         )}
         <TouchableOpacity onPress={onClose} style={[styles.closeButton, { borderRadius: borderRadius.full, padding: spacing.xs }]}>
-          <X size={24} color={colors.text.inverse} />
+          <MaterialIcons name="close" size={24} color={colors.text.inverse} />
         </TouchableOpacity>
       </View>
 
@@ -203,7 +203,7 @@ export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
       <View style={styles.content}>
         {state === 'error' ? (
           <View style={styles.errorContainer}>
-            <AlertCircle size={48} color={colors.error[600]} />
+            <MaterialIcons name="error" size={48} color={colors.error[600]} />
             <Text style={[styles.errorText, { color: colors.text.primary, marginTop: spacing.lg }]}>
               Failed to load PDF
             </Text>
@@ -211,7 +211,7 @@ export function PDFViewer({ uri, title, onClose }: PDFViewerProps) {
               {error}
             </Text>
             <TouchableOpacity onPress={handleRetry} style={[styles.retryBtn, { backgroundColor: colors.primary[600], borderRadius: borderRadius.md, marginTop: spacing.lg }]}>
-              <RefreshCw size={18} color={colors.text.inverse} />
+              <MaterialIcons name="refresh" size={18} color={colors.text.inverse} />
               <Text style={{ color: colors.text.inverse, marginLeft: spacing.xs, fontWeight: '600' }}>Retry</Text>
             </TouchableOpacity>
           </View>

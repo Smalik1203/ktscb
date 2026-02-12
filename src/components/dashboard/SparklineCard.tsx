@@ -4,12 +4,12 @@
  * Displays key metrics with visual trend indicators and sparkline
  */
 
-import React, { useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
-import { Text } from 'react-native-paper';
+import React, { ComponentProps, useMemo } from 'react';
+import { View, TouchableOpacity, StyleSheet, Dimensions, Text as RNText } from 'react-native';
 import Animated, { FadeInUp, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { TrendingUp, TrendingDown, Minus, LucideIcon } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import * as Haptics from 'expo-haptics';
 import { safeImpact } from '../../utils/haptics';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -23,7 +23,7 @@ export interface SparklineCardProps {
     sparklineData?: number[];
     color: string;
     bgColor: string;
-    icon: LucideIcon;
+    icon: ComponentProps<typeof MaterialIcons>['name'];
     onPress?: () => void;
     smartLabel?: string;
     animationDelay?: number;
@@ -98,7 +98,7 @@ export const SparklineCard = React.memo<SparklineCardProps>(({
     sparklineData,
     color,
     bgColor,
-    icon: Icon,
+    icon,
     onPress,
     smartLabel,
     animationDelay = 0,
@@ -108,7 +108,7 @@ export const SparklineCard = React.memo<SparklineCardProps>(({
 
     const handlePress = () => {
         if (onPress) {
-            safeImpact('Light');
+            safeImpact(Haptics.ImpactFeedbackStyle.Light);
             onPress();
         }
     };
@@ -122,18 +122,18 @@ export const SparklineCard = React.memo<SparklineCardProps>(({
                 ? colors.error[600]
                 : colors.neutral[500];
 
-        const TrendIcon = trend.direction === 'up'
-            ? TrendingUp
+        const trendIconName: ComponentProps<typeof MaterialIcons>['name'] = trend.direction === 'up'
+            ? 'trending-up'
             : trend.direction === 'down'
-                ? TrendingDown
-                : Minus;
+                ? 'trending-down'
+                : 'remove';
 
         return (
             <View style={[styles.trendContainer, { backgroundColor: `${trendColor}15`, borderRadius: borderRadius.sm }]}>
-                <TrendIcon size={12} color={trendColor} strokeWidth={2.5} />
-                <Text style={[styles.trendText, { color: trendColor, marginLeft: 2 }]}>
+                <MaterialIcons name={trendIconName} size={12} color={trendColor} />
+                <RNText style={[styles.trendText, { color: trendColor, marginLeft: 2 }]}>
                     {trend.percentage > 0 ? '+' : ''}{trend.percentage}%
-                </Text>
+                </RNText>
             </View>
         );
     };
@@ -167,14 +167,13 @@ export const SparklineCard = React.memo<SparklineCardProps>(({
                         },
                     ]}
                 >
-                    <Icon size={22} color={color} strokeWidth={2.5} />
+                    <MaterialIcons name={icon} size={22} color={color} />
                 </View>
                 {getTrendIcon()}
             </View>
 
             {/* Value */}
-            <Text
-                variant="headlineMedium"
+            <RNText
                 style={[
                     styles.value,
                     {
@@ -186,11 +185,10 @@ export const SparklineCard = React.memo<SparklineCardProps>(({
                 ]}
             >
                 {value}
-            </Text>
+            </RNText>
 
             {/* Title */}
-            <Text
-                variant="bodySmall"
+            <RNText
                 style={[
                     styles.title,
                     {
@@ -200,7 +198,7 @@ export const SparklineCard = React.memo<SparklineCardProps>(({
                 ]}
             >
                 {title}
-            </Text>
+            </RNText>
 
             {/* Subtitle or Smart Label */}
             {(subtitle || smartLabel) && (
@@ -217,7 +215,7 @@ export const SparklineCard = React.memo<SparklineCardProps>(({
                         },
                     ]}
                 >
-                    <Text
+                    <RNText
                         style={[
                             styles.labelText,
                             {
@@ -228,7 +226,7 @@ export const SparklineCard = React.memo<SparklineCardProps>(({
                         ]}
                     >
                         {smartLabel || subtitle}
-                    </Text>
+                    </RNText>
                 </View>
             )}
         </Animated.View>

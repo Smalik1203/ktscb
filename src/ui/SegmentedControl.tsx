@@ -1,15 +1,34 @@
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
-import { Text } from 'react-native-paper';
-import { useTheme } from '../../contexts/ThemeContext';
-import { spacing, borderRadius, typography, shadows } from '../../../lib/design-system';
+/**
+ * SegmentedControl Component
+ * 
+ * A themed segmented control / tab selector.
+ * Replaces react-native-paper SegmentedButtons.
+ * 
+ * @example
+ * ```tsx
+ * <SegmentedControl
+ *   options={[
+ *     { label: 'Day', value: 'day' },
+ *     { label: 'Week', value: 'week' },
+ *     { label: 'Month', value: 'month' },
+ *   ]}
+ *   value={view}
+ *   onChange={setView}
+ * />
+ * ```
+ */
 
-interface SegmentOption {
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity, ViewStyle, TextStyle, Text } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
+
+export interface SegmentOption {
   label: string;
   value: string;
+  icon?: React.ReactNode;
 }
 
-interface SegmentedControlProps {
+export interface SegmentedControlProps {
   options: SegmentOption[];
   value: string;
   onChange: (value: string) => void;
@@ -26,7 +45,7 @@ export function SegmentedControl({
   itemStyle,
   textStyle,
 }: SegmentedControlProps) {
-  const { colors } = useTheme();
+  const { colors, spacing, borderRadius, shadows, typography } = useTheme();
 
   return (
     <View
@@ -35,6 +54,8 @@ export function SegmentedControl({
         {
           backgroundColor: colors.surface.secondary,
           borderColor: colors.border.light,
+          borderRadius: borderRadius.full,
+          padding: 4,
         },
         containerStyle,
       ]}
@@ -46,6 +67,10 @@ export function SegmentedControl({
             key={option.value}
             style={[
               styles.item,
+              {
+                borderRadius: borderRadius.full,
+                paddingVertical: spacing.sm,
+              },
               isActive && {
                 backgroundColor: colors.surface.primary,
                 ...shadows.sm,
@@ -54,11 +79,18 @@ export function SegmentedControl({
             ]}
             onPress={() => onChange(option.value)}
             activeOpacity={0.8}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
           >
+            {option.icon && <View style={{ marginRight: spacing.xs }}>{option.icon}</View>}
             <Text
               style={[
                 styles.text,
-                { color: isActive ? colors.text.primary : colors.text.secondary },
+                {
+                  color: isActive ? colors.text.primary : colors.text.secondary,
+                  fontWeight: typography.fontWeight.semibold as any,
+                  fontSize: typography.fontSize.sm,
+                },
                 textStyle,
               ]}
             >
@@ -74,17 +106,13 @@ export function SegmentedControl({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    padding: 4,
-    borderRadius: borderRadius.full,
     borderWidth: 1,
   },
   item: {
     flex: 1,
-    paddingVertical: spacing.sm,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: borderRadius.full,
+    justifyContent: 'center',
   },
-  text: {
-    fontWeight: typography.fontWeight.semibold as any,
-  },
+  text: {},
 });

@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { Text, ActivityIndicator, Button } from 'react-native-paper';
-// Check, Clock, Calendar are standard icon names
-import { Calendar as CalendarIcon, Coffee, AlertCircle, Clock, BookOpen, User, Check, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { DatePickerModal } from '../common/DatePickerModal';
-import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
+import { EmptyStateIllustration } from '../../ui';
 import { format, isToday as isTodayFn, addDays, subDays } from 'date-fns';
 import { supabase } from '../../lib/supabase';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
@@ -98,7 +96,7 @@ function TimetableRow({
         <View style={styles.timelineColumn}>
           <View style={[styles.timelineLine, isLast && styles.timelineLineLast]} />
           <View style={styles.timelineDotBreak}>
-            <Coffee size={12} color={colors.warning[600]} />
+            <MaterialIcons name="local-cafe" size={12} color={colors.warning[600]} />
           </View>
         </View>
 
@@ -160,20 +158,20 @@ function TimetableRow({
               </Text>
               {isTaught && (
                 <View style={styles.taughtBadge}>
-                  <Check size={12} color={colors.success[600]} />
+                  <MaterialIcons name="check" size={12} color={colors.success[600]} />
                 </View>
               )}
             </View>
 
             <View style={styles.eventDetails}>
               <View style={styles.detailItem}>
-                <BookOpen size={14} color={colors.text.tertiary} />
+                <MaterialIcons name="menu-book" size={14} color={colors.text.tertiary} />
                 <Text style={styles.detailText} numberOfLines={1}>
                   {slot.topic_title || slot.plan_text || 'No topic assigned'}
                 </Text>
               </View>
               <View style={styles.detailItem}>
-                <User size={14} color={colors.text.tertiary} />
+                <MaterialIcons name="person" size={14} color={colors.text.tertiary} />
                 <Text style={styles.detailText} numberOfLines={1}>
                   {slot.teacher_name || 'No teacher'}
                 </Text>
@@ -301,7 +299,7 @@ export function StudentTimetableScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <ActivityIndicator size="large" color={colors.primary[600] as string} />
           <Text style={styles.loadingText}>Loading timetable...</Text>
         </View>
       </View>
@@ -312,12 +310,15 @@ export function StudentTimetableScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.centerContainer}>
-          <AlertCircle size={48} color={colors.error[600]} />
+          <MaterialIcons name="error" size={48} color={colors.error[600]} />
           <Text style={styles.errorTitle}>Failed to load</Text>
           <Text style={styles.errorText}>{error}</Text>
-          <Button mode="contained" onPress={() => fetchTimetable()}>
-            Retry
-          </Button>
+          <TouchableOpacity
+            onPress={() => fetchTimetable()}
+            style={{ backgroundColor: colors.primary[600], paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, marginTop: 8 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -340,7 +341,7 @@ export function StudentTimetableScreen() {
       {/* Minimized Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handlePrevDay} style={styles.navButton}>
-          <ChevronLeft size={24} color={colors.text.secondary} />
+          <MaterialIcons name="chevron-left" size={24} color={colors.text.secondary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
@@ -349,7 +350,7 @@ export function StudentTimetableScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={handleNextDay} style={styles.navButton}>
-          <ChevronRight size={24} color={colors.text.secondary} />
+          <MaterialIcons name="chevron-right" size={24} color={colors.text.secondary} />
         </TouchableOpacity>
 
         {!isTodayFn(selectedDate) && (

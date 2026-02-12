@@ -18,23 +18,11 @@ import {
     TextInput,
     Alert,
     RefreshControl,
+    Text,
 } from 'react-native';
-import { Text, Card, ProgressBar } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-    BookOpen,
-    ChevronDown,
-    X,
-    Search,
-    Sparkles,
-    Settings2,
-    CheckCircle,
-    Edit3,
-    RefreshCw,
-    FileText,
-    User,
-    TrendingUp,
-} from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Card, ProgressBar } from '../../ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClasses } from '../../hooks/useClasses';
@@ -312,7 +300,7 @@ export default function ReportCommentsScreen() {
                 <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
                     {/* Header */}
                     <View style={styles.headerSection}>
-                        <Sparkles size={32} color={colors.primary[600]} />
+                        <MaterialIcons name="auto-awesome" size={32} color={colors.primary[600]} />
                         <Text style={styles.headerTitle}>AI Report Comments</Text>
                         <Text style={styles.headerSubtitle}>
                             Generate personalized report card comments for your students
@@ -322,18 +310,18 @@ export default function ReportCommentsScreen() {
                     {/* Class Selector */}
                     <TouchableOpacity style={styles.selectorCard} onPress={() => setShowClassPicker(true)}>
                         <View style={[styles.selectorIcon, { backgroundColor: colors.primary[100] }]}>
-                            <BookOpen size={24} color={colors.primary[600]} />
+                            <MaterialIcons name="menu-book" size={24} color={colors.primary[600]} />
                         </View>
                         <View style={styles.selectorContent}>
                             <Text style={styles.selectorLabel}>Class</Text>
                             <Text style={styles.selectorValue}>{getSelectedClassName()}</Text>
                         </View>
-                        <ChevronDown size={20} color={colors.text.secondary} />
+                        <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
                     </TouchableOpacity>
 
                     {/* Empty state */}
                     <View style={styles.emptyContainer}>
-                        <FileText size={64} color={colors.text.tertiary} />
+                        <MaterialIcons name="description" size={64} color={colors.text.tertiary} />
                         <Text style={styles.emptyTitle}>Select a Class</Text>
                         <Text style={styles.emptyText}>
                             Choose a class to start generating AI-powered report card comments.
@@ -359,15 +347,15 @@ export default function ReportCommentsScreen() {
                 {/* Selection Summary */}
                 <View style={styles.selectionSummary}>
                     <TouchableOpacity style={styles.selectionChip} onPress={() => setShowClassPicker(true)}>
-                        <BookOpen size={16} color={colors.primary[600]} />
+                        <MaterialIcons name="menu-book" size={16} color={colors.primary[600]} />
                         <Text style={styles.selectionChipText}>{getSelectedClassName()}</Text>
-                        <ChevronDown size={14} color={colors.text.secondary} />
+                        <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.text.secondary} />
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.selectionChip, styles.settingsChip]}
                         onPress={() => setShowSettings(!showSettings)}
                     >
-                        <Settings2 size={16} color={colors.text.secondary} />
+                        <MaterialIcons name="settings" size={16} color={colors.text.secondary} />
                     </TouchableOpacity>
                 </View>
 
@@ -427,12 +415,12 @@ export default function ReportCommentsScreen() {
                 {isGenerating ? (
                     <Card style={styles.progressCard}>
                         <View style={styles.progressHeader}>
-                            <Sparkles size={24} color={colors.primary[600]} />
+                            <MaterialIcons name="auto-awesome" size={24} color={colors.primary[600]} />
                             <Text style={styles.progressTitle}>Generating Comments...</Text>
                         </View>
                         <ProgressBar
-                            progress={generationProgress.total > 0 ? generationProgress.current / generationProgress.total : 0}
-                            color={colors.primary[600]}
+                            progress={generationProgress.total > 0 ? (generationProgress.current / generationProgress.total) * 100 : 0}
+                            fillColor={colors.primary[600]}
                             style={styles.progressBar}
                         />
                         <Text style={styles.progressText}>
@@ -441,7 +429,7 @@ export default function ReportCommentsScreen() {
                     </Card>
                 ) : comments.length === 0 ? (
                     <TouchableOpacity style={styles.generateButton} onPress={handleGenerateComments}>
-                        <Sparkles size={24} color={colors.text.inverse} />
+                        <MaterialIcons name="auto-awesome" size={24} color={colors.text.inverse} />
                         <Text style={styles.generateButtonText}>
                             Generate Comments for {students.length} Students
                         </Text>
@@ -469,7 +457,7 @@ export default function ReportCommentsScreen() {
                 {/* Search */}
                 {comments.length > 0 && (
                     <View style={styles.searchContainer}>
-                        <Search size={20} color={colors.text.secondary} />
+                        <MaterialIcons name="search" size={20} color={colors.text.secondary} />
                         <TextInput
                             style={styles.searchInput}
                             placeholder="Search students..."
@@ -479,7 +467,7 @@ export default function ReportCommentsScreen() {
                         />
                         {searchQuery.length > 0 && (
                             <TouchableOpacity onPress={() => setSearchQuery('')}>
-                                <X size={18} color={colors.text.secondary} />
+                                <MaterialIcons name="close" size={18} color={colors.text.secondary} />
                             </TouchableOpacity>
                         )}
                     </View>
@@ -507,9 +495,9 @@ export default function ReportCommentsScreen() {
                                 { backgroundColor: comment.status === 'approved' ? colors.success[100] : colors.warning[100] }
                             ]}>
                                 {comment.status === 'approved' ? (
-                                    <CheckCircle size={14} color={colors.success[600]} />
+                                    <MaterialIcons name="check-circle" size={14} color={colors.success[600]} />
                                 ) : (
-                                    <Edit3 size={14} color={colors.warning[600]} />
+                                    <MaterialIcons name="edit" size={14} color={colors.warning[600]} />
                                 )}
                                 <Text style={[
                                     styles.statusText,
@@ -523,13 +511,13 @@ export default function ReportCommentsScreen() {
                         {/* Input Data Summary */}
                         <View style={styles.inputDataRow}>
                             <View style={styles.inputDataItem}>
-                                <TrendingUp size={14} color={colors.text.secondary} />
+                                <MaterialIcons name="trending-up" size={14} color={colors.text.secondary} />
                                 <Text style={styles.inputDataText}>
                                     {comment.inputData?.subjects?.length || 0} subjects
                                 </Text>
                             </View>
                             <View style={styles.inputDataItem}>
-                                <User size={14} color={colors.text.secondary} />
+                                <MaterialIcons name="person" size={14} color={colors.text.secondary} />
                                 <Text style={styles.inputDataText}>
                                     {comment.inputData?.attendance?.percentage?.toFixed(0) || 0}% attendance
                                 </Text>
@@ -557,14 +545,14 @@ export default function ReportCommentsScreen() {
                                     style={[styles.actionButton, styles.editButton]}
                                     onPress={() => openEditModal(comment)}
                                 >
-                                    <Edit3 size={16} color={colors.primary[600]} />
+                                    <MaterialIcons name="edit" size={16} color={colors.primary[600]} />
                                     <Text style={[styles.actionButtonText, { color: colors.primary[600] }]}>Edit</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={[styles.actionButton, styles.approveButton]}
                                     onPress={() => handleApprove(comment)}
                                 >
-                                    <CheckCircle size={16} color={colors.success[600]} />
+                                    <MaterialIcons name="check-circle" size={16} color={colors.success[600]} />
                                     <Text style={[styles.actionButtonText, { color: colors.success[600] }]}>Approve</Text>
                                 </TouchableOpacity>
                             </View>
@@ -595,7 +583,7 @@ export default function ReportCommentsScreen() {
                             );
                         }}
                     >
-                        <CheckCircle size={18} color={colors.text.inverse} />
+                        <MaterialIcons name="check-circle" size={18} color={colors.text.inverse} />
                         <Text style={styles.approveAllText}>Approve All</Text>
                     </TouchableOpacity>
                 </View>
@@ -615,7 +603,7 @@ export default function ReportCommentsScreen() {
                                 Edit Comment - {editingComment?.studentName}
                             </Text>
                             <TouchableOpacity onPress={() => setEditingComment(null)}>
-                                <X size={24} color={colors.text.primary} />
+                                <MaterialIcons name="close" size={24} color={colors.text.primary} />
                             </TouchableOpacity>
                         </View>
 
@@ -648,11 +636,11 @@ export default function ReportCommentsScreen() {
                                 style={styles.editResetButton}
                                 onPress={() => setEditedText(editingComment?.generatedComment || '')}
                             >
-                                <RefreshCw size={16} color={colors.text.secondary} />
+                                <MaterialIcons name="refresh" size={16} color={colors.text.secondary} />
                                 <Text style={styles.editResetText}>Reset to AI</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.editSaveButton} onPress={handleSaveEdit}>
-                                <CheckCircle size={18} color={colors.text.inverse} />
+                                <MaterialIcons name="check-circle" size={18} color={colors.text.inverse} />
                                 <Text style={styles.editSaveText}>Save & Approve</Text>
                             </TouchableOpacity>
                         </View>

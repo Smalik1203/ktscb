@@ -18,15 +18,15 @@ import {
   Animated,
   StyleSheet,
   StatusBar,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
-import { ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useTheme } from '../src/contexts/ThemeContext';
-import { Eye, EyeOff, User, Mail, Lock, GraduationCap } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { isRateLimited, getRemainingAttempts, getResetTime, clearRateLimit } from '../src/utils/rateLimiter';
 import { sanitizeString, sanitizeEmail } from '../src/utils/sanitize';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,6 +39,7 @@ import {
   Caption,
   Center,
   Input,
+  Icon,
 } from '../src/ui';
 
 export default function LoginScreen() {
@@ -223,7 +224,7 @@ export default function LoginScreen() {
               />
             </View>
           </Animated.View>
-          <ActivityIndicator size="small" color={colors.primary.main} style={{ marginTop: spacing.lg }} />
+          <ActivityIndicator size="small" color={colors.primary.main} style={{ marginTop: spacing.lg }} hidesWhenStopped={false} />
           <Body color="tertiary" style={{ marginTop: spacing.sm }}>Loading...</Body>
         </Center>
       </Container>
@@ -258,7 +259,7 @@ export default function LoginScreen() {
           resolvedEmail = sanitized;
         }
       }
-      rateLimitKey = email.trim().toLowerCase();
+      rateLimitKey = resolvedEmail || email.trim().toLowerCase();
     }
 
     if (!password) {
@@ -465,7 +466,7 @@ export default function LoginScreen() {
                     <View style={cardStyle}>
                       <Stack spacing="sm">
                         <View style={styles.cardHeader}>
-                          <GraduationCap size={22} color={colors.primary.main} />
+                          <Icon name="school" size={22} color={colors.primary.main} />
                           <Heading level={3} style={{ marginLeft: spacing.sm }}>
                             Welcome Back
                           </Heading>
@@ -494,9 +495,9 @@ export default function LoginScreen() {
                             disabled={loading}
                             activeOpacity={0.7}
                           >
-                            <User size={14} color={loginMode === 'usercode' ? colors.primary.main : colors.text.tertiary} />
+                            <Icon name="person" size={14} color={loginMode === 'usercode' ? colors.primary.main : colors.text.tertiary} />
                             <Body
-                              weight={loginMode === 'usercode' ? 'semibold' : 'regular'}
+                              weight={loginMode === 'usercode' ? 'semibold' : 'normal'}
                               style={{
                                 color: loginMode === 'usercode' ? colors.primary.main : colors.text.tertiary,
                                 fontSize: 13,
@@ -521,9 +522,9 @@ export default function LoginScreen() {
                             disabled={loading}
                             activeOpacity={0.7}
                           >
-                            <Mail size={14} color={loginMode === 'email' ? colors.primary.main : colors.text.tertiary} />
+                            <Icon name="email" size={14} color={loginMode === 'email' ? colors.primary.main : colors.text.tertiary} />
                             <Body
-                              weight={loginMode === 'email' ? 'semibold' : 'regular'}
+                              weight={loginMode === 'email' ? 'semibold' : 'normal'}
                               style={{
                                 color: loginMode === 'email' ? colors.primary.main : colors.text.tertiary,
                                 fontSize: 13,
@@ -562,8 +563,8 @@ export default function LoginScreen() {
                           disabled={loading}
                           error={loginMode === 'usercode' ? usernameError : emailError}
                           leftIcon={loginMode === 'usercode'
-                            ? <User size={20} color={colors.primary.main} />
-                            : <Mail size={20} color={colors.primary.main} />
+                            ? <Icon name="person" size={20} color={colors.primary.main} />
+                            : <Icon name="email" size={20} color={colors.primary.main} />
                           }
                           returnKeyType="next"
                         />
@@ -578,11 +579,11 @@ export default function LoginScreen() {
                           autoComplete="password"
                           disabled={loading}
                           error={passwordError}
-                          leftIcon={<Lock size={20} color={colors.primary.main} />}
+                          leftIcon={<Icon name="lock" size={20} color={colors.primary.main} />}
                           rightIcon={
                             showPassword
-                              ? <EyeOff size={20} color={colors.text.tertiary} />
-                              : <Eye size={20} color={colors.text.tertiary} />
+                              ? <Icon name="visibility-off" size={20} color={colors.text.tertiary} />
+                              : <Icon name="visibility" size={20} color={colors.text.tertiary} />
                           }
                           onRightIconPress={() => setShowPassword(!showPassword)}
                           returnKeyType="go"
@@ -623,7 +624,7 @@ export default function LoginScreen() {
                           >
                             {loading ? (
                               <View style={styles.loadingRow}>
-                                <ActivityIndicator color={colors.text.inverse} size="small" />
+                                <ActivityIndicator color={colors.text.inverse} size="small" hidesWhenStopped={false} />
                                 <Body color="inverse" weight="semibold" style={{ marginLeft: spacing.sm }}>
                                   Signing in...
                                 </Body>

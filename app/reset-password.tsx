@@ -6,13 +6,12 @@ import {
   Alert,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
-import { TextInput, ActivityIndicator } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { supabase } from '../src/lib/supabase';
 import { useTheme } from '../src/contexts/ThemeContext';
-import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Container,
@@ -20,6 +19,8 @@ import {
   Heading,
   Body,
   Center,
+  Input,
+  Icon,
 } from '../src/ui';
 
 const { height } = Dimensions.get('window');
@@ -162,7 +163,7 @@ export default function ResetPasswordScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background.primary }}>
         <Center style={{ flex: 1 }}>
-          <CheckCircle size={64} color={colors.success?.main || colors.primary.main} />
+          <Icon name="check-circle" size={64} color={colors.success?.main || colors.primary.main} />
           <Heading level={2} style={{ marginTop: spacing.md }}>
             Password Reset Successful
           </Heading>
@@ -185,32 +186,36 @@ export default function ResetPasswordScreen() {
               <Stack spacing="md">
                 <Heading level={2} align="center">Set New Password</Heading>
 
-                <TextInput
+                <Input
                   label="New Password"
                   secureTextEntry={!showPassword}
                   value={password}
                   onChangeText={setPassword}
-                  left={<TextInput.Icon icon={() => <Lock size={20} />} />}
-                  right={
-                    <TextInput.Icon
-                      icon={() => showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                      onPress={() => setShowPassword(!showPassword)}
-                    />
+                  leftIcon={<Icon name="lock" size={20} color={colors.text.tertiary} />}
+                  rightIcon={
+                    showPassword ? (
+                      <Icon name="visibility-off" size={20} color={colors.text.tertiary} />
+                    ) : (
+                      <Icon name="visibility" size={20} color={colors.text.tertiary} />
+                    )
                   }
+                  onRightIconPress={() => setShowPassword(!showPassword)}
                 />
 
-                <TextInput
+                <Input
                   label="Confirm Password"
                   secureTextEntry={!showConfirmPassword}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
-                  left={<TextInput.Icon icon={() => <Lock size={20} />} />}
-                  right={
-                    <TextInput.Icon
-                      icon={() => showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                    />
+                  leftIcon={<Icon name="lock" size={20} color={colors.text.tertiary} />}
+                  rightIcon={
+                    showConfirmPassword ? (
+                      <Icon name="visibility-off" size={20} color={colors.text.tertiary} />
+                    ) : (
+                      <Icon name="visibility" size={20} color={colors.text.tertiary} />
+                    )
                   }
+                  onRightIconPress={() => setShowConfirmPassword(!showConfirmPassword)}
                 />
 
                 <TouchableOpacity

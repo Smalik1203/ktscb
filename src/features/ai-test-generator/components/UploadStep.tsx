@@ -8,7 +8,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, Animated, Easing } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { Upload, X, ImageIcon, Sparkles } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Heading, Body, Caption, Button } from '../../../ui';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -98,7 +98,7 @@ export function UploadStep({
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.iconContainer}>
-                    <Sparkles size={24} color={colors.primary[600]} />
+                    <MaterialIcons name="auto-awesome" size={24} color={colors.primary[600]} />
                 </View>
                 <Heading level={3} align="center">Upload for Sage</Heading>
                 <Body color="secondary" align="center" style={{ marginTop: spacing.xs }}>
@@ -126,12 +126,12 @@ export function UploadStep({
                         style={[styles.removeButton, { backgroundColor: colors.error[500] }]}
                         onPress={onRemoveImage}
                     >
-                        <X size={20} color={colors.text.inverse} />
+                        <MaterialIcons name="close" size={20} color={colors.text.inverse} />
                     </TouchableOpacity>
 
                     {/* Success badge */}
                     <View style={[styles.successBadge, { backgroundColor: colors.success[500] }]}>
-                        <ImageIcon size={14} color={colors.text.inverse} />
+                        <MaterialIcons name="image" size={14} color={colors.text.inverse} />
                         <Caption style={{ color: colors.text.inverse, marginLeft: 4 }}>
                             Ready to analyze
                         </Caption>
@@ -172,7 +172,7 @@ export function UploadStep({
                                 },
                             ]}
                         >
-                            <Upload size={32} color={colors.primary[600]} />
+                            <MaterialIcons name="upload" size={32} color={colors.primary[600]} />
                         </Animated.View>
 
                         <Heading level={5} style={{ marginTop: spacing.lg, color: colors.primary[700] }}>
@@ -212,7 +212,7 @@ export function UploadStep({
                                 Continue
                             </Body>
                             <View style={styles.arrowIcon}>
-                                <Sparkles size={18} color={colors.text.inverse} />
+                                <MaterialIcons name="auto-awesome" size={18} color={colors.text.inverse} />
                             </View>
                         </LinearGradient>
                     </TouchableOpacity>

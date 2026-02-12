@@ -14,14 +14,15 @@
 
 import React, { useRef, useCallback } from 'react';
 import { TouchableOpacity, Animated, ViewStyle, StyleSheet } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../contexts/ThemeContext';
 
 export type IconButtonVariant = 'default' | 'primary' | 'secondary' | 'ghost' | 'destructive';
 export type IconButtonSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export interface IconButtonProps {
-  /** Icon element */
-  icon: React.ReactNode;
+  /** Icon element or MaterialIcons name string */
+  icon: React.ReactNode | string;
   /** Press handler */
   onPress: () => void;
   /** Visual variant */
@@ -37,7 +38,7 @@ export interface IconButtonProps {
   /** Custom style */
   style?: ViewStyle;
   /** Accessibility label */
-  accessibilityLabel: string;
+  accessibilityLabel?: string;
   /** Accessibility hint */
   accessibilityHint?: string;
   /** Test ID */
@@ -157,13 +158,15 @@ export function IconButton({
     opacity: disabled ? 0.5 : 1,
   };
 
-  // Clone icon with correct size and color
-  const iconWithProps = React.isValidElement(icon)
-    ? React.cloneElement(icon as React.ReactElement<any>, {
-        size: sizeStyles.iconSize,
-        color: variantStyles.iconColor,
-      })
-    : icon;
+  // Resolve icon: string → MaterialIcons, ReactElement → cloneElement with size/color
+  const resolvedIcon = typeof icon === 'string'
+    ? <MaterialIcons name={icon as any} size={sizeStyles.iconSize} color={variantStyles.iconColor} />
+    : React.isValidElement(icon)
+      ? React.cloneElement(icon as React.ReactElement<any>, {
+          size: sizeStyles.iconSize,
+          color: variantStyles.iconColor,
+        })
+      : null;
 
   return (
     <Animated.View
@@ -186,7 +189,7 @@ export function IconButton({
         testID={testID}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        {iconWithProps}
+        {resolvedIcon}
       </TouchableOpacity>
     </Animated.View>
   );

@@ -1,10 +1,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput as RNTextInput } from 'react-native';
-import { Text, Portal, Modal } from 'react-native-paper';
-import { BookOpen, Edit, Trash2, X, Plus } from 'lucide-react-native';
-import { Button, Input, EmptyState, Badge, SearchBar } from '../../components/ui';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, TextInput as RNTextInput, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button, Input, EmptyState, Badge, SearchBar, Modal } from '../../ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import { AccessDenied } from '../../components/common/AccessDenied';
@@ -45,7 +44,7 @@ export default function AddSubjectsScreen() {
   const [editSubjectName, setEditSubjectName] = useState('');
 
   // Capability-based access control
-  const { can, isReady: capabilitiesReady } = useCapabilities();
+  const { can, isLoading: capabilitiesLoading } = useCapabilities();
   const canManageSubjects = can('subjects.manage');
 
   // Normalization function to match backend logic
@@ -65,11 +64,11 @@ export default function AddSubjectsScreen() {
     return set;
   }, [subjects]);
 
-  if (capabilitiesReady && !canManageSubjects) {
+  if (!capabilitiesLoading && !canManageSubjects) {
     return (
       <AccessDenied 
         message="You don't have permission to manage subjects."
-        requiredCapability="subjects.manage"
+        capability="subjects.manage"
       />
     );
   }
@@ -212,7 +211,7 @@ export default function AddSubjectsScreen() {
         {/* Create Subjects Form */}
         <View style={styles.section}>
           <View style={styles.cardHeader}>
-            <BookOpen size={24} color={colors.primary[600]} />
+            <MaterialIcons name="menu-book" size={24} color={colors.primary[600]} />
             <Text style={styles.cardTitle}>Add Subjects</Text>
             <Badge variant="info">School-wide</Badge>
           </View>
@@ -243,7 +242,7 @@ export default function AddSubjectsScreen() {
                   <View key={index} style={styles.chip}>
                     <Text style={styles.chipText}>{name}</Text>
                     <TouchableOpacity onPress={() => handleRemoveChip(index)}>
-                      <X size={16} color={colors.text.primary} />
+                      <MaterialIcons name="close" size={16} color={colors.text.primary} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -255,7 +254,7 @@ export default function AddSubjectsScreen() {
               onPress={handleCreate}
               loading={createSubject.isPending}
               disabled={createSubject.isPending || subjectNames.length === 0}
-              icon={<Plus size={20} color={colors.surface.primary} />}
+              icon={<MaterialIcons name="add" size={20} color={colors.surface.primary} />}
             />
           </View>
         </View>
@@ -291,10 +290,10 @@ export default function AddSubjectsScreen() {
 
                   <View style={styles.subjectActions}>
                     <TouchableOpacity onPress={() => handleEdit(subject)} style={styles.actionButton}>
-                      <Edit size={18} color={colors.info[600]} />
+                      <MaterialIcons name="edit" size={18} color={colors.info[600]} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleDelete(subject)} style={styles.actionButton}>
-                      <Trash2 size={18} color={colors.error[600]} />
+                      <MaterialIcons name="delete" size={18} color={colors.error[600]} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -314,16 +313,15 @@ export default function AddSubjectsScreen() {
       </ScrollView>
 
       {/* Edit Modal */}
-      <Portal>
-        <Modal
-          visible={editModalVisible}
-          onDismiss={() => setEditModalVisible(false)}
-          contentContainerStyle={styles.modal}
-        >
+      <Modal
+        visible={editModalVisible}
+        onDismiss={() => setEditModalVisible(false)}
+        contentContainerStyle={styles.modal}
+      >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Edit Subject</Text>
             <TouchableOpacity onPress={() => setEditModalVisible(false)}>
-              <X size={24} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={24} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -352,8 +350,7 @@ export default function AddSubjectsScreen() {
               />
             </View>
           </View>
-        </Modal>
-      </Portal>
+      </Modal>
     </View>
   );
 }

@@ -5,9 +5,8 @@
  */
 
 import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Modal, Text, Button } from 'react-native-paper';
-import { Clock, ArrowRight, Check } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal as RNModal } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { TimetableSlot } from '../../services/api';
 import { formatTimeForDisplay, timeToMinutes } from '../../utils/timeParser';
@@ -105,11 +104,14 @@ export function TimelinePreviewModal({
   });
 
   return (
-    <Modal
+    <RNModal
       visible={visible}
-      onDismiss={onDismiss}
-      contentContainerStyle={styles.modalContainer}
+      transparent
+      animationType="fade"
+      onRequestClose={onDismiss}
     >
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+      <View style={styles.modalContainer}>
       <View style={styles.header}>
         <Text style={styles.title}>Preview Timeline Changes</Text>
         <Text style={styles.subtitle}>
@@ -145,17 +147,17 @@ export function TimelinePreviewModal({
                       <View style={styles.timeBlock}>
                         <Text style={styles.oldTimeLabel}>Old</Text>
                         <View style={styles.timeRange}>
-                          <Clock size={14} color={colors.text.secondary} />
+                          <MaterialIcons name="schedule" size={14} color={colors.text.secondary} />
                           <Text style={styles.oldTime}>
                             {formatTimeForDisplay(item.oldStart!)} - {formatTimeForDisplay(item.oldEnd!)}
                           </Text>
                         </View>
                       </View>
-                      <ArrowRight size={20} color={colors.primary[600]} />
+                      <MaterialIcons name="arrow-forward" size={20} color={colors.primary[600]} />
                       <View style={styles.timeBlock}>
                         <Text style={styles.newTimeLabel}>New</Text>
                         <View style={styles.timeRange}>
-                          <Clock size={14} color={colors.primary[600]} />
+                          <MaterialIcons name="schedule" size={14} color={colors.primary[600]} />
                           <Text style={styles.newTime}>
                             {formatTimeForDisplay(item.newStart!)} - {formatTimeForDisplay(item.newEnd!)}
                           </Text>
@@ -164,7 +166,8 @@ export function TimelinePreviewModal({
                     </View>
                   ) : (
                     <View style={styles.timeRange}>
-                      <Clock
+                      <MaterialIcons
+                        name="schedule"
                         size={16}
                         color={isNew ? colors.primary[600] : colors.text.secondary}
                       />
@@ -198,26 +201,23 @@ export function TimelinePreviewModal({
       </ScrollView>
 
       <View style={styles.actions}>
-        <Button
-          mode="outlined"
+        <TouchableOpacity
           onPress={onDismiss}
-          style={styles.cancelButton}
-          textColor={colors.text.primary}
+          style={[styles.cancelButton, { borderWidth: 1, borderColor: colors.border.light, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }]}
         >
-          Cancel
-        </Button>
-        <Button
-          mode="contained"
+          <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           onPress={onConfirm}
-          style={styles.confirmButton}
-          buttonColor={colors.primary[600]}
-          textColor={colors.text.inverse}
-          icon={() => <Check size={18} color={colors.text.inverse} />}
+          style={[styles.confirmButton, { backgroundColor: colors.primary[600], paddingVertical: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
         >
-          Apply Changes
-        </Button>
+          <MaterialIcons name="check" size={18} color={colors.text.inverse} />
+          <Text style={{ color: colors.text.inverse, fontWeight: '600', fontSize: 14 }}>Apply Changes</Text>
+        </TouchableOpacity>
       </View>
-    </Modal>
+      </View>
+      </View>
+    </RNModal>
   );
 }
 

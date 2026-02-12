@@ -8,7 +8,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { CheckCircle2, ArrowLeft, Save, Sparkles } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Heading, Body, Caption } from '../../../ui';
 import { QuestionAccordion } from './QuestionAccordion';
 import { GeneratedQuestion } from '../../../services/aiTestGeneratorFetch';
@@ -34,7 +34,7 @@ export function ReviewStep({
             {/* Success Header */}
             <View style={styles.header}>
                 <View style={[styles.successIcon, { backgroundColor: colors.success[100] }]}>
-                    <CheckCircle2 size={32} color={colors.success[600]} />
+                    <MaterialIcons name="check-circle" size={32} color={colors.success[600]} />
                 </View>
                 <Heading level={3} align="center">Questions Ready!</Heading>
                 <Body color="secondary" align="center" style={{ marginTop: spacing.xs }}>
@@ -69,7 +69,7 @@ export function ReviewStep({
                 </View>
                 <View style={[styles.statDivider, { backgroundColor: colors.primary[200] }]} />
                 <View style={styles.statItem}>
-                    <Sparkles size={24} color={colors.primary[600]} />
+                    <MaterialIcons name="auto-awesome" size={24} color={colors.primary[600]} />
                     <Caption color="secondary">AI Generated</Caption>
                 </View>
             </View>
@@ -94,7 +94,7 @@ export function ReviewStep({
                         },
                     ]}
                 >
-                    <ArrowLeft size={20} color={colors.text.secondary} />
+                    <MaterialIcons name="arrow-back" size={20} color={colors.text.secondary} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -108,7 +108,7 @@ export function ReviewStep({
                         end={{ x: 1, y: 0 }}
                         style={[styles.saveButton, { borderRadius: borderRadius.xl }]}
                     >
-                        <Save size={20} color={colors.text.inverse} />
+                        <MaterialIcons name="save" size={20} color={colors.text.inverse} />
                         <Body weight="semibold" style={{ color: colors.text.inverse }}>
                             Save Sage Assessment
                         </Body>

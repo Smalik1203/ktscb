@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
     View,
+    Text,
     StyleSheet,
     TouchableOpacity,
     TextInput as RNTextInput,
@@ -9,26 +10,11 @@ import {
     Animated,
     Easing,
     Dimensions,
+    ActivityIndicator,
 } from 'react-native';
-import { Modal, Portal, Text, Button, ActivityIndicator, IconButton } from 'react-native-paper';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button, Modal as ThemedModal } from '../../ui';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-    Mic,
-    MicOff,
-    Square,
-    X,
-    Check,
-    AlertCircle,
-    Edit3,
-    Sparkles,
-    ChevronDown,
-    Calendar,
-    BookOpen,
-    Users,
-    Flag,
-    Wand2,
-    Volume2,
-} from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { useVoiceRecording } from '../../hooks/useVoiceRecording';
@@ -234,7 +220,7 @@ const ProcessingSparkles = ({ colors }: { colors: ThemeColors }) => {
 
     return (
         <Animated.View style={{ transform: [{ rotate: spin }, { scale }] }}>
-            <Wand2 size={48} color={colors.primary[500]} />
+            <MaterialIcons name="auto-fix-high" size={48} color={colors.primary[500]} />
         </Animated.View>
     );
 };
@@ -501,19 +487,19 @@ export function VoiceTaskCreator({
         if (status === 'confirmed') {
             return (
                 <View style={[styles.statusBadge, { backgroundColor: colors.success[100] }]}>
-                    <Check size={12} color={colors.success[600]} />
+                    <MaterialIcons name="check" size={12} color={colors.success[600]} />
                 </View>
             );
         } else if (status === 'needs_review') {
             return (
                 <View style={[styles.statusBadge, { backgroundColor: colors.warning[100] }]}>
-                    <AlertCircle size={12} color={colors.warning[600]} />
+                    <MaterialIcons name="error" size={12} color={colors.warning[600]} />
                 </View>
             );
         } else {
             return (
                 <View style={[styles.statusBadge, { backgroundColor: colors.error[100] }]}>
-                    <X size={12} color={colors.error[600]} />
+                    <MaterialIcons name="close" size={12} color={colors.error[600]} />
                 </View>
             );
         }
@@ -566,7 +552,7 @@ export function VoiceTaskCreator({
                                 </Text>
                             </View>
                         )}
-                        {isEditable && <ChevronDown size={16} color={colors.text.tertiary} />}
+                        {isEditable && <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.text.tertiary} />}
                     </View>
                 </TouchableOpacity>
             </AnimatedField>
@@ -594,8 +580,8 @@ export function VoiceTaskCreator({
         : ['#10b981', '#14b8a6'] as const;
 
     return (
-        <Portal>
-            <Modal
+        <>
+            <ThemedModal
                 visible={visible}
                 onDismiss={onDismiss}
                 dismissable={false}
@@ -625,7 +611,7 @@ export function VoiceTaskCreator({
                                     colors={sageGradient}
                                     style={styles.sageIconContainer}
                                 >
-                                    <Sparkles size={20} color="#fff" />
+                                    <MaterialIcons name="auto-awesome" size={20} color="#fff" />
                                 </LinearGradient>
                                 <View>
                                     <Text style={styles.headerTitle}>Sage Voice Assistant</Text>
@@ -633,7 +619,7 @@ export function VoiceTaskCreator({
                                 </View>
                             </View>
                             <TouchableOpacity onPress={onDismiss} style={styles.closeButton}>
-                                <X size={24} color={colors.text.secondary} />
+                                <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                             </TouchableOpacity>
                         </View>
 
@@ -668,7 +654,7 @@ export function VoiceTaskCreator({
                                                         : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)')
                                                 }
                                             ]}>
-                                                <Edit3 size={18} color={selectedInputMethod === 'type' ? colors.primary[600] : colors.text.tertiary} />
+                                                <MaterialIcons name="edit" size={18} color={selectedInputMethod === 'type' ? colors.primary[600] : colors.text.tertiary} />
                                             </View>
                                             <Text style={[styles.inputCardTitle, selectedInputMethod === 'type' && { color: colors.primary[600] }]}>Type</Text>
                                         </TouchableOpacity>
@@ -698,9 +684,9 @@ export function VoiceTaskCreator({
                                                 {voiceRecording.state.isPreparing ? (
                                                     <ActivityIndicator size="small" color={colors.success[600]} />
                                                 ) : voiceRecording.state.permissionDenied ? (
-                                                    <MicOff size={18} color={colors.neutral[400]} />
+                                                    <MaterialIcons name="mic-off" size={18} color={colors.neutral[400]} />
                                                 ) : (
-                                                    <Mic size={18} color={selectedInputMethod === 'speak' ? colors.success[600] : colors.text.tertiary} />
+                                                    <MaterialIcons name="mic" size={18} color={selectedInputMethod === 'speak' ? colors.success[600] : colors.text.tertiary} />
                                                 )}
                                             </View>
                                             <Text style={[styles.inputCardTitle, selectedInputMethod === 'speak' && !voiceRecording.state.permissionDenied && { color: colors.success[600] }]}>
@@ -728,7 +714,7 @@ export function VoiceTaskCreator({
                                                     colors={primaryGradient}
                                                     style={styles.sendButtonGradient}
                                                 >
-                                                    <Wand2 size={18} color="#fff" />
+                                                    <MaterialIcons name="auto-fix-high" size={18} color="#fff" />
                                                 </LinearGradient>
                                             </TouchableOpacity>
                                         ) : null}
@@ -752,7 +738,7 @@ export function VoiceTaskCreator({
                                             style={styles.stopButton}
                                             onPress={handleMicPress}
                                         >
-                                            <Square size={18} color="#fff" fill="#fff" />
+                                            <MaterialIcons name="stop" size={18} color="#fff" />
                                         </TouchableOpacity>
 
                                         {/* Recording Info + Waveform */}
@@ -807,14 +793,14 @@ export function VoiceTaskCreator({
                                         >
                                             {canSubmit ? (
                                                 <>
-                                                    <Check size={18} color={colors.success[600]} />
+                                                    <MaterialIcons name="check" size={18} color={colors.success[600]} />
                                                     <Text style={[styles.reviewBannerText, { color: colors.success[700] }]}>
                                                         All required fields ready. Review and confirm.
                                                     </Text>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <AlertCircle size={18} color={colors.warning[600]} />
+                                                    <MaterialIcons name="error" size={18} color={colors.warning[600]} />
                                                     <Text style={[styles.reviewBannerText, { color: colors.warning[700] }]}>
                                                         Some fields need your input. Tap to edit.
                                                     </Text>
@@ -828,7 +814,7 @@ export function VoiceTaskCreator({
                                         'Title',
                                         parsedTask.title,
                                         (editedFields.title ?? parsedTask.title?.value) as string || '',
-                                        <Edit3 size={18} color={colors.primary[500]} />,
+                                        <MaterialIcons name="edit" size={18} color={colors.primary[500]} />,
                                         1
                                     )}
 
@@ -838,7 +824,7 @@ export function VoiceTaskCreator({
                                         (editedFields.class_instance_id
                                             ? availableClasses.find(c => c.id === editedFields.class_instance_id)?.label
                                             : parsedTask.class?.value?.label) || '',
-                                        <Users size={18} color={colors.primary[500]} />,
+                                        <MaterialIcons name="group" size={18} color={colors.primary[500]} />,
                                         2,
                                         () => setShowClassPicker(true)
                                     )}
@@ -849,7 +835,7 @@ export function VoiceTaskCreator({
                                         (editedFields.subject_id
                                             ? availableSubjects.find(s => s.id === editedFields.subject_id)?.name
                                             : parsedTask.subject?.value?.name) || '',
-                                        <BookOpen size={18} color={colors.primary[500]} />,
+                                        <MaterialIcons name="menu-book" size={18} color={colors.primary[500]} />,
                                         3,
                                         () => setShowSubjectPicker(true)
                                     )}
@@ -858,7 +844,7 @@ export function VoiceTaskCreator({
                                         'Due Date',
                                         parsedTask.due_date,
                                         parsedTask.due_date_display || (parsedTask.due_date?.value as string) || '',
-                                        <Calendar size={18} color={colors.primary[500]} />,
+                                        <MaterialIcons name="event" size={18} color={colors.primary[500]} />,
                                         4
                                     )}
 
@@ -866,7 +852,7 @@ export function VoiceTaskCreator({
                                         'Priority',
                                         parsedTask.priority,
                                         ((editedFields.priority ?? parsedTask.priority?.value) as string || 'medium').toUpperCase(),
-                                        <Flag size={18} color={getPriorityColor((editedFields.priority ?? parsedTask.priority?.value) as string || 'medium')} />,
+                                        <MaterialIcons name="flag" size={18} color={getPriorityColor((editedFields.priority ?? parsedTask.priority?.value) as string || 'medium')} />,
                                         5
                                     )}
 
@@ -874,20 +860,19 @@ export function VoiceTaskCreator({
                                     <AnimatedField index={6} visible={true}>
                                         <View style={styles.previewActions}>
                                             <Button
-                                                mode="outlined"
+                                                variant="outline"
                                                 onPress={() => setViewState('input')}
                                                 style={styles.backButton}
-                                                textColor={colors.text.secondary}
                                             >
                                                 Try Again
                                             </Button>
                                             <Button
-                                                mode="contained"
+                                                variant="primary"
                                                 onPress={handleCreateTask}
                                                 disabled={!canSubmit || isSubmitting}
                                                 loading={isSubmitting}
                                                 style={styles.createButton}
-                                                icon={() => <Check size={18} color="#fff" />}
+                                                icon={<MaterialIcons name="check" size={18} color="#fff" />}
                                             >
                                                 Create Task
                                             </Button>
@@ -898,13 +883,12 @@ export function VoiceTaskCreator({
                         </ScrollView>
                     </View>
                 </Animated.View>
-            </Modal >
+            </ThemedModal>
 
             {/* Class Picker Modal */}
-            < Modal
+            <ThemedModal
                 visible={showClassPicker}
-                onDismiss={() => setShowClassPicker(false)
-                }
+                onDismiss={() => setShowClassPicker(false)}
                 contentContainerStyle={styles.pickerModal}
             >
                 <Text style={styles.pickerTitle}>Select Class</Text>
@@ -923,16 +907,16 @@ export function VoiceTaskCreator({
                         >
                             <Text style={styles.pickerItemText}>{cls.label}</Text>
                             {(editedFields.class_instance_id ?? parsedTask?.class?.value?.id) === cls.id && (
-                                <Check size={18} color={colors.primary[500]} />
+                                <MaterialIcons name="check" size={18} color={colors.primary[500]} />
                             )}
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
-                <Button mode="outlined" onPress={() => setShowClassPicker(false)}>Close</Button>
-            </Modal >
+                <Button variant="outline" onPress={() => setShowClassPicker(false)}>Close</Button>
+            </ThemedModal>
 
             {/* Subject Picker Modal */}
-            < Modal
+            <ThemedModal
                 visible={showSubjectPicker}
                 onDismiss={() => setShowSubjectPicker(false)}
                 contentContainerStyle={styles.pickerModal}
@@ -953,14 +937,14 @@ export function VoiceTaskCreator({
                         >
                             <Text style={styles.pickerItemText}>{subj.name}</Text>
                             {(editedFields.subject_id ?? parsedTask?.subject?.value?.id) === subj.id && (
-                                <Check size={18} color={colors.primary[500]} />
+                                <MaterialIcons name="check" size={18} color={colors.primary[500]} />
                             )}
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
-                <Button mode="outlined" onPress={() => setShowSubjectPicker(false)}>Close</Button>
-            </Modal >
-        </Portal >
+                <Button variant="outline" onPress={() => setShowSubjectPicker(false)}>Close</Button>
+            </ThemedModal>
+        </>
     );
 }
 

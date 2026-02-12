@@ -57,6 +57,8 @@ export interface InputProps extends Omit<TextInputProps, 'style'> {
   variant?: InputVariant;
   /** Size preset */
   size?: InputSize;
+  /** Custom style override for the input container */
+  style?: ViewStyle;
   /** Left icon */
   leftIcon?: React.ReactNode;
   /** Right icon */
@@ -85,6 +87,7 @@ export function Input({
   helperText,
   variant = 'default',
   size = 'md',
+  style,
   leftIcon,
   rightIcon,
   onRightIconPress,
@@ -267,7 +270,7 @@ export function Input({
   };
 
   return (
-    <View style={[styles.container, containerStyle]} testID={testID}>
+    <View style={[styles.container, containerStyle, style]} testID={testID}>
       {label && (
         <Label
           required={required}

@@ -8,9 +8,8 @@
  */
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
-import { ShieldX, Lock, AlertCircle } from 'lucide-react-native';
+import { View, StyleSheet, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { spacing, borderRadius, typography } from '../../../lib/design-system';
 import { Capability } from '../../domain/auth/capabilities';
@@ -87,11 +86,11 @@ export function AccessDenied({
   const shouldShowAction = showAction ?? variant === 'full';
   
   // Determine icon
-  const IconComponent = React.useMemo(() => {
-    if (icon === 'lock') return Lock;
-    if (icon === 'alert') return AlertCircle;
-    if (icon === 'shield' || variant === 'full') return ShieldX;
-    return Lock;
+  const iconName = React.useMemo((): React.ComponentProps<typeof MaterialIcons>['name'] => {
+    if (icon === 'lock') return 'lock';
+    if (icon === 'alert') return 'error';
+    if (icon === 'shield' || variant === 'full') return 'gpp-bad';
+    return 'lock';
   }, [icon, variant]);
   
   const iconSize = variant === 'full' ? 64 : variant === 'card' ? 40 : 32;
@@ -109,10 +108,10 @@ export function AccessDenied({
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <IconComponent 
+          <MaterialIcons 
+            name={iconName} 
             size={iconSize} 
             color={colors.error[isDark ? 400 : 500]} 
-            strokeWidth={1.5}
           />
         </View>
         

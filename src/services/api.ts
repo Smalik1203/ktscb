@@ -209,7 +209,7 @@ export const api = {
         if (adminRows && adminRows.length > 0) {
           const { data: adminData } = await supabase
             .from('admin')
-            .select('id, user_id, auth_user_id, full_name, email, phone, role, school_code, created_at')
+            .select('id, admin_code, auth_user_id, full_name, email, phone, role, school_code, school_name, created_at')
             .eq('id', adminRows[0].id)
             .maybeSingle();
 
@@ -566,7 +566,7 @@ export const api = {
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as FeePayment[];
     },
 
     async getClassPayments(classId: string): Promise<FeePayment[]> {
@@ -586,7 +586,7 @@ export const api = {
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as FeePayment[];
     },
 
     async getSchoolPayments(schoolCode: string): Promise<FeePayment[]> {
@@ -606,7 +606,7 @@ export const api = {
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []) as FeePayment[];
     },
   },
 
@@ -996,10 +996,10 @@ export const api = {
       const limit = options?.limit ?? 50;
       const offset = options?.offset ?? 0;
       const { data, error } = await supabase.rpc('get_tests_with_stats', {
-        p_class_instance_id: classInstanceId ?? null,
+        p_class_instance_id: classInstanceId ?? undefined,
         p_limit: limit,
         p_offset: offset,
-        p_test_mode: options?.test_mode ?? null,
+        p_test_mode: options?.test_mode ?? undefined,
       });
 
       if (error) throw error;
