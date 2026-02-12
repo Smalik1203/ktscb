@@ -39,6 +39,10 @@ google-services.json
 GoogleService-Info.plist
 **/GoogleService-Info.plist
 
+# Setup/deploy scripts with secrets
+setup-eas-secrets.sh
+setup-*.sh
+
 # EAS configuration with secrets (if you need a local override)
 eas.json.local
 eas.local.json
