@@ -3,17 +3,13 @@ import {
     View,
     Text as RNText,
     TouchableOpacity,
-    Modal,
     ScrollView,
     Alert,
     ActivityIndicator,
     Image,
-    Dimensions,
-    KeyboardAvoidingView,
-    Platform,
 } from 'react-native';
-import { TextInput } from 'react-native-paper';
-import { X, ImagePlus, Camera, Image as ImageIcon, Trash2, ChevronDown, Check, AlertCircle } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Input, Modal } from '../../../ui';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -21,7 +17,6 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useCreateAnnouncement, useUpdateAnnouncement, Announcement } from '../../../hooks/useAnnouncements';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../../lib/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
 
 const STORAGE_BUCKET = 'Lms';
 
@@ -30,8 +25,6 @@ interface CreateAnnouncementModalProps {
     onClose: () => void;
     editingAnnouncement?: Announcement | null;
 }
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const PRIORITIES = [
     { key: 'low', label: 'Info', emoji: 'ℹ️', color: '#3B82F6', description: 'General information' },
@@ -70,7 +63,7 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
     }, [editingAnnouncement, visible]);
 
     // Fetch classes for selection
-    const { data: classes } = useQuery<{ id: string; grade: string; section: string }[]>({
+    const { data: classes } = useQuery({
         queryKey: ['classes', profile?.school_code],
         queryFn: async () => {
             const { data, error } = await supabase
@@ -81,7 +74,7 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                 .order('section');
 
             if (error) throw error;
-            return data || [];
+            return (data || []) as { id: string; grade: number | null; section: string | null }[];
         },
         enabled: !!profile?.school_code && visible,
     });
@@ -268,60 +261,13 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
     return (
         <Modal
             visible={visible}
-            animationType="slide"
-            presentationStyle="pageSheet"
-            onRequestClose={handleClose}
+            onDismiss={handleClose}
+            title={isEditing ? 'Edit Announcement' : 'New Announcement'}
+            size="full"
         >
-            <KeyboardAvoidingView 
-                style={{ flex: 1, backgroundColor: colors.background.primary }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            >
-                {/* Header */}
-                <View
-                    style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        paddingHorizontal: spacing.lg,
-                        paddingVertical: spacing.md,
-                        borderBottomWidth: 1,
-                        borderBottomColor: colors.border.light,
-                        backgroundColor: colors.surface.primary,
-                    }}
-                >
-                    <TouchableOpacity onPress={handleClose} style={{ padding: spacing.xs }}>
-                        <X size={24} color={colors.text.secondary} />
-                    </TouchableOpacity>
-                    
-                    <RNText style={{ fontSize: 18, fontWeight: '700', color: colors.text.primary }}>
-                        {isEditing ? 'Edit Announcement' : 'New Announcement'}
-                    </RNText>
-
-                    <TouchableOpacity
-                        onPress={handleSubmit}
-                        disabled={isSubmitting || !title.trim() || !message.trim()}
-                        style={{
-                            backgroundColor: isSubmitting || !title.trim() || !message.trim() 
-                                ? colors.neutral[300] 
-                                : colors.primary[600],
-                            paddingHorizontal: spacing.lg,
-                            paddingVertical: spacing.sm,
-                            borderRadius: borderRadius.full,
-                        }}
-                    >
-                        {isSubmitting ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <RNText style={{ fontSize: 14, fontWeight: '700', color: '#fff' }}>
-                                {isEditing ? 'Update' : 'Post'}
-                            </RNText>
-                        )}
-                    </TouchableOpacity>
-                </View>
-
                 <ScrollView 
                     style={{ flex: 1 }} 
-                    contentContainerStyle={{ padding: spacing.lg }}
+                    contentContainerStyle={{ paddingBottom: spacing.lg }}
                     keyboardShouldPersistTaps="handled"
                 >
                     {/* Image Section */}
@@ -344,7 +290,7 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                                         padding: spacing.xs,
                                     }}
                                 >
-                                    <Trash2 size={18} color="#fff" />
+                                    <MaterialIcons name="delete" size={18} color="#fff" />
                                 </TouchableOpacity>
                             </View>
                         ) : (
@@ -361,11 +307,11 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                                         borderRadius: borderRadius.lg,
                                         borderWidth: 2,
                                         borderStyle: 'dashed',
-                                        borderColor: colors.border.primary,
+                                        borderColor: colors.border.DEFAULT,
                                         backgroundColor: colors.background.secondary,
                                     }}
                                 >
-                                    <ImageIcon size={24} color={colors.primary[600]} />
+                                    <MaterialIcons name="image" size={24} color={colors.primary[600]} />
                                     <RNText style={{ fontSize: 14, fontWeight: '600', color: colors.primary[600] }}>
                                         Gallery
                                     </RNText>
@@ -383,11 +329,11 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                                         borderRadius: borderRadius.lg,
                                         borderWidth: 2,
                                         borderStyle: 'dashed',
-                                        borderColor: colors.border.primary,
+                                        borderColor: colors.border.DEFAULT,
                                         backgroundColor: colors.background.secondary,
                                     }}
                                 >
-                                    <Camera size={24} color={colors.primary[600]} />
+                                    <MaterialIcons name="camera-alt" size={24} color={colors.primary[600]} />
                                     <RNText style={{ fontSize: 14, fontWeight: '600', color: colors.primary[600] }}>
                                         Camera
                                     </RNText>
@@ -398,35 +344,25 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
 
                     {/* Title Input */}
                     <View style={{ marginBottom: spacing.md }}>
-                        <TextInput
+                        <Input
                             label="Title"
                             value={title}
                             onChangeText={setTitle}
                             placeholder="What's this about?"
-                            mode="outlined"
-                            style={{ backgroundColor: colors.surface.primary }}
-                            outlineColor={colors.border.primary}
-                            activeOutlineColor={colors.primary[600]}
-                            textColor={colors.text.primary}
-                            placeholderTextColor={colors.text.tertiary}
+                            variant="outlined"
                         />
                     </View>
 
                     {/* Message Input */}
                     <View style={{ marginBottom: spacing.lg }}>
-                        <TextInput
+                        <Input
                             label="Message"
                             value={message}
                             onChangeText={setMessage}
                             placeholder="Share the details..."
-                            mode="outlined"
+                            variant="outlined"
                             multiline
                             numberOfLines={4}
-                            style={{ backgroundColor: colors.surface.primary, minHeight: 120 }}
-                            outlineColor={colors.border.primary}
-                            activeOutlineColor={colors.primary[600]}
-                            textColor={colors.text.primary}
-                            placeholderTextColor={colors.text.tertiary}
                         />
                     </View>
 
@@ -497,13 +433,13 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                                         height: 24,
                                         borderRadius: 12,
                                         borderWidth: 2,
-                                        borderColor: targetType === 'all' ? colors.primary[500] : colors.border.primary,
+                                        borderColor: targetType === 'all' ? colors.primary[500] : colors.border.DEFAULT,
                                         backgroundColor: targetType === 'all' ? colors.primary[500] : 'transparent',
                                         justifyContent: 'center',
                                         alignItems: 'center',
                                     }}
                                 >
-                                    {targetType === 'all' && <Check size={14} color="#fff" strokeWidth={3} />}
+                                    {targetType === 'all' && <MaterialIcons name="check" size={14} color="#fff" />}
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.text.primary }}>
@@ -535,13 +471,13 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                                         height: 24,
                                         borderRadius: 12,
                                         borderWidth: 2,
-                                        borderColor: targetType === 'class' ? colors.primary[500] : colors.border.primary,
+                                        borderColor: targetType === 'class' ? colors.primary[500] : colors.border.DEFAULT,
                                         backgroundColor: targetType === 'class' ? colors.primary[500] : 'transparent',
                                         justifyContent: 'center',
                                         alignItems: 'center',
                                     }}
                                 >
-                                    {targetType === 'class' && <Check size={14} color="#fff" strokeWidth={3} />}
+                                    {targetType === 'class' && <MaterialIcons name="check" size={14} color="#fff" />}
                                 </View>
                                 <View style={{ flex: 1 }}>
                                     <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.text.primary }}>
@@ -566,7 +502,7 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                                         borderRadius: borderRadius.lg,
                                         backgroundColor: colors.surface.primary,
                                         borderWidth: 1,
-                                        borderColor: selectedClassId ? colors.primary[500] : colors.border.primary,
+                                        borderColor: selectedClassId ? colors.primary[500] : colors.border.DEFAULT,
                                     }}
                                 >
                                     <RNText style={{ 
@@ -579,7 +515,7 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                                             : 'Select a class...'
                                         }
                                     </RNText>
-                                    <ChevronDown size={20} color={colors.text.tertiary} />
+                                    <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -596,96 +532,90 @@ export function CreateAnnouncementModal({ visible, onClose, editingAnnouncement 
                             gap: spacing.sm,
                         }}
                     >
-                        <AlertCircle size={20} color={colors.info[600]} />
+                        <MaterialIcons name="error" size={20} color={colors.info[600]} />
                         <RNText style={{ flex: 1, fontSize: 13, color: colors.info[700], lineHeight: 18 }}>
                             Push notifications will be sent to {targetType === 'all' ? 'all students and parents' : 'students in the selected class'} immediately after posting.
                         </RNText>
                     </View>
+
+                    {/* Submit Button */}
+                    <TouchableOpacity
+                        onPress={handleSubmit}
+                        disabled={isSubmitting || !title.trim() || !message.trim()}
+                        style={{
+                            backgroundColor: isSubmitting || !title.trim() || !message.trim()
+                                ? colors.neutral[300]
+                                : colors.primary[600],
+                            paddingVertical: spacing.md,
+                            borderRadius: borderRadius.full,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginTop: spacing.lg,
+                        }}
+                    >
+                        {isSubmitting ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <RNText style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>
+                                {isEditing ? 'Update Announcement' : 'Post Announcement'}
+                            </RNText>
+                        )}
+                    </TouchableOpacity>
                 </ScrollView>
 
                 {/* Class Picker Modal */}
                 <Modal
                     visible={showClassPicker}
-                    transparent
-                    animationType="slide"
-                    onRequestClose={() => setShowClassPicker(false)}
+                    onDismiss={() => setShowClassPicker(false)}
+                    title="Select Class"
+                    size="md"
                 >
-                    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-                        <View
-                            style={{
-                                backgroundColor: colors.surface.primary,
-                                borderTopLeftRadius: borderRadius.xl,
-                                borderTopRightRadius: borderRadius.xl,
-                                maxHeight: '60%',
-                            }}
-                        >
-                            <View
+                    <ScrollView>
+                        {classes?.map((cls) => (
+                            <TouchableOpacity
+                                key={cls.id}
+                                onPress={() => {
+                                    setSelectedClassId(cls.id);
+                                    setShowClassPicker(false);
+                                }}
                                 style={{
                                     flexDirection: 'row',
                                     alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: spacing.lg,
-                                    borderBottomWidth: 1,
-                                    borderBottomColor: colors.border.light,
+                                    padding: spacing.md,
+                                    borderRadius: borderRadius.lg,
+                                    backgroundColor: selectedClassId === cls.id ? colors.primary[50] : colors.background.secondary,
+                                    marginBottom: spacing.sm,
+                                    borderWidth: 2,
+                                    borderColor: selectedClassId === cls.id ? colors.primary[500] : 'transparent',
                                 }}
                             >
-                                <RNText style={{ fontSize: 18, fontWeight: '700', color: colors.text.primary }}>
-                                    Select Class
-                                </RNText>
-                                <TouchableOpacity onPress={() => setShowClassPicker(false)}>
-                                    <X size={24} color={colors.text.secondary} />
-                                </TouchableOpacity>
-                            </View>
-
-                            <ScrollView style={{ padding: spacing.md }}>
-                                {classes?.map((cls) => (
-                                    <TouchableOpacity
-                                        key={cls.id}
-                                        onPress={() => {
-                                            setSelectedClassId(cls.id);
-                                            setShowClassPicker(false);
-                                        }}
-                                        style={{
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            padding: spacing.md,
-                                            borderRadius: borderRadius.lg,
-                                            backgroundColor: selectedClassId === cls.id ? colors.primary[50] : colors.background.secondary,
-                                            marginBottom: spacing.sm,
-                                            borderWidth: 2,
-                                            borderColor: selectedClassId === cls.id ? colors.primary[500] : 'transparent',
-                                        }}
-                                    >
-                                        <View
-                                            style={{
-                                                width: 40,
-                                                height: 40,
-                                                borderRadius: 20,
-                                                backgroundColor: colors.primary[100],
-                                                justifyContent: 'center',
-                                                alignItems: 'center',
-                                                marginRight: spacing.md,
-                                            }}
-                                        >
-                                            <RNText style={{ fontSize: 16, fontWeight: '700', color: colors.primary[600] }}>
-                                                {cls.grade}
-                                            </RNText>
-                                        </View>
-                                        <View style={{ flex: 1 }}>
-                                            <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.text.primary }}>
-                                                Class {cls.grade} - {cls.section}
-                                            </RNText>
-                                        </View>
-                                        {selectedClassId === cls.id && (
-                                            <Check size={20} color={colors.primary[600]} strokeWidth={3} />
-                                        )}
-                                    </TouchableOpacity>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    </View>
+                                <View
+                                    style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 20,
+                                        backgroundColor: colors.primary[100],
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        marginRight: spacing.md,
+                                    }}
+                                >
+                                    <RNText style={{ fontSize: 16, fontWeight: '700', color: colors.primary[600] }}>
+                                        {cls.grade}
+                                    </RNText>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.text.primary }}>
+                                        Class {cls.grade} - {cls.section}
+                                    </RNText>
+                                </View>
+                                {selectedClassId === cls.id && (
+                                    <MaterialIcons name="check" size={20} color={colors.primary[600]} />
+                                )}
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
                 </Modal>
-            </KeyboardAvoidingView>
         </Modal>
     );
 }

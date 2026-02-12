@@ -8,7 +8,7 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Image, TextInput } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { Settings2, ArrowLeft, Zap, ImageIcon } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Heading, Body, Caption } from '../../../ui';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -42,7 +42,7 @@ export function ConfigureStep({
             {/* Header */}
             <View style={styles.header}>
                 <View style={[styles.iconContainer, { backgroundColor: colors.secondary[100] }]}>
-                    <Settings2 size={24} color={colors.secondary[600]} />
+                    <MaterialIcons name="settings" size={24} color={colors.secondary[600]} />
                 </View>
                 <Heading level={3} align="center">Configure Sage</Heading>
                 <Body color="secondary" align="center" style={{ marginTop: spacing.xs }}>
@@ -56,7 +56,7 @@ export function ConfigureStep({
                     <Image source={{ uri: selectedImage }} style={styles.imageThumb} />
                     <View style={styles.imageInfo}>
                         <View style={[styles.imageBadge, { backgroundColor: colors.success[100] }]}>
-                            <ImageIcon size={12} color={colors.success[600]} />
+                            <MaterialIcons name="image" size={12} color={colors.success[600]} />
                         </View>
                         <Caption color="secondary">Image ready</Caption>
                     </View>
@@ -160,7 +160,7 @@ export function ConfigureStep({
                         },
                     ]}
                 >
-                    <ArrowLeft size={20} color={colors.text.secondary} />
+                    <MaterialIcons name="arrow-back" size={20} color={colors.text.secondary} />
                     <Body color="secondary">Back</Body>
                 </TouchableOpacity>
 
@@ -180,7 +180,7 @@ export function ConfigureStep({
                         end={{ x: 1, y: 0 }}
                         style={[styles.generateButton, { borderRadius: borderRadius.xl }]}
                     >
-                        <Zap size={20} color={colors.text.inverse} />
+                        <MaterialIcons name="bolt" size={20} color={colors.text.inverse} />
                         <Body weight="semibold" style={{ color: colors.text.inverse }}>
                             {isGenerating ? 'Sage is thinking...' : 'Ask Sage to Generate'}
                         </Body>

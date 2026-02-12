@@ -15,7 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Trash2, ArrowLeft, Save, Image as ImageIcon, Edit2, CheckCircle2, X } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestQuestions, useCreateQuestion, useUpdateQuestion, useDeleteQuestion } from '../../hooks/tests';
 import { TestQuestion, QuestionType } from '../../types/test.types';
@@ -274,7 +274,7 @@ export function QuestionBuilderScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft size={24} color={colors.text.primary} />
+          <MaterialIcons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>{testTitle}</Text>
@@ -289,7 +289,7 @@ export function QuestionBuilderScreen() {
           onPress={handleAddQuestion}
           activeOpacity={0.8}
         >
-          <Plus size={20} color={colors.text.inverse} />
+          <MaterialIcons name="add" size={20} color={colors.text.inverse} />
           <Text style={styles.addQuestionButtonText}>Add Question</Text>
         </TouchableOpacity>
 
@@ -302,7 +302,7 @@ export function QuestionBuilderScreen() {
           {questions.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIcon}>
-                <Plus size={32} color={colors.text.tertiary} />
+                <MaterialIcons name="add" size={32} color={colors.text.tertiary} />
               </View>
               <Text style={styles.emptyStateText}>
                 No questions yet. Add your first question above.
@@ -346,7 +346,7 @@ export function QuestionBuilderScreen() {
                           ]}
                         >
                           {optIndex === question.correct_index && (
-                            <CheckCircle2 size={16} color={colors.text.inverse} />
+                            <MaterialIcons name="check-circle" size={16} color={colors.text.inverse} />
                           )}
                         </View>
                         <Text
@@ -374,14 +374,14 @@ export function QuestionBuilderScreen() {
                     style={styles.actionButton}
                     onPress={() => handleEditQuestionClick(question as TestQuestion)}
                   >
-                    <Edit2 size={16} color={colors.primary[600]} />
+                    <MaterialIcons name="edit" size={16} color={colors.primary[600]} />
                     <Text style={styles.actionButtonText}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.actionButtonDanger]}
                     onPress={() => handleDeleteQuestion(question.id)}
                   >
-                    <Trash2 size={16} color={colors.error[600]} />
+                    <MaterialIcons name="delete" size={16} color={colors.error[600]} />
                     <Text style={[styles.actionButtonText, styles.actionButtonTextDanger]}>
                       Delete
                     </Text>
@@ -412,7 +412,7 @@ export function QuestionBuilderScreen() {
                 {editingQuestionId ? 'Edit Question' : 'Add Question'}
               </Text>
               <TouchableOpacity onPress={resetForm} style={styles.modalCloseButton}>
-                <X size={24} color={colors.text.primary} />
+                <MaterialIcons name="close" size={24} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
 
@@ -507,7 +507,7 @@ export function QuestionBuilderScreen() {
                     onPress={addOption}
                     activeOpacity={0.7}
                   >
-                    <Plus size={16} color={colors.primary[600]} />
+                    <MaterialIcons name="add" size={16} color={colors.primary[600]} />
                     <Text style={styles.addOptionText}>Add Option</Text>
                   </TouchableOpacity>
                 </View>
@@ -563,7 +563,7 @@ export function QuestionBuilderScreen() {
                 onPress={handleSaveQuestion}
                 activeOpacity={0.8}
               >
-                <Save size={20} color={colors.text.inverse} />
+                <MaterialIcons name="save" size={20} color={colors.text.inverse} />
                 <Text style={styles.modalSaveText}>
                   {editingQuestionId ? 'Update' : 'Add'}
                 </Text>

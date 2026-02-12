@@ -10,9 +10,8 @@
  */
 
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { ActivityIndicator } from 'react-native-paper';
-import { AlertCircle, Inbox } from 'lucide-react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../contexts/ThemeContext';
 import { Skeleton } from '../ui';
 import { Body, Button } from '../ui';
@@ -125,7 +124,7 @@ export function ThreeStateRenderer<T>({
     return (
       <View style={[styles.container, { minHeight }]}>
         <View style={styles.centerContent}>
-          <AlertCircle size={48} color={colors.error.main} />
+          <MaterialIcons name="error" size={48} color={colors.error.main} />
           <Body color="error" style={{ marginTop: spacing.md, textAlign: 'center' }}>
             {errorMessage}
           </Body>
@@ -151,7 +150,7 @@ export function ThreeStateRenderer<T>({
     return (
       <View style={[styles.container, { minHeight }]}>
         <View style={styles.centerContent}>
-          <Inbox size={48} color={colors.text.tertiary} />
+          <MaterialIcons name="inbox" size={48} color={colors.text.tertiary} />
           <Body color="secondary" style={{ marginTop: spacing.md, textAlign: 'center' }}>
             {emptyMessage}
           </Body>

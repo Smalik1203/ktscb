@@ -32,7 +32,9 @@ export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export interface ButtonProps {
   /** Button content */
-  children: React.ReactNode;
+  children?: React.ReactNode;
+  /** @deprecated Use children instead */
+  title?: string;
   /** Press handler */
   onPress: () => void;
   /** Visual variant */
@@ -63,6 +65,7 @@ export interface ButtonProps {
 
 export function Button({
   children,
+  title,
   onPress,
   variant = 'primary',
   size = 'md',
@@ -77,6 +80,8 @@ export function Button({
   accessibilityHint,
   testID,
 }: ButtonProps) {
+  // Support title as alias for children (backward compat)
+  const content = children ?? title;
   const { colors, spacing, borderRadius, typography, animation } = useTheme();
   
   // Animation refs
@@ -286,11 +291,11 @@ export function Button({
     ) : null;
 
     // Handle string children
-    const textContent = typeof children === 'string' ? (
+    const textContent = typeof content === 'string' ? (
       <Animated.Text style={[buttonTextStyle, textStyle]}>
-        {children}
+        {content}
       </Animated.Text>
-    ) : children;
+    ) : content;
 
     return (
       <>

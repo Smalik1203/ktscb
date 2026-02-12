@@ -4,14 +4,14 @@
  */
 
 import React, { useMemo, useRef, useCallback, useState } from 'react';
-import { View, StyleSheet, Modal, TouchableOpacity, Share, Alert } from 'react-native';
-import { Text, ActivityIndicator, IconButton, Button } from 'react-native-paper';
+import { View, StyleSheet, Modal, TouchableOpacity, Share, Alert, Text, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { IconButton, Button } from '../../ui';
 import { WebView } from 'react-native-webview';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { documentDirectory, moveAsync, copyAsync } from 'expo-file-system/legacy';
-import { X, Download, Share2, Printer, FileText, Image as ImageIcon, CheckCircle, AlertCircle } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import type { InvoiceResponse } from '../../hooks/useInvoice';
@@ -116,14 +116,14 @@ export const InvoiceViewer: React.FC<InvoiceViewerProps> = ({ visible, invoiceDa
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}><X size={24} color={colors.text.primary} /></TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn}><MaterialIcons name="close" size={24} color={colors.text.primary} /></TouchableOpacity>
           <View style={styles.headerTitle}>
             <Text style={styles.title}>Fee Receipt</Text>
             <Text style={styles.subtitle}>{invoiceData.invoice_number}</Text>
           </View>
           <View style={styles.headerActions}>
-            <IconButton icon={() => <Share2 size={20} color={colors.text.secondary} />} onPress={handleShare} disabled={isDownloading} />
-            <IconButton icon={() => <Printer size={20} color={colors.text.secondary} />} onPress={handlePrint} disabled={isDownloading} />
+            <IconButton icon={<MaterialIcons name="share" size={20} color={colors.text.secondary} />} onPress={handleShare} disabled={isDownloading} />
+            <IconButton icon={<MaterialIcons name="print" size={20} color={colors.text.secondary} />} onPress={handlePrint} disabled={isDownloading} />
           </View>
         </View>
 
@@ -155,11 +155,11 @@ export const InvoiceViewer: React.FC<InvoiceViewerProps> = ({ visible, invoiceDa
         {showDownloadOptions && (
           <View style={styles.downloadOptions}>
             <TouchableOpacity style={styles.downloadOption} onPress={handleDownloadPDF} disabled={isDownloading}>
-              <FileText size={20} color={colors.primary[600]} />
+              <MaterialIcons name="description" size={20} color={colors.primary[600]} />
               <Text style={styles.downloadOptionText}>Save as PDF</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.downloadOption} onPress={handleDownloadImage} disabled={isDownloading}>
-              <ImageIcon size={20} color={colors.primary[600]} />
+              <MaterialIcons name="image" size={20} color={colors.primary[600]} />
               <Text style={styles.downloadOptionText}>Save as Image</Text>
             </TouchableOpacity>
           </View>
@@ -168,11 +168,11 @@ export const InvoiceViewer: React.FC<InvoiceViewerProps> = ({ visible, invoiceDa
         {/* Footer */}
         <View style={styles.footer}>
           {invoiceData.cached && (
-            <View style={styles.cachedBadge}><CheckCircle size={14} color={colors.success[600]} /><Text style={styles.cachedText}>Cached</Text></View>
+            <View style={styles.cachedBadge}><MaterialIcons name="check-circle" size={14} color={colors.success[600]} /><Text style={styles.cachedText}>Cached</Text></View>
           )}
           <View style={styles.footerActions}>
-            <Button mode="outlined" onPress={handleShare} disabled={isDownloading}>Share</Button>
-            <Button mode="contained" onPress={() => setShowDownloadOptions(!showDownloadOptions)} loading={isDownloading} disabled={isDownloading}>
+            <Button variant="outline" onPress={handleShare} disabled={isDownloading}>Share</Button>
+            <Button variant="primary" onPress={() => setShowDownloadOptions(!showDownloadOptions)} loading={isDownloading} disabled={isDownloading}>
               {isDownloading ? 'Saving...' : 'Download'}
             </Button>
           </View>

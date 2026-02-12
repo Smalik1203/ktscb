@@ -5,14 +5,14 @@
  */
 
 import React, { useMemo, useRef, useCallback, useState } from 'react';
-import { View, StyleSheet, Modal, TouchableOpacity, Share, Alert } from 'react-native';
-import { Text, ActivityIndicator, IconButton, Button } from 'react-native-paper';
+import { View, StyleSheet, Modal, TouchableOpacity, Share, Alert, Text, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { IconButton, Button } from '../../ui';
 import { WebView } from 'react-native-webview';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { documentDirectory, moveAsync, copyAsync } from 'expo-file-system/legacy';
-import { X, Download, Share2, Printer, FileText, Image as ImageIcon, RefreshCw, AlertCircle } from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { invoiceService } from '../../services/fees';
@@ -165,7 +165,7 @@ export function InvoiceDocumentViewer({ invoiceId, visible, onClose }: InvoiceDo
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <X size={24} color={colors.text.primary} />
+            <MaterialIcons name="close" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <View style={styles.headerTitle}>
             <Text style={styles.title}>Invoice Document</Text>
@@ -175,17 +175,17 @@ export function InvoiceDocumentViewer({ invoiceId, visible, onClose }: InvoiceDo
           </View>
           <View style={styles.headerActions}>
             <IconButton 
-              icon={() => <RefreshCw size={20} color={colors.text.secondary} />} 
+              icon={<MaterialIcons name="refresh" size={20} color={colors.text.secondary} />} 
               onPress={handleRetry} 
               disabled={generateMutation.isPending || isDownloading}
             />
             <IconButton 
-              icon={() => <Share2 size={20} color={colors.text.secondary} />} 
+              icon={<MaterialIcons name="share" size={20} color={colors.text.secondary} />} 
               onPress={handleShare} 
               disabled={!invoiceData || isDownloading}
             />
             <IconButton 
-              icon={() => <Printer size={20} color={colors.text.secondary} />} 
+              icon={<MaterialIcons name="print" size={20} color={colors.text.secondary} />} 
               onPress={handlePrint} 
               disabled={!invoiceData || isDownloading}
             />
@@ -203,18 +203,18 @@ export function InvoiceDocumentViewer({ invoiceId, visible, onClose }: InvoiceDo
         {/* Error State with Fallback */}
         {error && !invoiceData && (
           <View style={styles.centered}>
-            <AlertCircle size={48} color={colors.error[600]} />
+            <MaterialIcons name="error" size={48} color={colors.error[600]} />
             <Text style={styles.errorTitle}>Failed to Generate Invoice</Text>
             <Text style={styles.errorText}>{error}</Text>
             <Button 
-              mode="contained" 
+              variant="primary" 
               onPress={handleRetry}
               style={styles.retryButton}
             >
               Retry
             </Button>
             <Button 
-              mode="outlined" 
+              variant="outline" 
               onPress={onClose}
               style={styles.closeButton}
             >
@@ -285,7 +285,7 @@ export function InvoiceDocumentViewer({ invoiceId, visible, onClose }: InvoiceDo
                   onPress={handleDownloadPDF} 
                   disabled={isDownloading}
                 >
-                  <FileText size={20} color={colors.primary[600]} />
+                  <MaterialIcons name="description" size={20} color={colors.primary[600]} />
                   <Text style={styles.downloadOptionText}>Save as PDF</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
@@ -293,7 +293,7 @@ export function InvoiceDocumentViewer({ invoiceId, visible, onClose }: InvoiceDo
                   onPress={handleDownloadImage} 
                   disabled={isDownloading}
                 >
-                  <ImageIcon size={20} color={colors.primary[600]} />
+                  <MaterialIcons name="image" size={20} color={colors.primary[600]} />
                   <Text style={styles.downloadOptionText}>Save as Image</Text>
                 </TouchableOpacity>
               </View>
@@ -306,18 +306,18 @@ export function InvoiceDocumentViewer({ invoiceId, visible, onClose }: InvoiceDo
               </Text>
               <View style={styles.footerActions}>
                 <Button 
-                  mode="outlined" 
+                  variant="outline" 
                   onPress={handleShare} 
                   disabled={isDownloading}
                 >
                   Share
                 </Button>
                 <Button 
-                  mode="contained" 
+                  variant="primary" 
                   onPress={() => setShowDownloadOptions(!showDownloadOptions)} 
                   loading={isDownloading} 
                   disabled={isDownloading}
-                  icon={() => <Download size={18} color="#fff" />}
+                  icon={<MaterialIcons name="file-download" size={18} color="#fff" />}
                 >
                   {isDownloading ? 'Saving...' : 'Download'}
                 </Button>

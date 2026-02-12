@@ -201,7 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const profile: Profile = {
         auth_id: user.id,
         role: userProfile.role,
-        school_code: actualSchoolCode,
+        school_code: actualSchoolCode ?? null,
         school_name: schoolName,
         class_instance_id: userProfile.class_instance_id,
         full_name: userProfile.full_name,

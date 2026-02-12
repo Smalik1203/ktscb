@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import {
@@ -9,16 +9,14 @@ import {
   TextInput,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Clock, ChevronLeft, ChevronRight, Flag, Check, AlertCircle } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTestQuestions, useCreateAttempt, useUpdateAttempt, useSubmitTest, useStudentAttempts } from '../../hooks/tests';
-import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { useAuth } from '../../contexts/AuthContext';
-import { SuccessAnimation } from '../ui/SuccessAnimation';
+import { SuccessAnimation, Card, Badge, Button, ProgressBar, Input, LoadingView, ErrorView } from '../../ui';
 import { supabase } from '../../lib/supabase';
 
 interface Answer {
@@ -38,30 +36,23 @@ export function TestTakingScreen() {
   const timeLimit = params.timeLimit ? parseInt(params.timeLimit as string) : null;
   const studentIdParam = params.studentId as string | undefined;
 
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [fetchedStudentId, setFetchedStudentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (studentIdParam) return;
     if (!user?.id) return;
-
     const fetchStudentId = async () => {
       const { data } = await supabase
         .from('student')
         .select('id')
         .eq('auth_user_id', user.id)
         .maybeSingle();
-
-      if (data?.id) {
-        setFetchedStudentId(data.id);
-      }
+      if (data?.id) setFetchedStudentId(data.id);
     };
-
     fetchStudentId();
   }, [studentIdParam, user?.id]);
 
-  // For students, we pass studentId via route params since profile doesn't include student relation yet
-  // If not passed, we use the fetched ID (for when student takes test themselves)
   const studentId = studentIdParam || fetchedStudentId;
 
   const { data: questions = [], isLoading: questionsLoading } = useTestQuestions(testId);
@@ -76,9 +67,9 @@ export function TestTakingScreen() {
   const [timeRemaining, setTimeRemaining] = useState(timeLimit || 0);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showQuestionPalette, setShowQuestionPalette] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [submissionScore, setSubmissionScore] = useState<{ earned: number; total: number } | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,31 +80,21 @@ export function TestTakingScreen() {
   // Initialize test attempt
   useEffect(() => {
     if (!studentId || !testId || attemptId) return;
-
     const initializeAttempt = async () => {
-      // Check if there's an existing in-progress attempt
       const inProgressAttempt = existingAttempts?.find((a) => a.status === 'in_progress');
-
-      // Reset timer flag for new attempt
       timerStartedRef.current = false;
       isSubmittedRef.current = false;
 
       if (inProgressAttempt) {
         setAttemptId(inProgressAttempt.id);
-        // Restore previous answers
         if (inProgressAttempt.answers && typeof inProgressAttempt.answers === 'object') {
           setAnswers(inProgressAttempt.answers as unknown as Record<string, Answer>);
         }
-        // Calculate time remaining if there's a time limit
         if (timeLimit) {
-          const elapsed = Math.floor(
-            (new Date().getTime() - new Date(inProgressAttempt.started_at || '').getTime()) / 1000
-          );
-          const remaining = Math.max(0, timeLimit - elapsed);
-          setTimeRemaining(remaining);
+          const elapsed = Math.floor((new Date().getTime() - new Date(inProgressAttempt.started_at || '').getTime()) / 1000);
+          setTimeRemaining(Math.max(0, timeLimit - elapsed));
         }
       } else {
-        // Create new attempt
         try {
           const newAttempt = await createAttempt.mutateAsync({
             test_id: testId,
@@ -122,208 +103,117 @@ export function TestTakingScreen() {
             status: 'in_progress',
           });
           setAttemptId(newAttempt.id);
-
-          // Set initial time remaining for new attempts
-          if (timeLimit) {
-            setTimeRemaining(timeLimit);
-          }
-        } catch (error: any) {
+          if (timeLimit) setTimeRemaining(timeLimit);
+        } catch {
           Alert.alert('Error', 'Failed to start test. Please try again.');
           router.back();
         }
       }
     };
-
     initializeAttempt();
   }, [studentId, testId, existingAttempts]);
 
-  // Timer countdown - using timestamp calculation for accuracy
+  // Timer
   useEffect(() => {
     if (!timeLimit || !attemptId || !existingAttempts) return;
-    if (isSubmittedRef.current) return;
-    if (timerStartedRef.current) return;
+    if (isSubmittedRef.current || timerStartedRef.current) return;
 
     const inProgressAttempt = existingAttempts?.find((a) => a.status === 'in_progress');
     const startTimePayload = inProgressAttempt?.started_at ? new Date(inProgressAttempt.started_at).getTime() : Date.now();
     const endTime = startTimePayload + (timeLimit * 1000);
 
     const startTimer = () => {
-      // Calculate initial remaining
-      const now = Date.now();
-      const initialRemaining = Math.max(0, Math.floor((endTime - now) / 1000));
-
-      if (initialRemaining <= 0 && !isSubmittedRef.current) {
-        handleAutoSubmit();
-        return;
-      }
-
+      const initialRemaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      if (initialRemaining <= 0 && !isSubmittedRef.current) { handleAutoSubmit(); return; }
       setTimeRemaining(initialRemaining);
       timerStartedRef.current = true;
 
       timerRef.current = setInterval(() => {
-        if (isSubmittedRef.current) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          return;
-        }
-
-        const currentNow = Date.now();
-        const remaining = Math.max(0, Math.floor((endTime - currentNow) / 1000));
-
+        if (isSubmittedRef.current) { if (timerRef.current) clearInterval(timerRef.current); return; }
+        const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
         setTimeRemaining(remaining);
-
-        if (remaining <= 0) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          handleAutoSubmit();
-        }
+        if (remaining <= 0) { if (timerRef.current) clearInterval(timerRef.current); handleAutoSubmit(); }
       }, 1000);
     };
 
-    // Small delay to ensure state ready
     const timer = setTimeout(startTimer, 100);
-
-    return () => {
-      clearTimeout(timer);
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => { clearTimeout(timer); if (timerRef.current) clearInterval(timerRef.current); };
   }, [timeLimit, attemptId, existingAttempts]);
 
-  // Auto-save functionality
+  // Auto-save
   useEffect(() => {
-    if (!attemptId) return;
-    if (isSubmittedRef.current) return; // Don't auto-save if already submitted
-
-    const currentAnswersStr = JSON.stringify(answers);
-
-    // Don't save if answers haven't changed
-    if (currentAnswersStr === lastSavedAnswersRef.current) return;
+    if (!attemptId || isSubmittedRef.current) return;
+    const currentStr = JSON.stringify(answers);
+    if (currentStr === lastSavedAnswersRef.current) return;
 
     autoSaveRef.current = setTimeout(() => {
-      if (!isSubmittedRef.current) {
-        saveAnswers();
-      }
-    }, 5000); // Auto-save every 5 seconds after a change
+      if (!isSubmittedRef.current) saveAnswers();
+    }, 5000);
 
-    return () => {
-      if (autoSaveRef.current) {
-        clearTimeout(autoSaveRef.current);
-      }
-    };
+    return () => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); };
   }, [answers, attemptId]);
 
-  // Prevent back button
+  // Back handler
   useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleBackPress();
-      return true;
-    });
-
-    return () => backHandler.remove();
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => { handleBackPress(); return true; });
+    return () => handler.remove();
   }, []);
 
-  // Cleanup all timers on unmount
+  // Cleanup
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (autoSaveRef.current) {
-        clearTimeout(autoSaveRef.current);
-      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
     };
   }, []);
 
   const saveAnswers = async () => {
     if (!attemptId) return;
-
+    const currentStr = JSON.stringify(answers);
+    if (currentStr === lastSavedAnswersRef.current) return;
+    setAutoSaveStatus('saving');
     try {
-      const currentAnswersStr = JSON.stringify(answers);
-
-      // Only save if changed
-      if (currentAnswersStr === lastSavedAnswersRef.current) return;
-
-      await updateAttempt.mutateAsync({
-        attemptId,
-        attemptData: {
-          answers,
-          status: 'in_progress',
-        },
-      });
-
-      lastSavedAnswersRef.current = currentAnswersStr;
-    } catch (error) {
-      // Answer save failed silently - will retry
+      await updateAttempt.mutateAsync({ attemptId, attemptData: { answers, status: 'in_progress' } });
+      lastSavedAnswersRef.current = currentStr;
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus('idle'), 3000);
+    } catch {
+      setAutoSaveStatus('error');
     }
   };
 
-  const calculateScore = () => {
+  const calculateScore = useCallback(() => {
     let earnedPoints = 0;
     let totalPoints = 0;
-
     questions.forEach((question) => {
       totalPoints += (question.points || 0);
       const answer = answers[question.id];
-
       if (!answer) return;
-
-      // Auto-grade MCQ and one_word questions
       if (question.question_type === 'mcq' && typeof answer.answer === 'number') {
-        if (answer.answer === question.correct_index) {
-          earnedPoints += (question.points || 0);
-        }
+        if (answer.answer === question.correct_index) earnedPoints += (question.points || 0);
       } else if (question.question_type === 'one_word' && typeof answer.answer === 'string') {
-        // Case-insensitive comparison, trim whitespace
-        const studentAnswer = answer.answer.trim().toLowerCase();
-        const correctAnswer = question.correct_text?.trim().toLowerCase() || '';
-        if (studentAnswer === correctAnswer) {
+        if (answer.answer.trim().toLowerCase() === (question.correct_text?.trim().toLowerCase() || '')) {
           earnedPoints += (question.points || 0);
         }
       }
-      // Long answer questions need manual grading, so we don't add points here
     });
-
     return { earnedPoints, totalPoints };
-  };
+  }, [questions, answers]);
 
   const handleAutoSubmit = async () => {
-    // Prevent double submission
     if (isSubmittedRef.current) return;
-
-    // Directly submit without confirmation since time is up
-    if (!attemptId) {
-      Alert.alert('Error', 'No active attempt found');
-      return;
-    }
-
+    if (!attemptId) { Alert.alert('Error', 'No active attempt found'); return; }
     isSubmittedRef.current = true;
     setIsSubmitting(true);
-
-    // Stop all timers
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    if (autoSaveRef.current) {
-      clearTimeout(autoSaveRef.current);
-      autoSaveRef.current = null;
-    }
-
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    if (autoSaveRef.current) { clearTimeout(autoSaveRef.current); autoSaveRef.current = null; }
     try {
       await saveAnswers();
-
       const { earnedPoints, totalPoints } = calculateScore();
-
-      await submitTest.mutateAsync({
-        attemptId,
-        finalAnswers: answers,
-        earnedPoints,
-        totalPoints,
-      });
-
-      // Show success animation
+      await submitTest.mutateAsync({ attemptId, finalAnswers: answers, earnedPoints, totalPoints });
       setSubmissionScore({ earned: earnedPoints, total: totalPoints });
       setShowSuccessAnimation(true);
-    } catch (error: any) {
-      // Auto-submit failed - alert shown below
+    } catch {
       Alert.alert('Error', 'Failed to submit test automatically. Please try again.');
       isSubmittedRef.current = false;
       setIsSubmitting(false);
@@ -331,147 +221,77 @@ export function TestTakingScreen() {
   };
 
   const handleBackPress = () => {
+    Alert.alert('Exit Test?', 'Your progress will be saved.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Exit', style: 'destructive', onPress: async () => { await saveAnswers(); router.back(); } },
+    ]);
+  };
+
+  const handleAnswerChange = (questionId: string, answer: any) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: { questionId, answer } }));
+  };
+
+  const toggleMarkForReview = () => {
+    const q = questions[currentQuestionIndex];
+    if (!q) return;
+    setMarkedForReview((prev) => {
+      const s = new Set(prev);
+      s.has(q.id) ? s.delete(q.id) : s.add(q.id);
+      return s;
+    });
+  };
+
+  const navigateToQuestion = (index: number) => {
+    if (index >= 0 && index < questions.length) setCurrentQuestionIndex(index);
+  };
+
+  const handleAnimationEnd = () => {
+    setShowSuccessAnimation(false);
+    if (submissionScore) {
+      Alert.alert('Test Submitted', `Score: ${submissionScore.earned}/${submissionScore.total} points`, [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } else { router.back(); }
+  };
+
+  const handleSubmit = async () => {
+    if (isSubmittedRef.current || !attemptId) return;
+    await saveAnswers();
     Alert.alert(
-      'Exit Test?',
-      'Are you sure you want to exit? Your progress will be saved.',
+      'Submit Test?',
+      `Answered ${Object.keys(answers).length} of ${questions.length} questions.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Exit',
+          text: 'Submit',
           style: 'destructive',
           onPress: async () => {
-            await saveAnswers();
-            router.back();
+            isSubmittedRef.current = true;
+            setIsSubmitting(true);
+            if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+            if (autoSaveRef.current) { clearTimeout(autoSaveRef.current); autoSaveRef.current = null; }
+            try {
+              const { earnedPoints, totalPoints } = calculateScore();
+              await submitTest.mutateAsync({ attemptId, finalAnswers: answers, earnedPoints, totalPoints });
+              setSubmissionScore({ earned: earnedPoints, total: totalPoints });
+              setShowSuccessAnimation(true);
+            } catch (error: any) {
+              Alert.alert('Error', error.message || 'Failed to submit test');
+              isSubmittedRef.current = false;
+              setIsSubmitting(false);
+            }
           },
         },
       ]
     );
   };
 
-  const handleAnswerChange = (questionId: string, answer: any) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        questionId,
-        answer,
-      },
-    }));
-  };
-
-  const toggleMarkForReview = () => {
-    const currentQuestion = questions[currentQuestionIndex];
-    if (!currentQuestion) return;
-
-    setMarkedForReview((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(currentQuestion.id)) {
-        newSet.delete(currentQuestion.id);
-      } else {
-        newSet.add(currentQuestion.id);
-      }
-      return newSet;
-    });
-  };
-
-  const navigateToQuestion = (index: number) => {
-    if (index >= 0 && index < questions.length) {
-      setCurrentQuestionIndex(index);
-      setShowQuestionPalette(false);
-    }
-  };
-
-  const handleAnimationEnd = () => {
-    setShowSuccessAnimation(false);
-
-    if (submissionScore) {
-      Alert.alert(
-        'Test Submitted',
-        `Your test has been submitted successfully!\n\nScore: ${submissionScore.earned}/${submissionScore.total} points`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
-    } else {
-      router.back();
-    }
-  };
-
-  const handleSubmit = async (autoSubmit = false) => {
-    // Prevent double submission
-    if (isSubmittedRef.current) return;
-
-    if (!attemptId) {
-      Alert.alert('Error', 'No active attempt found');
-      return;
-    }
-
-    // Save answers before submitting
-    await saveAnswers();
-
-    const confirmSubmit = () => {
-      Alert.alert(
-        'Submit Test?',
-        `You have answered ${Object.keys(answers).length} out of ${questions.length} questions. ${autoSubmit ? 'Time is up.' : 'Are you sure you want to submit?'
-        }`,
-        [
-          ...(autoSubmit ? [] : [{ text: 'Cancel', style: 'cancel' as const }]),
-          {
-            text: 'Submit',
-            style: 'destructive' as const,
-            onPress: async () => {
-              // Mark as submitted immediately
-              isSubmittedRef.current = true;
-              setIsSubmitting(true);
-
-              // Stop all timers immediately
-              if (timerRef.current) {
-                clearInterval(timerRef.current);
-                timerRef.current = null;
-              }
-              if (autoSaveRef.current) {
-                clearTimeout(autoSaveRef.current);
-                autoSaveRef.current = null;
-              }
-
-              try {
-                const { earnedPoints, totalPoints } = calculateScore();
-
-                await submitTest.mutateAsync({
-                  attemptId,
-                  finalAnswers: answers,
-                  earnedPoints,
-                  totalPoints,
-                });
-
-                // Show success animation
-                setSubmissionScore({ earned: earnedPoints, total: totalPoints });
-                setShowSuccessAnimation(true);
-              } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to submit test');
-                isSubmittedRef.current = false;
-                setIsSubmitting(false);
-              }
-            },
-          },
-        ]
-      );
-    };
-
-    confirmSubmit();
-  };
-
   const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
   };
 
   const getQuestionStatus = (questionId: string) => {
@@ -480,33 +300,23 @@ export function TestTakingScreen() {
     return 'unanswered';
   };
 
+  // Timer percentage for progress bar
+  const timerPercentage = timeLimit ? Math.round((timeRemaining / timeLimit) * 100) : 100;
+  const isTimerWarning = timeLimit ? timerPercentage <= 25 : false;
+
+  // Loading states
   if (questionsLoading || !attemptId || !studentId) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary[600]} />
-          <Text style={styles.loadingText}>Loading test...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <LoadingView message="Loading test..." />;
   }
 
   if (questions.length === 0) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <AlertCircle size={64} color={colors.error[500]} />
-          <Text style={styles.emptyText}>No questions available for this test</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
+    return <ErrorView message="No questions available for this test" onRetry={() => router.back()} />;
   }
 
   const currentQuestion = questions[currentQuestionIndex];
   const currentAnswer = answers[currentQuestion?.id];
+  const answeredCount = Object.keys(answers).length;
+  const completionPct = Math.round((answeredCount / questions.length) * 100);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -514,259 +324,186 @@ export function TestTakingScreen() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity onPress={handleBackPress} style={styles.backIcon}>
-            <ChevronLeft size={24} color={colors.text.primary} />
+            <MaterialIcons name="chevron-left" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <View>
-            <Text style={styles.headerTitle}>{testTitle}</Text>
-            <Text style={styles.headerSubtitle}>
-              Question {currentQuestionIndex + 1} of {questions.length}
-            </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle} numberOfLines={1}>{testTitle}</Text>
+            <View style={styles.headerMeta}>
+              <Text style={styles.headerSubtitle}>Q {currentQuestionIndex + 1}/{questions.length}</Text>
+              {/* Auto-save indicator */}
+              {autoSaveStatus === 'saving' && (
+                <View style={styles.autoSaveIndicator}>
+                  <MaterialIcons name="sync" size={12} color={colors.text.tertiary} />
+                  <Text style={styles.autoSaveText}>Saving...</Text>
+                </View>
+              )}
+              {autoSaveStatus === 'saved' && (
+                <View style={styles.autoSaveIndicator}>
+                  <MaterialIcons name="cloud-done" size={12} color={colors.success[600]} />
+                  <Text style={[styles.autoSaveText, { color: colors.success[600] }]}>Saved</Text>
+                </View>
+              )}
+              {autoSaveStatus === 'error' && (
+                <View style={styles.autoSaveIndicator}>
+                  <MaterialIcons name="cloud-off" size={12} color={colors.error[500]} />
+                  <Text style={[styles.autoSaveText, { color: colors.error[500] }]}>Error</Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
-        {timeLimit && (
-          <View style={[styles.timerContainer, timeRemaining < 300 && styles.timerWarning]}>
-            <Clock size={20} color={timeRemaining < 300 ? colors.error[600] : colors.primary[600]} />
-            <Text
-              style={[
-                styles.timerText,
-                timeRemaining < 300 && styles.timerTextWarning,
-              ]}
-            >
-              {formatTime(timeRemaining)}
-            </Text>
+        {timeLimit ? (
+          <View style={[styles.timerContainer, isTimerWarning && styles.timerWarning]}>
+            <MaterialIcons name="schedule" size={16} color={isTimerWarning ? colors.error[600] : colors.primary[600]} />
+            <Text style={[styles.timerText, isTimerWarning && styles.timerTextWarning]}>{formatTime(timeRemaining)}</Text>
           </View>
-        )}
+        ) : null}
       </View>
 
+      {/* Timer progress bar */}
+      {timeLimit ? (
+        <ProgressBar
+          progress={timerPercentage}
+          variant={isTimerWarning ? 'error' : 'primary'}
+          size="xs"
+          animated
+        />
+      ) : null}
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Question palette — always visible */}
+        <View style={styles.paletteRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.paletteScroll}>
+            {questions.map((q, index) => {
+              const status = getQuestionStatus(q.id);
+              const isActive = index === currentQuestionIndex;
+              return (
+                <TouchableOpacity
+                  key={q.id}
+                  style={[
+                    styles.paletteItem,
+                    isActive && styles.paletteItemActive,
+                    status === 'answered' && styles.paletteItemAnswered,
+                    status === 'marked' && styles.paletteItemMarked,
+                  ]}
+                  onPress={() => navigateToQuestion(index)}
+                >
+                  <Text style={[styles.paletteItemText, isActive && styles.paletteItemTextActive]}>
+                    {index + 1}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Completion progress */}
+        <View style={styles.completionRow}>
+          <Text style={styles.completionText}>{answeredCount}/{questions.length} answered</Text>
+          <ProgressBar progress={completionPct} variant="success" size="xs" style={{ flex: 1, marginLeft: spacing.sm }} />
+        </View>
+
         {/* Question Card */}
-        <View style={styles.questionCard}>
+        <Card variant="elevated" padding="lg" style={styles.questionCard}>
           <View style={styles.questionHeader}>
             <Text style={styles.questionNumber}>Q{currentQuestionIndex + 1}</Text>
-            <View style={styles.badges}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{currentQuestion.question_type.toUpperCase()}</Text>
-              </View>
-              <View style={[styles.badge, styles.badgePoints]}>
-                <Text style={styles.badgeText}>{currentQuestion.points} pts</Text>
-              </View>
+            <View style={styles.badgeRow}>
+              <Badge variant="info" size="xs">{currentQuestion.question_type.toUpperCase()}</Badge>
+              <Badge variant="success" size="xs">{currentQuestion.points} pts</Badge>
             </View>
           </View>
 
           <Text style={styles.questionText}>{currentQuestion.question_text}</Text>
 
-          {/* Answer Input */}
-          <View style={styles.answerSection}>
-            {currentQuestion.question_type === 'mcq' && currentQuestion.options && (
-              <View style={styles.optionsContainer}>
-                {currentQuestion.options.map((option, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.optionButton,
-                      currentAnswer?.answer === index && styles.optionButtonSelected,
-                    ]}
-                    onPress={() => handleAnswerChange(currentQuestion.id, index)}
-                  >
-                    <View
-                      style={[
-                        styles.radioButton,
-                        currentAnswer?.answer === index && styles.radioButtonSelected,
-                      ]}
-                    >
-                      {currentAnswer?.answer === index && <View style={styles.radioButtonInner} />}
-                    </View>
-                    <Text
-                      style={[
-                        styles.optionText,
-                        currentAnswer?.answer === index && styles.optionTextSelected,
-                      ]}
-                    >
-                      {option}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {currentQuestion.question_type === 'one_word' && (
-              <TextInput
-                style={styles.textInput}
-                placeholder="Enter your answer..."
-                value={currentAnswer?.answer || ''}
-                onChangeText={(text) => handleAnswerChange(currentQuestion.id, text)}
-                placeholderTextColor={colors.text.secondary}
-              />
-            )}
-
-            {currentQuestion.question_type === 'long_answer' && (
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder="Type your answer here..."
-                value={currentAnswer?.answer || ''}
-                onChangeText={(text) => handleAnswerChange(currentQuestion.id, text)}
-                multiline
-                numberOfLines={8}
-                textAlignVertical="top"
-                placeholderTextColor={colors.text.secondary}
-              />
-            )}
-          </View>
-
-          {/* Mark for Review */}
-          <TouchableOpacity style={styles.reviewButton} onPress={toggleMarkForReview}>
-            <Flag
-              size={20}
-              color={
-                markedForReview.has(currentQuestion.id) ? colors.warning[600] : colors.text.secondary
-              }
-              fill={markedForReview.has(currentQuestion.id) ? colors.warning[600] : 'none'}
-            />
-            <Text
-              style={[
-                styles.reviewButtonText,
-                markedForReview.has(currentQuestion.id) && styles.reviewButtonTextActive,
-              ]}
-            >
-              {markedForReview.has(currentQuestion.id) ? 'Marked for Review' : 'Mark for Review'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Question Palette */}
-        <TouchableOpacity
-          style={styles.paletteToggle}
-          onPress={() => setShowQuestionPalette(!showQuestionPalette)}
-        >
-          <Text style={styles.paletteToggleText}>
-            {showQuestionPalette ? 'Hide' : 'Show'} Question Overview
-          </Text>
-        </TouchableOpacity>
-
-        {showQuestionPalette && (
-          <View style={styles.questionPalette}>
-            <View style={styles.paletteHeader}>
-              <Text style={styles.paletteTitle}>All Questions</Text>
-              <View style={styles.paletteLegend}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, styles.legendAnswered]} />
-                  <Text style={styles.legendText}>Answered</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, styles.legendMarked]} />
-                  <Text style={styles.legendText}>Review</Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, styles.legendUnanswered]} />
-                  <Text style={styles.legendText}>Unanswered</Text>
-                </View>
-              </View>
-            </View>
-            <View style={styles.paletteGrid}>
-              {questions.map((q, index) => {
-                const status = getQuestionStatus(q.id);
+          {/* MCQ Options */}
+          {currentQuestion.question_type === 'mcq' && currentQuestion.options && (
+            <View style={styles.optionsContainer}>
+              {currentQuestion.options.map((option, index) => {
+                const isSelected = currentAnswer?.answer === index;
                 return (
                   <TouchableOpacity
-                    key={q.id}
-                    style={[
-                      styles.paletteItem,
-                      index === currentQuestionIndex && styles.paletteItemActive,
-                      status === 'answered' && styles.paletteItemAnswered,
-                      status === 'marked' && styles.paletteItemMarked,
-                    ]}
-                    onPress={() => navigateToQuestion(index)}
+                    key={index}
+                    style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
+                    onPress={() => handleAnswerChange(currentQuestion.id, index)}
                   >
-                    <Text
-                      style={[
-                        styles.paletteItemText,
-                        index === currentQuestionIndex && styles.paletteItemTextActive,
-                      ]}
-                    >
-                      {index + 1}
-                    </Text>
-                    {status === 'answered' && (
-                      <Check size={12} color={colors.success[600]} style={styles.checkIcon} />
-                    )}
-                    {status === 'marked' && (
-                      <Flag size={12} color={colors.warning[600]} style={styles.flagIcon} />
-                    )}
+                    <View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
+                      {isSelected && <View style={styles.radioButtonInner} />}
+                    </View>
+                    <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{option}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Progress Stats */}
-        <View style={styles.statsCard}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{Object.keys(answers).length}</Text>
-            <Text style={styles.statLabel}>Answered</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{markedForReview.size}</Text>
-            <Text style={styles.statLabel}>For Review</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {questions.length - Object.keys(answers).length}
+          {/* One word */}
+          {currentQuestion.question_type === 'one_word' && (
+            <Input
+              placeholder="Enter your answer..."
+              value={currentAnswer?.answer || ''}
+              onChangeText={(text) => handleAnswerChange(currentQuestion.id, text)}
+            />
+          )}
+
+          {/* Long answer */}
+          {currentQuestion.question_type === 'long_answer' && (
+            <Input
+              placeholder="Type your answer here..."
+              value={currentAnswer?.answer || ''}
+              onChangeText={(text) => handleAnswerChange(currentQuestion.id, text)}
+              multiline
+              numberOfLines={8}
+            />
+          )}
+
+          {/* Mark for review */}
+          <TouchableOpacity style={styles.reviewButton} onPress={toggleMarkForReview}>
+            <MaterialIcons
+              name="flag"
+              size={18}
+              color={markedForReview.has(currentQuestion.id) ? colors.warning[600] : colors.text.secondary}
+            />
+            <Text style={[styles.reviewButtonText, markedForReview.has(currentQuestion.id) && { color: colors.warning[600], fontWeight: typography.fontWeight.semibold }]}>
+              {markedForReview.has(currentQuestion.id) ? 'Marked for Review' : 'Mark for Review'}
             </Text>
-            <Text style={styles.statLabel}>Remaining</Text>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </Card>
       </ScrollView>
 
       {/* Navigation Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.navButton, currentQuestionIndex === 0 && styles.navButtonDisabled]}
+        <Button
+          variant="outline"
+          size="md"
           onPress={() => navigateToQuestion(currentQuestionIndex - 1)}
           disabled={currentQuestionIndex === 0}
+          style={styles.flex1}
         >
-          <ChevronLeft size={20} color={currentQuestionIndex === 0 ? colors.text.secondary : colors.primary[600]} />
-          <Text
-            style={[
-              styles.navButtonText,
-              currentQuestionIndex === 0 && styles.navButtonTextDisabled,
-            ]}
-          >
-            Previous
-          </Text>
-        </TouchableOpacity>
+          Previous
+        </Button>
 
         {currentQuestionIndex === questions.length - 1 ? (
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={() => handleSubmit(false)}
+          <Button
+            size="md"
+            onPress={handleSubmit}
+            loading={isSubmitting}
             disabled={isSubmitting}
+            style={styles.flex1}
           >
-            {isSubmitting ? (
-              <ActivityIndicator size="small" color={colors.text.inverse} />
-            ) : (
-              <>
-                <Check size={20} color={colors.text.inverse} />
-                <Text style={styles.submitButtonText}>Submit Test</Text>
-              </>
-            )}
-          </TouchableOpacity>
+            Submit Test
+          </Button>
         ) : (
-          <TouchableOpacity
-            style={styles.nextButton}
+          <Button
+            size="md"
             onPress={() => navigateToQuestion(currentQuestionIndex + 1)}
+            style={styles.flex1}
           >
-            <Text style={styles.nextButtonText}>Next</Text>
-            <ChevronRight size={20} color={colors.text.inverse} />
-          </TouchableOpacity>
+            Next
+          </Button>
         )}
       </View>
 
-      {/* Success Animation */}
-      <SuccessAnimation
-        visible={showSuccessAnimation}
-        onAnimationEnd={handleAnimationEnd}
-      />
+      <SuccessAnimation visible={showSuccessAnimation} onAnimationEnd={handleAnimationEnd} />
     </SafeAreaView>
   );
 }
@@ -775,50 +512,17 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background.primary,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    loadingText: {
-      marginTop: spacing.md,
-      fontSize: typography.fontSize.base,
-      color: colors.text.secondary,
-    },
-    emptyContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: spacing.xl,
-    },
-    emptyText: {
-      marginTop: spacing.md,
-      fontSize: typography.fontSize.lg,
-      color: colors.text.secondary,
-      textAlign: 'center',
-    },
-    backButton: {
-      marginTop: spacing.lg,
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
-      backgroundColor: colors.primary[600],
-      borderRadius: borderRadius.md,
-    },
-    backButtonText: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.text.inverse,
+      backgroundColor: colors.background.app,
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: spacing.lg,
-      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
       backgroundColor: colors.surface.primary,
-      ...shadows.sm,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border.light,
     },
     headerLeft: {
       flexDirection: 'row',
@@ -826,24 +530,38 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
       flex: 1,
     },
     backIcon: {
-      marginRight: spacing.md,
+      marginRight: spacing.sm,
     },
     headerTitle: {
-      fontSize: typography.fontSize.lg,
+      fontSize: typography.fontSize.base,
       fontWeight: typography.fontWeight.bold,
       color: colors.text.primary,
     },
-    headerSubtitle: {
-      fontSize: typography.fontSize.sm,
-      color: colors.text.secondary,
+    headerMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
       marginTop: 2,
+    },
+    headerSubtitle: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.secondary,
+    },
+    autoSaveIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+    autoSaveText: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.tertiary,
     },
     timerContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.xs,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
       backgroundColor: colors.primary[50],
       borderRadius: borderRadius.md,
     },
@@ -851,23 +569,63 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
       backgroundColor: colors.error[50],
     },
     timerText: {
-      fontSize: typography.fontSize.base,
+      fontSize: typography.fontSize.sm,
       fontWeight: typography.fontWeight.bold,
       color: colors.primary[600],
+      fontVariant: ['tabular-nums'],
     },
     timerTextWarning: {
       color: colors.error[600],
     },
     content: {
       flex: 1,
-      padding: spacing.lg,
+      padding: spacing.md,
+    },
+    paletteRow: {
+      marginBottom: spacing.sm,
+    },
+    paletteScroll: {
+      gap: spacing.xs,
+      paddingRight: spacing.md,
+    },
+    paletteItem: {
+      width: 36,
+      height: 36,
+      borderRadius: borderRadius.sm,
+      backgroundColor: colors.neutral[200],
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    paletteItemActive: {
+      borderWidth: 2,
+      borderColor: colors.primary[600],
+    },
+    paletteItemAnswered: {
+      backgroundColor: colors.success[100],
+    },
+    paletteItemMarked: {
+      backgroundColor: colors.warning[100],
+    },
+    paletteItemText: {
+      fontSize: typography.fontSize.sm,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.text.primary,
+    },
+    paletteItemTextActive: {
+      color: colors.primary[600],
+    },
+    completionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    completionText: {
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.medium,
+      color: colors.text.secondary,
     },
     questionCard: {
-      backgroundColor: colors.surface.primary,
-      borderRadius: borderRadius.lg,
-      padding: spacing.lg,
       marginBottom: spacing.md,
-      ...shadows.md,
     },
     questionHeader: {
       flexDirection: 'row',
@@ -880,23 +638,9 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
       fontWeight: typography.fontWeight.bold,
       color: colors.primary[600],
     },
-    badges: {
+    badgeRow: {
       flexDirection: 'row',
       gap: spacing.xs,
-    },
-    badge: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.xs,
-      borderRadius: borderRadius.sm,
-      backgroundColor: colors.primary[100],
-    },
-    badgePoints: {
-      backgroundColor: colors.success[100],
-    },
-    badgeText: {
-      fontSize: typography.fontSize.xs,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.primary[700],
     },
     questionText: {
       fontSize: typography.fontSize.lg,
@@ -904,11 +648,9 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
       color: colors.text.primary,
       marginBottom: spacing.lg,
     },
-    answerSection: {
-      marginBottom: spacing.md,
-    },
     optionsContainer: {
-      gap: spacing.md,
+      gap: spacing.sm,
+      marginBottom: spacing.md,
     },
     optionButton: {
       flexDirection: 'row',
@@ -925,9 +667,9 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
       backgroundColor: colors.primary[50],
     },
     radioButton: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
       borderWidth: 2,
       borderColor: colors.border.DEFAULT,
       justifyContent: 'center',
@@ -951,225 +693,30 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
       fontWeight: typography.fontWeight.semibold,
       color: colors.primary[700],
     },
-    textInput: {
-      backgroundColor: colors.surface.secondary,
-      borderWidth: 1,
-      borderColor: colors.border.DEFAULT,
-      borderRadius: borderRadius.md,
-      padding: spacing.md,
-      fontSize: typography.fontSize.base,
-      color: colors.text.primary,
-    },
-    textArea: {
-      height: 150,
-      textAlignVertical: 'top',
-    },
     reviewButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.sm,
-      padding: spacing.md,
+      paddingVertical: spacing.sm,
+      marginTop: spacing.sm,
       borderRadius: borderRadius.md,
       borderWidth: 1,
-      borderColor: colors.border.DEFAULT,
-      backgroundColor: colors.surface.secondary,
+      borderColor: colors.border.light,
     },
     reviewButtonText: {
-      fontSize: typography.fontSize.base,
-      color: colors.text.secondary,
-    },
-    reviewButtonTextActive: {
-      color: colors.warning[600],
-      fontWeight: typography.fontWeight.semibold,
-    },
-    paletteToggle: {
-      padding: spacing.md,
-      backgroundColor: colors.surface.primary,
-      borderRadius: borderRadius.md,
-      alignItems: 'center',
-      marginBottom: spacing.md,
-      ...shadows.sm,
-    },
-    paletteToggleText: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.primary[600],
-    },
-    questionPalette: {
-      backgroundColor: colors.surface.primary,
-      borderRadius: borderRadius.lg,
-      padding: spacing.lg,
-      marginBottom: spacing.md,
-      ...shadows.sm,
-    },
-    paletteHeader: {
-      marginBottom: spacing.md,
-    },
-    paletteTitle: {
-      fontSize: typography.fontSize.lg,
-      fontWeight: typography.fontWeight.bold,
-      color: colors.text.primary,
-      marginBottom: spacing.sm,
-    },
-    paletteLegend: {
-      flexDirection: 'row',
-      gap: spacing.md,
-      flexWrap: 'wrap',
-    },
-    legendItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.xs,
-    },
-    legendDot: {
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-    },
-    legendAnswered: {
-      backgroundColor: colors.success[500],
-    },
-    legendMarked: {
-      backgroundColor: colors.warning[500],
-    },
-    legendUnanswered: {
-      backgroundColor: colors.neutral[300],
-    },
-    legendText: {
       fontSize: typography.fontSize.sm,
       color: colors.text.secondary,
-    },
-    paletteGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.sm,
-    },
-    paletteItem: {
-      width: 48,
-      height: 48,
-      borderRadius: borderRadius.md,
-      backgroundColor: colors.neutral[200],
-      justifyContent: 'center',
-      alignItems: 'center',
-      position: 'relative',
-    },
-    paletteItemActive: {
-      borderWidth: 2,
-      borderColor: colors.primary[600],
-    },
-    paletteItemAnswered: {
-      backgroundColor: colors.success[100],
-    },
-    paletteItemMarked: {
-      backgroundColor: colors.warning[100],
-    },
-    paletteItemText: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.text.primary,
-    },
-    paletteItemTextActive: {
-      color: colors.primary[600],
-    },
-    checkIcon: {
-      position: 'absolute',
-      top: 2,
-      right: 2,
-    },
-    flagIcon: {
-      position: 'absolute',
-      top: 2,
-      right: 2,
-    },
-    statsCard: {
-      flexDirection: 'row',
-      backgroundColor: colors.surface.primary,
-      borderRadius: borderRadius.lg,
-      padding: spacing.lg,
-      marginBottom: spacing.md,
-      ...shadows.sm,
-    },
-    statItem: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    statValue: {
-      fontSize: typography.fontSize['2xl'],
-      fontWeight: typography.fontWeight.bold,
-      color: colors.primary[600],
-    },
-    statLabel: {
-      fontSize: typography.fontSize.sm,
-      color: colors.text.secondary,
-      marginTop: spacing.xs,
-    },
-    statDivider: {
-      width: 1,
-      backgroundColor: colors.border.DEFAULT,
     },
     footer: {
       flexDirection: 'row',
       gap: spacing.md,
-      padding: spacing.lg,
+      padding: spacing.md,
       backgroundColor: colors.surface.primary,
       borderTopWidth: 1,
-      borderTopColor: colors.border.DEFAULT,
-      ...shadows.sm,
+      borderTopColor: colors.border.light,
     },
-    navButton: {
+    flex1: {
       flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      padding: spacing.md,
-      borderRadius: borderRadius.md,
-      borderWidth: 1,
-      borderColor: colors.primary[600],
-      backgroundColor: colors.surface.secondary,
-    },
-    navButtonDisabled: {
-      borderColor: colors.border.DEFAULT,
-      backgroundColor: colors.surface.secondary,
-      opacity: 0.5,
-    },
-    navButtonText: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.primary[600],
-    },
-    navButtonTextDisabled: {
-      color: colors.text.secondary,
-    },
-    nextButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      padding: spacing.md,
-      borderRadius: borderRadius.md,
-      backgroundColor: colors.primary[600],
-    },
-    nextButtonText: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.text.inverse,
-    },
-    submitButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
-      padding: spacing.md,
-      borderRadius: borderRadius.md,
-      backgroundColor: colors.success[600],
-    },
-    submitButtonText: {
-      fontSize: typography.fontSize.base,
-      fontWeight: typography.fontWeight.semibold,
-      color: colors.text.inverse,
     },
   });

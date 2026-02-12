@@ -1,12 +1,12 @@
 /**
  * ResourcesScreen
  *
- * Production-quality learning resources browser.
+ * Intent-driven content workspace for learning resources.
  * Students see only their class resources; admins see all with class filter.
- * Modern card-based UI with pill tabs, animated bottom sheets, and clear hierarchy.
+ * Clean hierarchy: Search → Filters → Segmented type → Content cards.
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -21,25 +21,10 @@ import {
   Platform,
   ActivityIndicator,
   Dimensions,
+  TextInput,
 } from 'react-native';
-import { Text } from 'react-native-paper';
-import {
-  BookOpen,
-  FileText,
-  Video as VideoIcon,
-  Plus,
-  Edit2,
-  Trash2,
-  Download,
-  ChevronDown,
-  Filter,
-  Library,
-  PlayCircle,
-  File,
-  Search,
-  GraduationCap,
-  Check,
-} from 'lucide-react-native';
+import { Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   downloadAsync,
@@ -56,8 +41,7 @@ import { useCapabilities } from '../../hooks/useCapabilities';
 import { useInfiniteResources, useClassResources } from '../../hooks/useResources';
 import { useClasses } from '../../hooks/useClasses';
 import { useSubjects } from '../../hooks/useSubjects';
-import { LoadingView, ErrorView } from '../../components/ui';
-import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
+import { LoadingView, ErrorView, EmptyStateIllustration, FAB, Menu, IconButton } from '../../ui';
 import { VideoPlayer } from '../../components/resources/VideoPlayer';
 import { PDFViewer } from '../../components/resources/PDFViewer';
 import { AddResourceModal } from '../../components/resources/AddResourceModal';
@@ -67,15 +51,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // ─── Type-safe tab config ──────────────────────────────────────────
 type TabKey = 'all' | 'lectures' | 'study_materials';
-interface TabConfig {
-  key: TabKey;
-  label: string;
-  icon: React.ElementType;
-}
-const TABS: TabConfig[] = [
-  { key: 'all', label: 'All', icon: Library },
-  { key: 'lectures', label: 'Videos', icon: PlayCircle },
-  { key: 'study_materials', label: 'Documents', icon: File },
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'lectures', label: 'Videos' },
+  { key: 'study_materials', label: 'Documents' },
 ];
 
 export default function ResourcesScreen() {
@@ -121,19 +100,21 @@ export default function ResourcesScreen() {
   const [selectedResource, setSelectedResource] = useState<LearningResource | null>(null);
   const [viewerType, setViewerType] = useState<'video' | 'pdf' | null>(null);
   const [selectedClass, setSelectedClass] = useState<string | null>(
-    profile?.class_instance_id ?? null,
+    profile?.class_instance_id ?? 'all',
   );
-  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>('all');
   const [selectedTab, setSelectedTab] = useState<TabKey>('all');
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingResource, setEditingResource] = useState<LearningResource | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [overflowMenuId, setOverflowMenuId] = useState<string | null>(null);
 
   // Bottom-sheet animations
-  const classSlideAnim = React.useRef(new Animated.Value(0)).current;
-  const subjectSlideAnim = React.useRef(new Animated.Value(0)).current;
-  const overlayOpacity = React.useRef(new Animated.Value(0)).current;
+  const classSlideAnim = useRef(new Animated.Value(0)).current;
+  const subjectSlideAnim = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   const styles = useMemo(
     () => createStyles(colors, spacing, borderRadius, typography, shadows, isDark),
@@ -146,30 +127,14 @@ export default function ResourcesScreen() {
       switch (type.toLowerCase()) {
         case 'pdf':
         case 'document':
-          return { color: colors.error.main, bg: colors.error[100], label: 'PDF' };
+          return { color: colors.error[600], bg: colors.error[50], icon: 'picture-as-pdf' as const, label: 'PDF' };
         case 'video':
-          return { color: colors.primary.main, bg: colors.primary[100], label: 'Video' };
+          return { color: colors.primary[600], bg: colors.primary[50], icon: 'play-circle-filled' as const, label: 'Video' };
         default:
-          return { color: colors.info.main, bg: colors.info[100], label: 'File' };
+          return { color: colors.info[600], bg: colors.info[50], icon: 'insert-drive-file' as const, label: 'File' };
       }
     },
     [colors],
-  );
-
-  const getResourceIcon = useCallback(
-    (type: string, size = 22) => {
-      const { color } = getResourceAccent(type);
-      switch (type.toLowerCase()) {
-        case 'pdf':
-        case 'document':
-          return <FileText size={size} color={color} />;
-        case 'video':
-          return <PlayCircle size={size} color={color} />;
-        default:
-          return <BookOpen size={size} color={color} />;
-      }
-    },
-    [getResourceAccent],
   );
 
   const getClassDisplay = useCallback(
@@ -194,16 +159,16 @@ export default function ResourcesScreen() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }, []);
 
-  const studentClassName = useMemo(() => {
-    if (!isStudentView || !profile?.class_instance_id) return '';
-    const cls = classes.find((c) => c.id === profile.class_instance_id);
-    return cls ? `${cls.grade}-${cls.section}` : '';
-  }, [isStudentView, profile?.class_instance_id, classes]);
-
   // ── Filtered data ──────────────────────────────────────────────
   const filteredResources = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
     return (
       resources?.filter((resource) => {
+        // Search filter
+        if (query && !resource.title.toLowerCase().includes(query) &&
+            !(resource.description || '').toLowerCase().includes(query)) {
+          return false;
+        }
         if (selectedClass && selectedClass !== 'all' && resource.class_instance_id !== selectedClass)
           return false;
         if (selectedSubject && selectedSubject !== 'all' && resource.subject_id !== selectedSubject)
@@ -218,24 +183,7 @@ export default function ResourcesScreen() {
         }
       }) || []
     );
-  }, [resources, selectedClass, selectedSubject, selectedTab]);
-
-  // ── Resource counts by tab ─────────────────────────────────────
-  const tabCounts = useMemo(() => {
-    const baseFiltered =
-      resources?.filter((r) => {
-        if (selectedClass && selectedClass !== 'all' && r.class_instance_id !== selectedClass) return false;
-        if (selectedSubject && selectedSubject !== 'all' && r.subject_id !== selectedSubject) return false;
-        return true;
-      }) || [];
-    return {
-      all: baseFiltered.length,
-      lectures: baseFiltered.filter((r) => r.resource_type.toLowerCase() === 'video').length,
-      study_materials: baseFiltered.filter((r) =>
-        ['pdf', 'document'].includes(r.resource_type.toLowerCase()),
-      ).length,
-    };
-  }, [resources, selectedClass, selectedSubject]);
+  }, [resources, selectedClass, selectedSubject, selectedTab, searchQuery]);
 
   // ── Handlers ───────────────────────────────────────────────────
   const handleOpenResource = useCallback((resource: LearningResource) => {
@@ -289,7 +237,6 @@ export default function ResourcesScreen() {
       return;
     }
 
-    // Build a safe local cache path
     const urlParts = resource.content_url.split('/');
     const rawName = urlParts[urlParts.length - 1] || `${resource.title}.pdf`;
     const safeName = rawName.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -297,20 +244,15 @@ export default function ResourcesScreen() {
 
     setDownloadingId(resource.id);
     try {
-      // Step 1: Download to cache
       const result = await downloadAsync(resource.content_url, cachePath);
       if (result.status !== 200) {
-        // Download returned non-200 status
         Alert.alert('Download Failed', 'Could not download the file. Please try again.');
         return;
       }
 
-      // Step 2: Save to device
       if (Platform.OS === 'android') {
-        // Android: Save directly to user-chosen folder (usually Downloads)
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         if (!permissions.granted) {
-          // User cancelled -- file is still in cache, no error
           Alert.alert('Cancelled', 'Download was cancelled.');
           return;
         }
@@ -321,7 +263,6 @@ export default function ResourcesScreen() {
           safeName,
           mimeType,
         );
-        // Read from cache and write to the chosen location
         const fileContent = await readAsStringAsync(cachePath, {
           encoding: EncodingType.Base64,
         });
@@ -331,7 +272,6 @@ export default function ResourcesScreen() {
 
         Alert.alert('Saved', `"${resource.title}" has been saved to your device.`);
       } else {
-        // iOS: Use share sheet so user can save to Files app
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
           await Sharing.shareAsync(result.uri, {
@@ -343,7 +283,6 @@ export default function ResourcesScreen() {
         }
       }
     } catch (err) {
-      // Download error - alert shown below
       Alert.alert('Error', 'Something went wrong while downloading. Please try again.');
     } finally {
       setDownloadingId(null);
@@ -424,52 +363,33 @@ export default function ResourcesScreen() {
       ? 'All Subjects'
       : subjects.find((s) => s.id === selectedSubject)?.subject_name || 'Subject';
 
+  const totalCount = filteredResources.length;
+
   // ── Header ─────────────────────────────────────────────────────
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-      {/* Hero area */}
-      <View style={styles.heroSection}>
-        <View style={styles.heroTop}>
-          <View>
-            <Text style={styles.heroTitle}>
-              {isStudentView ? 'My Resources' : 'Resources'}
-            </Text>
-            <Text style={styles.heroSubtitle}>
-              {isStudentView && studentClassName
-                ? `Class ${studentClassName}`
-                : `${filteredResources.length} learning material${filteredResources.length !== 1 ? 's' : ''}`}
-            </Text>
-          </View>
-          <View style={styles.heroIconContainer}>
-            <GraduationCap size={28} color={colors.primary.main} />
-          </View>
-        </View>
-
-        {/* Quick stats row */}
-        <View style={styles.quickStatsRow}>
-          <View style={styles.quickStat}>
-            <Text style={styles.quickStatValue}>{tabCounts.all}</Text>
-            <Text style={styles.quickStatLabel}>Total</Text>
-          </View>
-          <View style={[styles.quickStatDivider, { backgroundColor: colors.border.light }]} />
-          <View style={styles.quickStat}>
-            <Text style={[styles.quickStatValue, { color: colors.primary.main }]}>
-              {tabCounts.lectures}
-            </Text>
-            <Text style={styles.quickStatLabel}>Videos</Text>
-          </View>
-          <View style={[styles.quickStatDivider, { backgroundColor: colors.border.light }]} />
-          <View style={styles.quickStat}>
-            <Text style={[styles.quickStatValue, { color: colors.error.main }]}>
-              {tabCounts.study_materials}
-            </Text>
-            <Text style={styles.quickStatLabel}>Documents</Text>
-          </View>
+      {/* Search bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <MaterialIcons name="search" size={20} color={colors.text.tertiary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search resources..."
+            placeholderTextColor={colors.text.tertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <MaterialIcons name="close" size={18} color={colors.text.tertiary} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* Filter chips (admin only: class + subject, student: subject only) */}
-      <View style={styles.filterChipsRow}>
+      {/* Primary filters: Class + Subject */}
+      <View style={styles.filterRow}>
         {!isStudentView && (
           <TouchableOpacity
             style={[
@@ -479,14 +399,6 @@ export default function ResourcesScreen() {
             onPress={() => setShowClassDropdown(true)}
             activeOpacity={0.7}
           >
-            <BookOpen
-              size={14}
-              color={
-                selectedClass && selectedClass !== 'all'
-                  ? colors.primary.main
-                  : colors.text.secondary
-              }
-            />
             <Text
               style={[
                 styles.filterChipText,
@@ -496,11 +408,12 @@ export default function ResourcesScreen() {
             >
               {selectedClassName}
             </Text>
-            <ChevronDown
-              size={14}
+            <MaterialIcons
+              name="keyboard-arrow-down"
+              size={16}
               color={
                 selectedClass && selectedClass !== 'all'
-                  ? colors.primary.main
+                  ? colors.primary[600]
                   : colors.text.tertiary
               }
             />
@@ -514,14 +427,6 @@ export default function ResourcesScreen() {
           onPress={() => setShowSubjectDropdown(true)}
           activeOpacity={0.7}
         >
-          <Filter
-            size={14}
-            color={
-              selectedSubject && selectedSubject !== 'all'
-                ? colors.primary.main
-                : colors.text.secondary
-            }
-          />
           <Text
             style={[
               styles.filterChipText,
@@ -531,60 +436,40 @@ export default function ResourcesScreen() {
           >
             {selectedSubjectName}
           </Text>
-          <ChevronDown
-            size={14}
+          <MaterialIcons
+            name="keyboard-arrow-down"
+            size={16}
             color={
               selectedSubject && selectedSubject !== 'all'
-                ? colors.primary.main
+                ? colors.primary[600]
                 : colors.text.tertiary
             }
           />
         </TouchableOpacity>
       </View>
 
-      {/* Pill tabs */}
-      <View style={styles.tabBarContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBarScroll}>
+      {/* Segmented control: All / Videos / Documents */}
+      <View style={styles.segmentedContainer}>
+        <View style={styles.segmentedControl}>
           {TABS.map((tab) => {
             const isActive = selectedTab === tab.key;
-            const Icon = tab.icon;
             return (
               <TouchableOpacity
                 key={tab.key}
-                style={[styles.tabPill, isActive && styles.tabPillActive]}
+                style={[styles.segmentItem, isActive && styles.segmentItemActive]}
                 onPress={() => setSelectedTab(tab.key)}
                 activeOpacity={0.7}
               >
-                <Icon
-                  size={15}
-                  color={isActive ? colors.text.inverse : colors.text.secondary}
-                />
-                <Text style={[styles.tabPillText, isActive && styles.tabPillTextActive]}>
+                <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>
                   {tab.label}
                 </Text>
-                <View
-                  style={[
-                    styles.tabCountBadge,
-                    {
-                      backgroundColor: isActive
-                        ? 'rgba(255,255,255,0.25)'
-                        : colors.background.secondary,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.tabCountText,
-                      { color: isActive ? colors.text.inverse : colors.text.tertiary },
-                    ]}
-                  >
-                    {tabCounts[tab.key]}
-                  </Text>
-                </View>
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
+        <Text style={styles.resultCount}>
+          {totalCount} {totalCount === 1 ? 'resource' : 'resources'}
+        </Text>
       </View>
     </View>
   );
@@ -594,20 +479,24 @@ export default function ResourcesScreen() {
     const accent = getResourceAccent(resource.resource_type);
     const className = getClassDisplay(resource.class_instance_id);
     const date = formatDate(resource.created_at);
+    const isMenuOpen = overflowMenuId === resource.id;
 
     return (
       <Pressable
-        onPress={() => handleOpenResource(resource)}
-        style={({ pressed }) => [styles.resourceCard, pressed && styles.resourceCardPressed]}
+        onPress={() => {
+          if (isMenuOpen) {
+            setOverflowMenuId(null);
+            return;
+          }
+          handleOpenResource(resource);
+        }}
+        style={({ pressed }) => [styles.resourceCard, pressed && !isMenuOpen && styles.resourceCardPressed]}
         disabled={!resource.content_url}
       >
-        {/* Left accent bar */}
-        <View style={[styles.accentBar, { backgroundColor: accent.color }]} />
-
         <View style={styles.cardBody}>
-          {/* Icon */}
+          {/* Icon with tinted background */}
           <View style={[styles.resourceIconBox, { backgroundColor: accent.bg }]}>
-            {getResourceIcon(resource.resource_type, 22)}
+            <MaterialIcons name={accent.icon} size={26} color={accent.color} />
           </View>
 
           {/* Content */}
@@ -621,60 +510,42 @@ export default function ResourcesScreen() {
               </Text>
             ) : null}
             <View style={styles.resourceMeta}>
-              {/* Type badge */}
-              <View style={[styles.typeBadge, { backgroundColor: accent.bg }]}>
-                <Text style={[styles.typeBadgeText, { color: accent.color }]}>{accent.label}</Text>
-              </View>
+              <Text style={[styles.metaLabel, { color: accent.color }]}>{accent.label}</Text>
               {className && !isStudentView ? (
                 <>
-                  <View style={styles.dot} />
+                  <Text style={styles.metaDot}>·</Text>
                   <Text style={styles.metaText}>{className}</Text>
                 </>
               ) : null}
               {date ? (
                 <>
-                  <View style={styles.dot} />
+                  <Text style={styles.metaDot}>·</Text>
                   <Text style={styles.metaText}>{date}</Text>
                 </>
               ) : null}
             </View>
           </View>
 
-          {/* Actions */}
-          <View style={styles.cardActions}>
+          {/* Overflow menu */}
+          <Menu
+            visible={isMenuOpen}
+            onDismiss={() => setOverflowMenuId(null)}
+            anchor={
+              <IconButton
+                icon="more-vert"
+                variant="ghost"
+                size="sm"
+                onPress={() => setOverflowMenuId(isMenuOpen ? null : resource.id)}
+              />
+            }
+          >
             {resource.content_url && (
-              <TouchableOpacity
-                onPress={() => handleDownloadResource(resource)}
-                style={styles.actionButton}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                disabled={downloadingId === resource.id}
-              >
-                {downloadingId === resource.id ? (
-                  <ActivityIndicator size={18} color={colors.primary.main} />
-                ) : (
-                  <Download size={20} color={colors.text.secondary} />
-                )}
-              </TouchableOpacity>
+              <Menu.Item title="Download" icon="download" onPress={() => { setOverflowMenuId(null); handleDownloadResource(resource); }} />
             )}
-            {canManage && (
-              <>
-                <TouchableOpacity
-                  onPress={() => handleEditResource(resource)}
-                  style={styles.actionButton}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Edit2 size={16} color={colors.text.tertiary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => handleDeleteResource(resource)}
-                  style={styles.actionButton}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Trash2 size={16} color={colors.error.main} />
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
+            {canManage && <Menu.Item title="Edit" icon="edit" onPress={() => { setOverflowMenuId(null); handleEditResource(resource); }} />}
+            {canManage && <Menu.Divider />}
+            {canManage && <Menu.Item title="Delete" icon="delete" onPress={() => { setOverflowMenuId(null); handleDeleteResource(resource); }} destructive />}
+          </Menu>
         </View>
       </Pressable>
     );
@@ -724,60 +595,44 @@ export default function ResourcesScreen() {
     label: string,
     isActive: boolean,
     onPress: () => void,
-    subtitle?: string,
   ) => (
     <TouchableOpacity
       style={[styles.sheetOption, isActive && styles.sheetOptionActive]}
       onPress={onPress}
       activeOpacity={0.6}
     >
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.sheetOptionText, isActive && styles.sheetOptionTextActive]}>
-          {label}
-        </Text>
-        {subtitle ? <Text style={styles.sheetOptionSubtitle}>{subtitle}</Text> : null}
-      </View>
+      <Text style={[styles.sheetOptionText, isActive && styles.sheetOptionTextActive]}>
+        {label}
+      </Text>
       {isActive && (
         <View style={styles.sheetCheck}>
-          <Check size={16} color={colors.text.inverse} />
+          <MaterialIcons name="check" size={16} color={colors.text.inverse} />
         </View>
       )}
     </TouchableOpacity>
   );
 
-  // ── No class selected (admin only) ────────────────────────────
-  const needsClassSelection = !isStudentView && !selectedClass;
-
   // ── Main render ────────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      {needsClassSelection ? (
-        <View style={{ flex: 1 }}>
-          {renderHeader()}
-          <View style={styles.emptyContainer}>
-            <EmptyStateIllustration
-              type="search"
-              title="Select a Class"
-              description="Choose a class from the filter above to view resources"
-            />
-          </View>
-        </View>
-      ) : filteredResources.length === 0 ? (
+      {filteredResources.length === 0 ? (
         <View style={{ flex: 1 }}>
           {renderHeader()}
           <View style={styles.emptyContainer}>
             <EmptyStateIllustration
               type="resources"
-              title="No Resources Yet"
+              title={searchQuery ? 'No Results' : 'No Resources Yet'}
               description={
-                isStudentView
-                  ? 'No learning materials available for your class yet'
-                  : 'No resources match the selected filters'
+                searchQuery
+                  ? `No resources match "${searchQuery}"`
+                  : isStudentView
+                    ? 'No learning materials available for your class yet'
+                    : 'No resources match the selected filters'
               }
               action={
-                canManage ? (
+                canManage && !searchQuery ? (
                   <TouchableOpacity style={styles.addButton} onPress={handleAddResource}>
-                    <Plus size={18} color={colors.text.inverse} />
+                    <MaterialIcons name="add" size={18} color={colors.text.inverse} />
                     <Text style={styles.addButtonText}>Add Resource</Text>
                   </TouchableOpacity>
                 ) : undefined
@@ -802,8 +657,8 @@ export default function ResourcesScreen() {
           onEndReachedThreshold={0.5}
           ListFooterComponent={
             isFetchingNextPage ? (
-              <View style={{ paddingVertical: 16 }}>
-                <ActivityIndicator size="small" color={colors.primary.main} />
+              <View style={{ paddingVertical: 20 }}>
+                <ActivityIndicator size="small" color={colors.primary[600]} />
               </View>
             ) : null
           }
@@ -812,11 +667,7 @@ export default function ResourcesScreen() {
       )}
 
       {/* FAB */}
-      {canManage && (
-        <TouchableOpacity onPress={handleAddResource} style={styles.fab} activeOpacity={0.85}>
-          <Plus size={24} color={colors.text.inverse} strokeWidth={2.5} />
-        </TouchableOpacity>
-      )}
+      <FAB icon="add" onPress={handleAddResource} visible={canManage} />
 
       {/* Class bottom sheet */}
       {renderBottomSheet(
@@ -927,7 +778,7 @@ const createStyles = (
       backgroundColor: colors.background.secondary,
     },
     listContent: {
-      paddingBottom: 100,
+      paddingBottom: 120, // extra room so FAB doesn't overlap last card
     },
     emptyContainer: {
       flex: 1,
@@ -936,79 +787,36 @@ const createStyles = (
       paddingHorizontal: spacing.xl,
     },
 
-    // ── Hero Header ────────────────────────────────────────────
+    // ── Header ────────────────────────────────────────────────
     headerContainer: {
-      paddingBottom: spacing.xs,
+      paddingBottom: spacing.md,
     },
-    heroSection: {
-      marginHorizontal: spacing.md,
-      marginTop: spacing.md,
+
+    // ── Search ────────────────────────────────────────────────
+    searchContainer: {
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.sm,
+      paddingBottom: 4,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
       backgroundColor: colors.surface.primary,
       borderRadius: borderRadius.xl,
-      padding: spacing.lg,
+      paddingHorizontal: 14,
+      paddingVertical: Platform.OS === 'ios' ? 10 : 4,
+      gap: 10,
       ...shadows.sm,
-      borderWidth: isDark ? 1 : 0,
-      borderColor: colors.border.DEFAULT,
     },
-    heroTop: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: spacing.lg,
-    },
-    heroTitle: {
-      fontSize: 22,
-      fontWeight: '700' as const,
-      color: colors.text.primary,
-      letterSpacing: -0.3,
-    },
-    heroSubtitle: {
-      fontSize: typography.fontSize.sm,
-      fontWeight: '500' as const,
-      color: colors.text.secondary,
-      marginTop: 2,
-    },
-    heroIconContainer: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
-      backgroundColor: colors.primary[100],
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-
-    // ── Quick Stats ────────────────────────────────────────────
-    quickStatsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.background.secondary,
-      borderRadius: borderRadius.lg,
-      paddingVertical: 12,
-      paddingHorizontal: spacing.sm,
-    },
-    quickStat: {
+    searchInput: {
       flex: 1,
-      alignItems: 'center',
-    },
-    quickStatValue: {
-      fontSize: 20,
-      fontWeight: '700' as const,
+      fontSize: 15,
       color: colors.text.primary,
-    },
-    quickStatLabel: {
-      fontSize: 11,
-      fontWeight: '500' as const,
-      color: colors.text.tertiary,
-      marginTop: 1,
-    },
-    quickStatDivider: {
-      width: 1,
-      height: 28,
-      borderRadius: 0.5,
+      paddingVertical: 0,
     },
 
-    // ── Filter Chips ───────────────────────────────────────────
-    filterChipsRow: {
+    // ── Primary Filters ───────────────────────────────────────
+    filterRow: {
       flexDirection: 'row',
       paddingHorizontal: spacing.md,
       paddingTop: spacing.sm,
@@ -1018,102 +826,88 @@ const createStyles = (
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      justifyContent: 'center',
+      gap: 4,
       backgroundColor: colors.surface.primary,
-      borderRadius: borderRadius.full,
-      paddingVertical: 10,
+      borderRadius: borderRadius.xl,
+      paddingVertical: 9,
       paddingHorizontal: 14,
-      borderWidth: 1,
-      borderColor: colors.border.light,
+      ...shadows.xs,
     },
     filterChipActive: {
-      borderColor: colors.primary.main,
-      backgroundColor: isDark ? colors.primary[100] : `${colors.primary.main}08`,
+      backgroundColor: isDark ? colors.primary[100] : `${colors.primary[600]}0C`,
     },
     filterChipText: {
-      flex: 1,
       fontSize: 13,
       fontWeight: '500' as const,
       color: colors.text.secondary,
     },
     filterChipTextActive: {
-      color: colors.primary.main,
+      color: colors.primary[600],
       fontWeight: '600' as const,
     },
 
-    // ── Pill Tabs ──────────────────────────────────────────────
-    tabBarContainer: {
-      paddingTop: spacing.sm,
-    },
-    tabBarScroll: {
-      paddingHorizontal: spacing.md,
-      gap: 8,
-    },
-    tabPill: {
+    // ── Segmented Control ─────────────────────────────────────
+    segmentedContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      paddingVertical: 8,
-      paddingHorizontal: 14,
-      borderRadius: borderRadius.full,
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.md,
+    },
+    segmentedControl: {
+      flexDirection: 'row',
+      backgroundColor: isDark ? colors.neutral[800] : colors.neutral[100],
+      borderRadius: borderRadius.lg,
+      padding: 3,
+    },
+    segmentItem: {
+      paddingVertical: 7,
+      paddingHorizontal: 16,
+      borderRadius: borderRadius.lg - 2,
+    },
+    segmentItemActive: {
       backgroundColor: colors.surface.primary,
-      borderWidth: 1,
-      borderColor: colors.border.light,
+      ...shadows.sm,
     },
-    tabPillActive: {
-      backgroundColor: colors.primary.main,
-      borderColor: colors.primary.main,
-    },
-    tabPillText: {
+    segmentText: {
       fontSize: 13,
+      fontWeight: '500' as const,
+      color: colors.text.tertiary,
+    },
+    segmentTextActive: {
+      color: colors.text.primary,
       fontWeight: '600' as const,
-      color: colors.text.secondary,
     },
-    tabPillTextActive: {
-      color: colors.text.inverse,
-    },
-    tabCountBadge: {
-      paddingHorizontal: 7,
-      paddingVertical: 1,
-      borderRadius: 10,
-      minWidth: 22,
-      alignItems: 'center',
-    },
-    tabCountText: {
-      fontSize: 11,
-      fontWeight: '700' as const,
+    resultCount: {
+      fontSize: 12,
+      fontWeight: '500' as const,
+      color: colors.text.tertiary,
     },
 
     // ── Resource Card ──────────────────────────────────────────
     resourceCard: {
       marginHorizontal: spacing.md,
-      marginTop: spacing.sm,
+      marginTop: 10,
       backgroundColor: colors.surface.primary,
-      borderRadius: borderRadius.lg,
+      borderRadius: borderRadius.xl,
       ...shadows.sm,
-      borderWidth: isDark ? 1 : 0,
-      borderColor: colors.border.DEFAULT,
-      overflow: 'hidden',
-      flexDirection: 'row',
+      overflow: 'visible',
     },
     resourceCardPressed: {
-      opacity: 0.75,
-      transform: [{ scale: 0.985 }],
-    },
-    accentBar: {
-      width: 4,
+      opacity: 0.85,
+      transform: [{ scale: 0.98 }],
     },
     cardBody: {
-      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 14,
-      gap: 12,
+      padding: 16,
+      gap: 14,
     },
     resourceIconBox: {
-      width: 44,
-      height: 44,
-      borderRadius: 12,
+      width: 48,
+      height: 48,
+      borderRadius: 14,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -1122,87 +916,60 @@ const createStyles = (
       minWidth: 0,
     },
     resourceTitle: {
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: '600' as const,
       color: colors.text.primary,
-      lineHeight: 20,
+      lineHeight: 22,
+      letterSpacing: -0.2,
     },
     resourceDescription: {
       fontSize: 13,
       fontWeight: '400' as const,
-      color: colors.text.secondary,
+      color: colors.text.tertiary,
       marginTop: 2,
+      lineHeight: 18,
     },
     resourceMeta: {
       flexDirection: 'row',
       alignItems: 'center',
       marginTop: 6,
       flexWrap: 'wrap',
-      gap: 4,
+      gap: 2,
     },
-    typeBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 6,
-    },
-    typeBadgeText: {
+    metaLabel: {
       fontSize: 11,
       fontWeight: '700' as const,
+      textTransform: 'uppercase' as const,
+      letterSpacing: 0.3,
     },
-    dot: {
-      width: 3,
-      height: 3,
-      borderRadius: 1.5,
-      backgroundColor: colors.text.tertiary,
-      marginHorizontal: 2,
+    metaDot: {
+      fontSize: 12,
+      color: colors.text.tertiary,
+      marginHorizontal: 3,
     },
     metaText: {
       fontSize: 12,
-      fontWeight: '500' as const,
+      fontWeight: '400' as const,
       color: colors.text.tertiary,
     },
-    cardActions: {
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: 4,
-    },
-    actionButton: {
-      padding: 6,
-      borderRadius: 8,
-    },
 
-    // ── FAB ────────────────────────────────────────────────────
-    fab: {
-      position: 'absolute',
-      bottom: 24,
-      right: 20,
-      width: 56,
-      height: 56,
-      borderRadius: 16,
-      backgroundColor: colors.primary.main,
-      justifyContent: 'center',
-      alignItems: 'center',
-      ...shadows.lg,
-      // Subtle elevation boost on iOS
-      ...(Platform.OS === 'ios' && {
-        shadowOffset: { width: 0, height: 6 },
-        shadowRadius: 12,
-        shadowOpacity: 0.2,
-      }),
+    // ── Overflow Menu ──────────────────────────────────────────
+    overflowArea: {
+      position: 'relative',
+      zIndex: 10,
     },
-
     // ── Add button (empty state) ───────────────────────────────
     addButton: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      backgroundColor: colors.primary.main,
+      backgroundColor: colors.primary[600],
       paddingHorizontal: 20,
       paddingVertical: 12,
       borderRadius: borderRadius.full,
     },
     addButtonText: {
-      color: colors.text.inverse,
+      color: '#fff',
       fontSize: 15,
       fontWeight: '600' as const,
     },
@@ -1210,7 +977,7 @@ const createStyles = (
     // ── Bottom Sheet ───────────────────────────────────────────
     overlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.4)',
+      backgroundColor: 'rgba(0,0,0,0.45)',
       justifyContent: 'flex-end',
     },
     sheet: {
@@ -1250,27 +1017,23 @@ const createStyles = (
       backgroundColor: 'transparent',
     },
     sheetOptionActive: {
-      backgroundColor: isDark ? colors.primary[100] : `${colors.primary.main}0A`,
+      backgroundColor: isDark ? colors.primary[100] : `${colors.primary[600]}0A`,
     },
     sheetOptionText: {
+      flex: 1,
       fontSize: 15,
       fontWeight: '500' as const,
       color: colors.text.primary,
     },
     sheetOptionTextActive: {
-      color: colors.primary.main,
+      color: colors.primary[600],
       fontWeight: '600' as const,
-    },
-    sheetOptionSubtitle: {
-      fontSize: 12,
-      color: colors.text.tertiary,
-      marginTop: 2,
     },
     sheetCheck: {
       width: 24,
       height: 24,
       borderRadius: 12,
-      backgroundColor: colors.primary.main,
+      backgroundColor: colors.primary[600],
       justifyContent: 'center',
       alignItems: 'center',
     },

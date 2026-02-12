@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text as RNText, TouchableOpacity, Alert, Image, Dimensions, Modal, Pressable } from 'react-native';
-import { Pin, Trash2, Bell, MoreHorizontal, X, Edit3 } from 'lucide-react-native';
+import { View, Text as RNText, TouchableOpacity, Alert, Image, Dimensions, Modal } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { Menu, IconButton } from '../../../ui';
 import type { Announcement } from '../../../hooks/useAnnouncements';
 import { useDeleteAnnouncement, useTogglePin, useSendReminder } from '../../../hooks/useAnnouncements';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useCapabilities } from '../../../hooks/useCapabilities';
 
 interface AnnouncementCardProps {
     announcement: Announcement;
@@ -16,6 +18,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 export function AnnouncementCard({ announcement, onEdit }: AnnouncementCardProps) {
     const { colors, spacing, borderRadius, shadows } = useTheme();
     const { profile } = useAuth();
+    const { can } = useCapabilities();
     const deleteMutation = useDeleteAnnouncement();
     const togglePinMutation = useTogglePin();
     const sendReminderMutation = useSendReminder();
@@ -23,7 +26,7 @@ export function AnnouncementCard({ announcement, onEdit }: AnnouncementCardProps
     const [showImageModal, setShowImageModal] = useState(false);
 
     const isCreator = profile?.auth_id === announcement.created_by;
-    const canManage = profile?.role === 'admin' || profile?.role === 'superadmin';
+    const canManage = can('announcements.manage');
 
     // Priority styling
     const getPriorityConfig = () => {
@@ -184,7 +187,7 @@ export function AnnouncementCard({ announcement, onEdit }: AnnouncementCardProps
                                 {announcement.creator?.full_name || 'Unknown'}
                             </RNText>
                             {announcement.pinned && (
-                                <Pin size={14} color={colors.primary[500]} fill={colors.primary[500]} />
+                                <MaterialIcons name="push-pin" size={14} color={colors.primary[500]} />
                             )}
                         </View>
 
@@ -224,15 +227,35 @@ export function AnnouncementCard({ announcement, onEdit }: AnnouncementCardProps
                         </RNText>
                     </View>
 
-                    {/* More options */}
+                    {/* Overflow menu */}
                     {canManage && isCreator && (
-                        <TouchableOpacity
-                            onPress={() => setShowMenu(true)}
-                            style={{ padding: spacing.xs }}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        <Menu
+                            visible={showMenu}
+                            onDismiss={() => setShowMenu(false)}
+                            anchor={
+                                <IconButton
+                                    icon="more-vert"
+                                    variant="ghost"
+                                    size="sm"
+                                    onPress={() => setShowMenu(true)}
+                                />
+                            }
                         >
-                            <MoreHorizontal size={22} color={colors.text.secondary} />
-                        </TouchableOpacity>
+                            <Menu.Item title="Edit" icon="edit" onPress={handleEdit} />
+                            <Menu.Item
+                                title="Send Reminder"
+                                icon="notifications"
+                                onPress={handleSendReminder}
+                                disabled={sendReminderMutation.isPending}
+                            />
+                            <Menu.Item
+                                title={announcement.pinned ? 'Unpin' : 'Pin to top'}
+                                icon="push-pin"
+                                onPress={handleTogglePin}
+                            />
+                            <Menu.Divider />
+                            <Menu.Item title="Delete" icon="delete" onPress={handleDelete} destructive />
+                        </Menu>
                     )}
                 </View>
 
@@ -270,127 +293,6 @@ export function AnnouncementCard({ announcement, onEdit }: AnnouncementCardProps
                 )}
             </View>
 
-            {/* Actions Menu Modal */}
-            <Modal
-                visible={showMenu}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setShowMenu(false)}
-            >
-                <Pressable 
-                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}
-                    onPress={() => setShowMenu(false)}
-                >
-                    <Pressable onPress={e => e.stopPropagation()}>
-                        <View
-                            style={{
-                                backgroundColor: colors.surface.primary,
-                                borderTopLeftRadius: borderRadius['2xl'],
-                                borderTopRightRadius: borderRadius['2xl'],
-                                paddingBottom: 34,
-                            }}
-                        >
-                            {/* Handle bar */}
-                            <View style={{ alignItems: 'center', paddingVertical: spacing.sm }}>
-                                <View style={{
-                                    width: 36,
-                                    height: 4,
-                                    backgroundColor: colors.border.medium,
-                                    borderRadius: 2,
-                                }} />
-                            </View>
-
-                            {/* Edit */}
-                            <TouchableOpacity
-                                onPress={handleEdit}
-                                style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    paddingVertical: spacing.md,
-                                    paddingHorizontal: spacing.lg,
-                                    gap: spacing.md,
-                                }}
-                            >
-                                <Edit3 size={24} color={colors.text.primary} />
-                                <RNText style={{ fontSize: 16, color: colors.text.primary }}>
-                                    Edit
-                                </RNText>
-                            </TouchableOpacity>
-
-                            {/* Send Reminder */}
-                            <TouchableOpacity
-                                onPress={handleSendReminder}
-                                disabled={sendReminderMutation.isPending}
-                                style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    paddingVertical: spacing.md,
-                                    paddingHorizontal: spacing.lg,
-                                    gap: spacing.md,
-                                    opacity: sendReminderMutation.isPending ? 0.5 : 1,
-                                }}
-                            >
-                                <Bell size={24} color={colors.text.primary} />
-                                <RNText style={{ fontSize: 16, color: colors.text.primary }}>
-                                    Send Reminder
-                                </RNText>
-                            </TouchableOpacity>
-
-                            {/* Pin/Unpin */}
-                            <TouchableOpacity
-                                onPress={handleTogglePin}
-                                style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    paddingVertical: spacing.md,
-                                    paddingHorizontal: spacing.lg,
-                                    gap: spacing.md,
-                                }}
-                            >
-                                <Pin size={24} color={colors.text.primary} fill={announcement.pinned ? colors.text.primary : 'none'} />
-                                <RNText style={{ fontSize: 16, color: colors.text.primary }}>
-                                    {announcement.pinned ? 'Unpin' : 'Pin to top'}
-                                </RNText>
-                            </TouchableOpacity>
-
-                            {/* Delete */}
-                            <TouchableOpacity
-                                onPress={handleDelete}
-                                style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    paddingVertical: spacing.md,
-                                    paddingHorizontal: spacing.lg,
-                                    gap: spacing.md,
-                                }}
-                            >
-                                <Trash2 size={24} color={colors.error[500]} />
-                                <RNText style={{ fontSize: 16, color: colors.error[500] }}>
-                                    Delete
-                                </RNText>
-                            </TouchableOpacity>
-
-                            {/* Cancel */}
-                            <TouchableOpacity
-                                onPress={() => setShowMenu(false)}
-                                style={{
-                                    alignItems: 'center',
-                                    paddingVertical: spacing.md,
-                                    marginTop: spacing.sm,
-                                    marginHorizontal: spacing.lg,
-                                    backgroundColor: colors.background.secondary,
-                                    borderRadius: borderRadius.lg,
-                                }}
-                            >
-                                <RNText style={{ fontSize: 16, fontWeight: '600', color: colors.text.primary }}>
-                                    Cancel
-                                </RNText>
-                            </TouchableOpacity>
-                        </View>
-                    </Pressable>
-                </Pressable>
-            </Modal>
-
             {/* Image Fullscreen Modal */}
             <Modal
                 visible={showImageModal}
@@ -409,7 +311,7 @@ export function AnnouncementCard({ announcement, onEdit }: AnnouncementCardProps
                             padding: spacing.sm,
                         }}
                     >
-                        <X size={28} color="#fff" />
+                        <MaterialIcons name="close" size={28} color="#fff" />
                     </TouchableOpacity>
                     {announcement.image_url && (
                         <Image

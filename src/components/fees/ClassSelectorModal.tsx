@@ -3,9 +3,9 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Portal, Modal } from 'react-native-paper';
-import { X, Check, Users } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Modal } from '../../ui/Modal';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 
@@ -37,41 +37,32 @@ export function ClassSelectorModal({
   );
 
   return (
-    <Portal>
-      <Modal visible={visible} onDismiss={onClose} contentContainerStyle={styles.modal}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Select Class</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <X size={24} color={colors.text.primary} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.list}>
-          {classes.length === 0 ? (
-            <View style={styles.empty}>
-              <Users size={48} color={colors.neutral[300]} />
-              <Text style={styles.emptyText}>No classes available</Text>
-            </View>
-          ) : (
-            classes.map(cls => {
-              const isSelected = selectedClass?.id === cls.id;
-              return (
-                <TouchableOpacity
-                  key={cls.id}
-                  style={[styles.classItem, isSelected && styles.classItemSelected]}
-                  onPress={() => onSelect(cls)}
-                >
-                  <Text style={[styles.className, isSelected && styles.classNameSelected]}>
-                    {cls.grade} {cls.section}
-                  </Text>
-                  {isSelected && <Check size={20} color="#fff" />}
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
-      </Modal>
-    </Portal>
+    <Modal visible={visible} onDismiss={onClose} title="Select Class" contentContainerStyle={styles.modal}>
+      <ScrollView style={styles.list}>
+        {classes.length === 0 ? (
+          <View style={styles.empty}>
+            <MaterialIcons name="group" size={48} color={colors.neutral[300]} />
+            <Text style={styles.emptyText}>No classes available</Text>
+          </View>
+        ) : (
+          classes.map(cls => {
+            const isSelected = selectedClass?.id === cls.id;
+            return (
+              <TouchableOpacity
+                key={cls.id}
+                style={[styles.classItem, isSelected && styles.classItemSelected]}
+                onPress={() => onSelect(cls)}
+              >
+                <Text style={[styles.className, isSelected && styles.classNameSelected]}>
+                  {cls.grade} {cls.section}
+                </Text>
+                {isSelected && <MaterialIcons name="check" size={20} color="#fff" />}
+              </TouchableOpacity>
+            );
+          })
+        )}
+      </ScrollView>
+    </Modal>
   );
 }
 
@@ -87,22 +78,6 @@ const createStyles = (
     margin: spacing.lg,
     borderRadius: borderRadius.xl,
     maxHeight: '70%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  title: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  closeBtn: {
-    padding: spacing.xs,
   },
   list: {
     padding: spacing.md,

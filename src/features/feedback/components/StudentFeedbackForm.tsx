@@ -9,9 +9,10 @@ import {
     Platform,
     FlatList,
     RefreshControl,
+    TextInput,
+    ActivityIndicator,
 } from 'react-native';
-import { TextInput, ActivityIndicator } from 'react-native-paper';
-import { Send, ChevronDown, X, Check, Info, MessageSquare, Inbox, Calendar } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -168,7 +169,7 @@ export function StudentFeedbackForm() {
 
                 {/* Date */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
-                    <Calendar size={14} color={colors.text.tertiary} />
+                    <MaterialIcons name="event" size={14} color={colors.text.tertiary} />
                     <RNText style={{ fontSize: 13, color: colors.text.tertiary }}>
                         {new Date(item.created_at).toLocaleDateString()}
                     </RNText>
@@ -205,7 +206,7 @@ export function StudentFeedbackForm() {
                             ...(activeTab === 'send' ? shadows.sm : {}),
                         }}
                     >
-                        <Send size={16} color={activeTab === 'send' ? colors.primary[600] : colors.text.tertiary} />
+                        <MaterialIcons name="send" size={16} color={activeTab === 'send' ? colors.primary[600] : colors.text.tertiary} />
                         <RNText style={{
                             fontSize: 14,
                             fontWeight: '600',
@@ -228,7 +229,7 @@ export function StudentFeedbackForm() {
                             ...(activeTab === 'received' ? shadows.sm : {}),
                         }}
                     >
-                        <Inbox size={16} color={activeTab === 'received' ? colors.primary[600] : colors.text.tertiary} />
+                        <MaterialIcons name="inbox" size={16} color={activeTab === 'received' ? colors.primary[600] : colors.text.tertiary} />
                         <RNText style={{
                             fontSize: 14,
                             fontWeight: '600',
@@ -280,7 +281,7 @@ export function StudentFeedbackForm() {
                             alignItems: 'center',
                             paddingTop: spacing.xl * 2,
                         }}>
-                            <Inbox size={48} color={colors.neutral[300]} />
+                            <MaterialIcons name="inbox" size={48} color={colors.neutral[300]} />
                             <RNText style={{
                                 marginTop: spacing.md,
                                 fontSize: 16,
@@ -350,7 +351,7 @@ export function StudentFeedbackForm() {
                                         }}>
                                             {selectedSubject?.subject_name || 'Select a subject...'}
                                         </RNText>
-                                        <ChevronDown size={20} color={colors.text.tertiary} />
+                                        <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                                     </TouchableOpacity>
                                 </View>
 
@@ -379,7 +380,7 @@ export function StudentFeedbackForm() {
                                         }}>
                                             {selectedTeacher?.full_name || 'Select a teacher...'}
                                         </RNText>
-                                        <ChevronDown size={20} color={colors.text.tertiary} />
+                                        <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                                     </TouchableOpacity>
                                 </View>
 
@@ -454,7 +455,7 @@ export function StudentFeedbackForm() {
                                         }}>
                                             {selectedCategory?.label || 'Select a category...'}
                                         </RNText>
-                                        <ChevronDown size={20} color={colors.text.tertiary} />
+                                        <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                                     </TouchableOpacity>
                                 </View>
 
@@ -473,15 +474,21 @@ export function StudentFeedbackForm() {
                                     </View>
                                     <TextInput
                                         value={content}
-                                        onChangeText={(text) => text.length <= MAX_CONTENT_LENGTH && setContent(text)}
+                                        onChangeText={(text: string) => text.length <= MAX_CONTENT_LENGTH && setContent(text)}
                                         placeholder="Write constructive feedback..."
-                                        mode="outlined"
                                         multiline
                                         numberOfLines={5}
-                                        style={{ backgroundColor: colors.surface.primary, minHeight: 120 }}
-                                        outlineColor={colors.border.DEFAULT}
-                                        activeOutlineColor={colors.primary[600]}
-                                        textColor={colors.text.primary}
+                                        textAlignVertical="top"
+                                        style={{
+                                            backgroundColor: colors.surface.primary,
+                                            minHeight: 120,
+                                            borderWidth: 1,
+                                            borderColor: colors.border.DEFAULT,
+                                            borderRadius: borderRadius.lg,
+                                            padding: spacing.md,
+                                            fontSize: 15,
+                                            color: colors.text.primary,
+                                        }}
                                         placeholderTextColor={colors.text.tertiary}
                                     />
                                 </View>
@@ -498,7 +505,7 @@ export function StudentFeedbackForm() {
                                         marginBottom: spacing.xl,
                                     }}
                                 >
-                                    <Info size={18} color={colors.text.tertiary} style={{ marginTop: 2 }} />
+                                    <MaterialIcons name="info" size={18} color={colors.text.tertiary} style={{ marginTop: 2 }} />
                                     <RNText style={{ flex: 1, fontSize: 13, color: colors.text.secondary, lineHeight: 18 }}>
                                         This feedback is visible to school management for quality assurance purposes.
                                     </RNText>
@@ -523,7 +530,7 @@ export function StudentFeedbackForm() {
                                         <ActivityIndicator size="small" color="#fff" />
                                     ) : (
                                         <>
-                                            <Send size={20} color="#fff" />
+                                            <MaterialIcons name="send" size={20} color="#fff" />
                                             <RNText style={{ fontSize: 16, fontWeight: '700', color: '#fff' }}>
                                                 Submit Feedback
                                             </RNText>
@@ -632,7 +639,7 @@ function PickerModal({ visible, title, items, selectedId, onSelect, onClose }: P
                         {title}
                     </RNText>
                     <TouchableOpacity onPress={onClose}>
-                        <X size={24} color={colors.text.secondary} />
+                        <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                     </TouchableOpacity>
                 </View>
 
@@ -656,7 +663,7 @@ function PickerModal({ visible, title, items, selectedId, onSelect, onClose }: P
                             <RNText style={{ flex: 1, fontSize: 16, fontWeight: '500', color: colors.text.primary }}>
                                 {item.label}
                             </RNText>
-                            {selectedId === item.id && <Check size={20} color={colors.primary[600]} strokeWidth={3} />}
+                            {selectedId === item.id && <MaterialIcons name="check" size={20} color={colors.primary[600]} />}
                         </TouchableOpacity>
                     ))}
                 </ScrollView>

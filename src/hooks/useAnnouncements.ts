@@ -46,7 +46,8 @@ const PAGE_SIZE = 20;
 export function useAnnouncementsFeed(schoolCode?: string) {
     return useInfiniteQuery({
         queryKey: ['announcements', 'feed', schoolCode],
-        queryFn: async ({ pageParam = 0 }) => {
+        initialPageParam: 0,
+        queryFn: async ({ pageParam }) => {
             const from = pageParam * PAGE_SIZE;
             const to = from + PAGE_SIZE - 1;
 

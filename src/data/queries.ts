@@ -169,7 +169,7 @@ export async function getActiveAcademicYear(schoolCode: string, options?: { sign
   try {
     const { data, error } = await supabase
       .from(DB.tables.academicYears)
-      .select('id, school_code, school_name, year_start, year_end, is_active')
+      .select('id, school_code, school_name, year_start, year_end, is_active, start_date, end_date')
       .eq(DB.columns.schoolCode, schoolCode)
       .eq('is_active', true)
       .maybeSingle();
@@ -201,7 +201,7 @@ export async function listAcademicYears(schoolCode: string, options?: { signal?:
   try {
     const { data, error } = await supabase
       .from(DB.tables.academicYears)
-      .select('id, school_code, school_name, year_start, year_end, is_active')
+      .select('id, school_code, school_name, year_start, year_end, is_active, start_date, end_date')
       .eq(DB.columns.schoolCode, schoolCode)
       .order('year_start', { ascending: false })
       .range(options?.from ?? 0, options?.to ?? 99);
@@ -463,7 +463,7 @@ export async function getAttendanceForDate(
   try {
     const { data, error } = await supabase
       .from(DB.tables.attendance)
-      .select('id, student_id, class_instance_id, date, status, marked_by, marked_by_role_code, school_code, created_at')
+      .select('id, student_id, class_instance_id, date, status, marked_by, marked_by_role_code, school_code, created_at, updated_at')
       .eq(DB.columns.classInstanceId, classInstanceId)
       .eq('date', date)
       .eq(DB.columns.schoolCode, schoolCode)

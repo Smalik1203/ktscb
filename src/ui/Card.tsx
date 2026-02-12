@@ -158,8 +158,8 @@ export function Card({
         };
       default:
         return {
-          backgroundColor: colors.surface.primary,
-          ...(isDark ? darkModeBorder : shadows.sm),
+          backgroundColor: colors.background.primary,
+          ...(isDark ? darkModeBorder : shadows.DEFAULT),
         };
     }
   }, [variant, colors, shadows, isDark]);

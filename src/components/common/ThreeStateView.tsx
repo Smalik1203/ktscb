@@ -7,7 +7,7 @@
 
 import React, { useMemo, useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Easing } from 'react-native';
-import { RefreshCw, AlertCircle, Inbox, WifiOff } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Body, Heading, Caption, Button, Stack, Center } from '../../ui';
 
@@ -179,7 +179,7 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
         return (
           <Center style={{ padding: spacing.xl }}>
             <View style={dynamicStyles.errorIconContainer}>
-              <AlertCircle size={40} color={colors.error.main} />
+              <MaterialIcons name="error" size={40} color={colors.error.main} />
             </View>
             <Heading level={4} align="center" style={{ color: colors.error.main }}>
               {errorMessage}
@@ -202,7 +202,7 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
                 variant="primary"
                 size="md"
                 onPress={onRetry}
-                icon={<RefreshCw size={16} color={colors.text.inverse} />}
+                icon={<MaterialIcons name="refresh" size={16} color={colors.text.inverse} />}
                 style={{ marginTop: spacing.lg }}
               >
                 Try Again
@@ -215,7 +215,7 @@ export const ThreeStateView: React.FC<ThreeStateViewProps> = ({
         return (
           <Center style={{ padding: spacing.xl }}>
             <View style={dynamicStyles.emptyIconContainer}>
-              {emptyIcon || <Inbox size={40} color={colors.primary.main} />}
+              {emptyIcon || <MaterialIcons name="inbox" size={40} color={colors.primary.main} />}
             </View>
             <Heading level={5} align="center" color="secondary">
               {emptyMessage}

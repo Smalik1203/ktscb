@@ -7,7 +7,7 @@ import {
     RefreshControl,
     ActivityIndicator,
 } from 'react-native';
-import { Check, MessageSquare, Filter } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -147,7 +147,7 @@ export function AdminFeedbackList() {
                     {/* Acknowledged Status */}
                     {isAcknowledged && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Check size={14} color={colors.success[600]} strokeWidth={3} />
+                            <MaterialIcons name="check" size={14} color={colors.success[600]} />
                             <RNText style={{ fontSize: 11, color: colors.success[600], fontWeight: '600' }}>
                                 Acknowledged
                             </RNText>
@@ -198,7 +198,7 @@ export function AdminFeedbackList() {
                             <ActivityIndicator size="small" color={colors.primary[600]} />
                         ) : (
                             <>
-                                <Check size={16} color={colors.primary[600]} strokeWidth={2.5} />
+                                <MaterialIcons name="check" size={16} color={colors.primary[600]} />
                                 <RNText style={{ fontSize: 14, fontWeight: '600', color: colors.primary[600] }}>
                                     Acknowledge
                                 </RNText>
@@ -235,7 +235,7 @@ export function AdminFeedbackList() {
                         marginBottom: spacing.xl,
                     }}
                 >
-                    <MessageSquare size={48} color={colors.neutral[400]} strokeWidth={1.5} />
+                    <MaterialIcons name="chat" size={48} color={colors.neutral[400]} />
                 </View>
                 <RNText style={{ fontSize: 20, fontWeight: '700', color: colors.text.primary, marginBottom: spacing.sm }}>
                     No Feedback Yet

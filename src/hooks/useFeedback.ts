@@ -244,6 +244,7 @@ export function useArchiveFeedback() {
 
 /**
  * Fetch teachers/admins for feedback dropdown (students use this)
+ * Includes super_admin/superadmin roles and handles null school_code for super admins
  */
 export function useFeedbackRecipients(schoolCode: string | undefined | null) {
     return useQuery<FeedbackRecipient[]>({
@@ -252,8 +253,8 @@ export function useFeedbackRecipients(schoolCode: string | undefined | null) {
             const { data, error } = await supabase
                 .from('users')
                 .select('id, full_name, role')
-                .eq('school_code', schoolCode!)
-                .in('role', ['admin', 'teacher'])
+                .in('role', ['admin', 'teacher', 'superadmin', 'super_admin'])
+                .or(`school_code.eq.${schoolCode!},school_code.is.null`)
                 .order('full_name');
 
             if (error) throw error;

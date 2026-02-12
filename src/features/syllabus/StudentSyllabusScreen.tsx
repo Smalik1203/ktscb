@@ -9,18 +9,11 @@ import {
   Modal,
   Animated,
 } from 'react-native';
-import { Text, Card, ActivityIndicator } from 'react-native-paper';
-import {
-  BookOpen,
-  CheckCircle2,
-  Circle as CircleIcon,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-} from 'lucide-react-native';
+import { Text, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, typography, spacing, borderRadius } from '../../../lib/design-system';
-import { EmptyState } from '../../components/ui';
+import { EmptyState } from '../../ui';
 import { 
   fetchSyllabusTree, 
   fetchProgress, 
@@ -196,7 +189,7 @@ export default function StudentSyllabusTab() {
         <View style={styles.filterRow}>
           <TouchableOpacity style={styles.filterItem} onPress={() => setShowSubjectDropdown(true)}>
             <View style={styles.filterIcon}>
-              <FileText size={16} color={colors.text.inverse} />
+              <MaterialIcons name="description" size={16} color={colors.text.inverse} />
             </View>
             <View style={styles.filterContent}>
               <Text style={styles.filterLabel}>Subject</Text>
@@ -204,7 +197,7 @@ export default function StudentSyllabusTab() {
                 {selectedSubjectId ? (subjects.find(s => s.id === selectedSubjectId)?.subject_name || 'Subject') : 'Select'}
               </Text>
             </View>
-            <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
+            <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
           </TouchableOpacity>
         </View>
       </View>
@@ -224,7 +217,7 @@ export default function StudentSyllabusTab() {
             <EmptyState
               title="No subjects available"
               message="Your class hasn't been assigned any subjects yet."
-              icon={<BookOpen size={64} color={colors.neutral[300]} />}
+              icon={<MaterialIcons name="menu-book" size={64} color={colors.neutral[300]} />}
               variant="card"
             />
           </View>
@@ -238,7 +231,7 @@ export default function StudentSyllabusTab() {
             <EmptyState
               title="No syllabus yet"
               message={`No syllabus has been created for ${selectedSubjectName} yet.`}
-              icon={<BookOpen size={64} color={colors.neutral[300]} />}
+              icon={<MaterialIcons name="menu-book" size={64} color={colors.neutral[300]} />}
               variant="card"
             />
           </View>
@@ -281,7 +274,7 @@ export default function StudentSyllabusTab() {
           {/* Syllabus Chapters and Topics */}
           <View style={styles.cardList}>
             {tree.chapters.map((node) => (
-              <Card key={node.chapter.id} style={styles.card}>
+              <View key={node.chapter.id} style={styles.card}>
                 <TouchableOpacity 
                   style={styles.chapterCardHeader}
                   onPress={() => setExpandedChapterId(prev => prev === node.chapter.id ? null : node.chapter.id)}
@@ -289,7 +282,7 @@ export default function StudentSyllabusTab() {
                   <View style={styles.chapterCardContent}>
                     <View style={styles.chapterInfo}>
                       <View style={styles.chapterIconContainer}>
-                        <BookOpen size={20} color={colors.primary[600]} />
+                        <MaterialIcons name="menu-book" size={20} color={colors.primary[600]} />
                       </View>
                       <View style={styles.chapterTextContainer}>
                         <Text style={styles.chapterTitle} numberOfLines={2}>
@@ -304,9 +297,9 @@ export default function StudentSyllabusTab() {
                     </View>
                     <View style={styles.chevronContainer}>
                       {expandedChapterId === node.chapter.id ? (
-                        <ChevronUp size={24} color={colors.primary[600]} />
+                        <MaterialIcons name="keyboard-arrow-up" size={24} color={colors.primary[600]} />
                       ) : (
-                        <ChevronDown size={24} color={colors.neutral[300]} />
+                        <MaterialIcons name="keyboard-arrow-down" size={24} color={colors.neutral[300]} />
                       )}
                     </View>
                   </View>
@@ -319,9 +312,9 @@ export default function StudentSyllabusTab() {
                         <View key={t.id} style={styles.topicItem}>
                           <View style={styles.topicIcon}>
                             {taught.taughtTopics.has(t.id) ? (
-                              <CheckCircle2 size={20} color={colors.success[600]} />
+                              <MaterialIcons name="check-circle" size={20} color={colors.success[600]} />
                             ) : (
-                              <CircleIcon size={20} color={colors.neutral[400]} />
+                              <MaterialIcons name="radio-button-unchecked" size={20} color={colors.neutral[400]} />
                             )}
                           </View>
                           <View style={styles.topicContent}>
@@ -337,7 +330,7 @@ export default function StudentSyllabusTab() {
                     )}
                   </View>
                 )}
-              </Card>
+              </View>
             ))}
           </View>
         </ScrollView>

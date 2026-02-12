@@ -2,31 +2,20 @@
 import React, { useMemo, useRef, useCallback, useState } from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   Modal,
   TouchableOpacity,
   Share,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { Text, ActivityIndicator, IconButton, Button } from 'react-native-paper';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { WebView } from 'react-native-webview';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { documentDirectory, moveAsync, copyAsync } from 'expo-file-system/legacy';
-import {
-  X,
-  Download,
-  Share2,
-  Printer,
-  RefreshCw,
-  AlertCircle,
-  FileText,
-  Image as ImageIcon,
-  TrendingUp,
-  Award,
-  BookOpen,
-} from 'lucide-react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import type { ProgressReportResponse } from '../../hooks/useProgressReport';
@@ -252,7 +241,7 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={colors.text.primary} />
+              <MaterialIcons name="close" size={24} color={colors.text.primary} />
             </TouchableOpacity>
             <View style={styles.headerTitleContainer}>
               <Text style={styles.headerTitle}>Progress Report</Text>
@@ -261,22 +250,28 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
           </View>
           <View style={styles.headerActions}>
             {onRefresh && (
-              <IconButton
-                icon={() => <RefreshCw size={20} color={colors.text.secondary} />}
+              <TouchableOpacity
                 onPress={onRefresh}
                 disabled={isLoading || isDownloading}
-              />
+                style={styles.headerIconButton}
+              >
+                <MaterialIcons name="refresh" size={20} color={colors.text.secondary} />
+              </TouchableOpacity>
             )}
-            <IconButton
-              icon={() => <Share2 size={20} color={colors.text.secondary} />}
+            <TouchableOpacity
               onPress={handleShare}
               disabled={isDownloading}
-            />
-            <IconButton
-              icon={() => <Printer size={20} color={colors.text.secondary} />}
+              style={styles.headerIconButton}
+            >
+              <MaterialIcons name="share" size={20} color={colors.text.secondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={handlePrint}
               disabled={isDownloading}
-            />
+              style={styles.headerIconButton}
+            >
+              <MaterialIcons name="print" size={20} color={colors.text.secondary} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -284,7 +279,7 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
         <View style={styles.statsBanner}>
           <View style={styles.statItem}>
             <View style={styles.statIcon}>
-              <BookOpen size={16} color={colors.primary[600]} />
+              <MaterialIcons name="menu-book" size={16} color={colors.primary[600]} />
             </View>
             <Text style={styles.statLabel}>Tests</Text>
             <Text style={styles.statValue}>{reportData.total_tests}</Text>
@@ -292,7 +287,7 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <View style={styles.statIcon}>
-              <TrendingUp size={16} color={colors.success[600]} />
+              <MaterialIcons name="trending-up" size={16} color={colors.success[600]} />
             </View>
             <Text style={styles.statLabel}>Average</Text>
             <Text style={[styles.statValue, { color: colors.success[600] }]}>
@@ -317,11 +312,10 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
           {/* Error State */}
           {webViewError && (
             <View style={styles.errorContainer}>
-              <AlertCircle size={48} color={colors.error[500]} />
+              <MaterialIcons name="error" size={48} color={colors.error[500]} />
               <Text style={styles.errorTitle}>Failed to Load Report</Text>
               <Text style={styles.errorText}>{webViewError}</Text>
-              <Button
-                mode="contained"
+              <TouchableOpacity
                 onPress={() => {
                   setWebViewError(null);
                   setWebViewLoading(true);
@@ -329,8 +323,8 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
                 }}
                 style={styles.retryButton}
               >
-                Try Again
-              </Button>
+                <Text style={styles.retryButtonText}>Try Again</Text>
+              </TouchableOpacity>
             </View>
           )}
           
@@ -367,7 +361,7 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
               }}
               renderError={(errorDomain, errorCode, errorDesc) => (
                 <View style={styles.errorContainer}>
-                  <AlertCircle size={48} color={colors.error[500]} />
+                  <MaterialIcons name="error" size={48} color={colors.error[500]} />
                   <Text style={styles.errorTitle}>Display Error</Text>
                   <Text style={styles.errorText}>{errorDesc || 'Failed to render report'}</Text>
                 </View>
@@ -393,7 +387,7 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
               onPress={handleDownloadPDF}
               disabled={isDownloading}
             >
-              <FileText size={20} color={colors.primary[600]} />
+              <MaterialIcons name="description" size={20} color={colors.primary[600]} />
               <View style={styles.downloadOptionText}>
                 <Text style={styles.downloadOptionTitle}>Save as PDF</Text>
                 <Text style={styles.downloadOptionSubtitle}>Best for printing & records</Text>
@@ -405,7 +399,7 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
               onPress={handleDownloadImage}
               disabled={isDownloading}
             >
-              <ImageIcon size={20} color={colors.primary[600]} />
+              <MaterialIcons name="image" size={20} color={colors.primary[600]} />
               <View style={styles.downloadOptionText}>
                 <Text style={styles.downloadOptionTitle}>Save as Image</Text>
                 <Text style={styles.downloadOptionSubtitle}>Best for sharing on WhatsApp</Text>
@@ -417,7 +411,7 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
         {/* Footer with Actions */}
         <View style={styles.footer}>
           <View style={styles.footerInfo}>
-            <Award size={16} color={colors.text.secondary} />
+            <MaterialIcons name="emoji-events" size={16} color={colors.text.secondary} />
             <Text style={styles.footerInfoText}>
               {reportData.total_tests > 0 
                 ? `Based on ${reportData.total_tests} assessments`
@@ -425,30 +419,28 @@ export const ProgressReportViewer: React.FC<ProgressReportViewerProps> = ({
             </Text>
           </View>
           <View style={styles.footerActions}>
-            <Button
-              mode="outlined"
+            <TouchableOpacity
               onPress={handleShare}
-              icon={() => <Share2 size={18} color={colors.primary[600]} />}
-              style={styles.footerButton}
-              labelStyle={styles.footerButtonLabel}
+              style={styles.footerShareButton}
               disabled={isDownloading}
             >
-              Share
-            </Button>
-            <Button
-              mode="contained"
+              <MaterialIcons name="share" size={18} color={colors.primary[600]} />
+              <Text style={styles.footerShareButtonText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={toggleDownloadOptions}
-              icon={() => isDownloading ? (
+              style={[styles.footerButton, styles.downloadButton]}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
                 <ActivityIndicator size={18} color="#fff" />
               ) : (
-                <Download size={18} color="#fff" />
+                <MaterialIcons name="download" size={18} color="#fff" />
               )}
-              style={[styles.footerButton, styles.downloadButton]}
-              labelStyle={[styles.footerButtonLabel, { color: '#fff' }]}
-              disabled={isDownloading}
-            >
-              {isDownloading ? 'Saving...' : 'Download'}
-            </Button>
+              <Text style={styles.downloadButtonText}>
+                {isDownloading ? 'Saving...' : 'Download'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -504,6 +496,10 @@ const createStyles = (
     headerActions: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: spacing.xs,
+    },
+    headerIconButton: {
+      padding: spacing.sm,
     },
     statsBanner: {
       flexDirection: 'row',
@@ -650,14 +646,36 @@ const createStyles = (
       flexDirection: 'row',
       gap: spacing.sm,
     },
-    footerButton: {
+    footerShareButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
       borderRadius: borderRadius.md,
+      borderWidth: 1,
+      borderColor: colors.primary[600],
     },
-    footerButtonLabel: {
+    footerShareButtonText: {
       fontSize: typography.fontSize.sm,
+      color: colors.primary[600],
+      fontWeight: typography.fontWeight.semibold,
+    },
+    footerButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: borderRadius.md,
     },
     downloadButton: {
       backgroundColor: colors.primary[600],
+    },
+    downloadButtonText: {
+      fontSize: typography.fontSize.sm,
+      color: '#fff',
+      fontWeight: typography.fontWeight.semibold,
     },
     errorContainer: {
       flex: 1,
@@ -683,6 +701,14 @@ const createStyles = (
     retryButton: {
       marginTop: spacing.md,
       backgroundColor: colors.primary[600],
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.xl,
+      borderRadius: borderRadius.md,
+    },
+    retryButtonText: {
+      color: '#fff',
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold,
     },
   });
 

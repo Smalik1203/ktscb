@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration, Modal as RNModal, Text as RNText } from 'react-native';
-import { Text, Card, Button, Chip, Portal, Modal, TextInput, SegmentedButtons, Snackbar, ActivityIndicator } from 'react-native-paper';
-import { Calendar, Clock, ChevronLeft, ChevronRight, Plus, Edit, Trash2, CheckCircle, Check, Circle, Settings, Users, BookOpen, MapPin, Filter, RotateCcw, User, MoreVertical, Coffee, ListTodo, X, AlertCircle, Calculator, FlaskConical, Languages, Globe, Palette, Music, Dna, Dumbbell, Copy } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, RefreshControl, Animated, Vibration, Modal as RNModal, Text, TextInput, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEnhancedTimetable } from '../../hooks/useEnhancedTimetable';
 import { useSyllabusLoader } from '../../hooks/useSyllabusLoader';
@@ -10,7 +9,7 @@ import { useSubjects } from '../../hooks/useSubjects';
 import { useAdmins } from '../../hooks/useAdmins';
 import { DatePickerModal } from '../common/DatePickerModal';
 import { ThreeStateView } from '../common/ThreeStateView';
-import { EmptyStateIllustration } from '../ui/EmptyStateIllustration';
+import { EmptyStateIllustration, FAB } from '../../ui';
 import { ConflictResolutionModal } from './ConflictResolutionModal';
 import { TimelinePreviewModal } from './TimelinePreviewModal';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -52,36 +51,40 @@ function getSubjectColor(subjectName: string, colors: ThemeColors): string {
   return colorMap[normalizedName] || colors.primary[500];
 }
 
-// Helper to get subject specific icon
-function getSubjectIcon(subjectName: string, color: string, size: number = 14) {
+// Helper to get subject specific icon name for MaterialIcons
+function getSubjectIconName(subjectName: string): string {
   const normalizedName = subjectName?.toLowerCase()?.trim() || '';
 
   if (normalizedName.includes('math') || normalizedName.includes('algebra') || normalizedName.includes('geometry') || normalizedName.includes('calculus')) {
-    return <Calculator size={size} color={color} />;
+    return 'calculate';
   }
   if (normalizedName.includes('science') || normalizedName.includes('physics') || normalizedName.includes('chemistry')) {
-    return <FlaskConical size={size} color={color} />;
+    return 'science';
   }
   if (normalizedName.includes('biology') || normalizedName.includes('life')) {
-    return <Dna size={size} color={color} />;
+    return 'biotech';
   }
   if (normalizedName.includes('english') || normalizedName.includes('hindi') || normalizedName.includes('urdu') || normalizedName.includes('language') || normalizedName.includes('literature')) {
-    return <Languages size={size} color={color} />;
+    return 'translate';
   }
   if (normalizedName.includes('geography') || normalizedName.includes('history') || normalizedName.includes('social')) {
-    return <Globe size={size} color={color} />;
+    return 'public';
   }
   if (normalizedName.includes('art') || normalizedName.includes('draw')) {
-    return <Palette size={size} color={color} />;
+    return 'palette';
   }
   if (normalizedName.includes('music')) {
-    return <Music size={size} color={color} />;
+    return 'music-note';
   }
   if (normalizedName.includes('physical') || normalizedName.includes('sport') || normalizedName.includes('gym') || normalizedName.includes('pe')) {
-    return <Dumbbell size={size} color={color} />;
+    return 'fitness-center';
   }
 
-  return <BookOpen size={size} color={color} />;
+  return 'menu-book';
+}
+
+function getSubjectIcon(subjectName: string, color: string, size: number = 14) {
+  return <MaterialIcons name={getSubjectIconName(subjectName) as any} size={size} color={color} />;
 }
 
 // Premium Timetable Card - Timeline Layout (Aligned with Student View)
@@ -131,7 +134,7 @@ function CleanTimetableCard({
         <View style={styles.timelineColumn}>
           <View style={[styles.timelineLine, isLast && styles.timelineLineLast]} />
           <View style={styles.timelineDotBreak}>
-            <Coffee size={12} color={colors.warning[600]} />
+            <MaterialIcons name="local-cafe" size={12} color={colors.warning[600]} />
           </View>
         </View>
 
@@ -142,7 +145,7 @@ function CleanTimetableCard({
               <View>
                 <Text style={styles.breakTitle}>{slot.name || 'Break'}</Text>
               </View>
-              <Edit size={14} color={colors.text.tertiary} />
+              <MaterialIcons name="edit" size={14} color={colors.text.tertiary} />
             </View>
           </TouchableOpacity>
         </View>
@@ -195,12 +198,12 @@ function CleanTimetableCard({
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                 {isTaught && (
                   <View style={styles.taughtBadge}>
-                    <Check size={10} color={colors.success[700]} />
+                    <MaterialIcons name="check" size={10} color={colors.success[700]} />
                     <Text style={styles.taughtText}>Done</Text>
                   </View>
                 )}
                 <TouchableOpacity onPress={() => { setSelectedSlotForMenu(slot); setShowSlotMenu(true); }}>
-                  <MoreVertical size={16} color={colors.text.tertiary} />
+                  <MaterialIcons name="more-vert" size={16} color={colors.text.tertiary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -214,7 +217,7 @@ function CleanTimetableCard({
                 </Text>
               </View>
               <View style={styles.detailItem}>
-                <User size={14} color={colors.text.tertiary} />
+                <MaterialIcons name="person" size={14} color={colors.text.tertiary} />
                 <Text style={styles.detailText} numberOfLines={1}>
                   {slot.teacher_name || 'No teacher'}
                 </Text>
@@ -278,7 +281,7 @@ function ModernTimetableSlotCard({
           style={styles.modernCardMenu}
           activeOpacity={0.7}
         >
-          <MoreVertical size={20} color={colors.text.secondary} />
+          <MaterialIcons name="more-vert" size={20} color={colors.text.secondary} />
         </TouchableOpacity>
       </View>
     );
@@ -315,13 +318,13 @@ function ModernTimetableSlotCard({
             style={styles.modernCardMenu}
             activeOpacity={0.7}
           >
-            <MoreVertical size={20} color={colors.text.secondary} />
+            <MaterialIcons name="more-vert" size={20} color={colors.text.secondary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.modernTeacherInfo}>
           <View style={styles.modernTeacherAvatar}>
-            <User size={16} color={colors.text.secondary} />
+            <MaterialIcons name="person" size={16} color={colors.text.secondary} />
           </View>
           <Text style={styles.modernTeacherName}>
             {slot.teacher_name || 'No Teacher'}
@@ -344,9 +347,9 @@ function ModernTimetableSlotCard({
             activeOpacity={0.7}
           >
             {isTaught ? (
-              <CheckCircle size={16} color={colors.success[600]} />
+              <MaterialIcons name="check-circle" size={16} color={colors.success[600]} />
             ) : (
-              <Circle size={16} color={colors.text.secondary} />
+              <MaterialIcons name="radio-button-unchecked" size={16} color={colors.text.secondary} />
             )}
             <Text style={[
               styles.modernStatusText,
@@ -1176,9 +1179,9 @@ export function ModernTimetableScreen() {
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Failed to load timetable</Text>
           <Text style={styles.errorMessage}>{error.message}</Text>
-          <Button mode="contained" onPress={refetch} style={styles.retryButton}>
-            Retry
-          </Button>
+          <TouchableOpacity onPress={refetch} style={[styles.retryButton, { backgroundColor: colors.primary[600], paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }]}>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -1220,7 +1223,7 @@ export function ModernTimetableScreen() {
             onPress={() => setShowClassSelector(true)}
             activeOpacity={0.7}
           >
-            <Users size={16} color={colors.primary[600]} />
+            <MaterialIcons name="group" size={16} color={colors.primary[600]} />
             <View style={styles.modernFilterContent}>
               <Text style={styles.modernFilterLabel}>Class</Text>
               <Text style={styles.modernFilterValue} numberOfLines={1}>
@@ -1236,7 +1239,7 @@ export function ModernTimetableScreen() {
             onPress={() => setShowDatePicker(true)}
             activeOpacity={0.7}
           >
-            <Calendar size={16} color={colors.primary[600]} />
+            <MaterialIcons name="event" size={16} color={colors.primary[600]} />
             <View style={styles.modernFilterContent}>
               <Text style={styles.modernFilterLabel}>Date</Text>
               <Text style={styles.modernFilterValue} numberOfLines={1}>
@@ -1270,8 +1273,8 @@ export function ModernTimetableScreen() {
                     style={styles.emptyActionButton}
                     onPress={() => setShowActionsModal(true)}
                   >
-                    <Plus size={20} color={colors.text.inverse} />
-                    <RNText style={styles.emptyActionButtonText}>Add Period</RNText>
+                    <MaterialIcons name="add" size={20} color={colors.text.inverse} />
+                    <Text style={styles.emptyActionButtonText}>Add Period</Text>
                   </TouchableOpacity>
                 }
               />
@@ -1377,12 +1380,9 @@ export function ModernTimetableScreen() {
       />
 
       {/* Add/Edit Modal */}
-      <Portal>
-        <Modal
-          visible={showAddModal}
-          onDismiss={closeModal}
-          contentContainerStyle={styles.modalContainer}
-        >
+      <RNModal visible={showAddModal} transparent animationType="fade" onRequestClose={closeModal}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalHeaderContainer}>
             <Text style={styles.modalTitle}>
               {editingSlot ? 'Edit Slot' : `Add ${slotForm.slot_type === 'period' ? 'Period' : 'Break'}`}
@@ -1394,31 +1394,30 @@ export function ModernTimetableScreen() {
             contentContainerStyle={styles.modalScrollContentContainer}
             showsVerticalScrollIndicator={true}
           >
-            <SegmentedButtons
-              value={slotForm.slot_type}
-              onValueChange={(value) => handleSlotFormChange('slot_type', value)}
-              buttons={[
-                { value: 'period', label: 'Period' },
-                { value: 'break', label: 'Break' },
-              ]}
-              style={styles.segmentedButtons}
-            />
+            <View style={[styles.segmentedButtons, { flexDirection: 'row', borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: colors.border.light }]}>
+              <TouchableOpacity
+                onPress={() => handleSlotFormChange('slot_type', 'period')}
+                style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: slotForm.slot_type === 'period' ? colors.primary[600] : colors.surface.primary }}
+              >
+                <Text style={{ color: slotForm.slot_type === 'period' ? '#fff' : colors.text.primary, fontWeight: '600', fontSize: 14 }}>Period</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleSlotFormChange('slot_type', 'break')}
+                style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: slotForm.slot_type === 'break' ? colors.primary[600] : colors.surface.primary }}
+              >
+                <Text style={{ color: slotForm.slot_type === 'break' ? '#fff' : colors.text.primary, fontWeight: '600', fontSize: 14 }}>Break</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
               <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4 }}>Start Time</Text>
                 <TextInput
-                  label="Start Time"
                   value={slotForm.start_time_input}
-                  onChangeText={(text) => handleTimeInputChange('start_time_input', text)}
-                  style={styles.textInput}
-                  mode="outlined"
+                  onChangeText={(text: string) => handleTimeInputChange('start_time_input', text)}
+                  style={[styles.textInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, fontSize: 14 }]}
                   placeholder="e.g. 9am"
-                  dense
-                  outlineColor={colors.border.light}
-                  activeOutlineColor={colors.primary[600]}
-                  textColor={colors.text.primary}
                   placeholderTextColor={colors.text.tertiary}
-                  right={<TextInput.Icon icon="clock-outline" size={20} color={colors.text.tertiary} />}
                 />
                 {slotForm.start_time && (
                   <View style={styles.timeHelperContainer}>
@@ -1430,19 +1429,13 @@ export function ModernTimetableScreen() {
               </View>
 
               <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4 }}>End Time</Text>
                 <TextInput
-                  label="End Time"
                   value={slotForm.end_time_input}
-                  onChangeText={(text) => handleTimeInputChange('end_time_input', text)}
-                  style={styles.textInput}
-                  mode="outlined"
+                  onChangeText={(text: string) => handleTimeInputChange('end_time_input', text)}
+                  style={[styles.textInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, fontSize: 14 }]}
                   placeholder="e.g. 10am"
-                  dense
-                  outlineColor={colors.border.light}
-                  activeOutlineColor={colors.primary[600]}
-                  textColor={colors.text.primary}
                   placeholderTextColor={colors.text.tertiary}
-                  right={<TextInput.Icon icon="clock-outline" size={20} color={colors.text.tertiary} />}
                 />
                 {slotForm.end_time && (
                   <View style={styles.timeHelperContainer}>
@@ -1455,19 +1448,16 @@ export function ModernTimetableScreen() {
             </View>
 
             {slotForm.slot_type === 'break' && (
-              <TextInput
-                label="Break Name"
-                value={slotForm.name}
-                onChangeText={(text) => handleSlotFormChange('name', text)}
-                style={styles.textInput}
-                mode="outlined"
-                placeholder="e.g. Lunch"
-                dense
-                outlineColor={colors.border.light}
-                activeOutlineColor={colors.primary[600]}
-                textColor={colors.text.primary}
-                placeholderTextColor={colors.text.tertiary}
-              />
+              <View>
+                <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4 }}>Break Name</Text>
+                <TextInput
+                  value={slotForm.name}
+                  onChangeText={(text: string) => handleSlotFormChange('name', text)}
+                  style={[styles.textInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, fontSize: 14 }]}
+                  placeholder="e.g. Lunch"
+                  placeholderTextColor={colors.text.tertiary}
+                />
+              </View>
             )}
 
             {slotForm.slot_type === 'period' && (
@@ -1478,19 +1468,14 @@ export function ModernTimetableScreen() {
                   onPress={() => setShowSubjectDropdown(true)}
                   activeOpacity={0.7}
                 >
-                  <View pointerEvents="none">
-                    <TextInput
-                      mode="outlined"
-                      label="Subject"
-                      value={subjects?.find(s => s.id === slotForm.subject_id)?.subject_name || ''}
-                      placeholder="Select Subject"
-                      editable={false}
-                      style={styles.textInput}
-                      dense
-                      outlineColor={colors.border.light}
-                      textColor={colors.text.primary}
-                      right={<TextInput.Icon icon="chevron-right" color={colors.text.tertiary} size={20} />}
-                    />
+                  <View style={{ borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View>
+                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>Subject</Text>
+                      <Text style={{ fontSize: 14, color: subjects?.find(s => s.id === slotForm.subject_id)?.subject_name ? colors.text.primary : colors.text.tertiary }}>
+                        {subjects?.find(s => s.id === slotForm.subject_id)?.subject_name || 'Select Subject'}
+                      </Text>
+                    </View>
+                    <MaterialIcons name="chevron-right" size={20} color={colors.text.tertiary} />
                   </View>
                 </TouchableOpacity>
 
@@ -1500,19 +1485,14 @@ export function ModernTimetableScreen() {
                   onPress={() => setShowTeacherDropdown(true)}
                   activeOpacity={0.7}
                 >
-                  <View pointerEvents="none">
-                    <TextInput
-                      mode="outlined"
-                      label="Teacher"
-                      value={adminsList?.find(t => t.id === slotForm.teacher_id)?.full_name || ''}
-                      placeholder="Select Teacher"
-                      editable={false}
-                      style={styles.textInput}
-                      dense
-                      outlineColor={colors.border.light}
-                      textColor={colors.text.primary}
-                      right={<TextInput.Icon icon="chevron-right" color={colors.text.tertiary} size={20} />}
-                    />
+                  <View style={{ borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <View>
+                      <Text style={{ fontSize: 12, color: colors.text.secondary }}>Teacher</Text>
+                      <Text style={{ fontSize: 14, color: adminsList?.find(t => t.id === slotForm.teacher_id)?.full_name ? colors.text.primary : colors.text.tertiary }}>
+                        {adminsList?.find(t => t.id === slotForm.teacher_id)?.full_name || 'Select Teacher'}
+                      </Text>
+                    </View>
+                    <MaterialIcons name="chevron-right" size={20} color={colors.text.tertiary} />
                   </View>
                 </TouchableOpacity>
 
@@ -1524,19 +1504,14 @@ export function ModernTimetableScreen() {
                       onPress={() => setShowChapterDropdown(true)}
                       activeOpacity={0.7}
                     >
-                      <View pointerEvents="none">
-                        <TextInput
-                          mode="outlined"
-                          label="Chapter"
-                          value={getChapterName(slotForm.syllabus_chapter_id) || ''}
-                          placeholder="Select"
-                          editable={false}
-                          style={styles.textInput}
-                          dense
-                          outlineColor={colors.border.light}
-                          textColor={colors.text.primary}
-                          right={<TextInput.Icon icon="chevron-right" color={colors.text.tertiary} size={20} />}
-                        />
+                      <View style={{ borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, color: colors.text.secondary }}>Chapter</Text>
+                          <Text style={{ fontSize: 13, color: getChapterName(slotForm.syllabus_chapter_id) ? colors.text.primary : colors.text.tertiary }} numberOfLines={1}>
+                            {getChapterName(slotForm.syllabus_chapter_id) || 'Select'}
+                          </Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={20} color={colors.text.tertiary} />
                       </View>
                     </TouchableOpacity>
                   </View>
@@ -1547,76 +1522,58 @@ export function ModernTimetableScreen() {
                       onPress={() => setShowTopicDropdown(true)}
                       activeOpacity={0.7}
                     >
-                      <View pointerEvents="none">
-                        <TextInput
-                          mode="outlined"
-                          label="Topic"
-                          value={getTopicName(slotForm.syllabus_topic_id) || ''}
-                          placeholder="Select"
-                          editable={false}
-                          style={styles.textInput}
-                          dense
-                          outlineColor={colors.border.light}
-                          textColor={colors.text.primary}
-                          right={<TextInput.Icon icon="chevron-right" color={colors.text.tertiary} size={20} />}
-                        />
+                      <View style={{ borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 12, color: colors.text.secondary }}>Topic</Text>
+                          <Text style={{ fontSize: 13, color: getTopicName(slotForm.syllabus_topic_id) ? colors.text.primary : colors.text.tertiary }} numberOfLines={1}>
+                            {getTopicName(slotForm.syllabus_topic_id) || 'Select'}
+                          </Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={20} color={colors.text.tertiary} />
                       </View>
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                <TextInput
-                  label="Plan Text"
-                  value={slotForm.plan_text}
-                  onChangeText={(text) => handleSlotFormChange('plan_text', text)}
-                  style={[styles.textInput, { height: 60 }]}
-                  mode="outlined"
-                  placeholder="Lesson plan..."
-                  multiline
-                  numberOfLines={2}
-                  dense
-                  outlineColor={colors.border.light}
-                  activeOutlineColor={colors.primary[600]}
-                  textColor={colors.text.primary}
-                  placeholderTextColor={colors.text.tertiary}
-                />
+                <View>
+                  <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4 }}>Plan Text</Text>
+                  <TextInput
+                    value={slotForm.plan_text}
+                    onChangeText={(text: string) => handleSlotFormChange('plan_text', text)}
+                    style={[styles.textInput, { height: 60, borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, color: colors.text.primary, fontSize: 14, textAlignVertical: 'top' }]}
+                    placeholder="Lesson plan..."
+                    multiline
+                    numberOfLines={2}
+                    placeholderTextColor={colors.text.tertiary}
+                  />
+                </View>
               </>
             )}
           </ScrollView>
 
           <View style={styles.modalActions}>
-            <Button
-              mode="outlined"
+            <TouchableOpacity
               onPress={closeModal}
-              style={styles.cancelButton}
-              buttonColor={colors.surface.primary}
-              textColor={colors.text.primary}
-              labelStyle={styles.buttonLabel}
+              style={[styles.cancelButton, { borderWidth: 1, borderColor: colors.border.light, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }]}
             >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
+              <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={editingSlot ? handleEditSlot : handleAddSlot}
-              style={styles.saveButton}
-              buttonColor={colors.primary[600]}
-              textColor={colors.text.inverse}
-              labelStyle={styles.buttonLabel}
+              style={[styles.saveButton, { backgroundColor: colors.primary[600], paddingVertical: 12, borderRadius: 8, alignItems: 'center' }]}
             >
-              {editingSlot ? 'Update' : 'Add'}
-            </Button>
+              <Text style={{ color: colors.text.inverse, fontWeight: '600', fontSize: 14 }}>{editingSlot ? 'Update' : 'Add'}</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </Portal>
+        </View>
+        </View>
+      </RNModal>
 
 
       {/* Quick Generate Form Modal */}
-      <Portal>
-        <Modal
-          visible={showQuickGenerateModal}
-          onDismiss={() => setShowQuickGenerateModal(false)}
-          contentContainerStyle={styles.quickGenerateModalContainer}
-        >
+      <RNModal visible={showQuickGenerateModal} transparent animationType="fade" onRequestClose={() => setShowQuickGenerateModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+        <View style={styles.quickGenerateModalContainer}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.quickGenerateModalContent}
@@ -1624,7 +1581,7 @@ export function ModernTimetableScreen() {
             {/* Header */}
             <View style={styles.quickGenerateHeader}>
               <View style={styles.quickGenerateHeaderIcon}>
-                <Settings size={24} color={colors.primary[600]} />
+                <MaterialIcons name="settings" size={24} color={colors.primary[600]} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.quickGenerateTitle}>Quick Generate</Text>
@@ -1635,7 +1592,7 @@ export function ModernTimetableScreen() {
                 style={styles.quickGenerateCloseBtn}
                 activeOpacity={0.7}
               >
-                <X size={20} color={colors.text.secondary} />
+                <MaterialIcons name="close" size={20} color={colors.text.secondary} />
               </TouchableOpacity>
             </View>
 
@@ -1645,21 +1602,17 @@ export function ModernTimetableScreen() {
 
               <View style={styles.quickGenerateInputGroup}>
                 <View style={styles.quickGenerateInputIcon}>
-                  <ListTodo size={18} color={colors.primary[600]} />
+                  <MaterialIcons name="playlist-add-check" size={18} color={colors.primary[600]} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.quickGenerateLabel}>Number of Periods</Text>
                   <TextInput
                     value={quickForm.numPeriods === '' ? '' : String(quickForm.numPeriods)}
-                    onChangeText={(v) => setQuickForm(f => ({ ...f, numPeriods: v === '' ? '' : parseInt(v) || '' }))}
-                    style={styles.quickGenerateInput}
+                    onChangeText={(v: string) => setQuickForm(f => ({ ...f, numPeriods: v === '' ? '' : parseInt(v) || '' }))}
+                    style={[styles.quickGenerateInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, fontSize: 14 }]}
                     keyboardType="number-pad"
-                    mode="outlined"
                     placeholder="e.g. 6"
                     placeholderTextColor={colors.text.tertiary}
-                    textColor={colors.text.primary}
-                    outlineColor={colors.border.light}
-                    activeOutlineColor={colors.primary[600]}
                   />
                   <Text style={styles.quickGenerateHelperText}>Typically 6-8 periods per day</Text>
                 </View>
@@ -1667,21 +1620,17 @@ export function ModernTimetableScreen() {
 
               <View style={styles.quickGenerateInputGroup}>
                 <View style={styles.quickGenerateInputIcon}>
-                  <Clock size={18} color={colors.primary[600]} />
+                  <MaterialIcons name="schedule" size={18} color={colors.primary[600]} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.quickGenerateLabel}>Period Duration (minutes)</Text>
                   <TextInput
                     value={quickForm.periodDurationMin === '' ? '' : String(quickForm.periodDurationMin)}
-                    onChangeText={(v) => setQuickForm(f => ({ ...f, periodDurationMin: v === '' ? '' : parseInt(v) || '' }))}
-                    style={styles.quickGenerateInput}
+                    onChangeText={(v: string) => setQuickForm(f => ({ ...f, periodDurationMin: v === '' ? '' : parseInt(v) || '' }))}
+                    style={[styles.quickGenerateInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, fontSize: 14 }]}
                     keyboardType="number-pad"
-                    mode="outlined"
                     placeholder="e.g. 40"
                     placeholderTextColor={colors.text.tertiary}
-                    textColor={colors.text.primary}
-                    outlineColor={colors.border.light}
-                    activeOutlineColor={colors.primary[600]}
                   />
                   <Text style={styles.quickGenerateHelperText}>Standard is 35-45 minutes</Text>
                 </View>
@@ -1689,20 +1638,16 @@ export function ModernTimetableScreen() {
 
               <View style={styles.quickGenerateInputGroup}>
                 <View style={styles.quickGenerateInputIcon}>
-                  <Clock size={18} color={colors.primary[600]} />
+                  <MaterialIcons name="schedule" size={18} color={colors.primary[600]} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.quickGenerateLabel}>Start Time</Text>
                   <TextInput
                     value={quickForm.startTime}
-                    onChangeText={(v) => setQuickForm(f => ({ ...f, startTime: v }))}
-                    style={styles.quickGenerateInput}
+                    onChangeText={(v: string) => setQuickForm(f => ({ ...f, startTime: v }))}
+                    style={[styles.quickGenerateInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, fontSize: 14 }]}
                     placeholder="09:00"
                     placeholderTextColor={colors.text.tertiary}
-                    textColor={colors.text.primary}
-                    mode="outlined"
-                    outlineColor={colors.border.light}
-                    activeOutlineColor={colors.primary[600]}
                   />
                   <Text style={styles.quickGenerateHelperText}>24-hour format (e.g. 09:00 for 9 AM)</Text>
                 </View>
@@ -1718,14 +1663,14 @@ export function ModernTimetableScreen() {
                   style={styles.quickGenerateAddBreakBtn}
                   activeOpacity={0.7}
                 >
-                  <Plus size={16} color={colors.primary[600]} />
+                  <MaterialIcons name="add" size={16} color={colors.primary[600]} />
                   <Text style={styles.quickGenerateAddBreakText}>Add Break</Text>
                 </TouchableOpacity>
               </View>
 
               {quickForm.breaks.length === 0 ? (
                 <View style={styles.quickGenerateEmptyBreaks}>
-                  <Coffee size={24} color={colors.text.tertiary} />
+                  <MaterialIcons name="local-cafe" size={24} color={colors.text.tertiary} />
                   <Text style={styles.quickGenerateEmptyBreaksText}>No breaks configured</Text>
                   <Text style={styles.quickGenerateEmptyBreaksSubtext}>Add breaks to schedule rest periods</Text>
                 </View>
@@ -1734,7 +1679,7 @@ export function ModernTimetableScreen() {
                   <View key={idx} style={styles.quickGenerateBreakCard}>
                     <View style={styles.quickGenerateBreakHeader}>
                       <View style={styles.quickGenerateBreakIcon}>
-                        <Coffee size={16} color={colors.warning[600]} />
+                        <MaterialIcons name="local-cafe" size={16} color={colors.warning[600]} />
                       </View>
                       <Text style={styles.quickGenerateBreakTitle}>Break {idx + 1}</Text>
                       <TouchableOpacity
@@ -1742,7 +1687,7 @@ export function ModernTimetableScreen() {
                         style={styles.quickGenerateRemoveBreakBtn}
                         activeOpacity={0.7}
                       >
-                        <X size={16} color={colors.error[600]} />
+                        <MaterialIcons name="close" size={16} color={colors.error[600]} />
                       </TouchableOpacity>
                     </View>
                     <View style={styles.quickGenerateBreakInputs}>
@@ -1750,30 +1695,22 @@ export function ModernTimetableScreen() {
                         <Text style={styles.quickGenerateLabel}>After Period</Text>
                         <TextInput
                           value={b.afterPeriod === '' ? '' : String(b.afterPeriod)}
-                          onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i === idx ? { ...bb, afterPeriod: v === '' ? '' : parseInt(v) || '' } : bb) }))}
-                          style={styles.quickGenerateInput}
+                          onChangeText={(v: string) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i === idx ? { ...bb, afterPeriod: v === '' ? '' : parseInt(v) || '' } : bb) }))}
+                          style={[styles.quickGenerateInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, fontSize: 14 }]}
                           keyboardType="number-pad"
-                          mode="outlined"
                           placeholder="2"
                           placeholderTextColor={colors.text.tertiary}
-                          textColor={colors.text.primary}
-                          outlineColor={colors.border.light}
-                          activeOutlineColor={colors.primary[600]}
                         />
                       </View>
                       <View style={{ flex: 1, marginLeft: spacing.xs }}>
                         <Text style={styles.quickGenerateLabel}>Duration (min)</Text>
                         <TextInput
                           value={b.durationMin === '' ? '' : String(b.durationMin)}
-                          onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i === idx ? { ...bb, durationMin: v === '' ? '' : parseInt(v) || '' } : bb) }))}
-                          style={styles.quickGenerateInput}
+                          onChangeText={(v: string) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i === idx ? { ...bb, durationMin: v === '' ? '' : parseInt(v) || '' } : bb) }))}
+                          style={[styles.quickGenerateInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, fontSize: 14 }]}
                           keyboardType="number-pad"
-                          mode="outlined"
                           placeholder="15"
                           placeholderTextColor={colors.text.tertiary}
-                          textColor={colors.text.primary}
-                          outlineColor={colors.border.light}
-                          activeOutlineColor={colors.primary[600]}
                         />
                       </View>
                     </View>
@@ -1781,14 +1718,10 @@ export function ModernTimetableScreen() {
                       <Text style={styles.quickGenerateLabel}>Break Name</Text>
                       <TextInput
                         value={b.name}
-                        onChangeText={(v) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i === idx ? { ...bb, name: v } : bb) }))}
-                        style={styles.quickGenerateInput}
-                        mode="outlined"
+                        onChangeText={(v: string) => setQuickForm(f => ({ ...f, breaks: f.breaks.map((bb, i) => i === idx ? { ...bb, name: v } : bb) }))}
+                        style={[styles.quickGenerateInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, fontSize: 14 }]}
                         placeholder="e.g. Recess, Lunch Break"
                         placeholderTextColor={colors.text.tertiary}
-                        textColor={colors.text.primary}
-                        outlineColor={colors.border.light}
-                        activeOutlineColor={colors.primary[600]}
                       />
                     </View>
                   </View>
@@ -1798,7 +1731,7 @@ export function ModernTimetableScreen() {
 
             {/* Warning */}
             <View style={styles.quickGenerateWarning}>
-              <AlertCircle size={18} color={colors.warning[600]} />
+              <MaterialIcons name="error" size={18} color={colors.warning[600]} />
               <Text style={styles.quickGenerateWarningText}>
                 This will replace any existing slots for {formatDateFull(selectedDate)}
               </Text>
@@ -1807,37 +1740,28 @@ export function ModernTimetableScreen() {
 
           {/* Actions */}
           <View style={styles.quickGenerateActions}>
-            <Button
-              mode="outlined"
+            <TouchableOpacity
               onPress={() => setShowQuickGenerateModal(false)}
-              style={styles.quickGenerateCancelBtn}
-              textColor={colors.text.primary}
-              labelStyle={styles.quickGenerateButtonLabel}
+              style={[styles.quickGenerateCancelBtn, { borderWidth: 1, borderColor: colors.border.light, paddingVertical: 12, borderRadius: 8, alignItems: 'center' }]}
             >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
+              <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={handleQuickGenerate}
-              style={styles.quickGenerateConfirmBtn}
-              buttonColor={colors.primary[600]}
-              textColor={colors.text.inverse}
-              labelStyle={styles.quickGenerateButtonLabel}
-              icon={() => <Settings size={18} color={colors.text.inverse} />}
+              style={[styles.quickGenerateConfirmBtn, { backgroundColor: colors.primary[600], paddingVertical: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }]}
             >
-              Generate
-            </Button>
+              <MaterialIcons name="settings" size={18} color={colors.text.inverse} />
+              <Text style={{ color: colors.text.inverse, fontWeight: '600', fontSize: 14 }}>Generate</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </Portal>
+        </View>
+        </View>
+      </RNModal>
 
       {/* Subject Selection Modal */}
-      <Portal>
-        <Modal
-          visible={showSubjectDropdown}
-          onDismiss={() => setShowSubjectDropdown(false)}
-          contentContainerStyle={styles.modalContainer}
-        >
+      <RNModal visible={showSubjectDropdown} transparent animationType="fade" onRequestClose={() => setShowSubjectDropdown(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Subject</Text>
             <TouchableOpacity
@@ -1870,7 +1794,7 @@ export function ModernTimetableScreen() {
                     {subject.subject_name}
                   </Text>
                   {slotForm.subject_id === subject.id && (
-                    <CheckCircle size={20} color={colors.primary[600]} />
+                    <MaterialIcons name="check-circle" size={20} color={colors.primary[600]} />
                   )}
                 </TouchableOpacity>
               ))
@@ -1881,16 +1805,14 @@ export function ModernTimetableScreen() {
               </View>
             )}
           </ScrollView>
-        </Modal>
-      </Portal>
+        </View>
+        </View>
+      </RNModal>
 
       {/* Teacher Selection Modal */}
-      <Portal>
-        <Modal
-          visible={showTeacherDropdown}
-          onDismiss={() => setShowTeacherDropdown(false)}
-          contentContainerStyle={styles.modalContainer}
-        >
+      <RNModal visible={showTeacherDropdown} transparent animationType="fade" onRequestClose={() => setShowTeacherDropdown(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Teacher</Text>
             <TouchableOpacity
@@ -1923,7 +1845,7 @@ export function ModernTimetableScreen() {
                     {teacher.full_name}
                   </Text>
                   {slotForm.teacher_id === teacher.id && (
-                    <CheckCircle size={20} color={colors.primary[600]} />
+                    <MaterialIcons name="check-circle" size={20} color={colors.primary[600]} />
                   )}
                 </TouchableOpacity>
               ))
@@ -1934,16 +1856,14 @@ export function ModernTimetableScreen() {
               </View>
             )}
           </ScrollView>
-        </Modal>
-      </Portal>
+        </View>
+        </View>
+      </RNModal>
 
       {/* Chapter Selection Modal */}
-      <Portal>
-        <Modal
-          visible={showChapterDropdown}
-          onDismiss={() => setShowChapterDropdown(false)}
-          contentContainerStyle={styles.modalContainer}
-        >
+      <RNModal visible={showChapterDropdown} transparent animationType="fade" onRequestClose={() => setShowChapterDropdown(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Chapter</Text>
             <TouchableOpacity
@@ -1978,7 +1898,7 @@ export function ModernTimetableScreen() {
                       {getChapterName(chapter.chapter_id)}
                     </Text>
                     {slotForm.syllabus_chapter_id === chapter.chapter_id && (
-                      <CheckCircle size={20} color={colors.primary[600]} />
+                      <MaterialIcons name="check-circle" size={20} color={colors.primary[600]} />
                     )}
                   </TouchableOpacity>
                 ));
@@ -1996,16 +1916,14 @@ export function ModernTimetableScreen() {
               }
             })()}
           </ScrollView>
-        </Modal>
-      </Portal>
+        </View>
+        </View>
+      </RNModal>
 
       {/* Topic Selection Modal */}
-      <Portal>
-        <Modal
-          visible={showTopicDropdown}
-          onDismiss={() => setShowTopicDropdown(false)}
-          contentContainerStyle={styles.modalContainer}
-        >
+      <RNModal visible={showTopicDropdown} transparent animationType="fade" onRequestClose={() => setShowTopicDropdown(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Topic</Text>
             <TouchableOpacity
@@ -2040,7 +1958,7 @@ export function ModernTimetableScreen() {
                       {topic.topic_id ? getTopicName(topic.topic_id) : ''}
                     </Text>
                     {slotForm.syllabus_topic_id === topic.topic_id && (
-                      <CheckCircle size={20} color={colors.primary[600]} />
+                      <MaterialIcons name="check-circle" size={20} color={colors.primary[600]} />
                     )}
                   </TouchableOpacity>
                 ));
@@ -2058,16 +1976,14 @@ export function ModernTimetableScreen() {
               }
             })()}
           </ScrollView>
-        </Modal>
-      </Portal>
+        </View>
+        </View>
+      </RNModal>
 
       {/* Slot Menu Modal */}
-      <Portal>
-        <Modal
-          visible={showSlotMenu}
-          onDismiss={() => setShowSlotMenu(false)}
-          contentContainerStyle={styles.slotMenuContainer}
-        >
+      <RNModal visible={showSlotMenu} transparent animationType="fade" onRequestClose={() => setShowSlotMenu(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+        <View style={styles.slotMenuContainer}>
           <View style={styles.slotMenuHeader}>
             <Text style={styles.slotMenuTitle}>Period Options</Text>
             <TouchableOpacity
@@ -2087,7 +2003,7 @@ export function ModernTimetableScreen() {
               style={styles.slotMenuAction}
               activeOpacity={0.7}
             >
-              <Edit size={20} color={colors.primary[600]} />
+              <MaterialIcons name="edit" size={20} color={colors.primary[600]} />
               <Text style={styles.slotMenuActionText}>Edit Period</Text>
             </TouchableOpacity>
 
@@ -2103,9 +2019,9 @@ export function ModernTimetableScreen() {
               activeOpacity={0.7}
             >
               {taughtSlotIds.has(selectedSlotForMenu?.id) ? (
-                <Circle size={20} color={colors.text.secondary} />
+                <MaterialIcons name="radio-button-unchecked" size={20} color={colors.text.secondary} />
               ) : (
-                <CheckCircle size={20} color={colors.text.secondary} />
+                <MaterialIcons name="check-circle" size={20} color={colors.text.secondary} />
               )}
               <Text style={[
                 styles.slotMenuActionText,
@@ -2123,137 +2039,42 @@ export function ModernTimetableScreen() {
               style={[styles.slotMenuAction, styles.slotMenuDeleteAction]}
               activeOpacity={0.7}
             >
-              <Trash2 size={20} color={colors.error[600]} />
+              <MaterialIcons name="delete" size={20} color={colors.error[600]} />
               <Text style={[styles.slotMenuActionText, styles.slotMenuDeleteText]}>Delete Period</Text>
             </TouchableOpacity>
           </View>
-        </Modal>
-      </Portal>
+        </View>
+        </View>
+      </RNModal>
 
-      {/* Error Snackbar */}
-      <Snackbar
-        visible={snackbarVisible}
-        onDismiss={() => setSnackbarVisible(false)}
-        duration={4000}
-        action={{
-          label: 'Dismiss',
-          onPress: () => setSnackbarVisible(false),
-        }}
-      >
-        {snackbarMessage}
-      </Snackbar>
-
-      {/* FAB - Bottom-right, Elevated, Circular, Primary Purple */}
-      {selectedClassId && (
-        <TouchableOpacity
-          style={styles.premiumFab}
-          onPress={() => {
-            setShowActionsModal(true);
-          }}
-          activeOpacity={0.85}
-        >
-          <Plus size={24} color={colors.text.inverse} strokeWidth={2.5} />
-        </TouchableOpacity>
+      {/* TODO: Replace with custom Toast component */}
+      {snackbarVisible && (
+        <View style={{ position: 'absolute', bottom: 80, left: 16, right: 16, backgroundColor: colors.neutral[800], padding: 14, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 999 }}>
+          <Text style={{ color: '#fff', fontSize: 14, flex: 1 }}>{snackbarMessage}</Text>
+          <TouchableOpacity onPress={() => setSnackbarVisible(false)}>
+            <Text style={{ color: colors.primary[300], fontWeight: '600', fontSize: 14, marginLeft: 12 }}>Dismiss</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
-      {/* Actions Modal */}
-      <Portal>
-        <Modal
-          visible={showActionsModal}
-          onDismiss={() => setShowActionsModal(false)}
-          contentContainerStyle={styles.actionsModalContentContainer}
-        >
-          <View style={styles.actionsModalContainer}>
-            <View style={styles.actionsModalHeader}>
-              <Text style={styles.actionsModalTitle}>Quick Actions</Text>
-              <TouchableOpacity onPress={() => setShowActionsModal(false)} style={styles.actionsModalCloseButton}>
-                <X size={24} color={colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.actionsList}>
-              <TouchableOpacity
-                style={styles.actionRow}
-                onPress={() => {
-                  setShowActionsModal(false);
-                  resetForm();
-                  setSlotForm(prev => ({ ...prev, slot_type: 'period' }));
-                  closeAllDropdowns();
-                  setShowAddModal(true);
-                }}
-                activeOpacity={0.8}
-              >
-                <Plus size={18} color={colors.primary[700]} />
-                <Text style={styles.actionText}>Add Period</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionRow}
-                onPress={() => {
-                  setShowActionsModal(false);
-                  resetForm();
-                  setSlotForm(prev => ({ ...prev, slot_type: 'break' }));
-                  closeAllDropdowns();
-                  setShowAddModal(true);
-                }}
-                activeOpacity={0.8}
-              >
-                <Coffee size={18} color={colors.warning[800]} />
-                <Text style={styles.actionText}>Add Break</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionRow}
-                onPress={() => {
-                  setShowActionsModal(false);
-                  setShowQuickGenerateModal(true);
-                }}
-                activeOpacity={0.8}
-              >
-                <Settings size={18} color={colors.warning[600]} />
-                <Text style={styles.actionText}>Quick Generate</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.actionRow}
-                onPress={() => {
-                  setShowActionsModal(false);
-                  // Set source date to current selected date
-                  setCopyForm(prev => ({
-                    ...prev,
-                    source_date: dateStr,
-                  }));
-                  setShowCopyTimetableModal(true);
-                }}
-                activeOpacity={0.8}
-              >
-                <Copy size={18} color={colors.info[600]} />
-                <Text style={styles.actionText}>Copy Timetable</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.actionsModalActions}>
-              <Button
-                mode="outlined"
-                onPress={() => setShowActionsModal(false)}
-                style={styles.actionsModalCancelButton}
-                textColor={colors.text.primary}
-              >
-                Close
-              </Button>
-            </View>
-          </View>
-        </Modal>
-      </Portal>
-
+      {/* FAB — speed-dial for timetable quick actions */}
+      <FAB.Group
+        icon="add"
+        visible={!!selectedClassId}
+        actions={[
+          { icon: 'add', label: 'Add Period', onPress: () => { resetForm(); setSlotForm(prev => ({ ...prev, slot_type: 'period' })); closeAllDropdowns(); setShowAddModal(true); } },
+          { icon: 'local-cafe', label: 'Add Break', onPress: () => { resetForm(); setSlotForm(prev => ({ ...prev, slot_type: 'break' })); closeAllDropdowns(); setShowAddModal(true); } },
+          { icon: 'settings', label: 'Quick Generate', onPress: () => setShowQuickGenerateModal(true) },
+          { icon: 'content-copy', label: 'Copy Timetable', onPress: () => { setCopyForm(prev => ({ ...prev, source_date: dateStr })); setShowCopyTimetableModal(true); } },
+        ]}
+      />
       {/* Copy Timetable Modal */}
-      <Portal>
-        <Modal
-          visible={showCopyTimetableModal}
-          onDismiss={() => setShowCopyTimetableModal(false)}
-          contentContainerStyle={styles.quickGenerateModalContainer}
-        >
+      <RNModal visible={showCopyTimetableModal} transparent animationType="fade" onRequestClose={() => setShowCopyTimetableModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' }}>
+        <View style={styles.quickGenerateModalContainer}>
           <View style={styles.quickGenerateHeader}>
             <View style={styles.quickGenerateHeaderIcon}>
-              <Copy size={24} color={colors.info[600]} />
+              <MaterialIcons name="content-copy" size={24} color={colors.info[600]} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.quickGenerateTitle}>Copy Timetable</Text>
@@ -2263,7 +2084,7 @@ export function ModernTimetableScreen() {
               onPress={() => setShowCopyTimetableModal(false)}
               style={styles.quickGenerateCloseBtn}
             >
-              <X size={20} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={20} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -2277,7 +2098,7 @@ export function ModernTimetableScreen() {
               <Text style={styles.quickGenerateSectionTitle}>Source Date</Text>
               <View style={styles.quickGenerateInputGroup}>
                 <View style={styles.quickGenerateInputIcon}>
-                  <Calendar size={18} color={colors.primary[600]} />
+                  <MaterialIcons name="event" size={18} color={colors.primary[600]} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.quickGenerateLabel}>Copy From</Text>
@@ -2336,9 +2157,9 @@ export function ModernTimetableScreen() {
                       activeOpacity={0.7}
                     >
                       {isSelected ? (
-                        <CheckCircle size={18} color={colors.primary[600]} style={{ marginBottom: 4 }} />
+                        <MaterialIcons name="check-circle" size={18} color={colors.primary[600]} style={{ marginBottom: 4 }} />
                       ) : (
-                        <Circle size={18} color={colors.text.tertiary} style={{ marginBottom: 4 }} />
+                        <MaterialIcons name="radio-button-unchecked" size={18} color={colors.text.tertiary} style={{ marginBottom: 4 }} />
                       )}
                       <Text style={{
                         fontSize: typography.fontSize.sm,
@@ -2363,7 +2184,7 @@ export function ModernTimetableScreen() {
               <Text style={styles.quickGenerateSectionTitle}>Duration</Text>
               <View style={styles.quickGenerateInputGroup}>
                 <View style={styles.quickGenerateInputIcon}>
-                  <Calendar size={18} color={colors.success[600]} />
+                  <MaterialIcons name="event" size={18} color={colors.success[600]} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.quickGenerateLabel}>Number of Weeks</Text>
@@ -2419,9 +2240,9 @@ export function ModernTimetableScreen() {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   {copyForm.replace_existing ? (
-                    <CheckCircle size={20} color={colors.warning[600]} />
+                    <MaterialIcons name="check-circle" size={20} color={colors.warning[600]} />
                   ) : (
-                    <Circle size={20} color={colors.text.tertiary} />
+                    <MaterialIcons name="radio-button-unchecked" size={20} color={colors.text.tertiary} />
                   )}
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.quickGenerateLabel, { marginBottom: 2 }]}>Replace Existing Timetables</Text>
@@ -2437,7 +2258,7 @@ export function ModernTimetableScreen() {
 
             {/* Info */}
             <View style={styles.quickGenerateWarning}>
-              <AlertCircle size={18} color={colors.info[600]} />
+              <MaterialIcons name="error" size={18} color={colors.info[600]} />
               <Text style={[styles.quickGenerateWarningText, { color: colors.info[700] }]}>
                 {normalizedSlots.length} slot(s) will be copied to {copyForm.selected_days.length} day(s)/week × {copyForm.weeks_ahead} week(s)
               </Text>
@@ -2446,18 +2267,13 @@ export function ModernTimetableScreen() {
 
           {/* Actions */}
           <View style={styles.quickGenerateActions}>
-            <Button
-              mode="outlined"
-              onPress={() => setShowCopyTimetableModal(false)}
-              style={styles.quickGenerateCancelBtn}
-              textColor={colors.text.primary}
-              labelStyle={styles.quickGenerateButtonLabel}
-              disabled={copyLoading}
+            <TouchableOpacity
+              onPress={() => !copyLoading && setShowCopyTimetableModal(false)}
+              style={[styles.quickGenerateCancelBtn, { borderWidth: 1, borderColor: colors.border.light, paddingVertical: 12, borderRadius: 8, alignItems: 'center', opacity: copyLoading ? 0.5 : 1 }]}
             >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
+              <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={async () => {
                 if (!selectedClassId || !schoolCode) {
                   Alert.alert('Error', 'Please select a class first');
@@ -2497,18 +2313,16 @@ export function ModernTimetableScreen() {
                   setCopyLoading(false);
                 }
               }}
-              style={styles.quickGenerateConfirmBtn}
-              buttonColor={colors.info[600]}
-              textColor={colors.text.inverse}
-              labelStyle={styles.quickGenerateButtonLabel}
-              icon={() => copyLoading ? <ActivityIndicator size={16} color={colors.text.inverse} /> : <Copy size={18} color={colors.text.inverse} />}
+              style={[styles.quickGenerateConfirmBtn, { backgroundColor: colors.info[600], paddingVertical: 12, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: (copyLoading || copyForm.selected_days.length === 0) ? 0.5 : 1 }]}
               disabled={copyLoading || copyForm.selected_days.length === 0}
             >
-              {copyLoading ? 'Copying...' : 'Copy Timetable'}
-            </Button>
+              {copyLoading ? <ActivityIndicator size={16} color={colors.text.inverse} /> : <MaterialIcons name="content-copy" size={18} color={colors.text.inverse} />}
+              <Text style={{ color: colors.text.inverse, fontWeight: '600', fontSize: 14 }}>{copyLoading ? 'Copying...' : 'Copy Timetable'}</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </Portal>
+        </View>
+        </View>
+      </RNModal>
 
       {/* Date Picker for Copy Timetable Source Date */}
       <DatePickerModal
@@ -2524,7 +2338,6 @@ export function ModernTimetableScreen() {
 
       {/* Conflict Resolution Modal */}
       {conflictInfo && (
-        <Portal>
           <ConflictResolutionModal
             visible={showConflictModal}
             onDismiss={() => setShowConflictModal(false)}
@@ -2542,12 +2355,10 @@ export function ModernTimetableScreen() {
                 : undefined,
             }}
           />
-        </Portal>
       )}
 
       {/* Timeline Preview Modal */}
       {conflictInfo && pendingResolution && (
-        <Portal>
           <TimelinePreviewModal
             visible={showPreviewModal}
             onDismiss={() => setShowPreviewModal(false)}
@@ -2565,7 +2376,6 @@ export function ModernTimetableScreen() {
             shifts={conflictInfo.affectedSlots}
             shiftDelta={conflictInfo.shiftDelta}
           />
-        </Portal>
       )}
     </View>
   );
@@ -2842,27 +2652,6 @@ const createStyles = (colors: ThemeColors, isDark: boolean, shadows: Shadows) =>
     color: colors.text.inverse,
   },
 
-  // Premium FAB - Bottom-right, Elevated, Circular, Primary Purple, ~56px
-  premiumFab: {
-    position: 'absolute',
-    bottom: spacing.lg,
-    right: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary[600],
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.xl,
-    elevation: 8,
-    shadowColor: colors.primary[900],
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-  },
-  fabSecondary: {
-    display: 'none',
-  },
   actionsModal: {
     backgroundColor: colors.surface.primary,
     margin: 20,

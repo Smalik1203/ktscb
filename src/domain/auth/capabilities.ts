@@ -102,7 +102,14 @@ export type Capability =
   | 'feedback.view_all'      // Super Admins: view all school feedback
   | 'feedback.add_note'      // Super Admins: add management notes
   | 'feedback.acknowledge'   // Admins: acknowledge feedback
-  | 'feedback.archive';      // Super Admins: archive feedback
+  | 'feedback.archive'       // Super Admins: archive feedback
+
+  // Announcements
+  | 'announcements.create'   // Create new announcements
+  | 'announcements.manage'   // Edit/delete/pin announcements
+
+  // Finance
+  | 'finance.access';        // Access finance module (superadmin only)
 
 /**
  * Explicit mapping of roles to their capabilities.
@@ -196,6 +203,13 @@ export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
     'feedback.add_note',
     'feedback.acknowledge',
     'feedback.archive',
+
+    // Announcements
+    'announcements.create',
+    'announcements.manage',
+
+    // Finance
+    'finance.access',
   ],
 
   // CB Admin (school board admin) - almost all capabilities except admin management
@@ -263,6 +277,10 @@ export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
     'feedback.add_note',
     'feedback.acknowledge',
     'feedback.archive',
+
+    // Announcements
+    'announcements.create',
+    'announcements.manage',
   ],
 
   // Regular Admin - school-level administration
@@ -323,6 +341,10 @@ export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
     // Feedback
     'feedback.read_own',
     'feedback.acknowledge',
+
+    // Announcements
+    'announcements.create',
+    'announcements.manage',
   ],
 
   // Teacher - teaching-related capabilities
@@ -443,5 +465,7 @@ export const CAPABILITY_DOMAINS = {
   management: ['management.view', 'management.user_activity'],
   inventory: ['inventory.read', 'inventory.create', 'inventory.manage'],
   feedback: ['feedback.submit', 'feedback.read_own', 'feedback.view_all', 'feedback.add_note', 'feedback.acknowledge', 'feedback.archive'],
+  announcements: ['announcements.create', 'announcements.manage'],
+  finance: ['finance.access'],
 } as const;
 

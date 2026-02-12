@@ -38,6 +38,8 @@ export interface ProgressBarProps {
   trackColor?: string;
   /** Custom fill color */
   fillColor?: string;
+  /** @deprecated Use fillColor instead */
+  color?: string;
   /** Custom style */
   style?: ViewStyle;
   /** Test ID */
@@ -54,6 +56,7 @@ export function ProgressBar({
   indeterminate = false,
   trackColor,
   fillColor,
+  color,
   style,
   testID,
 }: ProgressBarProps) {
@@ -114,6 +117,7 @@ export function ProgressBar({
   // Get variant color
   const getVariantColor = (): string => {
     if (fillColor) return fillColor;
+    if (color) return color;
     
     switch (variant) {
       case 'secondary':

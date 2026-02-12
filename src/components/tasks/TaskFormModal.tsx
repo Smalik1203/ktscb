@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { Modal, Portal, Text, TextInput, Button, ActivityIndicator, IconButton, ProgressBar } from 'react-native-paper';
-import { Calendar, X, Upload, FileText, Check, Loader2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput as RNTextInput } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button, IconButton, Modal as ThemedModal, ProgressBar } from '../../ui';
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { spacing, typography, borderRadius, colors } from '../../../lib/design-system';
@@ -314,33 +314,13 @@ export function TaskFormModal({
   };
 
   return (
-    <Portal>
-      <Modal
+    <>
+      <ThemedModal
         visible={visible}
         onDismiss={onDismiss}
         contentContainerStyle={styles.modal}
+        title={task ? 'Edit Task' : 'Create New Task'}
       >
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerIconCircle}>
-              <FileText size={24} color={colors.primary[600]} />
-            </View>
-            <View>
-              <Text style={styles.headerTitle}>
-                {task ? 'Edit Task' : 'Create New Task'}
-              </Text>
-              <Text style={styles.headerSubtitle}>
-                {task ? 'Update task details' : 'Fill in the task information below'}
-              </Text>
-            </View>
-          </View>
-          <IconButton
-            icon={() => <X size={24} color={colors.text.secondary} />}
-            onPress={onDismiss}
-            size={20}
-          />
-        </View>
-
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Basic Information Section */}
           <View style={styles.sectionHeader}>
@@ -352,14 +332,12 @@ export function TaskFormModal({
             <Text style={styles.label}>
               Task Title <Text style={styles.required}>*</Text>
             </Text>
-            <TextInput
-              mode="outlined"
+            <RNTextInput
               value={title}
               onChangeText={setTitle}
               placeholder="Enter task title"
-              style={styles.input}
-              outlineColor={colors.border.light}
-              activeOutlineColor={colors.primary[600]}
+              placeholderTextColor={colors.text.tertiary}
+              style={[styles.input, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, color: colors.text.primary }]}
             />
           </View>
 
@@ -371,38 +349,28 @@ export function TaskFormModal({
           {/* Priority */}
           <View style={styles.fieldContainer}>
             <TouchableOpacity onPress={() => setShowPriorityModal(true)}>
-              <TextInput
-                label="Priority"
-                value={priority ? PRIORITIES.find(p => p.value === priority)?.label : ''}
-                mode="outlined"
-                dense
-                editable={false}
-                pointerEvents="none"
-                style={styles.input}
-                outlineColor={colors.border.light}
-                right={<TextInput.Icon icon="chevron-down" color={colors.text.secondary} />}
-                textColor={colors.text.primary}
-              />
+              <View style={[styles.input, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 2 }}>Priority</Text>
+                  <Text style={{ fontSize: 14, color: colors.text.primary }}>{priority ? PRIORITIES.find(p => p.value === priority)?.label : ''}</Text>
+                </View>
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
+              </View>
             </TouchableOpacity>
           </View>
 
           {/* Class */}
           <View style={styles.fieldContainer}>
             <TouchableOpacity onPress={() => setShowClassModal(true)}>
-              <TextInput
-                label="Class"
-                value={selectedClassId
-                  ? `Grade ${classes?.find(c => c.id === selectedClassId)?.grade} - Section ${classes?.find(c => c.id === selectedClassId)?.section}`
-                  : ''}
-                mode="outlined"
-                dense
-                editable={false}
-                pointerEvents="none"
-                style={styles.input}
-                outlineColor={colors.border.light}
-                right={<TextInput.Icon icon="chevron-down" color={colors.text.secondary} />}
-                textColor={colors.text.primary}
-              />
+              <View style={[styles.input, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 2 }}>Class</Text>
+                  <Text style={{ fontSize: 14, color: colors.text.primary }}>{selectedClassId
+                    ? `Grade ${classes?.find(c => c.id === selectedClassId)?.grade} - Section ${classes?.find(c => c.id === selectedClassId)?.section}`
+                    : ''}</Text>
+                </View>
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -412,21 +380,15 @@ export function TaskFormModal({
               onPress={() => selectedClassId && setShowSubjectModal(true)}
               disabled={!selectedClassId}
             >
-              <TextInput
-                label="Subject"
-                value={selectedSubjectId
-                  ? subjects?.find(s => s.id === selectedSubjectId)?.subject_name
-                  : ''}
-                placeholder={!selectedClassId ? "Select a class first" : ""}
-                mode="outlined"
-                dense
-                editable={false}
-                pointerEvents="none"
-                style={styles.input}
-                outlineColor={colors.border.light}
-                right={<TextInput.Icon icon="chevron-down" color={colors.text.secondary} />}
-                textColor={colors.text.primary}
-              />
+              <View style={[styles.input, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', opacity: !selectedClassId ? 0.5 : 1 }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 2 }}>Subject</Text>
+                  <Text style={{ fontSize: 14, color: colors.text.primary }}>{selectedSubjectId
+                    ? subjects?.find(s => s.id === selectedSubjectId)?.subject_name
+                    : (!selectedClassId ? 'Select a class first' : '')}</Text>
+                </View>
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -439,35 +401,25 @@ export function TaskFormModal({
           <View style={styles.row}>
             <View style={[styles.fieldContainer, styles.halfWidth]}>
               <TouchableOpacity onPress={() => setShowAssignedDatePicker(true)}>
-                <TextInput
-                  label="Assigned Date"
-                  value={formatDate(assignedDate)}
-                  mode="outlined"
-                  dense
-                  editable={false}
-                  pointerEvents="none"
-                  style={styles.input}
-                  outlineColor={colors.border.light}
-                  right={<TextInput.Icon icon={Calendar} size={20} color={colors.text.secondary} />}
-                  textColor={colors.text.primary}
-                />
+                <View style={[styles.input, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 2 }}>Assigned Date</Text>
+                    <Text style={{ fontSize: 14, color: colors.text.primary }}>{formatDate(assignedDate)}</Text>
+                  </View>
+                  <MaterialIcons name="event" size={20} color={colors.text.secondary} />
+                </View>
               </TouchableOpacity>
             </View>
 
             <View style={[styles.fieldContainer, styles.halfWidth]}>
               <TouchableOpacity onPress={() => setShowDueDatePicker(true)}>
-                <TextInput
-                  label="Due Date"
-                  value={formatDate(dueDate)}
-                  mode="outlined"
-                  dense
-                  editable={false}
-                  pointerEvents="none"
-                  style={styles.input}
-                  outlineColor={colors.border.light}
-                  right={<TextInput.Icon icon={Calendar} size={20} color={colors.text.secondary} />}
-                  textColor={colors.text.primary}
-                />
+                <View style={[styles.input, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 2 }}>Due Date</Text>
+                    <Text style={{ fontSize: 14, color: colors.text.primary }}>{formatDate(dueDate)}</Text>
+                  </View>
+                  <MaterialIcons name="event" size={20} color={colors.text.secondary} />
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -481,11 +433,11 @@ export function TaskFormModal({
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>File Attachments</Text>
             <Button
-              mode="outlined"
-              icon={() => <Upload size={16} color={colors.primary[600]} />}
+              variant="outline"
+              icon={<MaterialIcons name="upload" size={16} color={colors.primary[600]} />}
               onPress={handlePickDocument}
               style={styles.uploadButton}
-              labelStyle={styles.uploadButtonLabel}
+              textStyle={styles.uploadButtonLabel}
             >
               Upload
             </Button>
@@ -497,12 +449,12 @@ export function TaskFormModal({
             {submitting && uploadingStatus && (
               <View style={styles.uploadProgressContainer}>
                 <View style={styles.uploadProgressHeader}>
-                  <Loader2 size={16} color={colors.primary[600]} style={{ animationDuration: '1s' }} />
+                  <ActivityIndicator size="small" color={colors.primary[600]} />
                   <Text style={styles.uploadStatusText}>{uploadingStatus}</Text>
                   <Text style={styles.uploadProgressText}>{Math.round(uploadProgress)}%</Text>
                 </View>
                 <ProgressBar
-                  progress={uploadProgress / 100}
+                  progress={uploadProgress}
                   color={colors.primary[600]}
                   style={styles.progressBar}
                 />
@@ -513,14 +465,15 @@ export function TaskFormModal({
               <View style={styles.attachmentsList}>
                 {attachments.map((file, index) => (
                   <View key={index} style={styles.attachmentItem}>
-                    <FileText size={16} color={colors.text.secondary} />
+                    <MaterialIcons name="description" size={16} color={colors.text.secondary} />
                     <Text style={styles.attachmentName} numberOfLines={1}>
                       {file.name}
                     </Text>
                     <IconButton
-                      icon={() => <X size={16} color={colors.error[600]} />}
-                      size={16}
+                      icon={<MaterialIcons name="close" size={16} color={colors.error[600]} />}
                       onPress={() => handleRemoveAttachment(index)}
+                      accessibilityLabel="Remove attachment"
+                      size="sm"
                     />
                   </View>
                 ))}
@@ -531,16 +484,14 @@ export function TaskFormModal({
           {/* Description */}
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>Description</Text>
-            <TextInput
-              mode="outlined"
+            <RNTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="Enter task description (optional)"
+              placeholderTextColor={colors.text.tertiary}
               multiline
               numberOfLines={3}
-              style={styles.textArea}
-              outlineColor={colors.border.light}
-              activeOutlineColor={colors.primary[600]}
+              style={[styles.textArea, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, textAlignVertical: 'top' }]}
             />
             <Text style={styles.charCount}>{description.length} / 1000</Text>
           </View>
@@ -548,16 +499,14 @@ export function TaskFormModal({
           {/* Instructions */}
           <View style={styles.fieldContainer}>
             <Text style={styles.label}>Instructions</Text>
-            <TextInput
-              mode="outlined"
+            <RNTextInput
               value={instructions}
               onChangeText={setInstructions}
               placeholder="Enter specific instructions for students (optional)"
+              placeholderTextColor={colors.text.tertiary}
               multiline
               numberOfLines={3}
-              style={styles.textArea}
-              outlineColor={colors.border.light}
-              activeOutlineColor={colors.primary[600]}
+              style={[styles.textArea, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, textAlignVertical: 'top' }]}
             />
             <Text style={styles.charCount}>{instructions.length} / 1000</Text>
           </View>
@@ -566,7 +515,7 @@ export function TaskFormModal({
         {/* Footer Actions */}
         <View style={styles.footer}>
           <Button
-            mode="outlined"
+            variant="outline"
             onPress={onDismiss}
             style={styles.cancelButton}
             disabled={submitting}
@@ -574,7 +523,7 @@ export function TaskFormModal({
             Cancel
           </Button>
           <Button
-            mode="contained"
+            variant="primary"
             onPress={handleSubmit}
             style={styles.submitButton}
             loading={submitting}
@@ -583,10 +532,10 @@ export function TaskFormModal({
             {task ? 'Update Task' : 'Create Task'}
           </Button>
         </View>
-      </Modal>
+      </ThemedModal>
 
       {/* Priority Selection Modal */}
-      <Modal
+      <ThemedModal
         visible={showPriorityModal}
         onDismiss={() => setShowPriorityModal(false)}
         contentContainerStyle={styles.selectionModal}
@@ -615,18 +564,18 @@ export function TaskFormModal({
                 </Text>
               </View>
               {priority === p.value && (
-                <Check size={18} color={colors.primary[600]} />
+                <MaterialIcons name="check" size={18} color={colors.primary[600]} />
               )}
             </TouchableOpacity>
           ))}
         </View>
-        <Button mode="outlined" onPress={() => setShowPriorityModal(false)} style={styles.selectionModalButton}>
+        <Button variant="outline" onPress={() => setShowPriorityModal(false)} style={styles.selectionModalButton}>
           Close
         </Button>
-      </Modal>
+      </ThemedModal>
 
       {/* Class Selection Modal */}
-      <Modal
+      <ThemedModal
         visible={showClassModal}
         onDismiss={() => setShowClassModal(false)}
         contentContainerStyle={styles.selectionModal}
@@ -652,18 +601,18 @@ export function TaskFormModal({
                 Grade {cls.grade} - Section {cls.section}
               </Text>
               {selectedClassId === cls.id && (
-                <Check size={18} color={colors.primary[600]} />
+                <MaterialIcons name="check" size={18} color={colors.primary[600]} />
               )}
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <Button mode="outlined" onPress={() => setShowClassModal(false)} style={styles.selectionModalButton}>
+        <Button variant="outline" onPress={() => setShowClassModal(false)} style={styles.selectionModalButton}>
           Close
         </Button>
-      </Modal>
+      </ThemedModal>
 
       {/* Subject Selection Modal */}
-      <Modal
+      <ThemedModal
         visible={showSubjectModal}
         onDismiss={() => setShowSubjectModal(false)}
         contentContainerStyle={styles.selectionModal}
@@ -689,15 +638,15 @@ export function TaskFormModal({
                 {subject.subject_name}
               </Text>
               {selectedSubjectId === subject.id && (
-                <Check size={18} color={colors.primary[600]} />
+                <MaterialIcons name="check" size={18} color={colors.primary[600]} />
               )}
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <Button mode="outlined" onPress={() => setShowSubjectModal(false)} style={styles.selectionModalButton}>
+        <Button variant="outline" onPress={() => setShowSubjectModal(false)} style={styles.selectionModalButton}>
           Close
         </Button>
-      </Modal>
+      </ThemedModal>
 
       {/* Date Picker Modals */}
       <DatePickerModal
@@ -722,7 +671,7 @@ export function TaskFormModal({
         minimumDate={assignedDate}
         title="Select Due Date"
       />
-    </Portal>
+    </>
   );
 }
 
@@ -733,39 +682,6 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
       margin: spacing.md,
       borderRadius: borderRadius.lg,
       maxHeight: '90%',
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: spacing.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border.light,
-      backgroundColor: colors.background.secondary,
-    },
-    headerContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      flex: 1,
-    },
-    headerIconCircle: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: colors.primary[50],
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    headerTitle: {
-      fontSize: typography.fontSize.xl,
-      fontWeight: typography.fontWeight.bold as any,
-      color: colors.text.primary,
-      marginBottom: spacing.xs,
-    },
-    headerSubtitle: {
-      fontSize: typography.fontSize.sm,
-      color: colors.text.secondary,
     },
     content: {
       padding: spacing.lg,

@@ -8,7 +8,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { Check } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 export interface StepIndicatorProps {
     currentStep: number;
@@ -76,7 +76,7 @@ export function StepIndicator({ currentStep, totalSteps, labels }: StepIndicator
                     ]}
                 >
                     {isCompleted ? (
-                        <Check size={14} color={colors.text.inverse} strokeWidth={3} />
+                        <MaterialIcons name="check" size={14} color={colors.text.inverse} />
                     ) : (
                         <View
                             style={[

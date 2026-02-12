@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import {
   View,
+  Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Switch,
 } from 'react-native';
-import { Text, Modal, Portal, Button, TextInput, Switch } from 'react-native-paper';
-import { Calendar as CalendarIcon, Clock, X, ChevronRight } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Modal, Button, Input } from '../../ui';
 import { DatePickerModal } from '../common/DatePickerModal';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../../theme/types';
@@ -178,52 +180,34 @@ export default function CalendarEventFormModal({
   const selectedClass = classes.find((c) => c.id === classInstanceId);
 
   return (
-    <Portal>
+    <>
       <Modal
         visible={visible}
         onDismiss={onCancel}
-        contentContainerStyle={styles.modalContainer}
+        title={event ? 'Edit Event' : `New ${isHoliday ? 'Holiday' : 'Event'}`}
       >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text variant="headlineSmall" style={styles.headerTitle}>
-              {event ? 'Edit Event' : `New ${isHoliday ? 'Holiday' : 'Event'}`}
-            </Text>
-            <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
-              <X size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-
           {/* Title */}
           <View style={styles.field}>
-            <TextInput
-              mode="outlined"
+            <Input
               label="Title *"
               value={title}
               onChangeText={setTitle}
               placeholder="Enter event title"
-              style={styles.input}
-              outlineColor={colors.border.DEFAULT}
-              activeOutlineColor={colors.primary.main}
-              textColor={colors.text.primary}
+              variant="outlined"
             />
           </View>
 
           {/* Description */}
           <View style={styles.field}>
-            <TextInput
-              mode="outlined"
+            <Input
               label="Description"
               value={description}
               onChangeText={setDescription}
               placeholder="Enter details (optional)"
               multiline
               numberOfLines={3}
-              style={[styles.input, styles.textArea]}
-              outlineColor={colors.border.DEFAULT}
-              activeOutlineColor={colors.primary.main}
-              textColor={colors.text.primary}
+              variant="outlined"
             />
           </View>
 
@@ -231,17 +215,13 @@ export default function CalendarEventFormModal({
           <View style={styles.row}>
             {/* Event Type */}
             <View style={[styles.field, styles.halfField]}>
-              <TextInput
-                mode="outlined"
+              <Input
                 label="Event Type *"
                 value={eventType}
                 onChangeText={setEventType}
                 placeholder="e.g. Exam"
-                style={styles.input}
-                outlineColor={colors.border.DEFAULT}
-                activeOutlineColor={colors.primary.main}
-                textColor={colors.text.primary}
-                dense
+                variant="outlined"
+                size="sm"
               />
             </View>
 
@@ -252,18 +232,15 @@ export default function CalendarEventFormModal({
                 activeOpacity={0.7}
               >
                 <View pointerEvents="none">
-                  <TextInput
-                    mode="outlined"
+                  <Input
                     label="Class"
                     value={selectedClass
                       ? `Grade ${selectedClass.grade}${selectedClass.section ? `-${selectedClass.section}` : ''}`
                       : 'School-wide'}
                     editable={false}
-                    style={styles.input}
-                    outlineColor={colors.border.DEFAULT}
-                    textColor={colors.text.primary}
-                    dense
-                    right={<TextInput.Icon icon="chevron-right" color={colors.text.tertiary} />}
+                    variant="outlined"
+                    size="sm"
+                    rightIcon={<MaterialIcons name="chevron-right" size={20} color={colors.text.tertiary} />}
                   />
                 </View>
               </TouchableOpacity>
@@ -281,16 +258,13 @@ export default function CalendarEventFormModal({
                 activeOpacity={0.7}
               >
                 <View pointerEvents="none">
-                  <TextInput
-                    mode="outlined"
+                  <Input
                     label="Start Date *"
                     value={formatDate(startDate)}
                     editable={false}
-                    style={styles.input}
-                    outlineColor={colors.border.DEFAULT}
-                    textColor={colors.text.primary}
-                    dense
-                    left={<TextInput.Icon icon="calendar" color={colors.text.tertiary} />}
+                    variant="outlined"
+                    size="sm"
+                    leftIcon={<MaterialIcons name="event" size={20} color={colors.text.tertiary} />}
                   />
                 </View>
               </TouchableOpacity>
@@ -305,16 +279,13 @@ export default function CalendarEventFormModal({
                 activeOpacity={0.7}
               >
                 <View pointerEvents="none">
-                  <TextInput
-                    mode="outlined"
+                  <Input
                     label="End Date"
                     value={endDate ? formatDate(endDate) : 'Same day'}
                     editable={false}
-                    style={styles.input}
-                    outlineColor={colors.border.DEFAULT}
-                    textColor={colors.text.primary}
-                    dense
-                    left={<TextInput.Icon icon="calendar-end" color={colors.text.tertiary} />}
+                    variant="outlined"
+                    size="sm"
+                    leftIcon={<MaterialIcons name="event" size={20} color={colors.text.tertiary} />}
                   />
                 </View>
               </TouchableOpacity>
@@ -326,7 +297,7 @@ export default function CalendarEventFormModal({
             <View style={styles.toggleLabelContainer}>
               <Text style={styles.compactLabel}>All Day Event</Text>
             </View>
-            <Switch value={isAllDay} onValueChange={setIsAllDay} color={colors.primary.main} style={{ transform: [{ scale: 0.8 }] }} />
+            <Switch value={isAllDay} onValueChange={setIsAllDay} trackColor={{ false: colors.neutral[300], true: colors.primary.main }} style={{ transform: [{ scale: 0.8 }] }} />
           </View>
 
           {/* Times */}
@@ -338,16 +309,13 @@ export default function CalendarEventFormModal({
                   activeOpacity={0.7}
                 >
                   <View pointerEvents="none">
-                    <TextInput
-                      mode="outlined"
+                    <Input
                       label="Start Time"
                       value={formatTime(startTime)}
                       editable={false}
-                      style={styles.input}
-                      outlineColor={colors.border.DEFAULT}
-                      textColor={colors.text.primary}
-                      dense
-                      left={<TextInput.Icon icon="clock-outline" color={colors.text.tertiary} size={20} />}
+                      variant="outlined"
+                      size="sm"
+                      leftIcon={<MaterialIcons name="schedule" size={20} color={colors.text.tertiary} />}
                     />
                   </View>
                 </TouchableOpacity>
@@ -359,16 +327,13 @@ export default function CalendarEventFormModal({
                   activeOpacity={0.7}
                 >
                   <View pointerEvents="none">
-                    <TextInput
-                      mode="outlined"
+                    <Input
                       label="End Time"
                       value={formatTime(endTime)}
                       editable={false}
-                      style={styles.input}
-                      outlineColor={colors.border.DEFAULT}
-                      textColor={colors.text.primary}
-                      dense
-                      left={<TextInput.Icon icon="clock-outline" color={colors.text.tertiary} size={20} />}
+                      variant="outlined"
+                      size="sm"
+                      leftIcon={<MaterialIcons name="schedule" size={20} color={colors.text.tertiary} />}
                     />
                   </View>
                 </TouchableOpacity>
@@ -400,24 +365,23 @@ export default function CalendarEventFormModal({
             <View style={styles.toggleLabelContainer}>
               <Text style={styles.compactLabel}>Active Status</Text>
             </View>
-            <Switch value={isActive} onValueChange={setIsActive} color={colors.success.main} style={{ transform: [{ scale: 0.8 }] }} />
+            <Switch value={isActive} onValueChange={setIsActive} trackColor={{ false: colors.neutral[300], true: colors.success.main }} style={{ transform: [{ scale: 0.8 }] }} />
           </View>
 
           {/* Action Buttons */}
           <View style={styles.actions}>
             {event && onDelete && (
               <Button
-                mode="outlined"
+                variant="destructive"
                 onPress={onDelete}
-                style={[styles.actionButton, { borderColor: colors.error.main }]}
-                textColor={colors.error.main}
+                style={styles.actionButton}
                 disabled={loading}
               >
                 Delete
               </Button>
             )}
             <Button
-              mode="outlined"
+              variant="outline"
               onPress={onCancel}
               style={styles.actionButton}
               disabled={loading}
@@ -425,7 +389,7 @@ export default function CalendarEventFormModal({
               Cancel
             </Button>
             <Button
-              mode="contained"
+              variant="primary"
               onPress={handleSubmit}
               style={styles.actionButton}
               loading={loading}
@@ -488,14 +452,13 @@ export default function CalendarEventFormModal({
       <Modal
         visible={showClassSelector}
         onDismiss={() => setShowClassSelector(false)}
-        contentContainerStyle={styles.classModalContainer}
       >
         <View style={styles.classModalHeader}>
-          <Text variant="headlineSmall" style={styles.classModalTitle}>
+          <Text style={styles.classModalTitle}>
             Select Class
           </Text>
           <TouchableOpacity onPress={() => setShowClassSelector(false)} style={styles.closeButton}>
-            <X size={24} color={colors.text.primary} />
+            <MaterialIcons name="close" size={24} color={colors.text.primary} />
           </TouchableOpacity>
         </View>
         <ScrollView style={styles.classModalList}>
@@ -542,11 +505,11 @@ export default function CalendarEventFormModal({
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <Button onPress={() => setShowClassSelector(false)} style={styles.classModalButton}>
+        <Button variant="ghost" onPress={() => setShowClassSelector(false)} style={styles.classModalButton}>
           Cancel
         </Button>
       </Modal>
-    </Portal>
+    </>
   );
 }
 
@@ -567,16 +530,6 @@ const createStyles = (
     },
     scrollView: {
       padding: spacing.lg,
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: spacing.lg,
-    },
-    headerTitle: {
-      fontWeight: typography.fontWeight.bold,
-      color: colors.text.primary,
     },
     closeButton: {
       padding: spacing.xs,

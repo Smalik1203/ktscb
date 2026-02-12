@@ -4,12 +4,14 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, ScrollView, RefreshControl, TouchableOpacity, Alert, Animated } from 'react-native';
-import { Text, Button, Card, ActivityIndicator, Portal, Modal, TextInput, Chip, FAB, SegmentedButtons } from 'react-native-paper';
+import { View, ScrollView, RefreshControl, TouchableOpacity, Alert, Animated, Text, ActivityIndicator } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Download, FileText, AlertCircle, Calendar, TrendingUp, TrendingDown, Wallet, ArrowRight, Filter, ChevronDown } from 'lucide-react-native';
+import { Button, Card, Input, Modal as CustomModal, FAB, Chip } from '../../ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import { AccessDenied } from '../../components/common/AccessDenied';
 import { supabase as supabaseClient } from '../../lib/supabase';
 import { financeService, financeReportsService } from '../../services/finance';
 import type { FinanceTransaction } from '../../services/finance';
@@ -80,30 +82,23 @@ function AddExpenseModal({ visible, onClose, onSuccess, schoolCode }: AddExpense
   
   return (
     <>
-      <Portal>
-        <Modal
-          visible={visible}
-          onDismiss={onClose}
-          contentContainerStyle={{
-            backgroundColor: colors.surface.primary,
-            margin: spacing.md,
-            borderRadius: 16,
-            maxHeight: '85%',
-            overflow: 'hidden',
-          }}
-        >
+      <CustomModal
+        visible={visible}
+        onDismiss={onClose}
+        contentContainerStyle={{
+          padding: 0,
+        }}
+      >
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing.md }}>
-            <Text variant="titleLarge" style={{ fontWeight: '700', marginBottom: spacing.xs }}>
+            <Text style={{ fontWeight: '700', marginBottom: spacing.xs }}>
               New Expense
             </Text>
             
-            <TextInput
+            <Input
               label="Amount"
               value={amount}
               onChangeText={setAmount}
               keyboardType="numeric"
-              mode="outlined"
-              dense
               style={{ marginBottom: spacing.sm }}
               placeholder="0.00"
             />
@@ -119,25 +114,23 @@ function AddExpenseModal({ visible, onClose, onSuccess, schoolCode }: AddExpense
                 backgroundColor: colors.surface.secondary,
               }}
             >
-              <Text variant="bodySmall" style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 11 }}>
+              <Text style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 11 }}>
                 Date
               </Text>
-              <Text variant="bodyMedium" style={{ fontSize: 14 }}>{format(txnDate, 'MMM dd, yyyy')}</Text>
+              <Text style={{ fontSize: 14 }}>{format(txnDate, 'MMM dd, yyyy')}</Text>
             </TouchableOpacity>
             
-            <TextInput
+            <Input
               label="Description"
               value={description}
               onChangeText={setDescription}
-              mode="outlined"
-              dense
               multiline
               numberOfLines={2}
               style={{ marginBottom: spacing.sm }}
               placeholder="Optional"
             />
             
-            <Text variant="bodySmall" style={{ marginBottom: spacing.xs, fontWeight: '600', fontSize: 12 }}>
+            <Text style={{ marginBottom: spacing.xs, fontWeight: '600', fontSize: 12 }}>
               Category
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm }}>
@@ -154,7 +147,7 @@ function AddExpenseModal({ visible, onClose, onSuccess, schoolCode }: AddExpense
               ))}
             </View>
             
-            <Text variant="bodySmall" style={{ marginBottom: spacing.xs, fontWeight: '600', fontSize: 12 }}>
+            <Text style={{ marginBottom: spacing.xs, fontWeight: '600', fontSize: 12 }}>
               Account
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm }}>
@@ -180,11 +173,11 @@ function AddExpenseModal({ visible, onClose, onSuccess, schoolCode }: AddExpense
             )}
             
             <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.md }}>
-              <Button mode="outlined" onPress={onClose} style={{ flex: 1 }}>
+              <Button variant="outline" onPress={onClose} style={{ flex: 1 }}>
                 Cancel
               </Button>
               <Button
-                mode="contained"
+                variant="primary"
                 onPress={() => createMutation.mutate()}
                 loading={createMutation.isPending}
                 disabled={createMutation.isPending || !selectedCategoryId || !selectedAccountId || !amount}
@@ -194,8 +187,7 @@ function AddExpenseModal({ visible, onClose, onSuccess, schoolCode }: AddExpense
               </Button>
             </View>
           </ScrollView>
-        </Modal>
-      </Portal>
+      </CustomModal>
       
       <DatePickerModal
         visible={showDatePicker}
@@ -214,6 +206,7 @@ function AddExpenseModal({ visible, onClose, onSuccess, schoolCode }: AddExpense
 export default function FinanceScreen() {
   const { colors, spacing } = useTheme();
   const { profile } = useAuth();
+  const { can } = useCapabilities();
   const queryClient = useQueryClient();
   const supabase = supabaseClient as any;
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -228,18 +221,18 @@ export default function FinanceScreen() {
   const [actualSchoolCode, setActualSchoolCode] = useState<string | null>(null);
   
   useEffect(() => {
-    if (profile?.role === 'superadmin') {
+    if (can('finance.access')) {
       // Fetch school code from super_admin table (what finance service uses)
       supabase
         .from('super_admin')
         .select('school_code')
-        .eq('auth_user_id', profile.auth_id)
+        .eq('auth_user_id', profile?.auth_id ?? '')
         .maybeSingle()
         .then(({ data, error }) => {
           if (!error && data?.school_code) {
             setActualSchoolCode(data.school_code);
           } else {
-            setActualSchoolCode(profile.school_code);
+            setActualSchoolCode(profile?.school_code ?? null);
           }
         });
     } else {
@@ -335,30 +328,34 @@ export default function FinanceScreen() {
       .map(([date, txns]) => ({ date, transactions: txns }));
   }, [filteredTransactions]);
   
+  if (!can('finance.access')) {
+    return (
+      <AccessDenied
+        message="Finance module is only available for super admin users."
+        capability="finance.access"
+      />
+    );
+  }
+
   if (!schoolCode) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, backgroundColor: colors.background.app }}>
-        <Text variant="titleLarge" style={{ marginBottom: spacing.sm, textAlign: 'center' }}>
-          Access Restricted
-        </Text>
-        <Text variant="bodyMedium" style={{ color: colors.text.secondary, textAlign: 'center' }}>
-          Finance module is only available for super admin users
-        </Text>
-      </View>
+      <AccessDenied
+        message="Unable to determine your school. Please contact support."
+      />
     );
   }
   
   if (transactionsError) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, backgroundColor: colors.background.app }}>
-        <AlertCircle size={48} color={colors.error[600]} style={{ marginBottom: spacing.md }} />
-        <Text variant="titleLarge" style={{ marginBottom: spacing.sm, color: colors.error[600], textAlign: 'center' }}>
+        <MaterialIcons name="error" size={48} color={colors.error[600]} style={{ marginBottom: spacing.md }} />
+        <Text style={{ marginBottom: spacing.sm, color: colors.error[600], textAlign: 'center' }}>
           Error
         </Text>
-        <Text variant="bodyMedium" style={{ color: colors.error[600], marginBottom: spacing.lg, textAlign: 'center' }}>
+        <Text style={{ color: colors.error[600], marginBottom: spacing.lg, textAlign: 'center' }}>
           {transactionsError.message}
         </Text>
-        <Button mode="contained" onPress={() => refetch()}>
+        <Button variant="primary" onPress={() => refetch()}>
           Retry
         </Button>
       </View>
@@ -393,7 +390,7 @@ export default function FinanceScreen() {
               marginRight: spacing.sm,
               flexShrink: 0,
             }}>
-              <Calendar size={14} color={colors.primary[600]} />
+              <MaterialIcons name="event" size={14} color={colors.primary[600]} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{
@@ -416,7 +413,7 @@ export default function FinanceScreen() {
                 {format(parseISO(dateRange.startDate), 'MMM dd')}
               </Text>
             </View>
-            <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
+            <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
           </TouchableOpacity>
 
           {/* Divider */}
@@ -444,7 +441,7 @@ export default function FinanceScreen() {
               marginRight: spacing.sm,
               flexShrink: 0,
             }}>
-              <Calendar size={14} color={colors.primary[600]} />
+              <MaterialIcons name="event" size={14} color={colors.primary[600]} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{
@@ -467,7 +464,7 @@ export default function FinanceScreen() {
                 {format(parseISO(dateRange.endDate), 'MMM dd, yyyy')}
               </Text>
             </View>
-            <ChevronDown size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
+            <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.text.secondary} style={{ marginLeft: spacing.xs, flexShrink: 0 }} />
           </TouchableOpacity>
 
           {/* Divider */}
@@ -502,7 +499,7 @@ export default function FinanceScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Download size={16} color={colors.primary[600]} />
+              <MaterialIcons name="download" size={16} color={colors.primary[600]} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={async () => {
@@ -525,7 +522,7 @@ export default function FinanceScreen() {
               }}
               activeOpacity={0.7}
             >
-              <FileText size={16} color={colors.primary[600]} />
+              <MaterialIcons name="description" size={16} color={colors.primary[600]} />
             </TouchableOpacity>
           </View>
         </View>
@@ -546,11 +543,10 @@ export default function FinanceScreen() {
             {/* Compact Summary Row */}
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <View style={{ flex: 1, backgroundColor: colors.success[50], padding: spacing.sm, borderRadius: 8, minWidth: 0 }}>
-                <Text variant="bodySmall" style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 11 }}>
+                <Text style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 11 }}>
                   Income
                 </Text>
                 <Text 
-                  variant="titleLarge" 
                   style={{ color: colors.success[700], fontWeight: '700', fontSize: 18 }}
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -560,11 +556,10 @@ export default function FinanceScreen() {
                 </Text>
               </View>
               <View style={{ flex: 1, backgroundColor: colors.error[50], padding: spacing.sm, borderRadius: 8, minWidth: 0 }}>
-                <Text variant="bodySmall" style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 11 }}>
+                <Text style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 11 }}>
                   Expense
                 </Text>
                 <Text 
-                  variant="titleLarge" 
                   style={{ color: colors.error[700], fontWeight: '700', fontSize: 18 }}
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -574,11 +569,10 @@ export default function FinanceScreen() {
                 </Text>
               </View>
               <View style={{ flex: 1, backgroundColor: summary.net_income >= 0 ? colors.success[50] : colors.error[50], padding: spacing.sm, borderRadius: 8, minWidth: 0 }}>
-                <Text variant="bodySmall" style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 11 }}>
+                <Text style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 11 }}>
                   Net
                 </Text>
                 <Text 
-                  variant="titleLarge" 
                   style={{ 
                     color: summary.net_income >= 0 ? colors.success[700] : colors.error[700],
                     fontWeight: '700',
@@ -642,14 +636,14 @@ export default function FinanceScreen() {
             </View>
           ) : groupedTransactions.length === 0 ? (
             <View style={{ padding: spacing.lg, alignItems: 'center', marginTop: spacing.md }}>
-              <Wallet size={32} color={colors.text.secondary} style={{ opacity: 0.3, marginBottom: spacing.sm }} />
-              <Text variant="bodyLarge" style={{ marginBottom: spacing.xs, textAlign: 'center' }}>
+              <MaterialIcons name="account-balance-wallet" size={32} color={colors.text.secondary} style={{ opacity: 0.3, marginBottom: spacing.sm }} />
+              <Text style={{ marginBottom: spacing.xs, textAlign: 'center' }}>
                 No Transactions
               </Text>
-              <Text variant="bodySmall" style={{ color: colors.text.secondary, textAlign: 'center', marginBottom: spacing.md }}>
+              <Text style={{ color: colors.text.secondary, textAlign: 'center', marginBottom: spacing.md }}>
                 Start by adding an expense
               </Text>
-              <Button mode="contained" icon={() => <Plus size={16} />} onPress={() => setShowAddExpense(true)} compact>
+              <Button variant="primary" icon={<MaterialIcons name="add" size={16} color={colors.text.inverse} />} onPress={() => setShowAddExpense(true)}>
                 Add Expense
               </Button>
             </View>
@@ -657,7 +651,7 @@ export default function FinanceScreen() {
             <View style={{ gap: spacing.md }}>
               {groupedTransactions.map(({ date, transactions: dayTransactions }) => (
                 <View key={date}>
-                  <Text variant="bodySmall" style={{ 
+                  <Text style={{ 
                     color: colors.text.secondary, 
                     marginBottom: spacing.xs,
                     marginTop: spacing.sm,
@@ -682,7 +676,6 @@ export default function FinanceScreen() {
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                           <View style={{ flex: 1, paddingRight: spacing.sm, minWidth: 0 }}>
                             <Text 
-                              variant="bodyLarge" 
                               style={{ fontWeight: '600', marginBottom: 2 }}
                               numberOfLines={1}
                               ellipsizeMode="tail"
@@ -691,7 +684,6 @@ export default function FinanceScreen() {
                             </Text>
                             {txn.description && (
                               <Text 
-                                variant="bodySmall" 
                                 style={{ color: colors.text.secondary, marginBottom: 2, fontSize: 12 }}
                                 numberOfLines={2}
                                 ellipsizeMode="tail"
@@ -700,7 +692,6 @@ export default function FinanceScreen() {
                               </Text>
                             )}
                             <Text 
-                              variant="bodySmall" 
                               style={{ color: colors.text.secondary, fontSize: 11 }}
                               numberOfLines={1}
                               ellipsizeMode="tail"
@@ -710,7 +701,6 @@ export default function FinanceScreen() {
                           </View>
                           <View style={{ flexShrink: 0, marginLeft: spacing.xs }}>
                             <Text 
-                              variant="titleMedium" 
                               style={{ 
                                 fontWeight: '700',
                                 color: txn.type === 'income' ? colors.success[700] : colors.error[700],
@@ -734,7 +724,7 @@ export default function FinanceScreen() {
       
       {/* FAB */}
       <FAB
-        icon={() => <Plus size={24} />}
+        icon="add"
         style={{
           position: 'absolute',
           right: spacing.lg,

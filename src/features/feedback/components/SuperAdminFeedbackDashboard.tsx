@@ -11,21 +11,13 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
+    TextInput,
 } from 'react-native';
-import { TextInput } from 'react-native-paper';
-import {
-    Plus,
-    MessageSquare,
-    Archive,
-    Eye,
-    X,
-    Check,
-    ChevronDown,
-    ClipboardList,
-} from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
+import { FAB } from '../../../ui';
 import {
     useAllSchoolFeedback,
     useAddManagementNote,
@@ -146,7 +138,7 @@ export function SuperAdminFeedbackDashboard() {
                     {/* Status Badge */}
                     {isAcknowledged ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            <Check size={12} color={colors.success[600]} strokeWidth={3} />
+                            <MaterialIcons name="check" size={12} color={colors.success[600]} />
                             <RNText style={{ fontSize: 11, color: colors.success[600], fontWeight: '600' }}>
                                 Acknowledged
                             </RNText>
@@ -258,7 +250,7 @@ export function SuperAdminFeedbackDashboard() {
                         marginBottom: spacing.xl,
                     }}
                 >
-                    <ClipboardList size={48} color={colors.neutral[400]} strokeWidth={1.5} />
+                    <MaterialIcons name="assignment" size={48} color={colors.neutral[400]} />
                 </View>
                 <RNText style={{ fontSize: 20, fontWeight: '700', color: colors.text.primary, marginBottom: spacing.sm }}>
                     No Feedback Records
@@ -351,25 +343,11 @@ export function SuperAdminFeedbackDashboard() {
             />
 
             {/* Floating Action Button - show only on management/toStudents tabs */}
-            {(filterType === 'management' || filterType === 'toStudents') && (
-                <TouchableOpacity
-                    onPress={() => filterType === 'toStudents' ? setShowStudentFeedbackModal(true) : setShowAddNoteModal(true)}
-                    style={{
-                        position: 'absolute',
-                        bottom: insets.bottom + spacing.xl,
-                        right: spacing.lg,
-                        width: 56,
-                        height: 56,
-                        borderRadius: 28,
-                        backgroundColor: colors.primary[600],
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        ...shadows.lg,
-                    }}
-                >
-                    <Plus size={24} color="#fff" strokeWidth={2.5} />
-                </TouchableOpacity>
-            )}
+            <FAB
+                icon="add"
+                onPress={() => filterType === 'toStudents' ? setShowStudentFeedbackModal(true) : setShowAddNoteModal(true)}
+                visible={filterType === 'management' || filterType === 'toStudents'}
+            />
         </View>
     );
 }
@@ -451,7 +429,7 @@ function AddManagementNoteModal({ visible, onClose }: { visible: boolean; onClos
                     }}
                 >
                     <TouchableOpacity onPress={onClose} style={{ padding: spacing.xs }}>
-                        <X size={24} color={colors.text.secondary} />
+                        <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                     </TouchableOpacity>
 
                     <RNText style={{ fontSize: 18, fontWeight: '700', color: colors.text.primary }}>
@@ -507,7 +485,7 @@ function AddManagementNoteModal({ visible, onClose }: { visible: boolean; onClos
                             }}>
                                 {selectedTeacher?.full_name || 'Select a teacher...'}
                             </RNText>
-                            <ChevronDown size={20} color={colors.text.tertiary} />
+                            <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                         </TouchableOpacity>
                     </View>
 
@@ -556,13 +534,19 @@ function AddManagementNoteModal({ visible, onClose }: { visible: boolean; onClos
                             value={content}
                             onChangeText={setContent}
                             placeholder="Write professional feedback for the teacher..."
-                            mode="outlined"
                             multiline
                             numberOfLines={5}
-                            style={{ backgroundColor: colors.surface.primary, minHeight: 120 }}
-                            outlineColor={colors.border.DEFAULT}
-                            activeOutlineColor={colors.primary[600]}
-                            textColor={colors.text.primary}
+                            textAlignVertical="top"
+                            style={{
+                                backgroundColor: colors.surface.primary,
+                                minHeight: 120,
+                                borderWidth: 1,
+                                borderColor: colors.border.DEFAULT,
+                                borderRadius: borderRadius.lg,
+                                padding: spacing.md,
+                                fontSize: 15,
+                                color: colors.text.primary,
+                            }}
                             placeholderTextColor={colors.text.tertiary}
                         />
                     </View>
@@ -593,7 +577,7 @@ function AddManagementNoteModal({ visible, onClose }: { visible: boolean; onClos
                                 alignItems: 'center',
                             }}
                         >
-                            {requiresAck && <Check size={14} color="#fff" strokeWidth={3} />}
+                            {requiresAck && <MaterialIcons name="check" size={14} color="#fff" />}
                         </View>
                         <View style={{ flex: 1 }}>
                             <RNText style={{ fontSize: 15, fontWeight: '600', color: colors.text.primary }}>
@@ -639,7 +623,7 @@ function AddManagementNoteModal({ visible, onClose }: { visible: boolean; onClos
                                     Select Teacher
                                 </RNText>
                                 <TouchableOpacity onPress={() => setShowTeacherPicker(false)}>
-                                    <X size={24} color={colors.text.secondary} />
+                                    <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                                 </TouchableOpacity>
                             </View>
                             <ScrollView style={{ padding: spacing.md }}>
@@ -664,7 +648,7 @@ function AddManagementNoteModal({ visible, onClose }: { visible: boolean; onClos
                                         <RNText style={{ flex: 1, fontSize: 16, fontWeight: '500', color: colors.text.primary }}>
                                             {teacher.full_name}
                                         </RNText>
-                                        {selectedTeacherId === teacher.id && <Check size={20} color={colors.primary[600]} strokeWidth={3} />}
+                                        {selectedTeacherId === teacher.id && <MaterialIcons name="check" size={20} color={colors.primary[600]} />}
                                     </TouchableOpacity>
                                 ))}
                             </ScrollView>
@@ -717,7 +701,7 @@ function FeedbackDetailModal({
                     }}
                 >
                     <TouchableOpacity onPress={onClose} style={{ padding: spacing.xs }}>
-                        <X size={24} color={colors.text.secondary} />
+                        <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                     </TouchableOpacity>
 
                     <RNText style={{ fontSize: 18, fontWeight: '700', color: colors.text.primary }}>
@@ -731,7 +715,7 @@ function FeedbackDetailModal({
                         }}
                         style={{ padding: spacing.xs }}
                     >
-                        <Archive size={22} color={colors.text.secondary} />
+                        <MaterialIcons name="archive" size={22} color={colors.text.secondary} />
                     </TouchableOpacity>
                 </View>
 
@@ -794,7 +778,7 @@ function FeedbackDetailModal({
                                 borderRadius: borderRadius.md,
                                 gap: 4,
                             }}>
-                                <Check size={14} color={colors.success[700]} strokeWidth={3} />
+                                <MaterialIcons name="check" size={14} color={colors.success[700]} />
                                 <RNText style={{ fontSize: 13, fontWeight: '600', color: colors.success[700] }}>
                                     Acknowledged
                                 </RNText>
@@ -927,7 +911,7 @@ function AddStudentFeedbackModal({ visible, onClose }: { visible: boolean; onClo
                     }}
                 >
                     <TouchableOpacity onPress={onClose} style={{ padding: spacing.xs }}>
-                        <X size={24} color={colors.text.secondary} />
+                        <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                     </TouchableOpacity>
 
                     <RNText style={{ fontSize: 18, fontWeight: '700', color: colors.text.primary }}>
@@ -964,7 +948,7 @@ function AddStudentFeedbackModal({ visible, onClose }: { visible: boolean; onClo
                             }}>
                                 {selectedClass ? `${selectedClass.grade}${selectedClass.section ? `-${selectedClass.section}` : ''}` : 'Select a class...'}
                             </RNText>
-                            <ChevronDown size={20} color={colors.text.tertiary} />
+                            <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                         </TouchableOpacity>
                     </View>
 
@@ -994,7 +978,7 @@ function AddStudentFeedbackModal({ visible, onClose }: { visible: boolean; onClo
                             }}>
                                 {selectedStudent?.full_name || (selectedClassId ? 'Select a student...' : 'Select class first')}
                             </RNText>
-                            <ChevronDown size={20} color={colors.text.tertiary} />
+                            <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                         </TouchableOpacity>
                     </View>
 
@@ -1106,7 +1090,7 @@ function AddStudentFeedbackModal({ visible, onClose }: { visible: boolean; onClo
                             Select Class
                         </RNText>
                         <TouchableOpacity onPress={() => setShowClassPicker(false)}>
-                            <X size={24} color={colors.text.secondary} />
+                            <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                         </TouchableOpacity>
                     </View>
                     <FlatList
@@ -1138,13 +1122,13 @@ function AddStudentFeedbackModal({ visible, onClose }: { visible: boolean; onClo
                                     alignItems: 'center',
                                     marginRight: spacing.md,
                                 }}>
-                                    <ClipboardList size={20} color={colors.primary[600]} />
+                                    <MaterialIcons name="assignment" size={20} color={colors.primary[600]} />
                                 </View>
                                 <RNText style={{ fontSize: 16, color: colors.text.primary, flex: 1 }}>
                                     {item.grade}{item.section ? `-${item.section}` : ''}
                                 </RNText>
                                 {selectedClassId === item.id && (
-                                    <Check size={20} color={colors.primary[600]} />
+                                    <MaterialIcons name="check" size={20} color={colors.primary[600]} />
                                 )}
                             </TouchableOpacity>
                         )}
@@ -1177,7 +1161,7 @@ function AddStudentFeedbackModal({ visible, onClose }: { visible: boolean; onClo
                             Select Student
                         </RNText>
                         <TouchableOpacity onPress={() => setShowStudentPicker(false)}>
-                            <X size={24} color={colors.text.secondary} />
+                            <MaterialIcons name="close" size={24} color={colors.text.secondary} />
                         </TouchableOpacity>
                     </View>
                     <FlatList
@@ -1215,7 +1199,7 @@ function AddStudentFeedbackModal({ visible, onClose }: { visible: boolean; onClo
                                     {item.full_name}
                                 </RNText>
                                 {selectedStudentId === item.id && (
-                                    <Check size={20} color={colors.primary[600]} />
+                                    <MaterialIcons name="check" size={20} color={colors.primary[600]} />
                                 )}
                             </TouchableOpacity>
                         )}

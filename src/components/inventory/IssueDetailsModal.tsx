@@ -5,12 +5,11 @@
  */
 
 import React, { useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Portal, Modal } from 'react-native-paper';
-import { X, RotateCcw, AlertCircle } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Modal } from '../../ui';
 import { useTheme } from '../../contexts/ThemeContext';
 import { spacing, typography, borderRadius, shadows } from '../../../lib/design-system';
-import { Card } from 'react-native-paper';
 
 interface IssueDetailsModalProps {
   visible: boolean;
@@ -33,25 +32,15 @@ export function IssueDetailsModal({
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onClose}
-        contentContainerStyle={styles.modal}
-      >
-        <View style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerLeft}>
-              <Text style={styles.headerTitle}>{itemName}</Text>
-              <Text style={styles.headerSubtitle}>
-                {issues.length} {issues.length === 1 ? 'issue' : 'issues'}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <X size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
+    <Modal
+      visible={visible}
+      onDismiss={onClose}
+      title={itemName}
+    >
+      <View style={styles.container}>
+          <Text style={styles.headerSubtitle}>
+            {issues.length} {issues.length === 1 ? 'issue' : 'issues'}
+          </Text>
 
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
             {issues.map((issue) => {
@@ -60,8 +49,8 @@ export function IssueDetailsModal({
                 : false;
               
               return (
-                <Card key={issue.id} style={styles.issueCard}>
-                  <Card.Content>
+                <View key={issue.id} style={styles.issueCard}>
+                  <View style={{ padding: spacing.md }}>
                     <View style={styles.issueHeader}>
                       <View style={styles.issueInfo}>
                         <View style={styles.issueRow}>
@@ -114,25 +103,24 @@ export function IssueDetailsModal({
                             onClose();
                           }}
                         >
-                          <RotateCcw size={16} color={colors.primary[600]} />
+                          <MaterialIcons name="replay" size={16} color={colors.primary[600]} />
                           <Text style={styles.returnButtonText}>Return</Text>
                         </TouchableOpacity>
                       )}
                     </View>
                     {isOverdue && (
                       <View style={styles.overdueBadge}>
-                        <AlertCircle size={14} color={colors.error[600]} />
+                        <MaterialIcons name="error" size={14} color={colors.error[600]} />
                         <Text style={styles.overdueBadgeText}>Overdue</Text>
                       </View>
                     )}
-                  </Card.Content>
-                </Card>
+                  </View>
+                </View>
               );
             })}
           </ScrollView>
         </View>
       </Modal>
-    </Portal>
   );
 }
 
@@ -147,29 +135,9 @@ const createStyles = (colors: any, isDark: boolean) => StyleSheet.create({
   container: {
     maxHeight: '90%',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.xs / 2,
-  },
   headerSubtitle: {
     fontSize: typography.fontSize.sm,
     color: colors.text.secondary,
-  },
-  closeButton: {
-    padding: spacing.xs,
   },
   scrollView: {
     maxHeight: 500,

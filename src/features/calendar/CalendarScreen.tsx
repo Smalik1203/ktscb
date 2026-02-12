@@ -1,74 +1,81 @@
 /**
  * CalendarScreen
- * 
- * Refactored to use centralized design system with dynamic theming.
- * All styling uses theme tokens via useTheme hook.
+ *
+ * Academic calendar workspace. Month view with colored event-type dots,
+ * list view with type-tinted cards, event legend, FAB bottom sheet
+ * for creating events/holidays, and role-aware visibility.
  */
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal, RefreshControl, ActivityIndicator } from 'react-native';
-import { Text, Card, Button } from 'react-native-paper';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
-  Plus,
-  ListTodo,
-  Calendar as CalendarIcon,
-  Users,
-  Clock,
-  ChevronRight,
-} from 'lucide-react-native';
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal,
+  RefreshControl, ActivityIndicator, Animated, Pressable, Platform,
+} from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button, EmptyStateIllustration, FAB } from '../../ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import {
-  useCalendarEvents,
-  useCreateCalendarEvent,
-  useUpdateCalendarEvent,
-  useDeleteCalendarEvent,
+  useCalendarEvents, useCreateCalendarEvent,
+  useUpdateCalendarEvent, useDeleteCalendarEvent,
   CalendarEvent,
 } from '../../hooks/useCalendarEvents';
-import {
-  CalendarEventFormModal,
-  CalendarMonthView,
-} from '../../components/calendar';
+import { CalendarEventFormModal, CalendarMonthView } from '../../components/calendar';
+import { EVENT_TYPE_COLORS } from '../../components/calendar/CalendarMonthView';
 import { MonthPickerModal } from '../../components/common';
 import { supabase } from '../../lib/supabase';
 import { DB } from '../../types/db.constants';
-import { EmptyStateIllustration } from '../../components/ui/EmptyStateIllustration';
+
+// ── Event type color helper (for list view) ────────────────────────
+function getEventTypeColor(type: string, fallbackColor: string): string {
+  return EVENT_TYPE_COLORS[type.toLowerCase()] || fallbackColor;
+}
+
+// ── Determine event temporal status ────────────────────────────────
+function getEventStatus(event: CalendarEvent): 'upcoming' | 'today' | 'past' {
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const end = event.end_date || event.start_date;
+  if (event.start_date > todayStr) return 'upcoming';
+  if (event.start_date <= todayStr && end >= todayStr) return 'today';
+  return 'past';
+}
 
 export default function CalendarScreen() {
   const { profile } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
-  const { can, isLoading: capabilitiesLoading } = useCapabilities();
+  const { can } = useCapabilities();
 
-  // Capability-based checks (NO role checks in UI)
+  // Capability-based checks
   const canManageEvents = can('calendar.manage');
-  const canReadAllCalendar = can('calendar.read') && !can('attendance.read_own');
   const canReadOwnCalendar = can('calendar.read') && can('attendance.read_own') && !can('attendance.read');
 
-  // Create dynamic styles based on theme
-  const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark),
-    [colors, spacing, borderRadius, typography, shadows, isDark]);
+  const styles = useMemo(
+    () => createStyles(colors, spacing, borderRadius, typography, shadows, isDark),
+    [colors, spacing, borderRadius, typography, shadows, isDark],
+  );
 
-  // State
+  // ── State ───────────────────────────────────────────────────
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'list'>('month');
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);
   const [isHolidayModalVisible, setIsHolidayModalVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [selectedClassId, setSelectedClassId] = useState('');
   const [showClassDropdown, setShowClassDropdown] = useState(false);
   const [classes, setClasses] = useState<{ id: string; grade: number | null; section?: string | null }[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [monthPickerYear, setMonthPickerYear] = useState<number>(new Date().getFullYear());
   const [refreshing, setRefreshing] = useState(false);
+  const [showFabSheet, setShowFabSheet] = useState(false);
 
   const schoolCode = profile?.school_code || '';
   const studentClassId = canReadOwnCalendar ? profile?.class_instance_id || undefined : undefined;
 
+  // ── Fetch classes ───────────────────────────────────────────
   const fetchClasses = useCallback(async () => {
     if (!schoolCode || canReadOwnCalendar) return;
-
     setLoadingClasses(true);
     try {
       const { data, error } = await supabase
@@ -77,320 +84,293 @@ export default function CalendarScreen() {
         .eq('school_code', schoolCode)
         .order('grade', { ascending: true })
         .order('section', { ascending: true });
-
       if (error) throw error;
       setClasses(data || []);
-    } catch (error) {
-      // Classes fetch failed
+    } catch (_e) {
+      // silent
     } finally {
       setLoadingClasses(false);
     }
   }, [schoolCode, canReadOwnCalendar]);
 
-  useEffect(() => {
-    fetchClasses();
-  }, [fetchClasses]);
+  useEffect(() => { fetchClasses(); }, [fetchClasses]);
 
+  // ── Date range for current month ────────────────────────────
   const { startDate, endDate } = useMemo(() => {
-    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    return {
-      startDate: start.toISOString().split('T')[0],
-      endDate: end.toISOString().split('T')[0],
-    };
+    const s = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const e = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    return { startDate: s.toISOString().split('T')[0], endDate: e.toISOString().split('T')[0] };
   }, [currentDate]);
 
   const effectiveClassId = canReadOwnCalendar ? studentClassId : (selectedClassId || undefined);
 
   const { data: events = [], isLoading, error, refetch } = useCalendarEvents(
-    schoolCode,
-    startDate,
-    endDate,
-    effectiveClassId
+    schoolCode, startDate, endDate, effectiveClassId,
   );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      await refetch();
-    } catch (err) {
-      // Calendar refresh failed
-    } finally {
-      setRefreshing(false);
-    }
+    try { await refetch(); } catch (_e) { /* */ }
+    finally { setRefreshing(false); }
   }, [refetch]);
 
+  // ── Mutations ───────────────────────────────────────────────
   const createEventMutation = useCreateCalendarEvent();
   const updateEventMutation = useUpdateCalendarEvent();
   const deleteEventMutation = useDeleteCalendarEvent();
 
-  const handlePreviousMonth = () => {
-    setCurrentDate((prev) => {
-      const newDate = new Date(prev);
-      newDate.setMonth(prev.getMonth() - 1);
-      return newDate;
-    });
-  };
+  // ── Navigation ──────────────────────────────────────────────
+  const handleToday = () => setCurrentDate(new Date());
 
-  const handleNextMonth = () => {
-    setCurrentDate((prev) => {
-      const newDate = new Date(prev);
-      newDate.setMonth(prev.getMonth() + 1);
-      return newDate;
-    });
-  };
-
-  const handleToday = () => {
-    setCurrentDate(new Date());
-  };
-
+  // ── Event actions ───────────────────────────────────────────
   const handleAddEvent = () => {
-    if (!canManageEvents) {
-      Alert.alert('Access Denied', 'Only administrators can add events.');
-      return;
-    }
+    if (!canManageEvents) return;
     setSelectedEvent(null);
     setIsEventModalVisible(true);
+    setShowFabSheet(false);
   };
 
   const handleAddHoliday = () => {
-    if (!canManageEvents) {
-      Alert.alert('Access Denied', 'Only administrators can add holidays.');
-      return;
-    }
+    if (!canManageEvents) return;
     setSelectedEvent(null);
     setIsHolidayModalVisible(true);
+    setShowFabSheet(false);
   };
 
   const handleEditEvent = (event: CalendarEvent) => {
-    if (!canManageEvents) {
-      Alert.alert('Access Denied', 'Only administrators can edit events.');
-      return;
-    }
+    if (!canManageEvents) return;
     setSelectedEvent(event);
-    if (event.event_type === 'holiday') {
-      setIsHolidayModalVisible(true);
-    } else {
-      setIsEventModalVisible(true);
-    }
+    if (event.event_type === 'holiday') setIsHolidayModalVisible(true);
+    else setIsEventModalVisible(true);
   };
 
   const handleDeleteEvent = (event: CalendarEvent) => {
-    if (!canManageEvents) {
-      Alert.alert('Access Denied', 'Only administrators can delete events.');
-      return;
-    }
-
-    Alert.alert(
-      'Delete Event',
-      `Are you sure you want to delete "${event.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteEventMutation.mutate(event.id);
-            setIsEventModalVisible(false);
-            setIsHolidayModalVisible(false);
-            setSelectedEvent(null);
-          },
+    if (!canManageEvents) return;
+    Alert.alert('Delete Event', `Delete "${event.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: () => {
+          deleteEventMutation.mutate(event.id);
+          setIsEventModalVisible(false);
+          setIsHolidayModalVisible(false);
+          setSelectedEvent(null);
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleSaveEvent = async (eventData: any) => {
     try {
       if (selectedEvent) {
         await updateEventMutation.mutateAsync({ id: selectedEvent.id, ...eventData });
-        Alert.alert('Success', 'Event updated successfully');
+        Alert.alert('Success', 'Event updated');
       } else {
         await createEventMutation.mutateAsync(eventData);
-        Alert.alert('Success', 'Event created successfully');
+        Alert.alert('Success', 'Event created');
       }
       setIsEventModalVisible(false);
       setIsHolidayModalVisible(false);
       setSelectedEvent(null);
-    } catch (error) {
+    } catch (_e) {
       Alert.alert('Error', 'Failed to save event');
-      // Event save failed - alert shown above
     }
   };
 
-  const handleDateClick = (_date: Date) => {
-    // No view switching; month view remains active
-  };
-
+  const handleDateClick = (_date: Date) => { /* no-op in month view */ };
   const handleEventClick = (event: CalendarEvent) => {
-    handleEditEvent(event);
+    if (canManageEvents) handleEditEvent(event);
   };
 
-  const formatTime = (timeString: string) => {
-    if (!timeString) return '';
-    const [hours, minutes] = timeString.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
+  // ── Format helpers ──────────────────────────────────────────
+  const formatTime = (t: string) => {
+    if (!t) return '';
+    const [h, m] = t.split(':');
+    const hr = parseInt(h);
+    return `${hr % 12 || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
   };
 
-  const getEventTypeColor = (type: string) => {
-    const colorsMap: { [key: string]: string } = {
-      holiday: colors.info.main,
-      assembly: colors.primary.main,
-      exam: colors.warning.main,
-      ptm: colors.success.main,
-      'sports day': colors.secondary?.main || colors.primary[700],
-      'cultural event': colors.error[100],
-    };
-    return colorsMap[type.toLowerCase()] || colors.neutral[500];
-  };
+  // ── Bottom sheet animation for FAB ──────────────────────────
+  const fabSlide = useRef(new Animated.Value(0)).current;
+  const fabOverlay = useRef(new Animated.Value(0)).current;
 
-  const renderListView = () => {
-    // Group events by date - fix timezone issues by parsing date correctly
-    const groupedEvents: { [key: string]: CalendarEvent[] } = {};
-    events.forEach((event) => {
-      // Parse date string correctly (YYYY-MM-DD format)
-      const dateKey = event.start_date;
-      if (!groupedEvents[dateKey]) {
-        groupedEvents[dateKey] = [];
+  useEffect(() => {
+    if (showFabSheet) {
+      fabSlide.setValue(0); fabOverlay.setValue(0);
+      Animated.parallel([
+        Animated.timing(fabOverlay, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(fabSlide, { toValue: 1, tension: 65, friction: 11, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [showFabSheet, fabSlide, fabOverlay]);
+
+  const closeFabSheet = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(fabOverlay, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(fabSlide, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => setShowFabSheet(false));
+  }, [fabOverlay, fabSlide]);
+
+  // ── Bottom sheet animation for class selector ───────────────
+  const classSlide = useRef(new Animated.Value(0)).current;
+  const classOverlay = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showClassDropdown) {
+      classSlide.setValue(0); classOverlay.setValue(0);
+      Animated.parallel([
+        Animated.timing(classOverlay, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(classSlide, { toValue: 1, tension: 65, friction: 11, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [showClassDropdown, classSlide, classOverlay]);
+
+  const closeClassSheet = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(classOverlay, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(classSlide, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => setShowClassDropdown(false));
+  }, [classOverlay, classSlide]);
+
+  // ── Active event type legend (only types present this month) ─
+  const activeTypes = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const e of events) {
+      const key = e.event_type.toLowerCase();
+      if (!seen.has(key)) {
+        seen.set(key, getEventTypeColor(e.event_type, colors.neutral[400]));
       }
-      groupedEvents[dateKey].push(event);
-    });
+    }
+    return Array.from(seen.entries()).map(([type, color]) => ({ type, color }));
+  }, [events, colors.neutral]);
 
-    // Sort dates ascending (oldest first) for Outlook-like view
-    const sortedDates = Object.keys(groupedEvents).sort((a, b) => a.localeCompare(b));
+  // ── List view ───────────────────────────────────────────────
+  const renderListView = () => {
+    const grouped: Record<string, CalendarEvent[]> = {};
+    events.forEach((e) => {
+      if (!grouped[e.start_date]) grouped[e.start_date] = [];
+      grouped[e.start_date].push(e);
+    });
+    const sortedDates = Object.keys(grouped).sort();
 
     return (
       <ScrollView
-        style={styles.outlookContainer}
+        style={styles.listContainer}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContentContainer}
+        contentContainerStyle={styles.listContentPad}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={colors.primary.main}
-            colors={[colors.primary.main]}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh}
+            tintColor={colors.primary[600]} colors={[colors.primary[600]]} />
         }
       >
         {isLoading ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.primary.main} />
-            <Text style={styles.loadingText}>Loading events...</Text>
-          </View>
+          <View style={styles.center}><ActivityIndicator color={colors.primary[600]} /></View>
         ) : error ? (
-          <View style={styles.centerContainer}>
+          <View style={styles.center}>
             <Text style={styles.errorText}>Failed to load events</Text>
-            <Button mode="contained" onPress={() => refetch()} style={{ marginTop: spacing.md }}>
-              Retry
-            </Button>
+            <Button variant="primary" onPress={() => refetch()} style={{ marginTop: spacing.md }}>Retry</Button>
           </View>
-        ) : events.length > 0 ? (
-          <View style={styles.outlookList}>
-            {sortedDates.map((dateKey, dateIndex) => {
-              const dateEvents = groupedEvents[dateKey];
-              // Parse date correctly - use UTC to avoid timezone shifts
-              const [year, month, day] = dateKey.split('-').map(Number);
-              const date = new Date(Date.UTC(year, month - 1, day));
-              const today = new Date();
-              const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        ) : events.length === 0 ? (
+          <EmptyStateIllustration
+            type="calendar" title="No Events"
+            description="No events scheduled for this month."
+            action={canManageEvents ? <Button variant="primary" onPress={handleAddEvent}>Add First Event</Button> : undefined}
+          />
+        ) : (
+          <View style={styles.listContent}>
+            {sortedDates.map((dateKey) => {
+              const dateEvents = grouped[dateKey];
+              const [yr, mo, dy] = dateKey.split('-').map(Number);
+              const date = new Date(Date.UTC(yr, mo - 1, dy));
+              const now = new Date();
+              const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
               const isToday = dateKey === todayKey;
-              const isLastDate = dateIndex === sortedDates.length - 1;
 
-              // Sort events by time (all-day first, then by start time)
-              const sortedEvents = [...dateEvents].sort((a, b) => {
+              const sorted = [...dateEvents].sort((a, b) => {
                 if (a.is_all_day && !b.is_all_day) return -1;
                 if (!a.is_all_day && b.is_all_day) return 1;
-                if (a.is_all_day && b.is_all_day) return 0;
                 return (a.start_time || '').localeCompare(b.start_time || '');
               });
 
               return (
-                <View key={dateKey} style={styles.outlookDateGroup}>
-                  {/* Outlook-style Date Sidebar */}
-                  <View style={styles.outlookDateColumn}>
-                    {isToday && (
-                      <View style={styles.outlookTodayIndicator} />
-                    )}
-                    <Text style={[
-                      styles.outlookDateDay,
-                      isToday && styles.outlookDateDayToday
-                    ]}>
-                      {day}
-                    </Text>
-                    <Text style={[
-                      styles.outlookDateMonth,
-                      isToday && styles.outlookDateMonthToday
-                    ]}>
+                <View key={dateKey} style={styles.dateGroup}>
+                  {/* Date sidebar */}
+                  <View style={[styles.dateSidebar, isToday && styles.dateSidebarToday]}>
+                    {isToday && <View style={styles.todayBar} />}
+                    <Text style={[styles.dateDay, isToday && styles.dateDayToday]}>{dy}</Text>
+                    <Text style={[styles.dateMonth, isToday && styles.dateMonthToday]}>
                       {date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
                     </Text>
-                    <Text style={[
-                      styles.outlookDateWeekday,
-                      isToday && styles.outlookDateWeekdayToday
-                    ]}>
+                    <Text style={[styles.dateWeekday, isToday && styles.dateWeekdayToday]}>
                       {date.toLocaleDateString('en-US', { weekday: 'short' })}
                     </Text>
                   </View>
 
-                  {/* Events Column */}
-                  <View style={styles.outlookEventsColumn}>
-                    {sortedEvents.map((event, eventIndex) => {
-                      const eventColor = event.color || getEventTypeColor(event.event_type);
+                  {/* Events column */}
+                  <View style={styles.eventsColumn}>
+                    {sorted.map((event) => {
+                      const eColor = event.color || getEventTypeColor(event.event_type, colors.neutral[500]);
+                      const status = getEventStatus(event);
+                      const selectedClassName = event.class_instance_id
+                        ? classes.find(c => c.id === event.class_instance_id)
+                        : null;
 
                       return (
                         <TouchableOpacity
                           key={event.id}
                           onPress={() => handleEventClick(event)}
                           activeOpacity={0.6}
-                          style={[
-                            styles.outlookEventRow,
-                            {
-                              borderLeftColor: eventColor,
-                              backgroundColor: isDark ? colors.surface.secondary : colors.neutral[50],
-                            }
-                          ]}
+                          style={[styles.eventCard, { borderLeftColor: eColor }]}
                         >
-                          <View style={styles.outlookEventContent}>
-                            {/* Event Details */}
-                            <View style={styles.outlookEventDetails}>
-                              <View style={styles.outlookEventHeader}>
-                                <View style={[styles.outlookEventDot, { backgroundColor: eventColor }]} />
-                                <View style={styles.outlookEventTitleContainer}>
-                                  <View style={styles.outlookEventTitleRow}>
-                                    <Text style={styles.outlookEventTitle} numberOfLines={1}>
-                                      {event.title}
-                                    </Text>
-                                    {event.is_all_day ? (
-                                      <View style={styles.outlookAllDayBadge}>
-                                        <Text style={styles.outlookAllDayText}>All day</Text>
-                                      </View>
-                                    ) : event.start_time ? (
-                                      <View style={styles.outlookTimeBadge}>
-                                        <Text style={styles.outlookEventTime}>
-                                          {formatTime(event.start_time)}
-                                        </Text>
-                                      </View>
-                                    ) : null}
-                                  </View>
-                                  <View style={styles.outlookEventTypeBadgeContainer}>
-                                    <View style={[styles.outlookEventTypeBadge, { backgroundColor: `${eventColor}20` }]}>
-                                      <Text style={[styles.outlookEventTypeText, { color: eventColor }]}>
-                                        {event.event_type}
-                                      </Text>
-                                    </View>
-                                  </View>
-                                </View>
+                          <View style={styles.eventHeader}>
+                            <Text style={styles.eventTitle} numberOfLines={1}>{event.title}</Text>
+                            {/* Time / All-day badge */}
+                            {event.is_all_day ? (
+                              <View style={[styles.badge, { backgroundColor: `${eColor}18` }]}>
+                                <Text style={[styles.badgeText, { color: eColor }]}>ALL DAY</Text>
                               </View>
-                              {event.description && (
-                                <Text style={styles.outlookEventDescription} numberOfLines={2}>
-                                  {event.description}
+                            ) : event.start_time ? (
+                              <View style={styles.timeBadge}>
+                                <Text style={styles.timeText}>
+                                  {formatTime(event.start_time)}
+                                  {event.end_time ? ` – ${formatTime(event.end_time)}` : ''}
                                 </Text>
-                              )}
-                            </View>
+                              </View>
+                            ) : null}
                           </View>
+
+                          {/* Meta row: type + class + status */}
+                          <View style={styles.metaRow}>
+                            <View style={[styles.typeBadge, { backgroundColor: `${eColor}20` }]}>
+                              <Text style={[styles.typeText, { color: eColor }]}>
+                                {event.event_type.toUpperCase()}
+                              </Text>
+                            </View>
+                            {selectedClassName && (
+                              <Text style={styles.classMeta}>
+                                Grade {selectedClassName.grade}{selectedClassName.section ? `-${selectedClassName.section}` : ''}
+                              </Text>
+                            )}
+                            {!event.class_instance_id && !canReadOwnCalendar && (
+                              <Text style={styles.classMeta}>All Classes</Text>
+                            )}
+                            <View style={{ flex: 1 }} />
+                            <View style={[
+                              styles.statusDot,
+                              {
+                                backgroundColor: status === 'today' ? colors.success[500]
+                                  : status === 'upcoming' ? colors.primary[500]
+                                  : colors.neutral[300],
+                              },
+                            ]} />
+                            <Text style={styles.statusText}>
+                              {status === 'today' ? 'Today' : status === 'upcoming' ? 'Upcoming' : 'Past'}
+                            </Text>
+                          </View>
+
+                          {event.description ? (
+                            <Text style={styles.eventDesc} numberOfLines={2}>{event.description}</Text>
+                          ) : null}
                         </TouchableOpacity>
                       );
                     })}
@@ -399,599 +379,323 @@ export default function CalendarScreen() {
               );
             })}
           </View>
-        ) : (
-          <EmptyStateIllustration
-            type="calendar"
-            title="No Events"
-            description="No events scheduled for this month."
-            action={
-              canManageEvents ? (
-                <Button mode="contained" onPress={handleAddEvent} style={styles.addEventButton}>
-                  Add First Event
-                </Button>
-              ) : undefined
-            }
-          />
         )}
       </ScrollView>
     );
   };
 
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════
   return (
     <View style={styles.container}>
-      {/* Filter Bar */}
-      <View style={styles.filterBar}>
+      {/* Filter chips */}
+      <View style={styles.filterRow}>
         {!canReadOwnCalendar && (
-          <TouchableOpacity style={styles.filterItem} onPress={() => setShowClassDropdown(true)}>
-            <View style={styles.filterIcon}>
-              <Users size={16} color={colors.text.inverse} />
-            </View>
-            <View style={styles.filterContent}>
-              <Text style={styles.filterLabel}>Class</Text>
-              <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-                {selectedClassId
-                  ? `${classes.find((c) => c.id === selectedClassId)?.grade}-${classes.find((c) => c.id === selectedClassId)?.section || ''
-                  }`
-                  : 'All Classes'}
-              </Text>
-            </View>
+          <TouchableOpacity style={styles.filterChip} onPress={() => setShowClassDropdown(true)} activeOpacity={0.7}>
+            <Text style={[styles.chipText, selectedClassId ? styles.chipTextActive : undefined]} numberOfLines={1}>
+              {selectedClassId
+                ? `${classes.find(c => c.id === selectedClassId)?.grade}-${classes.find(c => c.id === selectedClassId)?.section || ''}`
+                : 'All Classes'}
+            </Text>
+            <MaterialIcons name="keyboard-arrow-down" size={16} color={selectedClassId ? colors.primary[600] : colors.text.tertiary} />
           </TouchableOpacity>
         )}
-
         <TouchableOpacity
-          style={styles.filterItem}
-          onPress={() => {
-            setMonthPickerYear(new Date(currentDate).getFullYear());
-            setShowMonthPicker(true);
-          }}
-          activeOpacity={0.8}
+          style={styles.filterChip}
+          onPress={() => setShowMonthPicker(true)}
+          activeOpacity={0.7}
         >
-          <View style={styles.filterIcon}>
-            <ListTodo size={16} color={colors.text.inverse} />
-          </View>
-          <View style={styles.filterContent}>
-            <Text style={styles.filterLabel}>Date</Text>
-            <Text style={styles.filterValue} numberOfLines={1} ellipsizeMode="tail">
-              {new Date(currentDate).toLocaleDateString('en-GB', {
-                month: 'short', year: 'numeric'
-              })}
-            </Text>
-          </View>
+          <Text style={styles.chipTextActive} numberOfLines={1}>
+            {currentDate.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+          </Text>
+          <MaterialIcons name="keyboard-arrow-down" size={16} color={colors.primary[600]} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.todayChip} onPress={handleToday} activeOpacity={0.7}>
+          <Text style={styles.todayChipText}>Today</Text>
         </TouchableOpacity>
       </View>
 
-      {/* View Mode Tabs */}
-      <View style={styles.tabsContainer}>
-        <View style={styles.pillTabs}>
-          <TouchableOpacity
-            style={[styles.pillTab, viewMode === 'month' && styles.pillTabActive]}
-            activeOpacity={0.9}
-            onPress={() => setViewMode('month')}
-          >
-            <View style={styles.pillTabContent}>
-              <CalendarIcon size={16} color={viewMode === 'month' ? colors.primary[700] : colors.text.secondary} />
-              <Text style={[styles.pillTabText, viewMode === 'month' && styles.pillTabTextActive]}>Month</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.pillTab, viewMode === 'list' && styles.pillTabActive]}
-            activeOpacity={0.9}
-            onPress={() => setViewMode('list')}
-          >
-            <View style={styles.pillTabContent}>
-              <ListTodo size={16} color={viewMode === 'list' ? colors.primary[700] : colors.text.secondary} />
-              <Text style={[styles.pillTabText, viewMode === 'list' && styles.pillTabTextActive]}>List</Text>
-            </View>
-          </TouchableOpacity>
+      {/* View mode toggle */}
+      <View style={styles.segRow}>
+        <View style={styles.segControl}>
+          {(['month', 'list'] as const).map((mode) => (
+            <TouchableOpacity
+              key={mode}
+              style={[styles.segBtn, viewMode === mode && styles.segBtnActive]}
+              onPress={() => setViewMode(mode)}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name={mode === 'month' ? 'calendar-today' : 'view-agenda'}
+                size={15}
+                color={viewMode === mode ? colors.primary[700] : colors.text.tertiary}
+              />
+              <Text style={[styles.segText, viewMode === mode && styles.segTextActive]}>
+                {mode === 'month' ? 'Month' : 'List'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
-      {/* Content */}
-      {viewMode === 'month' && (
-        <>
-          {isLoading && events.length === 0 ? (
-            <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color={colors.primary.main} />
-              <Text style={styles.loadingText}>Loading events...</Text>
+      {/* Event type legend (only shown when events exist) */}
+      {activeTypes.length > 0 && (
+        <View style={styles.legendRow}>
+          {activeTypes.map(({ type, color }) => (
+            <View key={type} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: color }]} />
+              <Text style={styles.legendText}>{type}</Text>
             </View>
-          ) : error ? (
-            <View style={styles.centerContainer}>
-              <Text style={styles.errorText}>Failed to load events</Text>
-              <Button onPress={() => refetch()} style={{ marginTop: spacing.md }}>
-                Retry
-              </Button>
-            </View>
-          ) : (
-            <CalendarMonthView
-              currentDate={currentDate}
-              events={events}
-              onDateClick={handleDateClick}
-              onEventClick={handleEventClick}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={colors.primary.main}
-                  colors={[colors.primary.main]}
-                />
-              }
-            />
-          )}
-        </>
+          ))}
+        </View>
       )}
 
-      {viewMode === 'list' && renderListView()}
+      {/* Content */}
+      {viewMode === 'month' ? (
+        isLoading && events.length === 0 ? (
+          <View style={styles.center}><ActivityIndicator color={colors.primary[600]} /></View>
+        ) : error ? (
+          <View style={styles.center}>
+            <Text style={styles.errorText}>Failed to load events</Text>
+            <Button variant="ghost" onPress={() => refetch()} style={{ marginTop: spacing.md }}>Retry</Button>
+          </View>
+        ) : (
+          <CalendarMonthView
+            currentDate={currentDate} events={events}
+            onDateClick={handleDateClick} onEventClick={handleEventClick}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh}
+                tintColor={colors.primary[600]} colors={[colors.primary[600]]} />
+            }
+          />
+        )
+      ) : renderListView()}
 
-      {/* Class Selector Modal */}
-      <Modal
-        visible={showClassDropdown}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowClassDropdown(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.sheet}>
+      {/* ── Class Selector Bottom Sheet ──────────────────────── */}
+      <Modal visible={showClassDropdown} transparent animationType="none" onRequestClose={closeClassSheet}>
+        <Animated.View style={[styles.overlay, { opacity: classOverlay }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeClassSheet} />
+          <Animated.View style={[styles.sheet, {
+            transform: [{ translateY: classSlide.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }],
+          }]}>
+            <View style={styles.sheetHandle} />
             <Text style={styles.sheetTitle}>Select Class</Text>
-            <ScrollView style={styles.sheetList}>
+            <ScrollView style={styles.sheetScroll} bounces={false}>
               <TouchableOpacity
-                style={styles.sheetItem}
-                onPress={() => {
-                  setSelectedClassId('');
-                  setShowClassDropdown(false);
-                }}
+                key="all"
+                style={[styles.sheetOption, !selectedClassId && styles.sheetOptionActive]}
+                onPress={() => { setSelectedClassId(''); closeClassSheet(); }}
               >
-                <Text
-                  style={[
-                    styles.sheetItemText,
-                    !selectedClassId && styles.sheetItemTextSelected,
-                  ]}
-                >
-                  All Classes (School-wide)
-                </Text>
+                <Text style={[styles.sheetOptionText, !selectedClassId && styles.sheetOptionTextActive]}>All Classes</Text>
+                {!selectedClassId && (
+                  <View style={styles.sheetCheck}><MaterialIcons name="check" size={16} color={colors.text.inverse} /></View>
+                )}
               </TouchableOpacity>
-              {classes.map((c) => (
+              {classes.map(c => (
                 <TouchableOpacity
                   key={c.id}
-                  style={styles.sheetItem}
-                  onPress={() => {
-                    setSelectedClassId(c.id);
-                    setShowClassDropdown(false);
-                  }}
+                  style={[styles.sheetOption, selectedClassId === c.id && styles.sheetOptionActive]}
+                  onPress={() => { setSelectedClassId(c.id); closeClassSheet(); }}
                 >
-                  <Text
-                    style={[
-                      styles.sheetItemText,
-                      selectedClassId === c.id && styles.sheetItemTextSelected,
-                    ]}
-                  >
-                    Grade {c.grade}
-                    {c.section ? `-${c.section}` : ''}
+                  <Text style={[styles.sheetOptionText, selectedClassId === c.id && styles.sheetOptionTextActive]}>
+                    Grade {c.grade}{c.section ? `-${c.section}` : ''}
                   </Text>
+                  {selectedClassId === c.id && (
+                    <View style={styles.sheetCheck}><MaterialIcons name="check" size={16} color={colors.text.inverse} /></View>
+                  )}
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <Button onPress={() => setShowClassDropdown(false)}>Close</Button>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
 
-      {/* Event Form Modal */}
+      {/* FAB — speed-dial for Add Event / Add Holiday */}
+
+      {/* Event Form Modals */}
       <CalendarEventFormModal
         visible={isEventModalVisible}
         event={selectedEvent || undefined}
-        academicYearId={undefined}
-        schoolCode={schoolCode}
-        classes={classes}
+        academicYearId={undefined} schoolCode={schoolCode} classes={classes}
         userId={profile?.auth_id || ''}
-        onCancel={() => {
-          setIsEventModalVisible(false);
-          setSelectedEvent(null);
-        }}
+        onCancel={() => { setIsEventModalVisible(false); setSelectedEvent(null); }}
         onSuccess={handleSaveEvent}
         onDelete={selectedEvent ? () => handleDeleteEvent(selectedEvent) : undefined}
       />
-
-      {/* Holiday Form Modal */}
       <CalendarEventFormModal
         visible={isHolidayModalVisible}
         event={selectedEvent || undefined}
-        academicYearId={undefined}
-        schoolCode={schoolCode}
-        classes={classes}
-        isHoliday
-        userId={profile?.auth_id || ''}
-        onCancel={() => {
-          setIsHolidayModalVisible(false);
-          setSelectedEvent(null);
-        }}
+        academicYearId={undefined} schoolCode={schoolCode} classes={classes}
+        isHoliday userId={profile?.auth_id || ''}
+        onCancel={() => { setIsHolidayModalVisible(false); setSelectedEvent(null); }}
         onSuccess={handleSaveEvent}
         onDelete={selectedEvent ? () => handleDeleteEvent(selectedEvent) : undefined}
       />
 
-      {/* Floating Add Button */}
-      {canManageEvents && (
-        <TouchableOpacity onPress={handleAddEvent} style={styles.floatingButton}>
-          <Plus size={24} color={colors.text.inverse} />
-        </TouchableOpacity>
-      )}
+      {/* FAB — speed-dial for managers */}
+      <FAB.Group
+        icon="add"
+        visible={canManageEvents}
+        actions={[
+          { icon: 'event', label: 'Add Event', onPress: handleAddEvent },
+          { icon: 'celebration', label: 'Add Holiday', onPress: handleAddHoliday },
+        ]}
+      />
 
       {/* Month Picker */}
       <MonthPickerModal
         visible={showMonthPicker}
         initialDate={new Date(currentDate)}
         onDismiss={() => setShowMonthPicker(false)}
-        onConfirm={(date) => setCurrentDate(date)}
+        onConfirm={(d) => setCurrentDate(d)}
       />
     </View>
   );
 }
 
+// ═════════════════════════════════════════════════════════════════════
+// STYLES
+// ═════════════════════════════════════════════════════════════════════
+
 const createStyles = (
-  colors: ThemeColors,
-  spacing: any,
-  borderRadius: any,
-  typography: any,
-  shadows: any,
-  isDark: boolean
+  colors: ThemeColors, spacing: any, borderRadius: any,
+  typography: any, shadows: any, isDark: boolean,
 ) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.app,
+  container: { flex: 1, backgroundColor: colors.background.secondary },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },
+  errorText: { color: colors.error[600], marginBottom: spacing.sm },
+
+  // ── Filter chips ────────────────────────────────────────────
+  filterRow: {
+    flexDirection: 'row', paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm, paddingBottom: 4, gap: spacing.sm,
   },
-  tabsContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.background.app,
+  filterChip: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 4, backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.xl, paddingVertical: 9, paddingHorizontal: 14,
+    ...shadows.xs,
   },
-  pillTabs: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    overflow: 'hidden',
+  chipText: { fontSize: 13, fontWeight: '500' as const, color: colors.text.secondary },
+  chipTextActive: { fontSize: 13, fontWeight: '600' as const, color: colors.primary[600] },
+  todayChip: {
+    backgroundColor: colors.primary[600], borderRadius: borderRadius.xl,
+    paddingVertical: 9, paddingHorizontal: 14, justifyContent: 'center',
+    ...shadows.sm,
   },
-  pillTab: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
+  todayChipText: { fontSize: 13, fontWeight: '600' as const, color: '#fff' },
+
+  // ── Segmented control ───────────────────────────────────────
+  segRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: 2 },
+  segControl: {
+    flexDirection: 'row', backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.full, overflow: 'hidden', ...shadows.xs,
   },
-  pillTabActive: {
-    backgroundColor: isDark ? colors.primary[100] : colors.primary[50],
+  segBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 10,
   },
-  pillTabContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  segBtnActive: { backgroundColor: isDark ? colors.primary[100] : colors.primary[50] },
+  segText: { fontSize: 13, fontWeight: '500' as const, color: colors.text.tertiary },
+  segTextActive: { color: colors.primary[700], fontWeight: '600' as const },
+
+  // ── Legend ───────────────────────────────────────────────────
+  legendRow: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+    paddingHorizontal: spacing.md + 4, paddingTop: spacing.sm, paddingBottom: 2,
   },
-  pillTabText: {
-    color: colors.text.secondary,
-    fontWeight: typography.fontWeight.medium,
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: {
+    fontSize: 11, fontWeight: '500' as const, color: colors.text.tertiary,
+    textTransform: 'capitalize',
   },
-  pillTabTextActive: {
-    color: colors.primary[700],
-    fontWeight: typography.fontWeight.bold,
+
+  // ── List view ───────────────────────────────────────────────
+  listContainer: { flex: 1, paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
+  listContentPad: { paddingBottom: 120 },
+  listContent: { gap: spacing.sm },
+
+  dateGroup: {
+    flexDirection: 'row', backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg, overflow: 'hidden', ...shadows.sm,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.background.app,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: spacing.xl,
-  },
-  errorText: {
-    color: colors.error.main,
-    marginBottom: spacing.md,
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: typography.fontSize.base,
-    color: colors.text.secondary,
-  },
-  listContentContainer: {
-    paddingBottom: spacing.xl * 2,
-  },
-  // Outlook-style calendar list
-  outlookContainer: {
-    flex: 1,
-    backgroundColor: colors.background.app,
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  outlookList: {
-    flexDirection: 'column',
-    gap: spacing.xs,
-  },
-  outlookDateGroup: {
-    flexDirection: 'row',
-    minHeight: 80,
-    backgroundColor: colors.surface.primary,
-    marginBottom: spacing.xs,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  outlookDateColumn: {
-    minWidth: 70,
-    maxWidth: 90,
-    width: 70,
-    paddingVertical: spacing.sm,
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRightWidth: 1,
-    borderRightColor: colors.border.light,
-    position: 'relative',
+  dateSidebar: {
+    width: 70, paddingVertical: spacing.md, alignItems: 'center', justifyContent: 'center',
     backgroundColor: isDark ? colors.surface.secondary : colors.neutral[50],
-    flexShrink: 0,
+    position: 'relative',
   },
-  outlookTodayIndicator: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: colors.primary.main,
+  dateSidebarToday: {
+    backgroundColor: isDark ? `${colors.primary[600]}18` : colors.primary[50],
   },
-  outlookDateDay: {
-    fontSize: 24,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.secondary,
-    lineHeight: 28,
-    letterSpacing: -0.5,
+  todayBar: {
+    position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
+    backgroundColor: colors.primary[600], borderRadius: 2,
   },
-  outlookDateDayToday: {
-    color: colors.primary.main,
+  dateDay: { fontSize: 22, fontWeight: '700' as const, color: colors.text.secondary, lineHeight: 26 },
+  dateDayToday: { color: colors.primary[600] },
+  dateMonth: { fontSize: 10, fontWeight: '700' as const, color: colors.text.tertiary, letterSpacing: 0.8 },
+  dateMonthToday: { color: colors.primary[600] },
+  dateWeekday: { fontSize: 10, fontWeight: '500' as const, color: colors.text.tertiary, marginTop: 1 },
+  dateWeekdayToday: { color: colors.primary[600] },
+
+  eventsColumn: { flex: 1, paddingVertical: spacing.sm, paddingHorizontal: spacing.sm, gap: spacing.xs },
+
+  eventCard: {
+    borderLeftWidth: 4, borderRadius: 8,
+    backgroundColor: isDark ? colors.surface.secondary : colors.neutral[50],
+    paddingVertical: 10, paddingHorizontal: 12,
   },
-  outlookDateMonth: {
-    fontSize: 10,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.secondary,
-    letterSpacing: 1,
-    marginTop: -4,
-    textTransform: 'uppercase',
+  eventHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    gap: spacing.xs, marginBottom: 4,
   },
-  outlookDateMonthToday: {
-    color: colors.primary.main,
-  },
-  outlookDateWeekday: {
-    fontSize: 10,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.tertiary,
-    marginTop: 2,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  outlookDateWeekdayToday: {
-    color: colors.primary.main,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  outlookEventsColumn: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    paddingRight: spacing.sm,
-    paddingLeft: spacing.xs,
-    minWidth: 0,
-  },
-  outlookEventRow: {
-    paddingVertical: spacing.sm,
-    paddingLeft: spacing.sm,
-    paddingRight: spacing.xs,
-    marginBottom: spacing.xs,
-    borderRadius: borderRadius.sm,
-    borderLeftWidth: 4,
-    borderLeftColor: 'transparent',
-  },
-  outlookEventContent: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-start',
-    flexShrink: 1,
-  },
-  outlookTimeBadge: {
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: borderRadius.xs,
-    backgroundColor: colors.neutral[100],
-    flexShrink: 0,
-  },
-  outlookEventTime: {
-    fontSize: 11,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.text.secondary,
-    letterSpacing: 0.2,
-  },
-  outlookEventDetails: {
-    flex: 1,
-    minWidth: 0,
-  },
-  outlookEventHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-    flexWrap: 'wrap',
-  },
-  outlookEventDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary.main,
-    borderWidth: 2,
-    borderColor: isDark ? colors.surface.primary : colors.background.app,
-    marginTop: 6,
-    flexShrink: 0,
-  },
-  outlookEventTitleContainer: {
-    flex: 1,
-    minWidth: 0,
-    flexShrink: 1,
-  },
-  outlookEventTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xs / 2,
-  },
-  outlookEventTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    lineHeight: 20,
-    letterSpacing: -0.2,
-    minWidth: 0,
-  },
-  outlookEventTypeBadgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  outlookEventTypeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: borderRadius.xs,
-    alignSelf: 'flex-start',
-    flexShrink: 0,
-  },
-  outlookEventTypeText: {
-    fontSize: 9,
-    fontWeight: typography.fontWeight.bold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  outlookAllDayBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: borderRadius.xs,
-    backgroundColor: colors.primary[100],
-    flexShrink: 0,
-  },
-  outlookAllDayText: {
-    fontSize: 10,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary.main,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  outlookEventDescription: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    lineHeight: 16,
-    marginTop: spacing.xs,
-    letterSpacing: 0.1,
-  },
-  outlookEventEndTime: {
-    fontSize: 10,
-    color: colors.text.tertiary,
-    marginTop: spacing.xs,
-    fontWeight: typography.fontWeight.medium,
-  },
-  outlookDateSeparator: {
-    height: 1,
-    backgroundColor: colors.border.light,
-    marginLeft: spacing.md,
-    marginRight: spacing.md,
-    marginVertical: spacing.sm,
-  },
-  addEventButton: {
-    marginTop: spacing.md,
-  },
-  filterBar: {
-    flexDirection: 'row',
-    backgroundColor: colors.background.app,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
-  },
-  filterItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border.DEFAULT,
-    minWidth: 0,
-  },
-  filterIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary.main,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterContent: {
-    flex: 1,
-    minWidth: 0,
-  },
-  filterLabel: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text.secondary,
-    marginBottom: 2,
-  },
-  filterValue: {
-    color: colors.text.primary,
-    fontSize: typography.fontSize.base,
-    fontWeight: typography.fontWeight.medium,
-    flexShrink: 1,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.surface.overlay,
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
+  eventTitle: { flex: 1, fontSize: 14, fontWeight: '600' as const, color: colors.text.primary, letterSpacing: -0.2 },
+  badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  badgeText: { fontSize: 9, fontWeight: '700' as const, letterSpacing: 0.3 },
+  timeBadge: { backgroundColor: isDark ? colors.neutral[700] : colors.neutral[100], paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  timeText: { fontSize: 11, fontWeight: '600' as const, color: colors.text.secondary },
+
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  typeBadge: { paddingHorizontal: 5, paddingVertical: 1, borderRadius: 3 },
+  typeText: { fontSize: 9, fontWeight: '700' as const, textTransform: 'uppercase', letterSpacing: 0.2 },
+  classMeta: { fontSize: 11, fontWeight: '500' as const, color: colors.text.tertiary },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusText: { fontSize: 10, fontWeight: '500' as const, color: colors.text.tertiary },
+  eventDesc: { fontSize: 12, color: colors.text.secondary, lineHeight: 16, marginTop: 4 },
+
+  // ── Bottom sheets (shared) ──────────────────────────────────
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    maxHeight: '70%',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingTop: spacing.sm, paddingBottom: spacing.xl + 16, maxHeight: '60%',
   },
-  sheetTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-    marginBottom: spacing.md,
+  sheetHandle: { width: 36, height: 4, backgroundColor: colors.border.DEFAULT, borderRadius: 2, alignSelf: 'center', marginBottom: spacing.md },
+  sheetTitle: { fontSize: 18, fontWeight: '700' as const, color: colors.text.primary, paddingHorizontal: spacing.lg, marginBottom: spacing.md },
+  sheetScroll: { paddingHorizontal: spacing.md, maxHeight: 400 },
+  sheetOption: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: spacing.md,
+    borderRadius: 12, marginBottom: 4,
   },
-  sheetList: {
-    maxHeight: 400,
-    marginBottom: spacing.md,
+  sheetOptionActive: { backgroundColor: isDark ? colors.primary[100] : `${colors.primary[600]}0A` },
+  sheetOptionText: { flex: 1, fontSize: 15, fontWeight: '500' as const, color: colors.text.primary },
+  sheetOptionTextActive: { color: colors.primary[600], fontWeight: '600' as const },
+  sheetCheck: {
+    width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary[600],
+    justifyContent: 'center', alignItems: 'center',
   },
-  sheetItem: {
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
+
+  // ── FAB sheet items ─────────────────────────────────────────
+  fabSheetItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 14, paddingHorizontal: spacing.lg,
   },
-  sheetItemText: {
-    fontSize: typography.fontSize.base,
-    color: colors.text.primary,
+  fabSheetIcon: {
+    width: 44, height: 44, borderRadius: 12,
+    justifyContent: 'center', alignItems: 'center',
   },
-  sheetItemTextSelected: {
-    color: colors.primary.main,
-    fontWeight: typography.fontWeight.bold,
-  },
-  floatingButton: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary.main,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.lg,
-  },
+  fabSheetLabel: { fontSize: 15, fontWeight: '600' as const, color: colors.text.primary },
+  fabSheetHint: { fontSize: 12, fontWeight: '400' as const, color: colors.text.tertiary, marginTop: 1 },
 });

@@ -6,9 +6,8 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from 'react-native-paper';
-import { Users, Plus, ChevronDown } from 'lucide-react-native';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
@@ -61,11 +60,11 @@ export default function FeesScreen() {
           style={styles.classSelector}
           onPress={() => setShowClassSelector(true)}
         >
-          <Users size={20} color={colors.primary[600]} />
+          <MaterialIcons name="group" size={20} color={colors.primary[600]} />
           <Text style={styles.classSelectorText}>
             {selectedClass ? `Grade ${selectedClass.grade} ${selectedClass.section}` : 'Select Class'}
           </Text>
-          <ChevronDown size={18} color={colors.text.tertiary} />
+          <MaterialIcons name="keyboard-arrow-down" size={18} color={colors.text.tertiary} />
         </TouchableOpacity>
 
         {selectedClass && canManageFees && (
@@ -73,7 +72,7 @@ export default function FeesScreen() {
             style={styles.generateBtn}
             onPress={() => setShowGenerateModal(true)}
           >
-            <Plus size={18} color="#fff" />
+            <MaterialIcons name="add" size={18} color="#fff" />
             <Text style={styles.generateBtnText}>Generate</Text>
           </TouchableOpacity>
         )}
@@ -88,7 +87,7 @@ export default function FeesScreen() {
         />
       ) : (
         <View style={styles.emptyState}>
-          <Users size={64} color={colors.neutral[300]} />
+          <MaterialIcons name="group" size={64} color={colors.neutral[300]} />
           <Text style={styles.emptyTitle}>Select a Class</Text>
           <Text style={styles.emptyText}>
             Choose a class to view and manage fee invoices.
@@ -106,10 +105,11 @@ export default function FeesScreen() {
       <ClassSelectorModal
         visible={showClassSelector}
         onClose={() => setShowClassSelector(false)}
-        classes={classes}
-        selectedClass={selectedClass}
+        classes={classes as { id: string; grade: number | string; section: string }[]}
+        selectedClass={selectedClass as { id: string; grade: number | string; section: string } | null}
         onSelect={(cls) => {
-          setSelectedClass(cls);
+          const matched = classes.find(c => c.id === cls.id);
+          setSelectedClass(matched ?? null);
           setShowClassSelector(false);
         }}
       />

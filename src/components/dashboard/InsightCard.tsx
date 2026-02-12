@@ -4,12 +4,11 @@
  * Used to display smart, actionable information on dashboards
  */
 
-import React from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
+import React, { ComponentProps } from 'react';
+import { View, TouchableOpacity, StyleSheet, Text as RNText } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { ChevronRight, LucideIcon } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export interface InsightCardProps {
@@ -17,7 +16,7 @@ export interface InsightCardProps {
     title: string;
     message: string;
     action?: { label: string; onPress: () => void };
-    icon?: LucideIcon;
+    icon?: ComponentProps<typeof MaterialIcons>['name'];
     animationDelay?: number;
 }
 
@@ -26,7 +25,7 @@ export const InsightCard = React.memo<InsightCardProps>(({
     title,
     message,
     action,
-    icon: Icon,
+    icon,
     animationDelay = 0,
 }) => {
     const { colors, spacing, borderRadius, typography, shadows } = useTheme();
@@ -94,7 +93,7 @@ export const InsightCard = React.memo<InsightCardProps>(({
             ]}
         >
             <View style={styles.contentRow}>
-                {Icon && (
+                {icon && (
                     <View
                         style={[
                             styles.iconContainer,
@@ -107,30 +106,28 @@ export const InsightCard = React.memo<InsightCardProps>(({
                             },
                         ]}
                     >
-                        <Icon size={20} color={typeColors.iconColor} strokeWidth={2.5} />
+                        <MaterialIcons name={icon} size={20} color={typeColors.iconColor} />
                     </View>
                 )}
                 <View style={styles.textContainer}>
-                    <Text
-                        variant="titleSmall"
+                    <RNText
                         style={[
                             styles.title,
                             { color: typeColors.textColor, fontWeight: typography.fontWeight.bold },
                         ]}
                     >
                         {title}
-                    </Text>
-                    <Text
-                        variant="bodySmall"
+                    </RNText>
+                    <RNText
                         style={[styles.message, { color: typeColors.textColor, opacity: 0.85 }]}
                         numberOfLines={2}
                     >
                         {message}
-                    </Text>
+                    </RNText>
                 </View>
                 {action && (
                     <View style={[styles.actionContainer, { marginLeft: spacing.sm }]}>
-                        <ChevronRight size={20} color={typeColors.iconColor} />
+                        <MaterialIcons name="chevron-right" size={20} color={typeColors.iconColor} />
                     </View>
                 )}
             </View>

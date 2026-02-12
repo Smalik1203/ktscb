@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, Platform, TextInput, TouchableOpacity } from 'react-native';
-import { Text, Button, Portal, Modal } from 'react-native-paper';
+import { View, Text, StyleSheet, Platform, TextInput, TouchableOpacity } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Modal } from '../../ui';
 import { typography, spacing, borderRadius, shadows, colors } from '../../../lib/design-system';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 
@@ -85,7 +85,6 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
       return null;
     }
     return (
-      <Portal>
         <Modal
           visible={visible}
           onDismiss={handleCancel}
@@ -106,24 +105,21 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
               maximumDate={maximumDate}
             />
             <View style={styles.actions}>
-              <Button
-                mode="outlined"
+              <TouchableOpacity
                 onPress={handleCancel}
-                style={styles.button}
+                style={[styles.button, styles.cancelButton]}
               >
-                Cancel
-              </Button>
-              <Button
-                mode="contained"
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={handleConfirm}
-                style={styles.button}
+                style={[styles.button, styles.confirmButton]}
               >
-                Done
-              </Button>
+                <Text style={styles.confirmButtonText}>Done</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
-      </Portal>
     );
   }
 
@@ -133,7 +129,6 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
   }
 
   return (
-    <Portal>
       <Modal
         visible={visible}
         onDismiss={handleCancel}
@@ -206,24 +201,21 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
 
           {/* Action Buttons */}
           <View style={styles.actions}>
-            <Button
-              mode="outlined"
+            <TouchableOpacity
               onPress={handleCancel}
-              style={styles.button}
+              style={[styles.button, styles.cancelButton]}
             >
-              Cancel
-            </Button>
-            <Button
-              mode="contained"
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={handleConfirm}
-              style={styles.button}
+              style={[styles.button, styles.confirmButton]}
             >
-              Done
-            </Button>
+              <Text style={styles.confirmButtonText}>Done</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    </Portal>
   );
 };
 
@@ -300,5 +292,27 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.md,
+  },
+  cancelButton: {
+    borderWidth: 1,
+    borderColor: colors.border.DEFAULT,
+    backgroundColor: colors.surface.primary,
+  },
+  cancelButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text.primary,
+  },
+  confirmButton: {
+    backgroundColor: colors.primary[600],
+  },
+  confirmButtonText: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semibold,
+    color: '#fff',
   },
 });

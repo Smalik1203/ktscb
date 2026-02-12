@@ -2,18 +2,8 @@ import React, { useState , useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { View, Text, StyleSheet, Alert } from 'react-native';
-import { Card, Menu, IconButton } from 'react-native-paper';
-import { 
-  BookOpen, 
-  Clock, 
-  AlertCircle, 
-  CheckCircle, 
-  MoreVertical, 
-  FileText, 
-  Eye,
-  Upload,
-  XCircle
-} from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Card, Menu, IconButton } from '../../ui';
 import { format } from 'date-fns';
 import { Task } from '../../hooks/useTasks';
 import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
@@ -91,7 +81,7 @@ export function StudentTaskCard({
   };
 
   return (
-    <Card style={[styles.card, isSubmitted && styles.cardSubmitted]}>
+    <Card style={StyleSheet.flatten([styles.card, isSubmitted && styles.cardSubmitted])}>
       <View style={[styles.cardContent, isSubmitted && styles.cardContentSubmitted]}>
         {/* Header with title and actions */}
         <View style={styles.header}>
@@ -112,10 +102,10 @@ export function StudentTaskCard({
               onDismiss={closeMenu}
               anchor={
                 <IconButton
-                  icon={() => <MoreVertical size={20} color={colors.text.tertiary} />}
-                  size={20}
+                  icon={<MaterialIcons name="more-vert" size={20} color={colors.text.tertiary} />}
                   onPress={toggleMenu}
                   style={styles.menuButton}
+                  accessibilityLabel="Task menu"
                 />
               }
             >
@@ -125,7 +115,7 @@ export function StudentTaskCard({
                   onViewDetail?.();
                 }}
                 title="View Details"
-                leadingIcon={() => <Eye size={16} color={colors.primary[600]} />}
+                icon="visibility"
               />
               {hasAttachments && (
                 <Menu.Item
@@ -134,7 +124,7 @@ export function StudentTaskCard({
                     onViewAttachments?.();
                   }}
                   title="View Attachments"
-                  leadingIcon={() => <FileText size={16} color={colors.primary[600]} />}
+                  icon="description"
                 />
               )}
               {!isCompleted && (
@@ -144,14 +134,15 @@ export function StudentTaskCard({
                     onSubmit?.();
                   }}
                   title="Submit Task"
-                  leadingIcon={() => <Upload size={16} color={colors.success[600]} />}
+                  icon="upload"
                 />
               )}
               {isCompleted && !isGraded && (
                 <Menu.Item
                   onPress={handleUnsubmit}
                   title="Unsubmit Task"
-                  leadingIcon={() => <XCircle size={16} color={colors.error[600]} />}
+                  icon="cancel"
+                  destructive
                 />
               )}
             </Menu>
@@ -164,12 +155,12 @@ export function StudentTaskCard({
           <View style={styles.metaRow}>
             {task.subjects && (
               <View style={styles.metaChip}>
-                <BookOpen size={14} color={colors.primary[600]} />
+                <MaterialIcons name="menu-book" size={14} color={colors.primary[600]} />
                 <Text style={styles.metaChipText}>{task.subjects.subject_name}</Text>
               </View>
             )}
             <View style={[styles.metaChip, { backgroundColor: getPriorityColor(task.priority) + '15' }]}>
-              <AlertCircle size={14} color={getPriorityColor(task.priority)} />
+              <MaterialIcons name="error" size={14} color={getPriorityColor(task.priority)} />
               <Text style={[styles.metaChipText, { color: getPriorityColor(task.priority) }]}>
                 {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
               </Text>
@@ -178,7 +169,7 @@ export function StudentTaskCard({
 
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
-              <Clock size={14} color={dueDateStatus.color} />
+              <MaterialIcons name="schedule" size={14} color={dueDateStatus.color} />
               <Text style={styles.metaLabel}>Due:</Text>
               <Text style={[styles.metaValue, { color: dueDateStatus.color }]}>
                 {format(new Date(task.due_date), 'MMM dd, yyyy')}
@@ -188,7 +179,7 @@ export function StudentTaskCard({
               <>
                 <View style={styles.metaDivider} />
                 <View style={styles.metaItem}>
-                  <FileText size={14} color={colors.text.tertiary} />
+                  <MaterialIcons name="description" size={14} color={colors.text.tertiary} />
                   <Text style={styles.metaValue}>
                     {task.attachments.length} {task.attachments.length === 1 ? 'file' : 'files'}
                   </Text>
@@ -201,7 +192,7 @@ export function StudentTaskCard({
         {/* Status Badge */}
         {isCompleted && (
           <View style={styles.statusBadge}>
-            <CheckCircle size={16} color={colors.success[600]} />
+            <MaterialIcons name="check-circle" size={16} color={colors.success[600]} />
             <Text style={styles.statusText}>Submitted</Text>
             {task.submission?.submitted_at && (
               <Text style={styles.statusDate}>

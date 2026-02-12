@@ -4,11 +4,11 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, Button, ActivityIndicator, Portal, Modal } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TextInput, Alert, KeyboardAvoidingView, Platform, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button } from '../../ui';
+import { Modal } from '../../ui/Modal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Receipt, CreditCard, Wallet, Smartphone, Calendar, CheckCircle, AlertCircle } from 'lucide-react-native';
-import { TouchableOpacity } from 'react-native';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { invoiceService } from '../../services/fees';
@@ -36,9 +36,9 @@ const formatDate = (dateString?: string) => {
 };
 
 const PAYMENT_METHODS = [
-  { key: 'cash', label: 'Cash', icon: Wallet },
-  { key: 'card', label: 'Card', icon: CreditCard },
-  { key: 'online', label: 'UPI/Online', icon: Smartphone },
+  { key: 'cash', label: 'Cash', icon: 'account-balance-wallet' as const },
+  { key: 'card', label: 'Card', icon: 'credit-card' as const },
+  { key: 'online', label: 'UPI/Online', icon: 'smartphone' as const },
 ];
 
 export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }: PaymentScreenProps) {
@@ -169,21 +169,20 @@ export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }
   if (!visible) return null;
 
   return (
-    <Portal>
-      <Modal visible={visible} onDismiss={handleClose} contentContainerStyle={styles.modal}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text style={styles.headerTitle}>Record Payment</Text>
-              {invoice?.student && (
-                <Text style={styles.headerSubtitle}>{invoice.student.full_name}</Text>
-              )}
-            </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <X size={24} color={colors.text.primary} />
-            </TouchableOpacity>
+    <Modal visible={visible} onDismiss={handleClose} contentContainerStyle={styles.modal}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Record Payment</Text>
+            {invoice?.student && (
+              <Text style={styles.headerSubtitle}>{invoice.student.full_name}</Text>
+            )}
           </View>
+          <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+            <MaterialIcons name="close" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+        </View>
 
           {isLoading ? (
             <View style={styles.loading}>
@@ -217,7 +216,7 @@ export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }
                 </View>
                 {invoice.due_date && (
                   <View style={styles.dueDateRow}>
-                    <Calendar size={14} color={colors.text.secondary} />
+                    <MaterialIcons name="event" size={14} color={colors.text.secondary} />
                     <Text style={styles.dueDateText}>
                       Due Date: {formatDate(invoice.due_date)}
                     </Text>
@@ -253,12 +252,12 @@ export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }
                         </View>
                         {isFullyPaid ? (
                           <View style={styles.paidBadge}>
-                            <CheckCircle size={16} color={colors.success[600]} />
+                            <MaterialIcons name="check-circle" size={16} color={colors.success[600]} />
                             <Text style={styles.paidBadgeText}>Paid</Text>
                           </View>
                         ) : (
                           <View style={styles.statusBadge}>
-                            <AlertCircle size={16} color={colors.warning[600]} />
+                            <MaterialIcons name="error" size={16} color={colors.warning[600]} />
                             <Text style={styles.statusBadgeText}>
                               Due: {formatAmount(status?.remaining || item.amount)}
                             </Text>
@@ -338,7 +337,6 @@ export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }
                     <Text style={styles.inputLabel}>Payment Method *</Text>
                     <View style={styles.methodRow}>
                       {PAYMENT_METHODS.map(method => {
-                        const Icon = method.icon;
                         const isActive = paymentMethod === method.key;
                         return (
                           <TouchableOpacity
@@ -346,7 +344,7 @@ export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }
                             style={[styles.methodBtn, isActive && styles.methodBtnActive]}
                             onPress={() => setPaymentMethod(method.key)}
                           >
-                            <Icon size={18} color={isActive ? colors.primary[700] : colors.text.secondary} />
+                            <MaterialIcons name={method.icon} size={18} color={isActive ? colors.primary[700] : colors.text.secondary} />
                             <Text style={[styles.methodLabel, isActive && styles.methodLabelActive]}>
                               {method.label}
                             </Text>
@@ -385,7 +383,7 @@ export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }
                   {/* Actions */}
                   <View style={styles.formActions}>
                     <Button
-                      mode="outlined"
+                      variant="outline"
                       onPress={() => {
                         setSelectedItemId(null);
                         setPaymentAmount('');
@@ -397,7 +395,7 @@ export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }
                       Cancel
                     </Button>
                     <Button
-                      mode="contained"
+                      variant="primary"
                       onPress={handleRecordPayment}
                       loading={saving}
                       disabled={saving}
@@ -412,7 +410,6 @@ export function PaymentScreen({ invoiceId, visible, onClose, onPaymentRecorded }
           )}
         </KeyboardAvoidingView>
       </Modal>
-    </Portal>
   );
 }
 

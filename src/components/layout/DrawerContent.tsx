@@ -1,9 +1,9 @@
 import React, { useMemo, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { Text } from 'react-native-paper';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 
 import {
   DrawerContentScrollView,
@@ -11,35 +11,6 @@ import {
   DrawerItem,
   type DrawerContentComponentProps,
 } from '@react-navigation/drawer';
-import {
-  LayoutDashboard,
-  CalendarDays,
-  CalendarRange,
-  NotebookText,
-  UserCheck,
-  UsersRound,
-  CreditCard,
-  LogOut,
-  Bell,
-  Settings2,
-  User,
-  ChevronRight,
-  Star,
-  CheckCircle2,
-  UserPlus,
-  List,
-  Layers,
-  FolderOpen,
-  FileText,
-  Moon,
-  Sun,
-  TrendingUp,
-  DollarSign,
-  Package,
-  MessageSquare,
-  MessageSquareMore,
-  Bot
-} from 'lucide-react-native';
 import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -52,7 +23,7 @@ import { useClass } from '../../hooks/useClasses';
 type MenuItem = {
   key: string;
   label: string;
-  icon: any;
+  icon: string;
   route: string;
   /** @deprecated Use requiredCapability instead for capability-based access control */
   roles?: ('superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student')[];
@@ -70,7 +41,7 @@ const MENU: MenuItem[] = [
   {
     key: 'home',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: 'dashboard' as const,
     route: '/(tabs)',
     section: 'Main',
     description: 'Overview and quick stats'
@@ -78,7 +49,7 @@ const MENU: MenuItem[] = [
   {
     key: 'calendar',
     label: 'Calendar',
-    icon: CalendarDays,
+    icon: 'date-range' as const,
     route: '/(tabs)/calendar',
     section: 'Main',
     description: 'Events and schedules'
@@ -86,7 +57,7 @@ const MENU: MenuItem[] = [
   {
     key: 'timetable',
     label: 'Timetable',
-    icon: CalendarRange,
+    icon: 'date-range' as const,
     route: '/(tabs)/timetable',
     section: 'Main',
     description: 'Class schedules'
@@ -94,7 +65,7 @@ const MENU: MenuItem[] = [
   {
     key: 'resources',
     label: 'Resources',
-    icon: FolderOpen,
+    icon: 'folder-open' as const,
     route: '/(tabs)/resources',
     section: 'Learning',
     description: 'Study materials'
@@ -102,7 +73,7 @@ const MENU: MenuItem[] = [
   {
     key: 'announcements',
     label: 'Announcements',
-    icon: MessageSquare,
+    icon: 'chat' as const,
     route: '/(tabs)/announcements',
     section: 'Main',
     description: 'School updates and news'
@@ -110,7 +81,7 @@ const MENU: MenuItem[] = [
   {
     key: 'feedback',
     label: 'Feedback',
-    icon: MessageSquareMore,
+    icon: 'question-answer' as const,
     route: '/(tabs)/feedback',
     section: 'Main',
     description: 'Share and view feedback'
@@ -118,7 +89,7 @@ const MENU: MenuItem[] = [
   {
     key: 'syllabus_staff',
     label: 'Syllabus',
-    icon: NotebookText,
+    icon: 'auto-stories' as const,
     route: '/(tabs)/syllabus',
     requiredCapability: 'syllabus.manage',
     section: 'Learning',
@@ -127,7 +98,7 @@ const MENU: MenuItem[] = [
   {
     key: 'syllabus_student',
     label: 'Syllabus',
-    icon: NotebookText,
+    icon: 'auto-stories' as const,
     route: '/(tabs)/syllabus-student',
     requiredCapability: 'syllabus.read',
     section: 'Learning',
@@ -136,7 +107,7 @@ const MENU: MenuItem[] = [
   {
     key: 'attendance',
     label: 'Attendance',
-    icon: UserCheck,
+    icon: 'how-to-reg' as const,
     route: '/(tabs)/attendance',
     section: 'Academic',
     description: 'Track student attendance'
@@ -144,7 +115,7 @@ const MENU: MenuItem[] = [
   {
     key: 'fees_student',
     label: 'Fees',
-    icon: CreditCard,
+    icon: 'credit-card' as const,
     route: '/(tabs)/fees-student',
     requiredCapability: 'fees.read_own',
     section: 'Academic',
@@ -153,7 +124,7 @@ const MENU: MenuItem[] = [
   {
     key: 'assessments',
     label: 'Assessments',
-    icon: FileText,
+    icon: 'description' as const,
     route: '/(tabs)/assessments',
     section: 'Academic',
     description: 'Tests and exams',
@@ -162,7 +133,7 @@ const MENU: MenuItem[] = [
   {
     key: 'progress',
     label: 'Student Progress',
-    icon: TrendingUp,
+    icon: 'trending-up' as const,
     route: '/(tabs)/progress',
     section: 'Academic',
     description: 'Track your performance',
@@ -172,7 +143,7 @@ const MENU: MenuItem[] = [
   {
     key: 'fees',
     label: 'Fees',
-    icon: CreditCard,
+    icon: 'credit-card' as const,
     route: '/(tabs)/fees',
     requiredCapability: 'fees.write',
     section: 'Academic',
@@ -181,7 +152,7 @@ const MENU: MenuItem[] = [
   {
     key: 'tasks',
     label: 'Tasks',
-    icon: CheckCircle2,
+    icon: 'check-circle' as const,
     route: '/(tabs)/tasks',
     section: 'Academic',
     description: 'Homework and assignments',
@@ -190,7 +161,7 @@ const MENU: MenuItem[] = [
   {
     key: 'class_mgmt',
     label: 'Management',
-    icon: Settings2,
+    icon: 'settings' as const,
     route: '/(tabs)/manage',
     requiredCapability: 'management.view',
     section: 'Academic',
@@ -199,7 +170,7 @@ const MENU: MenuItem[] = [
   {
     key: 'add_admin',
     label: 'Add Admins',
-    icon: UserPlus,
+    icon: 'person-add' as const,
     route: '/(tabs)/add-admin',
     requiredCapability: 'admins.create',
     section: 'Admin',
@@ -208,7 +179,7 @@ const MENU: MenuItem[] = [
   {
     key: 'add_classes',
     label: 'Add Classes',
-    icon: List,
+    icon: 'list' as const,
     route: '/(tabs)/add-classes',
     requiredCapability: 'classes.manage',
     section: 'Admin',
@@ -217,7 +188,7 @@ const MENU: MenuItem[] = [
   {
     key: 'add_subjects',
     label: 'Add Subjects',
-    icon: Layers,
+    icon: 'layers' as const,
     route: '/(tabs)/add-subjects',
     requiredCapability: 'subjects.manage',
     section: 'Admin',
@@ -226,7 +197,7 @@ const MENU: MenuItem[] = [
   {
     key: 'add_student',
     label: 'Add Students',
-    icon: UsersRound,
+    icon: 'group' as const,
     route: '/(tabs)/add-student',
     requiredCapability: 'students.create',
     section: 'Admin',
@@ -235,7 +206,7 @@ const MENU: MenuItem[] = [
   {
     key: 'inventory',
     label: 'Inventory',
-    icon: Package,
+    icon: 'inventory-2' as const,
     route: '/(tabs)/inventory',
     requiredCapability: 'inventory.create',
     section: 'Admin',
@@ -244,7 +215,7 @@ const MENU: MenuItem[] = [
   {
     key: 'finance',
     label: 'Finance',
-    icon: DollarSign,
+    icon: 'attach-money' as const,
     route: '/(tabs)/finance',
     requiredCapability: 'management.view',
     roles: ['superadmin'], // Finance is super admin only
@@ -582,7 +553,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
               onPress={handleLogout}
               activeOpacity={0.7}
             >
-              <LogOut size={19} color={colors.text.inverse} />
+              <MaterialIcons name="logout" size={19} color={colors.text.inverse} />
             </TouchableOpacity>
           </View>
         </LinearGradient>
@@ -617,7 +588,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                         ]}
                         onPress={() => handleItemPress(item)}
                       >
-                        <item.icon
+                        <MaterialIcons
+                          name={item.icon as any}
                           size={21}
                           color={activeItem === item.key ? colors.primary[600] : colors.text.secondary}
                         />
@@ -628,7 +600,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                           {item.label}
                         </Text>
                         {item.hasSubMenu && (
-                          <ChevronRight
+                          <MaterialIcons
+                            name="chevron-right"
                             size={16}
                             color={colors.text.secondary}
                             style={[
@@ -657,7 +630,8 @@ export function DrawerContent(props: DrawerContentComponentProps) {
                             ]}
                             onPress={() => handleItemPress(subItem)}
                           >
-                            <subItem.icon
+                            <MaterialIcons
+                              name={subItem.icon as any}
                               size={19}
                               color={isSubItemActive ? colors.primary[600] : colors.text.secondary}
                             />
@@ -703,9 +677,9 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           activeOpacity={0.7}
         >
           {isDark ? (
-            <Sun size={20} color={colors.text.primary} />
+            <MaterialIcons name="light-mode" size={20} color={colors.text.primary} />
           ) : (
-            <Moon size={20} color={colors.text.primary} />
+            <MaterialIcons name="dark-mode" size={20} color={colors.text.primary} />
           )}
           <Text style={[dynamicStyles.footerItemLabel, { marginLeft: spacing.sm }]}>
             {isDark ? 'Light Mode' : 'Dark Mode'}
@@ -721,7 +695,7 @@ export function DrawerContent(props: DrawerContentComponentProps) {
           onPress={handleLogout}
           activeOpacity={0.7}
         >
-          <LogOut size={20} color={colors.error[600]} />
+          <MaterialIcons name="logout" size={20} color={colors.error[600]} />
           <Text style={[dynamicStyles.footerItemLabel, { marginLeft: spacing.sm, color: colors.error[600] }]}>
             Logout
           </Text>

@@ -1,17 +1,17 @@
 import React, { useState, useEffect , useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, ActivityIndicator, TextInput as RNTextInput } from 'react-native';
 import { Image } from 'expo-image';
-import { Modal, Portal, TextInput, Button, ActivityIndicator } from 'react-native-paper';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button, Modal as ThemedModal } from '../../ui';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
-import { X, Upload, FileText, Paperclip, Image as ImageIcon } from 'lucide-react-native';
 import { Task } from '../../hooks/useTasks';
 import { supabase } from '../../lib/supabase';
 import { spacing, typography, borderRadius, shadows, colors } from '../../../lib/design-system';
-import { SuccessAnimation } from '../ui/SuccessAnimation';
+import { SuccessAnimation } from '../../ui';
 
 const STORAGE_BUCKET = 'task-submissions';
 
@@ -295,21 +295,13 @@ export function TaskSubmissionModal({
   };
 
   return (
-    <Portal>
-      <Modal
-        visible={visible}
-        onDismiss={onDismiss}
-        contentContainerStyle={styles.modalContainer}
-      >
+    <ThemedModal
+      visible={visible}
+      onDismiss={onDismiss}
+      contentContainerStyle={styles.modalContainer}
+      title="Submit Task"
+    >
         <View style={styles.modalContent}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Submit Task</Text>
-            <TouchableOpacity onPress={onDismiss} style={styles.closeButton}>
-              <X size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          </View>
-
           {task && (
             <View style={styles.taskInfo}>
               <Text style={styles.taskTitle}>{task.title}</Text>
@@ -323,15 +315,14 @@ export function TaskSubmissionModal({
             {/* Submission Text (Optional) */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Submission Text (Optional)</Text>
-              <TextInput
-                mode="outlined"
+              <RNTextInput
                 multiline
                 numberOfLines={6}
                 value={submissionText}
                 onChangeText={setSubmissionText}
                 placeholder="Enter your submission text here (optional)..."
-                style={styles.textInput}
-                contentStyle={styles.textInputContent}
+                placeholderTextColor={colors.text.tertiary}
+                style={[styles.textInput, { borderWidth: 1, borderColor: colors.border.light, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, color: colors.text.primary, textAlignVertical: 'top', minHeight: 120 }]}
               />
             </View>
 
@@ -344,7 +335,7 @@ export function TaskSubmissionModal({
                   onPress={handlePickImage}
                   disabled={uploading}
                 >
-                  <ImageIcon size={16} color={colors.primary[600]} />
+                  <MaterialIcons name="image" size={16} color={colors.primary[600]} />
                   <Text style={styles.attachButtonText}>Add Image</Text>
                 </TouchableOpacity>
               </View>
@@ -364,7 +355,7 @@ export function TaskSubmissionModal({
                         onPress={() => handleRemoveImage(index)}
                         style={styles.imageRemoveButton}
                       >
-                        <X size={16} color={colors.text.inverse} />
+                        <MaterialIcons name="close" size={16} color={colors.text.inverse} />
                       </TouchableOpacity>
                       {image.name && (
                         <Text style={styles.imageName} numberOfLines={1}>
@@ -386,7 +377,7 @@ export function TaskSubmissionModal({
                   onPress={handlePickDocument}
                   disabled={uploading}
                 >
-                  <Paperclip size={16} color={colors.primary[600]} />
+                  <MaterialIcons name="attach-file" size={16} color={colors.primary[600]} />
                   <Text style={styles.attachButtonText}>Add Files</Text>
                 </TouchableOpacity>
               </View>
@@ -402,7 +393,7 @@ export function TaskSubmissionModal({
                 <View style={styles.attachmentsList}>
                   {attachments.map((attachment, index) => (
                     <View key={index} style={styles.attachmentItem}>
-                      <FileText size={20} color={colors.primary[600]} />
+                      <MaterialIcons name="description" size={20} color={colors.primary[600]} />
                       <View style={styles.attachmentInfo}>
                         <Text style={styles.attachmentName} numberOfLines={1}>
                           {attachment.name}
@@ -417,7 +408,7 @@ export function TaskSubmissionModal({
                         onPress={() => handleRemoveAttachment(index)}
                         style={styles.removeButton}
                       >
-                        <X size={16} color={colors.error[600]} />
+                        <MaterialIcons name="close" size={16} color={colors.error[600]} />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -436,7 +427,7 @@ export function TaskSubmissionModal({
           {/* Action Buttons */}
           <View style={styles.actions}>
             <Button
-              mode="outlined"
+              variant="outline"
               onPress={onDismiss}
               style={styles.cancelButton}
               disabled={submitting || uploading}
@@ -444,7 +435,7 @@ export function TaskSubmissionModal({
               Cancel
             </Button>
             <Button
-              mode="contained"
+              variant="primary"
               onPress={handleSubmit}
               style={styles.submitButton}
               loading={submitting || uploading}
@@ -460,8 +451,7 @@ export function TaskSubmissionModal({
           visible={showSuccessAnimation}
           onAnimationEnd={handleAnimationEnd}
         />
-      </Modal>
-    </Portal>
+    </ThemedModal>
   );
 }
 
@@ -480,22 +470,6 @@ const createStyles = (colors: ThemeColors, typography: any, spacing: any, border
     maxWidth: 600,
     maxHeight: '90%',
     ...shadows.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  title: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
-  },
-  closeButton: {
-    padding: spacing.xs,
   },
   taskInfo: {
     padding: spacing.lg,

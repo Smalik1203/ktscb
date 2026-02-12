@@ -8,7 +8,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, Modal, Animated, Easing, ScrollView } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { Sparkles, Brain } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Heading, Body, Caption } from '../../../ui';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -180,7 +180,7 @@ export function AIGenerationOverlay({
                                 colors={[colors.primary[500], colors.secondary[500]]}
                                 style={styles.brainGradient}
                             >
-                                <Brain size={48} color="#fff" />
+                                <MaterialIcons name="psychology" size={48} color="#fff" />
                             </LinearGradient>
                         </Animated.View>
 
@@ -197,7 +197,7 @@ export function AIGenerationOverlay({
                                     },
                                 ]}
                             >
-                                <Sparkles size={16} color={colors.primary[300]} />
+                                <MaterialIcons name="auto-awesome" size={16} color={colors.primary[300]} />
                             </Animated.View>
                         ))}
                     </View>

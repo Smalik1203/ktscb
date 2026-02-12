@@ -1,20 +1,22 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { View, ScrollView, Alert, TouchableOpacity, StyleSheet } from 'react-native';
-import { Text, Portal, Modal } from 'react-native-paper';
+import { View, ScrollView, Alert, TouchableOpacity, StyleSheet, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCapabilities } from '../../hooks/useCapabilities';
+import { AccessDenied } from '../../components/common/AccessDenied';
 import { useCreateStudent, useStudents, useUpdateStudent, useDeleteStudent } from '../../hooks/useStudents';
 import { useClassInstances } from '../../hooks/useClassInstances';
 import { spacing, borderRadius, shadows } from '../../../lib/design-system';
-import { ChevronDown, X, CheckCircle2, Edit2, Trash2 } from 'lucide-react-native';
+import { Modal, Button, Input, Badge, SearchBar, SegmentedControl, EmptyState, Avatar } from '../../ui';
 import { ThreeStateView } from '../../components/common/ThreeStateView';
 import { Pagination } from '../../components/common/Pagination';
 import { sanitizeEmail, sanitizePhone, sanitizeCode, sanitizeName, validatePassword } from '../../utils/sanitize';
-import { Button, Input, Badge, SearchBar, SegmentedControl, EmptyState, Avatar } from '../../components/ui';
 
 export default function AddStudentScreen() {
   const { profile } = useAuth();
+  const { can } = useCapabilities();
   const { colors, typography, spacing, borderRadius, shadows } = useTheme();
   const styles = useMemo(
     () => createStyles(colors, typography, spacing, borderRadius, shadows),
@@ -64,6 +66,16 @@ export default function AddStudentScreen() {
   useEffect(() => {
     setPage(1);
   }, [studentSearch]);
+
+  // Access guard
+  if (!can('students.create')) {
+    return (
+      <AccessDenied
+        message="You don't have permission to manage students."
+        capability="students.create"
+      />
+    );
+  }
 
   const selectedClass = classInstances.find((c: any) => c.id === classInstanceId);
   const selectedClassLabel = selectedClass
@@ -213,7 +225,7 @@ export default function AddStudentScreen() {
                   <Text style={[styles.classSelectorText, !classInstanceId && styles.placeholderText]}>
                     {selectedClassLabel}
                   </Text>
-                  <ChevronDown size={20} color={colors.text.tertiary} />
+                  <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                 </TouchableOpacity>
               </View>
               <View style={styles.formGroup}>
@@ -223,7 +235,7 @@ export default function AddStudentScreen() {
                   onChangeText={setFullName}
                   placeholder="Enter full name"
                   autoCapitalize="words"
-                  rightIcon={fullName.trim().length > 0 ? <CheckCircle2 size={18} color={colors.success[600]} /> : undefined}
+                  rightIcon={fullName.trim().length > 0 ? <MaterialIcons name="check-circle" size={18} color={colors.success[600]} /> : undefined}
                 />
 
                 <Input
@@ -284,7 +296,7 @@ export default function AddStudentScreen() {
                 <Text style={[styles.classSelectorText, !classInstanceId && styles.placeholderText]}>
                   {selectedClassLabel}
                 </Text>
-                <ChevronDown size={20} color={colors.text.tertiary} />
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
             </View>
 
@@ -324,7 +336,7 @@ export default function AddStudentScreen() {
                         <Avatar
                           name={s.full_name || s.student_code || 'Student'}
                           size="sm"
-                          variant="primary"
+                          backgroundColor={colors.primary[100]}
                           style={styles.studentAvatar}
                         />
                         <View style={styles.studentInfo}>
@@ -332,10 +344,10 @@ export default function AddStudentScreen() {
                         </View>
                         <View style={styles.studentActions}>
                           <TouchableOpacity onPress={() => handleEdit(s)} style={styles.actionButton}>
-                            <Edit2 size={18} color={colors.primary[600]} />
+                            <MaterialIcons name="edit" size={18} color={colors.primary[600]} />
                           </TouchableOpacity>
                           <TouchableOpacity onPress={() => handleDelete(s)} style={styles.actionButton}>
-                            <Trash2 size={18} color={colors.error[600]} />
+                            <MaterialIcons name="delete" size={18} color={colors.error[600]} />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -370,16 +382,15 @@ export default function AddStudentScreen() {
         </View>
       )}
 
-      <Portal>
-        <Modal
-          visible={showClassPicker}
-          onDismiss={() => setShowClassPicker(false)}
-          contentContainerStyle={styles.modal}
-        >
+      <Modal
+        visible={showClassPicker}
+        onDismiss={() => setShowClassPicker(false)}
+        contentContainerStyle={styles.modal}
+      >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Select Class</Text>
             <TouchableOpacity onPress={() => setShowClassPicker(false)} style={styles.closeButton}>
-              <X size={20} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={20} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -404,8 +415,7 @@ export default function AddStudentScreen() {
               );
             })}
           </ScrollView>
-        </Modal>
-      </Portal>
+      </Modal>
     </View>
   );
 }

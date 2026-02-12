@@ -45,4 +45,22 @@
     native <methods>;
 }
 
+# Sentry
+-keep class io.sentry.** { *; }
+-dontwarn io.sentry.**
+-keep class io.sentry.android.** { *; }
+
+# Expo modules framework (keep all module classes)
+-keep class expo.modules.** { *; }
+-dontwarn expo.modules.**
+
+# React Native Gesture Handler
+-keep class com.swmansion.gesturehandler.** { *; }
+
+# React Native Screens
+-keep class com.swmansion.rnscreens.** { *; }
+
+# React Navigation
+-keep class com.facebook.react.** { *; }
+
 # Add any project specific keep options here:

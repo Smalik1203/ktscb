@@ -1,10 +1,20 @@
-import React, { useEffect, useRef , useMemo } from 'react';
-import { useTheme } from '../../contexts/ThemeContext';
-import type { ThemeColors } from '../../theme/types';
-import { View, StyleSheet, Animated } from 'react-native';
-import { CheckCircle2 } from 'lucide-react-native';
+/**
+ * SuccessAnimation Component
+ * 
+ * Animated success checkmark with expanding ring effect.
+ * 
+ * @example
+ * ```tsx
+ * <SuccessAnimation visible={showSuccess} onAnimationEnd={() => setShowSuccess(false)} />
+ * ```
+ */
 
-interface SuccessAnimationProps {
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useTheme } from '../contexts/ThemeContext';
+
+export interface SuccessAnimationProps {
   visible: boolean;
   size?: number;
   color?: string;
@@ -17,10 +27,8 @@ export function SuccessAnimation({
   color,
   onAnimationEnd,
 }: SuccessAnimationProps) {
-  const { colors, typography, spacing, borderRadius, shadows } = useTheme();
-  const styles = useMemo(() => createStyles(colors, typography, spacing, borderRadius, shadows), [colors, typography, spacing, borderRadius, shadows]);
-
-  const finalColor = color || colors.success[500];
+  const { colors } = useTheme();
+  const finalColor = color || colors.success.main;
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const ringScale = useRef(new Animated.Value(0)).current;
@@ -28,15 +36,12 @@ export function SuccessAnimation({
 
   useEffect(() => {
     if (visible) {
-      // Reset animations
       scaleAnim.setValue(0);
       opacityAnim.setValue(0);
       ringScale.setValue(0);
       ringOpacity.setValue(1);
 
-      // Run animations in sequence
       Animated.sequence([
-        // Icon pops in
         Animated.parallel([
           Animated.spring(scaleAnim, {
             toValue: 1,
@@ -50,7 +55,6 @@ export function SuccessAnimation({
             useNativeDriver: true,
           }),
         ]),
-        // Ring expands
         Animated.parallel([
           Animated.timing(ringScale, {
             toValue: 1.5,
@@ -64,18 +68,15 @@ export function SuccessAnimation({
           }),
         ]),
       ]).start(() => {
-        if (onAnimationEnd) {
-          onAnimationEnd();
-        }
+        onAnimationEnd?.();
       });
     }
-  }, [visible]);
+  }, [visible, scaleAnim, opacityAnim, ringScale, ringOpacity, onAnimationEnd]);
 
   if (!visible) return null;
 
   return (
     <View style={styles.container} pointerEvents="none">
-      {/* Expanding ring */}
       <Animated.View
         style={[
           styles.ring,
@@ -83,14 +84,12 @@ export function SuccessAnimation({
             width: size,
             height: size,
             borderRadius: size / 2,
-            borderColor: color,
+            borderColor: finalColor,
             transform: [{ scale: ringScale }],
             opacity: ringOpacity,
           },
         ]}
       />
-
-      {/* Success icon */}
       <Animated.View
         style={[
           styles.iconContainer,
@@ -103,18 +102,17 @@ export function SuccessAnimation({
         <View
           style={[
             styles.iconCircle,
-            { width: size, height: size, borderRadius: size / 2, backgroundColor: color },
+            { width: size, height: size, borderRadius: size / 2, backgroundColor: finalColor },
           ]}
         >
-          <CheckCircle2 size={size * 0.5} color={colors.text.inverse} strokeWidth={3} />
+          <MaterialIcons name="check-circle" size={size * 0.5} color={colors.text.inverse} />
         </View>
       </Animated.View>
     </View>
   );
 }
 
-const createStyles = (colors: ThemeColors, typography: any, spacing: any, borderRadius: any, shadows: any) =>
-  StyleSheet.create({
+const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     top: 0,

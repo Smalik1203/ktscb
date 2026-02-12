@@ -1,11 +1,10 @@
 import React, { useState, useEffect , useMemo } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Text, Portal, Modal } from 'react-native-paper';
-import { Edit, Trash2, X, ChevronDown } from 'lucide-react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, Alert, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Modal, Button, Input, EmptyState, Badge } from '../../ui';
 import { spacing, borderRadius, typography, shadows, colors } from '../../../lib/design-system';
-import { Button, Input, EmptyState, Badge } from '../../components/ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import { AccessDenied } from '../../components/common/AccessDenied';
@@ -361,7 +360,7 @@ export default function AddClassesScreen() {
                   style={styles.manageLink}
                   activeOpacity={0.7}
                 >
-                  <Edit size={14} color={colors.primary[600]} />
+                  <MaterialIcons name="edit" size={14} color={colors.primary[600]} />
                   <Text style={styles.manageLinkText}>Manage</Text>
                 </TouchableOpacity>
               </View>
@@ -373,7 +372,7 @@ export default function AddClassesScreen() {
                 <Text style={[styles.selectText, !selectedAcademicYear && styles.placeholderText]}>
                   {selectedYearLabel}
                 </Text>
-                <ChevronDown size={20} color={colors.text.tertiary} />
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
               {academicYears.length === 0 && (
                 <Text style={styles.helperText}>Create an academic year before adding classes.</Text>
@@ -432,7 +431,7 @@ export default function AddClassesScreen() {
                 <Text style={[styles.selectText, !selectedTeacher && styles.placeholderText]}>
                   {selectedAdminLabel}
                 </Text>
-                <ChevronDown size={20} color={colors.text.tertiary} />
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
               {admins.length === 0 && (
                 <Text style={styles.helperText}>No teachers available</Text>
@@ -479,7 +478,7 @@ export default function AddClassesScreen() {
                         style={styles.actionButton}
                         activeOpacity={0.7}
                       >
-                        <Edit size={18} color={colors.info[600]} />
+                        <MaterialIcons name="edit" size={18} color={colors.info[600]} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => {
@@ -489,7 +488,7 @@ export default function AddClassesScreen() {
                         style={styles.actionButton}
                         activeOpacity={0.7}
                       >
-                        <Trash2 size={18} color={colors.error[600]} />
+                        <MaterialIcons name="delete" size={18} color={colors.error[600]} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -518,7 +517,6 @@ export default function AddClassesScreen() {
       </View>
 
       {/* Academic Years Modal */}
-      <Portal>
         <Modal
           visible={showYearsModal}
           onDismiss={() => setShowYearsModal(false)}
@@ -531,7 +529,7 @@ export default function AddClassesScreen() {
               style={styles.closeButton}
               activeOpacity={0.7}
             >
-              <X size={20} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={20} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -559,7 +557,7 @@ export default function AddClassesScreen() {
                         }}
                         style={styles.iconBtn}
                       >
-                        <Edit size={18} color={colors.primary[600]} />
+                        <MaterialIcons name="edit" size={18} color={colors.primary[600]} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => {
@@ -568,7 +566,7 @@ export default function AddClassesScreen() {
                         }}
                         style={styles.iconBtn}
                       >
-                        <Trash2 size={18} color={colors.error[600]} />
+                        <MaterialIcons name="delete" size={18} color={colors.error[600]} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -624,10 +622,8 @@ export default function AddClassesScreen() {
             </View>
           </ScrollView>
         </Modal>
-      </Portal>
 
       {/* Edit Year Modal */}
-      <Portal>
         <Modal
           visible={editYearModalVisible}
           onDismiss={() => {
@@ -646,7 +642,7 @@ export default function AddClassesScreen() {
               style={styles.closeButton}
               activeOpacity={0.7}
             >
-              <X size={24} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={24} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -696,10 +692,8 @@ export default function AddClassesScreen() {
             </View>
           </View>
         </Modal>
-      </Portal>
 
       {/* Edit Class Modal */}
-      <Portal>
         <Modal
           visible={editClassModalVisible}
           onDismiss={() => {
@@ -718,7 +712,7 @@ export default function AddClassesScreen() {
               style={styles.closeButton}
               activeOpacity={0.7}
             >
-              <X size={24} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={24} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -755,7 +749,7 @@ export default function AddClassesScreen() {
                 <Text style={[styles.selectText, !editTeacher && styles.placeholderText]}>
                   {editAdminLabel}
                 </Text>
-                <ChevronDown size={20} color={colors.text.tertiary} />
+                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
               </TouchableOpacity>
               {admins.length === 0 && (
                 <Text style={styles.helperText}>No teachers available</Text>
@@ -778,10 +772,8 @@ export default function AddClassesScreen() {
             </View>
           </View>
         </Modal>
-      </Portal>
 
       {/* Academic Year Picker */}
-      <Portal>
         <Modal
           visible={showAcademicYearPicker}
           onDismiss={() => setShowAcademicYearPicker(false)}
@@ -794,7 +786,7 @@ export default function AddClassesScreen() {
               style={styles.closeButton}
               activeOpacity={0.7}
             >
-              <X size={20} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={20} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -819,10 +811,8 @@ export default function AddClassesScreen() {
             })}
           </ScrollView>
         </Modal>
-      </Portal>
 
       {/* Class Admin Picker */}
-      <Portal>
         <Modal
           visible={showTeacherPicker}
           onDismiss={() => setShowTeacherPicker(false)}
@@ -835,7 +825,7 @@ export default function AddClassesScreen() {
               style={styles.closeButton}
               activeOpacity={0.7}
             >
-              <X size={20} color={colors.text.secondary} />
+              <MaterialIcons name="close" size={20} color={colors.text.secondary} />
             </TouchableOpacity>
           </View>
 
@@ -874,7 +864,6 @@ export default function AddClassesScreen() {
             </ScrollView>
           )}
         </Modal>
-      </Portal>
 
     </View>
   );

@@ -8,7 +8,7 @@
 import React, { useRef, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { ChevronDown, ChevronUp, X, Check, Lightbulb } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Body, Caption, Heading } from '../../../ui';
 import { GeneratedQuestion } from '../../../services/aiTestGeneratorFetch';
 
@@ -81,7 +81,7 @@ function QuestionItem({ question, index, onRemove }: QuestionItemProps) {
                             { backgroundColor: colors.primary[100] },
                         ]}
                     >
-                        <Caption weight="bold" style={{ color: colors.primary[700] }}>
+                        <Caption weight="semibold" style={{ color: colors.primary[700] }}>
                             Q{index + 1}
                         </Caption>
                     </View>
@@ -98,10 +98,10 @@ function QuestionItem({ question, index, onRemove }: QuestionItemProps) {
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         style={[styles.removeButton, { backgroundColor: colors.error[50] }]}
                     >
-                        <X size={16} color={colors.error[500]} />
+                        <MaterialIcons name="close" size={16} color={colors.error[500]} />
                     </TouchableOpacity>
                     <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-                        <ChevronDown size={20} color={colors.text.tertiary} />
+                        <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.tertiary} />
                     </Animated.View>
                 </View>
             </TouchableOpacity>
@@ -142,7 +142,7 @@ function QuestionItem({ question, index, onRemove }: QuestionItemProps) {
                                         ]}
                                     >
                                         <Caption
-                                            weight="bold"
+                                            weight="semibold"
                                             style={{
                                                 color: isCorrect ? colors.text.inverse : colors.text.secondary,
                                             }}
@@ -159,7 +159,7 @@ function QuestionItem({ question, index, onRemove }: QuestionItemProps) {
                                         {option}
                                     </Body>
                                     {isCorrect && (
-                                        <Check size={18} color={colors.success[600]} />
+                                        <MaterialIcons name="check" size={18} color={colors.success[600]} />
                                     )}
                                 </View>
                             );
@@ -180,7 +180,7 @@ function QuestionItem({ question, index, onRemove }: QuestionItemProps) {
                             ]}
                         >
                             <View style={styles.explanationHeader}>
-                                <Lightbulb size={14} color={colors.info[600]} />
+                                <MaterialIcons name="lightbulb" size={14} color={colors.info[600]} />
                                 <Caption weight="semibold" style={{ color: colors.info[700], marginLeft: 6 }}>
                                     Explanation
                                 </Caption>
@@ -205,7 +205,7 @@ export function QuestionAccordion({ questions, onRemoveQuestion }: QuestionAccor
             <View style={styles.listHeader}>
                 <Heading level={5}>Generated Questions</Heading>
                 <View style={[styles.countBadge, { backgroundColor: colors.primary[100] }]}>
-                    <Caption weight="bold" style={{ color: colors.primary[700] }}>
+                    <Caption weight="semibold" style={{ color: colors.primary[700] }}>
                         {questions.length}
                     </Caption>
                 </View>

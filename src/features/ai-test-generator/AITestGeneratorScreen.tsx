@@ -13,7 +13,7 @@ import { View, StyleSheet, Animated, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { ArrowLeft, Sparkles } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -310,11 +310,11 @@ export default function AITestGeneratorScreen() {
             onPress={() => router.back()}
             style={[styles.backButton, { backgroundColor: 'rgba(255,255,255,0.15)' }]}
           >
-            <ArrowLeft size={24} color="#fff" />
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
           <View style={styles.headerText}>
             <View style={styles.headerTitle}>
-              <Sparkles size={20} color="#fff" />
+              <MaterialIcons name="auto-awesome" size={20} color="#fff" />
               <Heading level={4} style={{ color: '#fff', marginLeft: 8 }}>
                 Sage Test Generator
               </Heading>

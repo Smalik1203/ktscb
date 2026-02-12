@@ -13,6 +13,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import {
   View,
+  Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -21,17 +22,8 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import { Text } from 'react-native-paper';
-import {
-  Calendar as CalendarIcon,
-  CheckCircle,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
-  AlertCircle,
-  Minus,
-} from 'lucide-react-native';
-import { ProgressRing } from '../ui/ProgressRing';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { ProgressRing } from '../../ui';
 import { useStudentAttendance } from '../../hooks/useAttendance';
 import { useSchoolHolidays } from '../../hooks/useCalendarEvents';
 import { useAuth } from '../../contexts/AuthContext';
@@ -363,7 +355,7 @@ export const StudentAttendanceView: React.FC = () => {
           detail: 'All periods attended',
           color: colors.success[700],
           bg: isDark ? 'rgba(34,197,94,0.1)' : colors.success[50],
-          Icon: CheckCircle,
+          iconName: 'check-circle' as const,
         };
       case 'absent':
         return {
@@ -371,7 +363,7 @@ export const StudentAttendanceView: React.FC = () => {
           detail: day.record ? 'Marked absent' : 'Not recorded',
           color: colors.error[700],
           bg: isDark ? 'rgba(239,68,68,0.1)' : colors.error[50],
-          Icon: XCircle,
+          iconName: 'cancel' as const,
         };
       case 'holiday':
         return {
@@ -379,7 +371,7 @@ export const StudentAttendanceView: React.FC = () => {
           detail: day.holidayName || 'No school',
           color: colors.text.tertiary,
           bg: isDark ? 'rgba(156,163,175,0.08)' : colors.neutral[50],
-          Icon: Minus,
+          iconName: 'remove' as const,
         };
     }
   };
@@ -427,7 +419,7 @@ export const StudentAttendanceView: React.FC = () => {
                   onPress={() => setShowStartDatePicker(true)}
                   activeOpacity={0.6}
                 >
-                  <CalendarIcon size={16} color={colors.primary[600]} />
+                  <MaterialIcons name="event" size={16} color={colors.primary[600]} />
                   <Text style={styles.dateFilterText}>
                     {format(startDate, 'dd MMM yyyy')}
                   </Text>
@@ -502,7 +494,7 @@ export const StudentAttendanceView: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyCard}>
               <View style={[styles.emptyIconBox, { backgroundColor: isDark ? 'rgba(156,163,175,0.08)' : colors.neutral[50] }]}>
-                <AlertCircle size={28} color={colors.text.tertiary} />
+                <MaterialIcons name="error" size={28} color={colors.text.tertiary} />
               </View>
               <Text style={styles.emptyTitle}>No Days in Range</Text>
               <Text style={styles.emptyText}>
@@ -568,9 +560,9 @@ export const StudentAttendanceView: React.FC = () => {
                       <Text style={[styles.weekPctText, { color: weekPctColor }]}>{weekPct}%</Text>
                     )}
                     {isExpanded ? (
-                      <ChevronUp size={18} color={colors.text.tertiary} />
+                      <MaterialIcons name="keyboard-arrow-up" size={18} color={colors.text.tertiary} />
                     ) : (
-                      <ChevronDown size={18} color={colors.text.tertiary} />
+                      <MaterialIcons name="keyboard-arrow-down" size={18} color={colors.text.tertiary} />
                     )}
                   </View>
                 </TouchableOpacity>
@@ -581,7 +573,6 @@ export const StudentAttendanceView: React.FC = () => {
                     {week.days.map((day, idx) => {
                       const cfg = getStatusConfig(day);
                       const isLast = idx === week.days.length - 1;
-                      const StatusIcon = cfg.Icon;
                       const isHolidayDay = day.status === 'holiday';
 
                       return (
@@ -595,7 +586,7 @@ export const StudentAttendanceView: React.FC = () => {
                         >
                           {/* Icon circle */}
                           <View style={[styles.dayIconCircle, { backgroundColor: cfg.bg }]}>
-                            <StatusIcon size={14} color={cfg.color} />
+                            <MaterialIcons name={cfg.iconName} size={14} color={cfg.color} />
                           </View>
 
                           {/* Date and detail */}

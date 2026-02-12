@@ -4,9 +4,10 @@
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Text, Button, Portal, Modal, IconButton, TextInput } from 'react-native-paper';
-import { X, Plus, Trash2, Users, Calendar, Receipt, Edit2 } from 'lucide-react-native';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, Text } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { Button, Input } from '../../ui';
+import { Modal } from '../../ui/Modal';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { invoiceService } from '../../services/fees';
@@ -212,23 +213,15 @@ export function GenerateFeesModal({
   };
 
   return (
-    <Portal>
-      <Modal visible={visible} onDismiss={handleClose} contentContainerStyle={styles.modal}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Generate Fees</Text>
-            <Text style={styles.headerSubtitle}>{className} • {studentCount} students</Text>
-          </View>
-          <IconButton icon={() => <X size={24} color={colors.text.primary} />} onPress={handleClose} />
-        </View>
+    <Modal visible={visible} onDismiss={handleClose} title="Generate Fees" contentContainerStyle={styles.modal}>
+        <Text style={styles.headerSubtitle}>{className} • {studentCount} students</Text>
 
         <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
           {/* Academic Year Info */}
           {activeAcademicYear && (
             <View style={styles.academicYearInfo}>
               <View style={styles.infoRow}>
-                <Calendar size={16} color={colors.primary[600]} />
+                <MaterialIcons name="event" size={16} color={colors.primary[600]} />
                 <Text style={styles.infoLabel}>Academic Year:</Text>
                 <Text style={styles.infoValue}>
                   {formatAcademicYear(activeAcademicYear.year_start, activeAcademicYear.year_end)}
@@ -236,7 +229,7 @@ export function GenerateFeesModal({
               </View>
               {dueDate && (
                 <View style={styles.infoRow}>
-                  <Calendar size={16} color={colors.text.secondary} />
+                  <MaterialIcons name="event" size={16} color={colors.text.secondary} />
                   <Text style={styles.infoLabel}>Due Date:</Text>
                   <Text style={styles.infoValue}>
                     {dueDate.toLocaleDateString('en-IN', {
@@ -249,7 +242,7 @@ export function GenerateFeesModal({
                     onPress={() => setShowDatePicker(true)}
                     style={styles.editDateBtn}
                   >
-                    <Edit2 size={14} color={colors.primary[600]} />
+                    <MaterialIcons name="edit" size={14} color={colors.primary[600]} />
                   </TouchableOpacity>
                 </View>
               )}
@@ -277,32 +270,30 @@ export function GenerateFeesModal({
           {/* Line Items */}
           <View style={styles.field}>
             <View style={styles.fieldHeader}>
-              <Receipt size={16} color={colors.text.secondary} />
+              <MaterialIcons name="receipt" size={16} color={colors.text.secondary} />
               <Text style={styles.fieldLabel}>Fee Items</Text>
             </View>
 
             {items.map((item, idx) => (
               <View key={item.id} style={styles.itemRow}>
-                <TextInput
-                  mode="outlined"
-                  dense
+                <Input
+                  variant="outlined"
+                  size="sm"
                   style={styles.labelInput}
                   value={item.label}
                   onChangeText={(v) => updateItem(item.id, 'label', v)}
                   placeholder="Item name"
-                  contentStyle={{ backgroundColor: colors.surface.primary }}
                 />
                 <View style={styles.amountContainer}>
-                  <TextInput
-                    mode="outlined"
-                    dense
+                  <Input
+                    variant="outlined"
+                    size="sm"
                     style={styles.amountInput}
                     value={item.amount}
                     onChangeText={(v) => updateItem(item.id, 'amount', v)}
                     placeholder="0"
                     keyboardType="decimal-pad"
-                    left={<TextInput.Affix text="₹" />}
-                    contentStyle={{ backgroundColor: colors.surface.primary }}
+                    leftIcon={<Text style={{ color: colors.text.secondary }}>₹</Text>}
                   />
                 </View>
                 <TouchableOpacity
@@ -310,13 +301,13 @@ export function GenerateFeesModal({
                   disabled={items.length <= 1}
                   style={styles.deleteBtn}
                 >
-                  <Trash2 size={18} color={items.length <= 1 ? colors.neutral[300] : colors.error[500]} />
+                  <MaterialIcons name="delete" size={18} color={items.length <= 1 ? colors.neutral[300] : colors.error[500]} />
                 </TouchableOpacity>
               </View>
             ))}
 
             <TouchableOpacity style={styles.addItemBtn} onPress={addItem}>
-              <Plus size={18} color={colors.primary[600]} />
+              <MaterialIcons name="add" size={18} color={colors.primary[600]} />
               <Text style={styles.addItemText}>Add Item</Text>
             </TouchableOpacity>
           </View>
@@ -348,22 +339,21 @@ export function GenerateFeesModal({
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Button mode="outlined" onPress={handleClose} style={styles.footerBtn}>
+          <Button variant="outline" onPress={handleClose} style={styles.footerBtn}>
             Cancel
           </Button>
           <Button
-            mode="contained"
+            variant="primary"
             onPress={handleGenerate}
             loading={generating}
             disabled={generating || total <= 0}
             style={styles.footerBtn}
-            icon={() => <Users size={18} color="#fff" />}
+            icon={<MaterialIcons name="group" size={18} color="#fff" />}
           >
             Generate for All
           </Button>
         </View>
       </Modal>
-    </Portal>
   );
 }
 
@@ -379,19 +369,6 @@ const createStyles = (
     margin: spacing.md,
     borderRadius: borderRadius.xl,
     maxHeight: '85%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text.primary,
   },
   headerSubtitle: {
     fontSize: typography.fontSize.sm,

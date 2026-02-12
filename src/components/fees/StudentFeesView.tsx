@@ -4,17 +4,16 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Text, ActivityIndicator } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, CheckCircle, Clock, AlertCircle, Receipt, ChevronRight } from 'lucide-react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { invoiceService, type Invoice } from '../../services/fees';
 import { InvoiceDetailModal } from './InvoiceDetailModal';
 import { supabase } from '../../lib/supabase';
-import { ProgressRing } from '../ui/ProgressRing';
+import { ProgressRing } from '../../ui';
 
 const formatAmount = (amount: number) =>
   `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
@@ -120,7 +119,7 @@ export function StudentFeesView() {
   if (!studentId) {
     return (
       <View style={styles.centered}>
-        <AlertCircle size={64} color={colors.error[400]} />
+        <MaterialIcons name="error" size={64} color={colors.error[400]} />
         <Text style={styles.errorTitle}>Profile Not Found</Text>
         <Text style={styles.errorText}>
           Unable to find your student profile. Please contact support.
@@ -132,7 +131,7 @@ export function StudentFeesView() {
   if (invoices.length === 0) {
     return (
       <View style={styles.centered}>
-        <FileText size={64} color={colors.neutral[300]} />
+        <MaterialIcons name="description" size={64} color={colors.neutral[300]} />
         <Text style={styles.emptyTitle}>No Fee Invoices</Text>
         <Text style={styles.emptyText}>
           You don't have any fee invoices yet.
@@ -187,7 +186,7 @@ export function StudentFeesView() {
         {/* All Paid Badge */}
         {summary.due === 0 && (
           <View style={styles.allPaidBadge}>
-            <CheckCircle size={18} color={colors.success[600]} />
+            <MaterialIcons name="check-circle" size={18} color={colors.success[600]} />
             <Text style={styles.allPaidText}>All fees paid!</Text>
           </View>
         )}
@@ -196,7 +195,7 @@ export function StudentFeesView() {
         <Text style={styles.sectionTitle}>Your Invoices</Text>
         {invoices.map(invoice => {
           const balance = invoice.total_amount - invoice.paid_amount;
-          const StatusIcon = invoice.status === 'PAID' ? CheckCircle : invoice.status === 'PARTIAL' ? Clock : AlertCircle;
+          const statusIconName = invoice.status === 'PAID' ? 'check-circle' as const : invoice.status === 'PARTIAL' ? 'schedule' as const : 'error' as const;
           const statusColor = invoice.status === 'PAID' ? colors.success[600] : invoice.status === 'PARTIAL' ? colors.warning[600] : colors.error[600];
 
           return (
@@ -207,7 +206,7 @@ export function StudentFeesView() {
               activeOpacity={0.7}
             >
               <View style={[styles.statusIndicator, { backgroundColor: statusColor }]}>
-                <StatusIcon size={16} color="#fff" />
+                <MaterialIcons name={statusIconName} size={16} color="#fff" />
               </View>
               <View style={styles.invoiceInfo}>
                 <Text style={styles.invoicePeriod}>{formatPeriod(invoice.billing_period)}</Text>
@@ -216,7 +215,7 @@ export function StudentFeesView() {
                   <Text style={styles.invoiceBalance}>Due: {formatAmount(balance)}</Text>
                 )}
               </View>
-              <ChevronRight size={20} color={colors.neutral[400]} />
+              <MaterialIcons name="chevron-right" size={20} color={colors.neutral[400]} />
             </TouchableOpacity>
           );
         })}
