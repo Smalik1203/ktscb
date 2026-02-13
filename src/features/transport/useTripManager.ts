@@ -153,7 +153,6 @@ export function useTripManager(): TripManagerReturn {
       try {
         // 1. Check if GPS is on
         const isEnabled = await Location.hasServicesEnabledAsync();
-        log.info('[TMS] GPS enabled:', isEnabled);
         if (!isEnabled) {
           setPermissionStatus('gps_disabled');
           store.setError(
@@ -165,7 +164,6 @@ export function useTripManager(): TripManagerReturn {
         // 2. Request foreground permission
         const { status: fgStatus } =
           await Location.requestForegroundPermissionsAsync();
-        log.info('[TMS] FG permission result:', fgStatus);
 
         if (fgStatus !== 'granted') {
           const { canAskAgain } =
@@ -181,10 +179,8 @@ export function useTripManager(): TripManagerReturn {
 
         // 3. Check if background is already granted
         const currentBg = await Location.getBackgroundPermissionsAsync();
-        log.info('[TMS] Current BG permission:', currentBg.status);
 
         if (currentBg.status === 'granted') {
-          log.info('[TMS] BG permission already granted');
           setPermissionStatus('granted');
           store.setError(null);
           return true;
@@ -196,14 +192,12 @@ export function useTripManager(): TripManagerReturn {
         try {
           const { status: bgStatus } =
             await Location.requestBackgroundPermissionsAsync();
-          log.info('[TMS] BG permission result:', bgStatus);
           bgGranted = bgStatus === 'granted';
 
           // Double-check — some devices report wrong on first call
           if (!bgGranted) {
             const recheck = await Location.getBackgroundPermissionsAsync();
             bgGranted = recheck.status === 'granted';
-            log.info('[TMS] BG recheck:', recheck.status);
           }
         } catch (bgError) {
           log.warn('[TMS] BG permission request threw:', bgError);
@@ -316,8 +310,6 @@ export function useTripManager(): TripManagerReturn {
           pausesUpdatesAutomatically: false,
         }),
       });
-
-      log.info('[TMS] Background location tracking started');
     } catch (error) {
       const message =
         error instanceof Error
@@ -367,7 +359,6 @@ export function useTripManager(): TripManagerReturn {
       );
       if (isRegistered) {
         await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-        log.info('[TMS] Background location tracking stopped');
       }
 
       // 3. Flush offline queue
@@ -375,10 +366,7 @@ export function useTripManager(): TripManagerReturn {
         const session = await supabase.auth.getSession();
         const token = session.data.session?.access_token;
         if (token) {
-          const sent = await flushQueue(token);
-          if (sent > 0) {
-            log.info(`[TMS] Flushed ${sent} queued GPS updates on stop`);
-          }
+          await flushQueue(token);
         }
       } catch (flushError) {
         log.warn('[TMS] Queue flush on stop failed:', flushError);

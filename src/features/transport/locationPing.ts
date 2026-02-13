@@ -41,8 +41,6 @@ export async function sendLocationPing(driverId: string): Promise<void> {
   setTimeout(() => {
     supabase.removeChannel(channel);
   }, 2000);
-
-  log.info(`[TMS] Location ping sent to driver ${driverId}`);
 }
 
 // ---------- Driver side: listen for pings ----------
@@ -68,8 +66,6 @@ export function useLocationPingListener(driverId: string | undefined) {
         // Prevent concurrent responses
         if (respondingRef.current) return;
         respondingRef.current = true;
-
-        log.info('[TMS] Received location ping — capturing fresh position');
 
         try {
           // 1. Grab current location immediately
@@ -101,9 +97,7 @@ export function useLocationPingListener(driverId: string | undefined) {
           const token = session.data.session?.access_token;
           if (token) {
             const result = await sendGpsUpdate(payload, token);
-            if (result.success) {
-              log.info('[TMS] Ping response sent successfully');
-            } else {
+            if (!result.success) {
               log.warn('[TMS] Ping response send failed:', result.error);
             }
           }

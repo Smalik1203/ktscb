@@ -520,12 +520,12 @@ export default function LiveBusMapScreen() {
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFillObject}
-          initialRegion={{
-            latitude: 24.8607,
-            longitude: 67.0011,
-            latitudeDelta: 0.1,
-            longitudeDelta: 0.1,
-          }}
+        initialRegion={{
+          latitude: 17.385,
+          longitude: 78.4867,
+          latitudeDelta: 0.15,
+          longitudeDelta: 0.15,
+        }}
           showsUserLocation={false}
           showsCompass={false}
           showsScale

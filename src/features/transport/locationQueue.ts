@@ -106,8 +106,6 @@ export async function flush(accessToken: string): Promise<number> {
   const queue = await readQueue();
   if (queue.length === 0) return 0;
 
-  log.info(`[TMS Queue] Flushing ${queue.length} queued GPS payloads`);
-
   let sent = 0;
   let consecutiveFailures = 0;
   const failedPayloads: GpsPayload[] = [];
@@ -148,7 +146,6 @@ export async function flush(accessToken: string): Promise<number> {
     await writeQueue(failedPayloads);
   }
 
-  log.info(`[TMS Queue] Flush complete — sent ${sent}/${queue.length}`);
   return sent;
 }
 

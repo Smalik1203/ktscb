@@ -88,7 +88,6 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     // 1. Check trip is active
     const tripState = await readTripStateFromStorage();
     if (!tripState || tripState.status !== 'active') {
-      log.info('[TMS Task] Trip not active — ignoring location update');
       return;
     }
 
@@ -117,7 +116,6 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     // 3. Deduplicate — skip if same or older timestamp
     const isNewer = await isNewerThanLastSent(timestamp);
     if (!isNewer) {
-      log.info('[TMS Task] Duplicate timestamp — skipping');
       return;
     }
 
@@ -166,5 +164,3 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     );
   }
 });
-
-log.info('[TMS] Background location task registered');
