@@ -70,7 +70,7 @@ const getAvatarTextColor = (name: string, isDark: boolean) => {
 export const AttendanceScreen: React.FC = () => {
   const { profile } = useAuth();
   const { colors, spacing, borderRadius, typography, shadows, isDark } = useTheme();
-  const { selectedClass, scope, setSelectedClass } = useClassSelection();
+  const { selectedClass, scope, setSelectedClass, classes: contextClasses } = useClassSelection();
   const { can, isLoading: capabilitiesLoading } = useCapabilities();
 
   // Capability-based checks (NO role checks in UI)
@@ -110,7 +110,9 @@ export const AttendanceScreen: React.FC = () => {
   const historyStartDateString = historyStartDate.toISOString().split('T')[0];
   const historyEndDateString = historyEndDate.toISOString().split('T')[0];
 
-  const { data: classes = [] } = useClasses(canReadAllAttendance ? (scope.school_code ?? undefined) : undefined);
+  const { data: localClasses = [] } = useClasses(canReadAllAttendance ? (scope.school_code ?? undefined) : undefined);
+  // Use context classes (always fetched via profile.school_code) as fallback for the class picker
+  const classes = localClasses.length > 0 ? localClasses : contextClasses;
   const effectiveSchoolCode = scope.school_code ?? profile?.school_code ?? selectedClass?.school_code ?? null;
 
   const { data: studentsResponse, isLoading: studentsLoading, error: studentsError } = useStudents(
@@ -460,9 +462,68 @@ export const AttendanceScreen: React.FC = () => {
 
   if (!selectedClass) {
     return (
-      <View style={styles.emptyContainer}>
-        <MaterialIcons name="group" size={48} color={colors.text.tertiary} />
-        <Text style={styles.emptyText}>Please select a class to view attendance</Text>
+      <View style={styles.container}>
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="group" size={48} color={colors.text.tertiary} />
+          <Text style={styles.emptyText}>Please select a class to view attendance</Text>
+          <TouchableOpacity
+            onPress={() => bottomSheetRef.current?.present()}
+            activeOpacity={0.7}
+            style={{
+              marginTop: spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              backgroundColor: colors.primary[50],
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              borderRadius: borderRadius.lg,
+              borderWidth: 1,
+              borderColor: colors.primary[200],
+            }}
+          >
+            <MaterialIcons name="class" size={20} color={colors.primary[600]} />
+            <Text style={{ fontSize: 15, fontWeight: typography.fontWeight.semibold, color: colors.primary[600] }}>
+              Select Class
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <BottomSheetModal
+          ref={bottomSheetRef}
+          index={0}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backgroundStyle={styles.bottomSheetBackground}
+          handleIndicatorStyle={styles.bottomSheetIndicator}
+        >
+          <BottomSheetScrollView
+            contentContainerStyle={styles.bottomSheetContent}
+            showsVerticalScrollIndicator={true}
+          >
+            <Text style={styles.bottomSheetTitle}>Select Class ({classes?.length || 0} available)</Text>
+            {classes && classes.length > 0 ? classes.map((cls) => (
+              <TouchableOpacity
+                key={cls.id}
+                onPress={() => {
+                  setSelectedClass(cls as any);
+                  setHasChanges(true);
+                  bottomSheetRef.current?.dismiss();
+                }}
+                style={styles.bottomSheetItem}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.bottomSheetItemText}>
+                  Grade {cls.grade} - Section {cls.section}
+                </Text>
+              </TouchableOpacity>
+            )) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateText}>No classes available</Text>
+              </View>
+            )}
+          </BottomSheetScrollView>
+        </BottomSheetModal>
       </View>
     );
   }
@@ -494,101 +555,155 @@ export const AttendanceScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {canReadAllAttendance ? (
-        <View style={styles.dashboardCard}>
-          {/* Row 1: Class | Date | History toggle */}
-          <View style={styles.headerRow}>
-            <View style={styles.filterBar}>
+        <View style={{ paddingHorizontal: spacing.sm, paddingTop: spacing.sm, gap: 8 }}>
+          {/* Row 1: Class + Date selectors */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => bottomSheetRef.current?.present()}
+              activeOpacity={0.7}
+              style={{
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                backgroundColor: colors.surface.primary,
+                borderRadius: borderRadius.lg,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderWidth: 1,
+                borderColor: colors.border.light,
+              }}
+            >
+              <MaterialIcons name="school" size={18} color={colors.primary.main} />
+              <Text style={{ flex: 1, fontSize: 15, fontWeight: typography.fontWeight.semibold, color: colors.text.primary }} numberOfLines={1}>
+                {selectedClass ? `Grade ${selectedClass.grade} - ${selectedClass.section}` : 'Select Class'}
+              </Text>
+              <MaterialIcons name="unfold-more" size={18} color={colors.text.tertiary} />
+            </TouchableOpacity>
+
+            {activeTab === 'mark' ? (
               <TouchableOpacity
-                style={styles.classSelector}
-                onPress={() => bottomSheetRef.current?.present()}
+                onPress={() => setShowDatePicker(true)}
                 activeOpacity={0.7}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: colors.surface.primary,
+                  borderRadius: borderRadius.lg,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderWidth: 1,
+                  borderColor: colors.border.light,
+                }}
               >
-                <MaterialIcons name="group" size={16} color={colors.primary.main} />
-                <Text style={styles.classTitle} numberOfLines={1} ellipsizeMode="tail">
-                  {selectedClass ? `${selectedClass.grade} - ${selectedClass.section}` : 'Select Class'}
+                <MaterialIcons name="calendar-today" size={16} color={colors.primary.main} />
+                <Text style={{ fontSize: 14, fontWeight: typography.fontWeight.medium, color: colors.text.primary }}>
+                  {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 </Text>
-                <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.text.tertiary} />
               </TouchableOpacity>
-
-              <View style={styles.headerDivider} />
-
-              {activeTab === 'mark' ? (
-                <TouchableOpacity
-                  style={styles.dateSelector}
-                  onPress={() => setShowDatePicker(true)}
-                  activeOpacity={0.7}
-                >
-                  <MaterialIcons name="event" size={16} color={colors.primary.main} />
-                  <Text style={styles.dateText}>
-                    {selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            ) : (
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: colors.surface.primary,
+                borderRadius: borderRadius.lg,
+                paddingHorizontal: 10,
+                paddingVertical: 10,
+                borderWidth: 1,
+                borderColor: colors.border.light,
+              }}>
+                <TouchableOpacity onPress={() => setShowHistoryStartDatePicker(true)} activeOpacity={0.7}>
+                  <Text style={{ fontSize: 13, fontWeight: typography.fontWeight.medium, color: colors.text.primary }}>
+                    {historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </Text>
-                  <MaterialIcons name="keyboard-arrow-down" size={14} color={colors.text.tertiary} />
                 </TouchableOpacity>
-              ) : (
-                <View style={styles.dateSelector}>
-                  <TouchableOpacity onPress={() => setShowHistoryStartDatePicker(true)} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <MaterialIcons name="event" size={16} color={colors.primary.main} />
-                    <Text style={styles.dateText}>{historyStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                  </TouchableOpacity>
-                  <Text style={{ color: colors.text.tertiary, fontSize: 12 }}>→</Text>
-                  <TouchableOpacity onPress={() => setShowHistoryEndDatePicker(true)} activeOpacity={0.7} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={styles.dateText}>{historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+                <Text style={{ color: colors.text.tertiary, fontSize: 11 }}>-</Text>
+                <TouchableOpacity onPress={() => setShowHistoryEndDatePicker(true)} activeOpacity={0.7}>
+                  <Text style={{ fontSize: 13, fontWeight: typography.fontWeight.medium, color: colors.text.primary }}>
+                    {historyEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             <TouchableOpacity
-              style={styles.historyToggleButton}
               onPress={() => setActiveTab(activeTab === 'mark' ? 'history' : 'mark')}
               activeOpacity={0.7}
+              style={{
+                width: 42,
+                height: 42,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: activeTab === 'history' ? colors.primary[50] : colors.surface.primary,
+                borderRadius: borderRadius.lg,
+                borderWidth: 1,
+                borderColor: activeTab === 'history' ? colors.primary[200] : colors.border.light,
+              }}
             >
-              <MaterialIcons name={activeTab === 'mark' ? 'history' : 'close'} size={20} color={activeTab === 'mark' ? colors.primary.main : colors.text.primary} />
+              <MaterialIcons
+                name={activeTab === 'mark' ? 'history' : 'edit-note'}
+                size={20}
+                color={activeTab === 'history' ? colors.primary.main : colors.text.secondary}
+              />
             </TouchableOpacity>
           </View>
 
-          {/* Row 2: Progress bar + stats — single line below header */}
+          {/* Row 2: Progress (mark tab) or History stats */}
           {activeTab === 'mark' && attendanceData.length > 0 && (
-            <View style={{ marginTop: 8 }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: colors.surface.primary,
+              borderRadius: borderRadius.lg,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderWidth: 1,
+              borderColor: colors.border.light,
+              gap: 12,
+            }}>
               {/* Progress bar */}
-              <View style={{ height: 5, borderRadius: 3, backgroundColor: isDark ? colors.neutral[700] : colors.neutral[200], overflow: 'hidden', flexDirection: 'row' }}>
-                {completionStats.present > 0 && <View style={{ width: `${(completionStats.present / completionStats.total) * 100}%`, height: '100%', backgroundColor: colors.success[500] }} />}
+              <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: isDark ? colors.neutral[700] : colors.neutral[100], overflow: 'hidden', flexDirection: 'row' }}>
+                {completionStats.present > 0 && <View style={{ width: `${(completionStats.present / completionStats.total) * 100}%`, height: '100%', backgroundColor: colors.success[500], borderRadius: 3 }} />}
                 {completionStats.absent > 0 && <View style={{ width: `${(completionStats.absent / completionStats.total) * 100}%`, height: '100%', backgroundColor: colors.error[500] }} />}
               </View>
-              {/* Stats text */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                <Text style={{ fontSize: 12, fontWeight: typography.fontWeight.bold, color: completionStats.percentage === 100 ? colors.success[600] : colors.text.primary }}>
-                  {completionStats.marked}/{completionStats.total} Marked
+              {/* Compact stats */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 13, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
+                  {completionStats.marked}<Text style={{ color: colors.text.tertiary, fontWeight: typography.fontWeight.medium }}>/{completionStats.total}</Text>
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Text style={{ fontSize: 12, color: colors.success[600], fontWeight: typography.fontWeight.semibold }}>{completionStats.present}P</Text>
-                  <Text style={{ fontSize: 12, color: colors.error[600], fontWeight: typography.fontWeight.semibold }}>{completionStats.absent}A</Text>
-                  {completionStats.unmarked > 0 && <Text style={{ fontSize: 12, color: colors.warning[600], fontWeight: typography.fontWeight.semibold }}>{completionStats.unmarked} left</Text>}
-                </View>
+                {completionStats.present > 0 && <Text style={{ fontSize: 12, color: colors.success[600], fontWeight: typography.fontWeight.bold }}>{completionStats.present}P</Text>}
+                {completionStats.absent > 0 && <Text style={{ fontSize: 12, color: colors.error[600], fontWeight: typography.fontWeight.bold }}>{completionStats.absent}A</Text>}
               </View>
             </View>
           )}
 
           {activeTab === 'history' && (
-            <>
-              <View style={[styles.headerSeparator, { marginVertical: 8 }]} />
-              <View style={styles.dashboardStatsRow}>
-                <View style={styles.statBigContainer}>
-                  <Text style={[styles.statBigNumber, { fontSize: 26 }]}>{historyStats.total}</Text>
-                  <Text style={styles.statBigLabel}>Total</Text>
+            <View style={{
+              flexDirection: 'row',
+              backgroundColor: colors.surface.primary,
+              borderRadius: borderRadius.lg,
+              padding: 14,
+              borderWidth: 1,
+              borderColor: colors.border.light,
+              gap: 16,
+            }}>
+              <View style={{ alignItems: 'center', borderRightWidth: 1, borderRightColor: colors.border.light, paddingRight: 16 }}>
+                <Text style={{ fontSize: 24, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>{historyStats.total}</Text>
+                <Text style={{ fontSize: 10, fontWeight: typography.fontWeight.bold, color: colors.text.tertiary, textTransform: 'uppercase', letterSpacing: 0.5 }}>Students</Text>
+              </View>
+              <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-around' }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: typography.fontWeight.bold, color: colors.success[600] }}>{historyStats.averageAttendance}%</Text>
+                  <Text style={{ fontSize: 10, color: colors.text.tertiary, fontWeight: typography.fontWeight.medium }}>Present</Text>
                 </View>
-                <View style={styles.statGroup}>
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: colors.success[600] }]}>{historyStats.averageAttendance}%</Text>
-                    <Text style={styles.statLabel}>Avg Present</Text>
-                  </View>
-                  <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: colors.error[600] }]}>{historyStats.averageAbsent}%</Text>
-                    <Text style={styles.statLabel}>Avg Absent</Text>
-                  </View>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 18, fontWeight: typography.fontWeight.bold, color: colors.error[600] }}>{historyStats.averageAbsent}%</Text>
+                  <Text style={{ fontSize: 10, color: colors.text.tertiary, fontWeight: typography.fontWeight.medium }}>Absent</Text>
                 </View>
               </View>
-            </>
+            </View>
           )}
         </View>
       ) : (
@@ -714,125 +829,63 @@ export const AttendanceScreen: React.FC = () => {
 
           {/* ── Toolbar: Search + filters + quick actions ── */}
           {attendanceData.length > 0 && !isHoliday && (
-            <View style={{ paddingHorizontal: spacing.sm, marginTop: spacing.sm, gap: 8 }}>
-              {/* Search row with quick action button */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View style={{
-                  flex: 1, flexDirection: 'row', alignItems: 'center',
-                  backgroundColor: colors.surface.secondary,
-                  borderRadius: borderRadius.md,
-                  borderWidth: 1, borderColor: colors.border.light,
-                  paddingHorizontal: 10, height: 36,
-                }}>
-                  <MaterialIcons name="search" size={18} color={colors.text.tertiary} />
-                  <TextInput
-                    style={{ flex: 1, fontSize: 14, color: colors.text.primary, marginLeft: 8, paddingVertical: 0 }}
-                    placeholder="Search by name or code..."
-                    placeholderTextColor={colors.text.tertiary}
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                  />
-                  {searchQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-                      <MaterialIcons name="close" size={16} color={colors.text.tertiary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {/* Quick Actions Menu */}
-                {canBulkMark && (
-                  <Menu
-                    visible={quickActionsVisible}
-                    onDismiss={() => setQuickActionsVisible(false)}
-                    anchor={
-                      <TouchableOpacity
-                        onPress={() => setQuickActionsVisible(true)}
-                        activeOpacity={0.7}
-                        style={{
-                          width: 36, height: 36,
-                          borderRadius: borderRadius.md,
-                          backgroundColor: colors.primary[50],
-                          borderWidth: 1,
-                          borderColor: colors.primary[200],
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <MaterialIcons name="bolt" size={20} color={colors.primary[600]} />
-                      </TouchableOpacity>
-                    }
-                  >
-                    <Menu.Item
-                      title="Mark All Present"
-                      icon="check-circle"
-                      onPress={() => {
-                        setQuickActionsVisible(false);
-                        handleBulkMark('present');
-                      }}
-                    />
-                    <Menu.Item
-                      title="Mark All Absent"
-                      icon="cancel"
-                      onPress={() => {
-                        setQuickActionsVisible(false);
-                        Alert.alert(
-                          'Mark All Absent',
-                          `Are you sure you want to mark all ${attendanceData.length} students as absent?`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            { text: 'Confirm', style: 'destructive', onPress: () => handleBulkMark('absent') },
-                          ]
-                        );
-                      }}
-                      destructive
-                    />
-                    <Menu.Item
-                      title="Reset All"
-                      icon="replay"
-                      onPress={() => {
-                        setQuickActionsVisible(false);
-                        handleResetAll();
-                      }}
-                    />
-                    {canMarkAttendance && !holidayLoading && (
-                      <>
-                        <Menu.Divider />
-                        <Menu.Item
-                          title="Mark Holiday"
-                          icon="celebration"
-                          onPress={() => {
-                            setQuickActionsVisible(false);
-                            handleMarkHoliday();
-                          }}
-                        />
-                      </>
-                    )}
-                  </Menu>
+            <View style={{ paddingHorizontal: spacing.sm, paddingTop: 6, paddingBottom: 4, gap: 8 }}>
+              {/* Search row */}
+              <View style={{
+                flexDirection: 'row', alignItems: 'center',
+                backgroundColor: isDark ? colors.neutral[800] : colors.neutral[50],
+                borderRadius: borderRadius.full,
+                paddingHorizontal: 12, height: 40,
+              }}>
+                <MaterialIcons name="search" size={18} color={colors.text.tertiary} />
+                <TextInput
+                  style={{ flex: 1, fontSize: 14, color: colors.text.primary, marginLeft: 8, paddingVertical: 0 }}
+                  placeholder="Search students..."
+                  placeholderTextColor={colors.text.tertiary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+                    <MaterialIcons name="close" size={16} color={colors.text.tertiary} />
+                  </TouchableOpacity>
                 )}
               </View>
 
-              {/* Filter chips */}
-              <View style={{ flexDirection: 'row', gap: 6 }}>
+              {/* Filter tabs - inline segmented style */}
+              <View style={{
+                flexDirection: 'row',
+                backgroundColor: isDark ? colors.neutral[800] : colors.neutral[100],
+                borderRadius: borderRadius.full,
+                padding: 3,
+              }}>
                 {(['all', 'absent', 'unmarked'] as const).map((mode) => {
                   const isActive = filterMode === mode;
-                  const label = mode === 'all' ? `All ${attendanceData.length}` : mode === 'absent' ? `Absent ${completionStats.absent}` : `Unmarked ${completionStats.unmarked}`;
-                  const chipColor = mode === 'absent' ? colors.error : mode === 'unmarked' ? colors.warning : colors.primary;
+                  const count = mode === 'all' ? attendanceData.length : mode === 'absent' ? completionStats.absent : completionStats.unmarked;
+                  const label = mode === 'all' ? 'All' : mode === 'absent' ? 'Absent' : 'Unmarked';
                   return (
                     <TouchableOpacity
                       key={mode}
                       onPress={() => setFilterMode(isActive ? 'all' : mode)}
                       activeOpacity={0.7}
                       style={{
-                        paddingHorizontal: 10, paddingVertical: 5,
+                        flex: 1,
+                        paddingVertical: 6,
                         borderRadius: borderRadius.full,
-                        backgroundColor: isActive ? (isDark ? `rgba(${mode === 'absent' ? '239,68,68' : mode === 'unmarked' ? '234,179,8' : '99,102,241'},0.15)` : chipColor[50]) : 'transparent',
-                        borderWidth: 1,
-                        borderColor: isActive ? chipColor[300] : colors.border.light,
+                        alignItems: 'center',
+                        backgroundColor: isActive ? colors.surface.primary : 'transparent',
+                        ...(isActive ? shadows.xs : {}),
                       }}
                     >
-                      <Text style={{ fontSize: 12, fontWeight: isActive ? typography.fontWeight.semibold : typography.fontWeight.medium, color: isActive ? chipColor[700] : colors.text.secondary }}>{label}</Text>
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: isActive ? typography.fontWeight.semibold : typography.fontWeight.medium,
+                        color: isActive ? colors.text.primary : colors.text.tertiary,
+                      }}>
+                        {label} {count > 0 ? count : ''}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -878,59 +931,19 @@ export const AttendanceScreen: React.FC = () => {
                   const isAbsent = status === 'absent';
                   const isMarked = status !== null;
 
-                  // Row tint: strong for absent, medium for present, pulsing border for unmarked
-                  const rowTintColor = isPresent
-                    ? (isDark ? 'rgba(34,197,94,0.08)' : 'rgba(34,197,94,0.06)')
-                    : isAbsent
-                    ? (isDark ? 'rgba(239,68,68,0.12)' : 'rgba(239,68,68,0.08)')
-                    : undefined;
-
                   return (
                     <View style={[
                       styles.cardContainer,
-                      rowTintColor ? { backgroundColor: rowTintColor } : undefined,
-                      // Absent: strong red left strip
-                      isAbsent && { borderLeftWidth: 4, borderLeftColor: colors.error[500] },
-                      // Unmarked: dashed-style warning border
-                      !isMarked && {
-                        borderColor: isDark ? colors.warning[700] : colors.warning[300],
-                        borderWidth: 1.5,
-                        borderStyle: 'dashed' as any,
-                      },
+                      isPresent && { backgroundColor: isDark ? 'rgba(34,197,94,0.06)' : '#f0fdf4' },
+                      isAbsent && { backgroundColor: isDark ? 'rgba(239,68,68,0.06)' : '#fef2f2', borderLeftWidth: 3, borderLeftColor: colors.error[500] },
                     ]}>
-                      {/* Roll Number Badge */}
-                      <View style={[
-                        styles.cardAvatar,
-                        {
-                          backgroundColor: isPresent
-                            ? (isDark ? 'rgba(34,197,94,0.2)' : colors.success[100])
-                            : isAbsent
-                            ? (isDark ? 'rgba(239,68,68,0.2)' : colors.error[100])
-                            : (isDark ? 'rgba(234,179,8,0.15)' : colors.warning[50]),
-                        }
-                      ]}>
-                        <Text style={[
-                          styles.cardAvatarText,
-                          {
-                            color: isPresent
-                              ? colors.success[700]
-                              : isAbsent
-                              ? colors.error[700]
-                              : colors.warning[700],
-                          }
-                        ]}>
-                          {student.studentCode.replace(/\D/g, '').slice(-3) || getInitials(student.studentName)}
-                        </Text>
-                      </View>
-
-                      {/* Info — Roll No prominent */}
+                      {/* Student Info */}
                       <View style={styles.cardInfo}>
                         <Text style={styles.cardName} numberOfLines={1}>
-                          <Text style={{ color: colors.text.secondary, fontWeight: typography.fontWeight.bold, fontSize: 12 }}>
-                            {student.studentCode}{' '}
-                          </Text>
-                          <Text style={{ color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.15)' }}>{'· '}</Text>
                           {student.studentName}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.text.tertiary, marginTop: 1 }}>
+                          {student.studentCode}
                         </Text>
                       </View>
 
@@ -947,9 +960,9 @@ export const AttendanceScreen: React.FC = () => {
                             activeOpacity={0.7}
                           >
                             {isPresent ? (
-                              <MaterialIcons name="check" size={16} color="#fff" />
+                              <MaterialIcons name="check" size={18} color="#fff" />
                             ) : (
-                              <Text style={styles.actionText}>P</Text>
+                              <Text style={[styles.actionText, { color: colors.success[600] }]}>P</Text>
                             )}
                           </TouchableOpacity>
 
@@ -963,9 +976,9 @@ export const AttendanceScreen: React.FC = () => {
                             activeOpacity={0.7}
                           >
                             {isAbsent ? (
-                              <MaterialIcons name="close" size={16} color="#fff" />
+                              <MaterialIcons name="close" size={18} color="#fff" />
                             ) : (
-                              <Text style={styles.actionText}>A</Text>
+                              <Text style={[styles.actionText, { color: colors.error[600] }]}>A</Text>
                             )}
                           </TouchableOpacity>
                         </View>
@@ -985,8 +998,7 @@ export const AttendanceScreen: React.FC = () => {
                           )}
                           {!isMarked && (
                             <View style={[styles.statusBadge, styles.statusBadgePending]}>
-                              <MaterialIcons name="radio-button-unchecked" size={14} color={colors.text.tertiary} />
-                              <Text style={[styles.statusBadgeText, { color: colors.text.tertiary }]}>Pending</Text>
+                              <Text style={[styles.statusBadgeText, { color: colors.text.tertiary }]}>--</Text>
                             </View>
                           )}
                         </View>
@@ -1001,6 +1013,7 @@ export const AttendanceScreen: React.FC = () => {
                 windowSize={12}
                 contentContainerStyle={styles.flatListContent}
                 showsVerticalScrollIndicator={false}
+                ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.border.light, marginHorizontal: 4 }} />}
               />
             )}
           </View>
@@ -1154,106 +1167,103 @@ export const AttendanceScreen: React.FC = () => {
         title="Select End Date"
       />
 
-      {/* ── Sticky bottom bar: save actions or "saved" confirmation ── */}
+      {/* ── Sticky bottom bar ── */}
       {canMarkAttendance && activeTab === 'mark' && !isHoliday && attendanceData.length > 0 && (
-        hasChanges ? (
-          <View style={styles.saveButtonContainer}>
-            {/* Unmarked warning */}
-            {completionStats.unmarked > 0 && (
-              <View style={styles.warningBanner}>
-                <MaterialIcons name="warning" size={12} color={colors.warning[700]} />
-                <Text style={styles.warningText}>
-                  {completionStats.unmarked} student{completionStats.unmarked !== 1 ? 's' : ''} unmarked — mark all before saving
-                </Text>
-              </View>
-            )}
-
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {/* Reset / discard changes */}
-              <TouchableOpacity
-                style={{
-                  paddingVertical: 10,
-                  paddingHorizontal: 14,
-                  borderRadius: borderRadius.md,
-                  borderWidth: 1,
-                  borderColor: colors.border.DEFAULT,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onPress={handleResetAll}
-                activeOpacity={0.7}
-              >
-                <MaterialIcons name="replay" size={18} color={colors.text.secondary} />
-              </TouchableOpacity>
-
-              {/* Save button — full width */}
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  { flex: 1 },
-                  markAttendanceMutation.isPending && styles.saveButtonDisabled,
-                  completionStats.unmarked > 0 && styles.saveButtonWarning,
-                  completionStats.percentage === 100 && { backgroundColor: colors.success[600] },
-                ]}
-                onPress={handleSave}
-                disabled={markAttendanceMutation.isPending}
-                activeOpacity={0.8}
-              >
-                {markAttendanceMutation.isPending ? (
-                  <>
-                    <ActivityIndicator size="small" color={colors.text.inverse} />
-                    <Text style={styles.saveButtonText}>Saving attendance...</Text>
-                  </>
-                ) : (
-                  <>
-                    <MaterialIcons
-                      name={completionStats.percentage === 100 ? 'check-circle' : 'save'}
-                      size={16}
-                      color={colors.text.inverse}
-                    />
-                    <Text style={styles.saveButtonText}>
-                      {completionStats.percentage === 100
-                        ? `Save Attendance (${completionStats.total})`
-                        : `Save (${completionStats.marked}/${completionStats.total})`}
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+        <View style={styles.saveButtonContainer}>
+          {/* Unmarked warning */}
+          {hasChanges && completionStats.unmarked > 0 && (
+            <View style={styles.warningBanner}>
+              <MaterialIcons name="info-outline" size={12} color={colors.warning[700]} />
+              <Text style={styles.warningText}>
+                {completionStats.unmarked} student{completionStats.unmarked !== 1 ? 's' : ''} unmarked
+              </Text>
             </View>
-          </View>
-        ) : lastSavedAt ? (
-          /* Saved confirmation bar */
-          <View style={[styles.saveButtonContainer, { paddingVertical: 10 }]}>
+          )}
+
+          {/* Saved confirmation */}
+          {!hasChanges && lastSavedAt && (
             <View style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
               gap: 6,
+              marginBottom: 8,
             }}>
-              <MaterialIcons name="cloud-done" size={16} color={colors.success[600]} />
-              <Text style={{
-                fontSize: 13,
-                fontWeight: typography.fontWeight.semibold,
-                color: colors.success[700],
-              }}>
-                Saved
+              <MaterialIcons name="cloud-done" size={14} color={colors.success[600]} />
+              <Text style={{ fontSize: 12, fontWeight: typography.fontWeight.semibold, color: colors.success[700] }}>
+                Saved {lastSavedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
               </Text>
-              <Text style={{
-                fontSize: 12,
-                color: colors.text.tertiary,
-              }}>
-                {lastSavedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-              </Text>
-              <Text style={{ color: colors.text.tertiary, fontSize: 11 }}>·</Text>
-              <Text style={{
-                fontSize: 12,
-                color: colors.text.tertiary,
-              }}>
-                {completionStats.present}P / {completionStats.absent}A
+              <Text style={{ fontSize: 11, color: colors.text.tertiary }}>
+                · {completionStats.present}P / {completionStats.absent}A
               </Text>
             </View>
+          )}
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {/* Quick Actions */}
+            {canBulkMark && (
+              <View style={{ flex: 1 }}>
+                <Menu
+                  visible={quickActionsVisible}
+                  onDismiss={() => setQuickActionsVisible(false)}
+                  anchor={
+                    <TouchableOpacity
+                      onPress={() => setQuickActionsVisible(true)}
+                      activeOpacity={0.7}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        paddingVertical: 12,
+                        borderRadius: borderRadius.lg,
+                        borderWidth: 1,
+                        borderColor: colors.border.DEFAULT,
+                        backgroundColor: colors.surface.primary,
+                      }}
+                    >
+                      <MaterialIcons name="bolt" size={18} color={colors.text.primary} />
+                      <Text style={{ fontSize: 14, fontWeight: typography.fontWeight.semibold, color: colors.text.primary }}>Quick Actions</Text>
+                    </TouchableOpacity>
+                  }
+                >
+                  <Menu.Item title="Mark All Present" icon="check-circle" onPress={() => { setQuickActionsVisible(false); handleBulkMark('present'); }} />
+                  <Menu.Item title="Mark All Absent" icon="cancel" destructive onPress={() => { setQuickActionsVisible(false); Alert.alert('Mark All Absent', `Mark all ${attendanceData.length} students as absent?`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Confirm', style: 'destructive', onPress: () => handleBulkMark('absent') }]); }} />
+                  <Menu.Item title="Reset All" icon="replay" onPress={() => { setQuickActionsVisible(false); handleResetAll(); }} />
+                  {!holidayLoading && (<><Menu.Divider /><Menu.Item title="Mark Holiday" icon="celebration" onPress={() => { setQuickActionsVisible(false); handleMarkHoliday(); }} /></>)}
+                </Menu>
+              </View>
+            )}
+
+            {/* Save */}
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                { flex: 1 },
+                !hasChanges && { opacity: 0.4 },
+                markAttendanceMutation.isPending && styles.saveButtonDisabled,
+                hasChanges && completionStats.percentage === 100 && { backgroundColor: colors.success[600] },
+              ]}
+              onPress={handleSave}
+              disabled={markAttendanceMutation.isPending || !hasChanges}
+              activeOpacity={0.8}
+            >
+              {markAttendanceMutation.isPending ? (
+                <>
+                  <ActivityIndicator size="small" color={colors.text.inverse} />
+                  <Text style={styles.saveButtonText}>Saving...</Text>
+                </>
+              ) : (
+                <>
+                  <MaterialIcons name={hasChanges ? 'save' : 'check-circle'} size={16} color={colors.text.inverse} />
+                  <Text style={styles.saveButtonText}>
+                    {hasChanges ? `Save (${completionStats.marked}/${completionStats.total})` : 'Saved'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
-        ) : null
+        </View>
       )}
     </View >
   );
@@ -1630,84 +1640,62 @@ const createStyles = (
   },
   cardContainer: {
     backgroundColor: colors.surface.primary,
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-    marginBottom: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    ...shadows.xs,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  cardAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  cardAvatarText: {
-    fontSize: 14,
-    fontWeight: typography.fontWeight.bold,
   },
   cardInfo: {
     flex: 1,
     justifyContent: 'center',
   },
   cardName: {
-    fontSize: 14,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 15,
+    fontWeight: typography.fontWeight.medium,
     color: colors.text.primary,
-    marginBottom: 2,
-  },
-  cardId: {
-    fontSize: 11,
-    color: colors.text.tertiary,
   },
   cardActions: {
     flexDirection: 'row',
     gap: 8,
   },
   actionButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 38,
-    minHeight: 32,
   },
   actionButtonPresent: {
-    backgroundColor: colors.surface.secondary,
-    borderColor: colors.border.light,
+    backgroundColor: 'transparent',
+    borderColor: isDark ? colors.success[700] : colors.success[300],
   },
   actionButtonPresentActive: {
     backgroundColor: colors.success[500],
-    borderColor: colors.success[600],
+    borderColor: colors.success[500],
   },
   actionButtonAbsent: {
-    backgroundColor: colors.surface.secondary,
-    borderColor: colors.border.light,
+    backgroundColor: 'transparent',
+    borderColor: isDark ? colors.error[700] : colors.error[300],
   },
   actionButtonAbsentActive: {
     backgroundColor: colors.error[500],
-    borderColor: colors.error[600],
+    borderColor: colors.error[500],
   },
   actionText: {
-    fontSize: 12,
-    fontWeight: typography.fontWeight.medium,
-    color: colors.text.tertiary,
-  },
-  actionTextActive: {
-    color: '#fff',
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 14,
+    fontWeight: typography.fontWeight.bold,
   },
 
   // Keep original styles needed for bottom sheet, etc.
   flatListContent: {
     paddingBottom: 100,
+    backgroundColor: colors.surface.primary,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    ...shadows.sm,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
   saveButtonContainer: {
     position: 'absolute',

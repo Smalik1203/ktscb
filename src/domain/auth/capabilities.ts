@@ -109,7 +109,13 @@ export type Capability =
   | 'announcements.manage'   // Edit/delete/pin announcements
 
   // Finance
-  | 'finance.access';        // Access finance module (superadmin only)
+  | 'finance.access'        // Access finance module (superadmin only)
+
+  // Transport
+  | 'transport.track'           // Start/stop GPS tracking (driver)
+  | 'transport.view_own_trips'  // View own trip history (driver)
+  | 'transport.manage'          // Manage buses, drivers, assignments (admin)
+  | 'transport.view_bus';       // View assigned bus live location (student)
 
 /**
  * Explicit mapping of roles to their capabilities.
@@ -210,6 +216,11 @@ export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
 
     // Finance
     'finance.access',
+
+    // Transport
+    'transport.track',
+    'transport.view_own_trips',
+    'transport.manage',
   ],
 
   // CB Admin (school board admin) - almost all capabilities except admin management
@@ -345,6 +356,9 @@ export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
     // Announcements
     'announcements.create',
     'announcements.manage',
+
+    // Transport
+    'transport.manage',
   ],
 
   // Teacher - teaching-related capabilities
@@ -387,6 +401,14 @@ export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
     'feedback.acknowledge',
   ],
 
+  // Driver - transport tracking capabilities
+  [ROLES.DRIVER]: [
+    'dashboard.view',
+
+    'transport.track',
+    'transport.view_own_trips',
+  ],
+
   // Student - student-specific capabilities
   [ROLES.STUDENT]: [
     'dashboard.view',
@@ -412,6 +434,9 @@ export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
 
     // Feedback
     'feedback.submit',
+
+    // Transport
+    'transport.view_bus',
   ],
 
   // Unknown role - no capabilities (must be explicitly handled)
@@ -467,5 +492,6 @@ export const CAPABILITY_DOMAINS = {
   feedback: ['feedback.submit', 'feedback.read_own', 'feedback.view_all', 'feedback.add_note', 'feedback.acknowledge', 'feedback.archive'],
   announcements: ['announcements.create', 'announcements.manage'],
   finance: ['finance.access'],
+  transport: ['transport.track', 'transport.view_own_trips', 'transport.manage', 'transport.view_bus'],
 } as const;
 

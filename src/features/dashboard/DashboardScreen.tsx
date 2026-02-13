@@ -45,226 +45,11 @@ import { ProgressRing } from '../../ui';
 // New Dashboard Components
 import { InsightCard, ActionRequiredBanner, SparklineCard, StreakBadge, type ActionItem } from '../../components/dashboard';
 import { log } from '../../lib/logger';
-import { useNotificationContext } from '../../contexts/NotificationContext';
+
+// Driver Dashboard
+import DriverDashboard from '../transport/DriverDashboard';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// ============================================================================
-// PUSH NOTIFICATION DEBUG (Superadmin only)
-// ============================================================================
-
-function PushNotificationDebug() {
-  const { colors, spacing, borderRadius, shadows, typography } = useTheme();
-  const { pushToken, permissionGranted, sendTestNotification, reRegister } = useNotificationContext();
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [lastAction, setLastAction] = React.useState<string | null>(null);
-  const [syncStatus, setSyncStatus] = React.useState<'unknown' | 'syncing' | 'success' | 'failed'>('unknown');
-
-  const handleTestNotification = async () => {
-    setIsLoading(true);
-    setLastAction('Sending test notification...');
-    try {
-      await sendTestNotification();
-      setLastAction('✅ Local test notification sent!');
-    } catch (error) {
-      setLastAction(`❌ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
-    }
-    setIsLoading(false);
-  };
-
-  const handleReRegister = async () => {
-    setIsLoading(true);
-    setSyncStatus('syncing');
-    setLastAction('Re-registering push token...');
-    try {
-      await reRegister();
-      // Check if token exists after re-registration
-      setTimeout(() => {
-        if (pushToken) {
-          setSyncStatus('success');
-          setLastAction('✅ Token generated! Now testing server sync...');
-          // Try direct sync test
-          testServerSync();
-        } else {
-          setSyncStatus('failed');
-          setLastAction('❌ Token generation failed');
-        }
-      }, 1000);
-    } catch (error) {
-      setSyncStatus('failed');
-      setLastAction(`❌ Error: ${error instanceof Error ? error.message : 'Unknown'}`);
-      setIsLoading(false);
-    }
-  };
-
-  const testServerSync = async () => {
-    if (!pushToken) {
-      setLastAction('❌ No token to sync');
-      setIsLoading(false);
-      return;
-    }
-    
-    try {
-      const { supabase } = await import('../../lib/supabase');
-      const { error } = await supabase.rpc('register_push_token', {
-        p_token: pushToken,
-        p_device_type: Platform.OS,
-      });
-      
-      if (error) {
-        setSyncStatus('failed');
-        setLastAction(`❌ RPC Error: ${error.message} (code: ${error.code})`);
-      } else {
-        setSyncStatus('success');
-        setLastAction('✅ Token synced to server! Try sending a notification now.');
-      }
-    } catch (err) {
-      setSyncStatus('failed');
-      setLastAction(`❌ Sync exception: ${err instanceof Error ? err.message : 'Unknown'}`);
-    }
-    setIsLoading(false);
-  };
-
-  return (
-    <View style={{ paddingHorizontal: spacing.md, marginBottom: spacing.lg }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
-        <RNText style={{ fontSize: typography.fontSize.lg, fontWeight: typography.fontWeight.bold, color: colors.text.primary }}>
-          🔔 Push Debug
-        </RNText>
-      </View>
-      <View style={{
-        backgroundColor: colors.surface.primary,
-        borderRadius: borderRadius.lg,
-        padding: spacing.lg,
-        ...shadows.sm,
-        borderWidth: 1,
-        borderColor: colors.warning[200],
-      }}>
-        {/* Status */}
-        <View style={{ marginBottom: spacing.md }}>
-          <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.secondary, marginBottom: spacing.xs }}>
-            Permission Status
-          </RNText>
-          <RNText style={{ fontSize: typography.fontSize.base, fontWeight: typography.fontWeight.bold, color: permissionGranted ? colors.success[600] : colors.error[600] }}>
-            {permissionGranted ? '✅ Granted' : '❌ Not Granted'}
-          </RNText>
-        </View>
-
-        <View style={{ marginBottom: spacing.md }}>
-          <RNText style={{ fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.text.secondary, marginBottom: spacing.xs }}>
-            Push Token
-          </RNText>
-          <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }} numberOfLines={2}>
-            {pushToken || 'No token generated'}
-          </RNText>
-        </View>
-
-        {lastAction && (
-          <View style={{ backgroundColor: colors.background.secondary, padding: spacing.sm, borderRadius: borderRadius.md, marginBottom: spacing.md }}>
-            <RNText style={{ fontSize: typography.fontSize.sm, color: colors.text.primary }}>
-              {lastAction}
-            </RNText>
-          </View>
-        )}
-
-        {/* Sync Status */}
-        {syncStatus !== 'unknown' && (
-          <View style={{ 
-            flexDirection: 'row', 
-            alignItems: 'center', 
-            marginBottom: spacing.sm,
-            padding: spacing.xs,
-            borderRadius: borderRadius.sm,
-            backgroundColor: syncStatus === 'success' ? colors.success[50] : syncStatus === 'failed' ? colors.error[50] : colors.warning[50],
-          }}>
-            <RNText style={{ 
-              fontSize: typography.fontSize.sm, 
-              color: syncStatus === 'success' ? colors.success[700] : syncStatus === 'failed' ? colors.error[700] : colors.warning[700],
-              fontWeight: typography.fontWeight.medium,
-            }}>
-              Server Sync: {syncStatus === 'syncing' ? '⏳ Syncing...' : syncStatus === 'success' ? '✅ Synced' : '❌ Failed'}
-            </RNText>
-          </View>
-        )}
-
-        {/* Actions */}
-        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
-          <TouchableOpacity
-            onPress={handleReRegister}
-            disabled={isLoading}
-            style={{
-              flex: 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: colors.primary[600],
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.md,
-              borderRadius: borderRadius.md,
-              opacity: isLoading ? 0.6 : 1,
-              gap: spacing.xs,
-            }}
-          >
-            <MaterialIcons name="refresh" size={16} color={colors.text.inverse} />
-            <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
-              Re-register
-            </RNText>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={testServerSync}
-            disabled={isLoading || !pushToken}
-            style={{
-              flex: 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: pushToken ? colors.warning[600] : colors.neutral[400],
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.md,
-              borderRadius: borderRadius.md,
-              opacity: isLoading ? 0.6 : 1,
-              gap: spacing.xs,
-            }}
-          >
-            <MaterialIcons name="refresh" size={16} color={colors.text.inverse} />
-            <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
-              Force Sync
-            </RNText>
-          </TouchableOpacity>
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          <TouchableOpacity
-            onPress={handleTestNotification}
-            disabled={isLoading || !pushToken}
-            style={{
-              flex: 1,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: pushToken ? colors.success[600] : colors.neutral[400],
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.md,
-              borderRadius: borderRadius.md,
-              opacity: isLoading ? 0.6 : 1,
-              gap: spacing.xs,
-            }}
-          >
-            <MaterialIcons name="notifications" size={16} color={colors.text.inverse} />
-            <RNText style={{ color: colors.text.inverse, fontWeight: typography.fontWeight.semibold, fontSize: typography.fontSize.sm }}>
-              Test Local
-            </RNText>
-          </TouchableOpacity>
-        </View>
-
-        <RNText style={{ fontSize: typography.fontSize.xs, color: colors.text.tertiary, marginTop: spacing.md, textAlign: 'center' }}>
-          Check Metro/Logcat console for [PUSH] logs
-        </RNText>
-      </View>
-    </View>
-  );
-}
 
 // ============================================================================
 // SUB-COMPONENTS
@@ -508,6 +293,11 @@ export default function DashboardScreen() {
   const { can, isLoading: capabilitiesLoading } = useCapabilities();
   const [refreshing, setRefreshing] = React.useState(false);
 
+  // Driver role gets a completely different dashboard
+  if (!authLoading && !capabilitiesLoading && profile?.role === 'driver') {
+    return <DriverDashboard />;
+  }
+
   // Capability-based checks (NO role checks in UI)
   const canViewOwnDataOnly = can('attendance.read_own') && !can('attendance.read');
   const canViewAdminStats = can('dashboard.admin_stats');
@@ -587,8 +377,8 @@ export default function DashboardScreen() {
   const dashboardStats = typedStats ? [
     {
       title: "Today's Classes",
-      value: typedStats.todaysClasses.toString(),
-      change: typedStats.todaysClasses > 0 ? `${typedStats.todaysClasses} scheduled` : 'No classes',
+      value: (typedStats.todaysClasses ?? 0).toString(),
+      change: (typedStats.todaysClasses ?? 0) > 0 ? `${typedStats.todaysClasses} scheduled` : 'No classes',
       icon: 'event' as ComponentProps<typeof MaterialIcons>['name'],
       color: colors.primary.main,
       bgColor: colors.primary[50],
@@ -596,38 +386,38 @@ export default function DashboardScreen() {
     },
     {
       title: canViewOwnDataOnly ? 'Month Attendance' : 'Total Students',
-      value: canViewOwnDataOnly ? `${typedStats.attendancePercentage}%` : (typedStats.totalStudents?.toString() || '0'),
+      value: canViewOwnDataOnly ? `${typedStats.attendancePercentage ?? 0}%` : (typedStats.totalStudents?.toString() || '0'),
       change: canViewOwnDataOnly
-        ? (typedStats.attendancePercentage >= 90 ? 'Excellent' : typedStats.attendancePercentage >= 80 ? 'Good' : typedStats.attendancePercentage >= 75 ? 'Fair' : 'Low')
+        ? ((typedStats.attendancePercentage ?? 0) >= 90 ? 'Excellent' : (typedStats.attendancePercentage ?? 0) >= 80 ? 'Good' : (typedStats.attendancePercentage ?? 0) >= 75 ? 'Fair' : 'Low')
         : 'in class',
       icon: (canViewOwnDataOnly ? 'trending-up' : 'group') as ComponentProps<typeof MaterialIcons>['name'],
       color: canViewOwnDataOnly
-        ? (typedStats.attendancePercentage >= 90 ? colors.success.main : typedStats.attendancePercentage >= 80 ? colors.info.main : typedStats.attendancePercentage >= 75 ? colors.warning.main : colors.error.main)
+        ? ((typedStats.attendancePercentage ?? 0) >= 90 ? colors.success.main : (typedStats.attendancePercentage ?? 0) >= 80 ? colors.info.main : (typedStats.attendancePercentage ?? 0) >= 75 ? colors.warning.main : colors.error.main)
         : colors.info.main,
       bgColor: canViewOwnDataOnly
-        ? (typedStats.attendancePercentage >= 90 ? colors.success[50] : typedStats.attendancePercentage >= 80 ? colors.info[50] : typedStats.attendancePercentage >= 75 ? colors.warning[50] : colors.error[50])
+        ? ((typedStats.attendancePercentage ?? 0) >= 90 ? colors.success[50] : (typedStats.attendancePercentage ?? 0) >= 80 ? colors.info[50] : (typedStats.attendancePercentage ?? 0) >= 75 ? colors.warning[50] : colors.error[50])
         : colors.info[50],
       route: canViewOwnDataOnly ? '/(tabs)/attendance' : '/(tabs)/manage',
       showProgress: canViewOwnDataOnly,
-      progressValue: canViewOwnDataOnly ? typedStats.attendancePercentage : undefined,
-      trend: canViewOwnDataOnly ? (typedStats.attendancePercentage >= 75 ? 'up' as const : 'down' as const) : null,
+      progressValue: canViewOwnDataOnly ? (typedStats.attendancePercentage ?? 0) : undefined,
+      trend: canViewOwnDataOnly ? ((typedStats.attendancePercentage ?? 0) >= 75 ? 'up' as const : 'down' as const) : null,
     },
     {
       title: 'Tasks',
-      value: typedStats.pendingAssignments.toString(),
-      change: typedStats.pendingAssignments > 0 ? 'Pending' : 'All done',
+      value: (typedStats.pendingAssignments ?? 0).toString(),
+      change: (typedStats.pendingAssignments ?? 0) > 0 ? 'Pending' : 'All done',
       icon: 'description' as ComponentProps<typeof MaterialIcons>['name'],
-      color: typedStats.pendingAssignments > 0 ? colors.warning.main : colors.success.main,
-      bgColor: typedStats.pendingAssignments > 0 ? colors.warning[50] : colors.success[50],
+      color: (typedStats.pendingAssignments ?? 0) > 0 ? colors.warning.main : colors.success.main,
+      bgColor: (typedStats.pendingAssignments ?? 0) > 0 ? colors.warning[50] : colors.success[50],
       route: '/(tabs)/tasks',
     },
     {
       title: 'Upcoming Tests',
-      value: typedStats.upcomingTests.toString(),
-      change: typedStats.upcomingTests > 0 ? 'This week' : 'None',
+      value: (typedStats.upcomingTests ?? 0).toString(),
+      change: (typedStats.upcomingTests ?? 0) > 0 ? 'This week' : 'None',
       icon: 'gps-fixed' as ComponentProps<typeof MaterialIcons>['name'],
-      color: typedStats.upcomingTests > 0 ? colors.error.main : colors.success.main,
-      bgColor: typedStats.upcomingTests > 0 ? colors.error[50] : colors.success[50],
+      color: (typedStats.upcomingTests ?? 0) > 0 ? colors.error.main : colors.success.main,
+      bgColor: (typedStats.upcomingTests ?? 0) > 0 ? colors.error[50] : colors.success[50],
       route: '/(tabs)/assessments',
     },
   ] : [];
@@ -1331,9 +1121,6 @@ export default function DashboardScreen() {
             )}
           </Card>
         </SectionBlock>
-
-        {/* Push Notification Debug - Superadmin only */}
-        {can('finance.access') && <PushNotificationDebug />}
 
         {/* Recent Activity - Hidden for superadmin */}
         {profile?.role !== 'superadmin' && (

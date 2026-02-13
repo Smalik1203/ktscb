@@ -96,6 +96,11 @@ android {
         versionName "1.0.0"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+
+        // Google Maps API key for react-native-maps
+        manifestPlaceholders = [
+            GOOGLE_MAPS_API_KEY: project.hasProperty('GOOGLE_MAPS_API_KEY') ? project.property('GOOGLE_MAPS_API_KEY') : (System.getenv('EXPO_PUBLIC_GOOGLE_MAPS_KEY') ?: '')
+        ]
     }
     signingConfigs {
         debug {

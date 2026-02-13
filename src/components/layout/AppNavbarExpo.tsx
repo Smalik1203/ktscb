@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, TouchableOpacity, StyleSheet, Animated, Modal, ScrollView, Dimensions, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Animated, Modal, ScrollView, Dimensions, Text, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DrawerActions , useNavigation } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
   const router = useRouter();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   const { colors, isDark } = useTheme();
   const [showActivityModal, setShowActivityModal] = useState(false);
   const slideAnim = React.useRef(new Animated.Value(0)).current;
@@ -215,6 +215,11 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
             <TouchableOpacity onPress={handleBack} style={styles.iconBtn}>
               <MaterialIcons name="arrow-back" size={22} color={colors.text.primary} />
             </TouchableOpacity>
+          ) : profile?.role === 'driver' ? (
+            /* Drivers have no drawer — show bus icon instead of hamburger */
+            <View style={styles.iconBtn}>
+              <MaterialIcons name="directions-bus" size={22} color={colors.primary.main} />
+            </View>
           ) : (
             <TouchableOpacity
               onPress={handleMenuPress}
@@ -238,19 +243,35 @@ export const AppNavbar: React.FC<AppNavbarProps> = ({
               <MaterialIcons name="add" size={20} color={colors.text.primary} />
             </TouchableOpacity>
           ) : null}
-          <TouchableOpacity
-            onPress={handleNotificationPress}
-            style={styles.iconBtn}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <View style={styles.notificationContainer}>
-              <MaterialIcons name="notifications" size={20} color={colors.text.primary} />
-              {recentActivity && recentActivity.length > 0 && (
-                <View style={dynamicStyles.notificationBadge} />
-              )}
-            </View>
-          </TouchableOpacity>
+          {profile?.role === 'driver' ? (
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert('Logout', 'Are you sure you want to logout?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Logout', style: 'destructive', onPress: signOut },
+                ]);
+              }}
+              style={[styles.iconBtn, { backgroundColor: '#FEE2E2', borderRadius: 20, width: 38, height: 38 }]}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialIcons name="logout" size={20} color="#DC2626" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={handleNotificationPress}
+              style={styles.iconBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <View style={styles.notificationContainer}>
+                <MaterialIcons name="notifications" size={20} color={colors.text.primary} />
+                {recentActivity && recentActivity.length > 0 && (
+                  <View style={dynamicStyles.notificationBadge} />
+                )}
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

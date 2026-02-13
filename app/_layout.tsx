@@ -20,6 +20,9 @@ import { initSentry } from '../src/lib/sentry';
 import { NotificationProvider } from '../src/contexts/NotificationContext';
 import { ActivityIndicator, View } from 'react-native';
 
+// Register background location task (must run before app renders)
+import '../src/features/transport/locationTask';
+
 // Initialize Sentry error tracking
 initSentry();
 
@@ -38,8 +41,24 @@ function RootStack() {
     );
   }
 
-  // If authenticated, show Drawer (App Stack)
+  // If authenticated, show app
   if (auth.status === 'signedIn' && auth.profile) {
+    // Drivers get a simple stack (no drawer needed — only Dashboard + Transport)
+    if (auth.profile.role === 'driver') {
+      return (
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.background.app },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ title: 'ClassBridge' }} />
+          <Stack.Screen name="login" options={{ title: 'Login' }} />
+        </Stack>
+      );
+    }
+
+    // Everyone else gets the full Drawer navigation
     return (
       <Drawer
         drawerContent={(props) => <DrawerContent {...props} />}

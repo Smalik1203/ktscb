@@ -87,6 +87,10 @@ module.exports = {
       jsEngine: "hermes",
       icon: resolveAsset(school.assets?.icon) || "./assets/images/icon.png",
       infoPlist: {
+        NSLocationWhenInUseUsageDescription: "This app needs your location to track the school bus during a trip.",
+        NSLocationAlwaysAndWhenInUseUsageDescription: "This app needs background location access to continue tracking the school bus when the app is minimised.",
+        NSLocationAlwaysUsageDescription: "This app needs background location access to continue tracking the school bus when the app is minimised.",
+        UIBackgroundModes: ["location"],
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: false,
           NSExceptionDomains: {
@@ -122,9 +126,20 @@ module.exports = {
         backgroundColor: school.branding?.primaryColor || "#6B3FA0"
       },
       icon: resolveAsset(school.assets?.icon) || "./assets/images/icon.png",
+      // Google Maps API key for the transport live map (optional)
+      config: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ? {
+        googleMaps: {
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY
+        }
+      } : undefined,
       permissions: [
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ],
       playStoreUrl: school.stores?.playStoreUrl || undefined
     },
@@ -154,6 +169,16 @@ module.exports = {
         }
       ],
       "expo-asset",
+      [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission: "This app needs background location access to track the school bus during a trip.",
+          locationAlwaysPermission: "This app needs background location access to track the school bus when minimised.",
+          locationWhenInUsePermission: "This app needs your location to track the school bus during a trip.",
+          isAndroidBackgroundLocationEnabled: true,
+          isAndroidForegroundServiceEnabled: true
+        }
+      ],
       "expo-video",
       [
         "expo-notifications",

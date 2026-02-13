@@ -59,6 +59,16 @@
         </dict>
       </dict>
     </dict>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>This app needs your location to track the school bus during a trip.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>This app needs background location access to continue tracking the school bus when the app is minimised.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>This app needs background location access to continue tracking the school bus when the app is minimised.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+      <string>location</string>
+    </array>
     <key>NSCameraUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your camera</string>
     <key>NSFaceIDUsageDescription</key>

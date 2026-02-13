@@ -29,7 +29,7 @@ type MenuItem = {
   roles?: ('superadmin' | 'cb_admin' | 'admin' | 'teacher' | 'student')[];
   /** Capability required to see this menu item - preferred over roles */
   requiredCapability?: Capability;
-  section: 'Main' | 'Academic' | 'Learning' | 'Admin' | 'Settings' | 'CB Admin';
+  section: 'Main' | 'Academic' | 'Learning' | 'Admin' | 'Transport' | 'Settings' | 'CB Admin';
   badge?: number;
   isNew?: boolean;
   description?: string;
@@ -159,6 +159,60 @@ const MENU: MenuItem[] = [
     isNew: true
   },
   {
+    key: 'transport',
+    label: 'Transport',
+    icon: 'directions-bus' as const,
+    route: '/(tabs)/transport',
+    requiredCapability: 'transport.track',
+    section: 'Main',
+    description: 'School bus GPS tracking'
+  },
+  {
+    key: 'transport_buses',
+    label: 'Buses',
+    icon: 'directions-bus' as const,
+    route: '/(tabs)/transport-buses',
+    requiredCapability: 'transport.manage',
+    section: 'Transport',
+    description: 'Manage school buses'
+  },
+  {
+    key: 'transport_drivers',
+    label: 'Drivers',
+    icon: 'person' as const,
+    route: '/(tabs)/transport-drivers',
+    requiredCapability: 'transport.manage',
+    section: 'Transport',
+    description: 'Manage bus drivers'
+  },
+  {
+    key: 'transport_assignments',
+    label: 'Assignments',
+    icon: 'assignment-ind' as const,
+    route: '/(tabs)/transport-assignments',
+    requiredCapability: 'transport.manage',
+    section: 'Transport',
+    description: 'Student bus assignments'
+  },
+  {
+    key: 'transport_live',
+    label: 'Live Tracking',
+    icon: 'my-location' as const,
+    route: '/(tabs)/transport-live',
+    requiredCapability: 'transport.manage',
+    section: 'Transport',
+    description: 'Live bus map'
+  },
+  {
+    key: 'transport_mybus',
+    label: 'My Bus',
+    icon: 'directions-bus' as const,
+    route: '/(tabs)/transport-mybus',
+    requiredCapability: 'transport.view_bus',
+    section: 'Main',
+    description: 'Track your school bus'
+  },
+  {
     key: 'class_mgmt',
     label: 'Management',
     icon: 'settings' as const,
@@ -217,8 +271,7 @@ const MENU: MenuItem[] = [
     label: 'Finance',
     icon: 'attach-money' as const,
     route: '/(tabs)/finance',
-    requiredCapability: 'management.view',
-    roles: ['superadmin'], // Finance is super admin only
+    requiredCapability: 'finance.access',
     section: 'Admin',
     description: 'Income and expense tracking'
   },
@@ -257,6 +310,12 @@ export function DrawerContent(props: DrawerContentComponentProps) {
     if (pathname.includes('/add-student')) return 'add_student';
     if (pathname.includes('/inventory')) return 'inventory';
     if (pathname.includes('/finance')) return 'finance';
+    if (pathname.includes('/transport-live')) return 'transport_live';
+    if (pathname.includes('/transport-mybus')) return 'transport_mybus';
+    if (pathname.includes('/transport-buses')) return 'transport_buses';
+    if (pathname.includes('/transport-drivers')) return 'transport_drivers';
+    if (pathname.includes('/transport-assignments')) return 'transport_assignments';
+    if (pathname.includes('/transport')) return 'transport';
     return 'home';
   }, [pathname]);
 
@@ -391,9 +450,18 @@ export function DrawerContent(props: DrawerContentComponentProps) {
   const slideAnim = useRef(new Animated.Value(50)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
+  const isDriver = role === 'driver';
+
   const grouped = useMemo(() => {
     // Filter menu items based on capabilities and roles
     const allowed = MENU.filter(item => {
+      // Drivers only see Dashboard + Transport items
+      if (isDriver) {
+        if (item.key === 'home') return true; // Dashboard
+        if (item.requiredCapability?.startsWith('transport.')) return can(item.requiredCapability);
+        return false; // Hide everything else for drivers
+      }
+
       // Check role-based access (if specified)
       if (item.roles && item.roles.length > 0) {
         if (!profile?.role || !item.roles.includes(profile.role as any)) {

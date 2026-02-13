@@ -36,6 +36,10 @@ export default function TabLayout() {
   const canManageStudents = can('students.create');
   const canViewFinance = can('finance.access');
   const canManageInventory = can('inventory.create');
+  const canTrackTransport = can('transport.track');
+  const canManageTransport = can('transport.manage');
+  const canViewBus = can('transport.view_bus');
+  const isDriver = profile?.role === 'driver';
 
   // Feedback tab title based on role
   const getFeedbackTitle = () => {
@@ -70,6 +74,7 @@ export default function TabLayout() {
           options={{
             title: 'Timetable',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="date-range" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/timetable',
           }}
         />
 
@@ -78,6 +83,7 @@ export default function TabLayout() {
           options={{
             title: 'Calendar',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="date-range" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/calendar',
           }}
         />
 
@@ -86,6 +92,7 @@ export default function TabLayout() {
           options={{
             title: 'Resources',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="auto-stories" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/resources',
           }}
         />
 
@@ -94,6 +101,7 @@ export default function TabLayout() {
           options={{
             title: 'Announcements',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="chat" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/announcements',
           }}
         />
 
@@ -103,6 +111,7 @@ export default function TabLayout() {
           options={{
             title: getFeedbackTitle(),
             tabBarIcon: ({ size, color }) => <MaterialIcons name="question-answer" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/feedback',
           }}
         />
 
@@ -121,6 +130,7 @@ export default function TabLayout() {
           options={{
             title: 'Syllabus',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="auto-stories" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/syllabus',
           }}
         />
 
@@ -138,6 +148,7 @@ export default function TabLayout() {
           options={{
             title: 'Attendance',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="how-to-reg" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/attendance',
           }}
         />
 
@@ -146,6 +157,7 @@ export default function TabLayout() {
           options={{
             title: 'Tasks',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="check-circle" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/tasks',
           }}
         />
 
@@ -154,6 +166,7 @@ export default function TabLayout() {
           options={{
             title: 'Assessments',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="description" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/assessments',
           }}
         />
 
@@ -162,6 +175,7 @@ export default function TabLayout() {
           options={{
             title: can('dashboard.admin_stats') ? 'Student Progress' : 'My Progress',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="trending-up" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/progress',
           }}
         />
 
@@ -170,6 +184,7 @@ export default function TabLayout() {
           options={{
             title: 'Sage AI',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="smart-toy" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/chatbot',
           }}
         />
 
@@ -178,6 +193,7 @@ export default function TabLayout() {
           options={{
             title: 'Fees',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="credit-card" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/fees',
           }}
         />
 
@@ -189,6 +205,67 @@ export default function TabLayout() {
           options={{
             title: 'Management',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="settings" size={size} color={color} />,
+            href: isDriver ? null : '/(tabs)/manage',
+          }}
+        />
+
+        {/* Transport Screen - Driver / Admin */}
+        <Tabs.Screen
+          name="transport"
+          options={{
+            title: 'Transport',
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="directions-bus" size={size} color={color} />,
+            href: canTrackTransport ? '/(tabs)/transport' : null,
+          }}
+        />
+
+        {/* Transport Admin: Buses */}
+        <Tabs.Screen
+          name="transport-buses"
+          options={{
+            title: 'Buses',
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="directions-bus" size={size} color={color} />,
+            href: canManageTransport ? '/(tabs)/transport-buses' : null,
+          }}
+        />
+
+        {/* Transport Admin: Drivers */}
+        <Tabs.Screen
+          name="transport-drivers"
+          options={{
+            title: 'Drivers',
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="person" size={size} color={color} />,
+            href: canManageTransport ? '/(tabs)/transport-drivers' : null,
+          }}
+        />
+
+        {/* Transport Admin: Student Assignments */}
+        <Tabs.Screen
+          name="transport-assignments"
+          options={{
+            title: 'Bus Assignments',
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="assignment-ind" size={size} color={color} />,
+            href: canManageTransport ? '/(tabs)/transport-assignments' : null,
+          }}
+        />
+
+        {/* Transport Admin: Live Bus Tracking Map */}
+        <Tabs.Screen
+          name="transport-live"
+          options={{
+            title: 'Live Tracking',
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="my-location" size={size} color={color} />,
+            href: canManageTransport ? '/(tabs)/transport-live' : null,
+          }}
+        />
+
+        {/* Transport Student: My Bus */}
+        <Tabs.Screen
+          name="transport-mybus"
+          options={{
+            title: 'My Bus',
+            tabBarIcon: ({ size, color }) => <MaterialIcons name="directions-bus" size={size} color={color} />,
+            href: canViewBus ? '/(tabs)/transport-mybus' : null,
           }}
         />
 

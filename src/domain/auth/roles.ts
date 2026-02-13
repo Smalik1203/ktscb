@@ -15,6 +15,7 @@ export const ROLES = {
   CB_ADMIN: 'cb_admin',
   ADMIN: 'admin',
   TEACHER: 'teacher',
+  DRIVER: 'driver',
   STUDENT: 'student',
   UNKNOWN: 'unknown',
 } as const;
@@ -50,6 +51,7 @@ export const ROLE_HIERARCHY: Record<Role, number> = {
   [ROLES.CB_ADMIN]: 80,
   [ROLES.ADMIN]: 60,
   [ROLES.TEACHER]: 40,
+  [ROLES.DRIVER]: 30,
   [ROLES.STUDENT]: 20,
   [ROLES.UNKNOWN]: 0,
 };
