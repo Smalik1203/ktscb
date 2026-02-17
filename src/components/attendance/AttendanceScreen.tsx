@@ -9,6 +9,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { View, StyleSheet, FlatList, TouchableOpacity, Alert, Dimensions, Text, ActivityIndicator, TextInput } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { useClassSelection } from '../../contexts/ClassSelectionContext';
@@ -106,9 +107,9 @@ export const AttendanceScreen: React.FC = () => {
   const styles = useMemo(() => createStyles(colors, spacing, borderRadius, typography, shadows, isDark),
     [colors, spacing, borderRadius, typography, shadows, isDark]);
 
-  const dateString = selectedDate.toISOString().split('T')[0];
-  const historyStartDateString = historyStartDate.toISOString().split('T')[0];
-  const historyEndDateString = historyEndDate.toISOString().split('T')[0];
+  const dateString = format(selectedDate, 'yyyy-MM-dd');
+  const historyStartDateString = format(historyStartDate, 'yyyy-MM-dd');
+  const historyEndDateString = format(historyEndDate, 'yyyy-MM-dd');
 
   const { data: localClasses = [] } = useClasses(canReadAllAttendance ? (scope.school_code ?? undefined) : undefined);
   // Use context classes (always fetched via profile.school_code) as fallback for the class picker
@@ -177,7 +178,7 @@ export const AttendanceScreen: React.FC = () => {
     dateString,
     selectedClass?.id
   );
-  const isHoliday = !!holidayInfo;
+  const isHoliday = !!holidayInfo && selectedDate.getDay() !== 0;
   const createCalendarEvent = useCreateCalendarEvent();
 
   const handleMarkHoliday = useCallback(() => {

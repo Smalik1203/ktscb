@@ -140,7 +140,7 @@ export function ConflictResolutionModal({
             style={[styles.optionButton, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderColor: colors.border.light, paddingVertical: 12, borderRadius: 8 }]}
           >
             <MaterialIcons name="close" size={18} color={colors.text.primary} />
-            <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 14 }}>Cancel - Don't Add Slot</Text>
+            <Text style={{ color: colors.text.primary, fontWeight: '600', fontSize: 14 }}>Cancel - Don&apos;t Add Slot</Text>
           </TouchableOpacity>
 
           {hasConflicts && (

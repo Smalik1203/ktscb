@@ -32,7 +32,7 @@ export function useCalendarEvents(
     queryKey: ['calendar-events', schoolCode, startDate, endDate, classInstanceId],
     queryFn: () => getCalendarEventsForDateRange(startDate, endDate, schoolCode, classInstanceId),
     enabled: !!schoolCode && !!startDate && !!endDate,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -42,7 +42,7 @@ export function useDayData(date: string, schoolCode: string, classInstanceId?: s
     queryKey: ['day-data', date, schoolCode, classInstanceId],
     queryFn: () => getDayData(date, schoolCode, classInstanceId),
     enabled: !!date && !!schoolCode,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -52,7 +52,7 @@ export function useHolidayCheck(schoolCode: string, date: string, classInstanceI
     queryKey: ['holiday-check', schoolCode, date, classInstanceId],
     queryFn: () => getHolidayInfo(schoolCode, date, classInstanceId),
     enabled: !!schoolCode && !!date,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 5 * 60 * 1000,
   });
 }
 

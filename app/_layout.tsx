@@ -3,9 +3,10 @@ import { Stack } from 'expo-router/stack';
 import { Drawer } from 'expo-router/drawer';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { useEffect } from 'react';
+import { ActivityIndicator, AppState, type AppStateStatus, View } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import { queryClient } from '../src/lib/queryClient';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
@@ -18,16 +19,20 @@ import { ToastProvider } from '../src/components/common';
 import { DrawerContent } from '../src/components/layout/DrawerContent';
 import { initSentry } from '../src/lib/sentry';
 import { NotificationProvider } from '../src/contexts/NotificationContext';
-import { ActivityIndicator, View } from 'react-native';
 
-// Register background location task (must run before app renders)
+import '../src/lib/disableConsoleInProd';
+
+focusManager.setEventListener((handleFocus) => {
+  const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+    handleFocus(state === 'active');
+  });
+  return () => sub.remove();
+});
+
 import '../src/features/transport/locationTask';
 
-// Initialize Sentry error tracking
 initSentry();
 
-// Root Stack - Handles both auth and app screens
-// Expo Router file-based routing means we need a single root navigator
 function RootStack() {
   const auth = useAuth();
   const { colors, isDark } = useTheme();

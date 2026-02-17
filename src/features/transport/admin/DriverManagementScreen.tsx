@@ -225,7 +225,7 @@ export default function DriverManagementScreen() {
     try {
       if (editingDriver) {
         // Update existing driver + user
-        const { error: driverErr } = await supabase
+        const { data: updatedDriver, error: driverErr } = await supabase
           .from('drivers')
           .update({
             bus_id: selectedBusId,
@@ -233,8 +233,11 @@ export default function DriverManagementScreen() {
             phone: phone.trim() || null,
             is_active: isActive,
           })
-          .eq('id', editingDriver.id);
+          .eq('id', editingDriver.id)
+          .select('id')
+          .single();
         if (driverErr) throw driverErr;
+        if (!updatedDriver) throw new Error('Update failed — you may not have permission to edit drivers.');
 
         const { error: userErr } = await supabase
           .from('users')

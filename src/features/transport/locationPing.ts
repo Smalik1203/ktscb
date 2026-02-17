@@ -29,18 +29,12 @@ const CHANNEL_PREFIX = 'location-ping';
 export async function sendLocationPing(driverId: string): Promise<void> {
   const channel = supabase.channel(`${CHANNEL_PREFIX}:${driverId}`);
 
-  await channel.subscribe();
-
-  await channel.send({
-    type: 'broadcast',
-    event: 'location-request',
-    payload: { requested_at: new Date().toISOString() },
+  // Use httpSend() for one-shot broadcast — no WebSocket subscription needed
+  await channel.httpSend('location-request', {
+    requested_at: new Date().toISOString(),
   });
 
-  // Clean up — we only needed to send one message
-  setTimeout(() => {
-    supabase.removeChannel(channel);
-  }, 2000);
+  supabase.removeChannel(channel);
 }
 
 // ---------- Driver side: listen for pings ----------

@@ -124,15 +124,16 @@ export function useFeedbackReceived(userId: string | undefined) {
         queryFn: async () => {
             const { data, error } = await supabase
                 .from('feedback_for_admin')
-                .select('*')
+                .select('id, feedback_type, to_user_id, subject_id, class_instance_id, sentiment, category, content, requires_acknowledgement, acknowledged_at, school_code, created_at, subject_name, grade, section')
                 .eq('to_user_id', userId!)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(100);
 
             if (error) throw error;
             return data || [];
         },
         enabled: !!userId,
-        staleTime: 2 * 60 * 1000, // 2 minutes
+        staleTime: 5 * 60 * 1000,
         gcTime: 5 * 60 * 1000, // 5 minutes
     });
 }
@@ -155,13 +156,14 @@ export function useAllSchoolFeedback(schoolCode: string | undefined | null) {
         `)
                 .eq('school_code', schoolCode!)
                 .is('archived_at', null)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(200);
 
             if (error) throw error;
             return (data || []) as Feedback[];
         },
         enabled: !!schoolCode,
-        staleTime: 2 * 60 * 1000,
+        staleTime: 5 * 60 * 1000,
         gcTime: 5 * 60 * 1000,
     });
 }
@@ -354,7 +356,7 @@ export function useFeedbackForStudent(studentId: string | undefined | null) {
             return data;
         },
         enabled: !!studentId,
-        staleTime: 30 * 1000,
+        staleTime: 5 * 60 * 1000,
     });
 }
 
@@ -381,7 +383,7 @@ export function useFeedbackToStudents(schoolCode: string | undefined | null) {
             return data;
         },
         enabled: !!schoolCode,
-        staleTime: 30 * 1000,
+        staleTime: 5 * 60 * 1000,
     });
 }
 

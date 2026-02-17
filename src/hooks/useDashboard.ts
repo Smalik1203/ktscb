@@ -61,6 +61,22 @@ export interface SyllabusProgressOverview {
   }[];
 }
 
+export interface NextClass {
+  subjectName: string;
+  startTime: string;
+  endTime: string;
+  teacherName: string;
+  periodNumber: number;
+}
+
+export interface NextDueTask {
+  id: string;
+  title: string;
+  dueDate: string;
+  subjectName: string;
+  priority: string;
+}
+
 export interface DashboardBundle {
   stats: DashboardStats;
   recentActivity: RecentActivity[];
@@ -69,6 +85,57 @@ export interface DashboardBundle {
   taskOverview: TaskOverview;
   syllabusOverview: SyllabusProgressOverview;
   classInfo: { classInstanceId: string; grade: number | null; section: string | null } | null;
+  nextClass: NextClass | null;
+  nextDueTask: NextDueTask | null;
+}
+
+// ── Management Dashboard Types ───────────────────────
+export interface ManagementKPIs {
+  todayAttPct: number;
+  yesterdayAttPct: number;
+  feesCollectedToday: number;
+  pendingFeesTotal: number;
+  activeClassesMarked: number;
+  totalClassesScheduled: number;
+  totalStudents: number;
+}
+
+export interface TrendPoint {
+  date: string;
+  pct?: number;
+  amount?: number;
+}
+
+export interface ActionItem {
+  type: string;
+  label: string;
+  count: number;
+  category: string;
+  route: string;
+}
+
+export interface AcademicSnapshot {
+  avgPerformancePct: number;
+  topClass: { name: string; pct: number } | null;
+  lowestClass: { name: string; pct: number } | null;
+  totalTests: number;
+}
+
+export interface ManagementFeeOverview {
+  totalExpected: number;
+  totalCollected: number;
+  outstanding: number;
+  collectionRate: number;
+}
+
+export interface ManagementDashboard {
+  kpis: ManagementKPIs;
+  attendanceTrend: TrendPoint[];
+  feeCollectionTrend: TrendPoint[];
+  actionItems: ActionItem[];
+  academicSnapshot: AcademicSnapshot;
+  feeOverview: ManagementFeeOverview;
+  upcomingEvents: UpcomingEvent[];
 }
 
 const supabase = supabaseClient as any;
@@ -94,13 +161,20 @@ export function useDashboardBundle(userId?: string) {
           taskOverview: { total: 0, completed: 0, pending: 0, overdue: 0, dueThisWeek: 0 },
           syllabusOverview: { overallProgress: 0, totalSubjects: 0, subjectBreakdown: [] },
           classInfo: null,
+          nextClass: null,
+          nextDueTask: null,
         };
       }
 
       const { data, error } = await supabase.rpc('get_dashboard_bundle');
       if (error) throw error;
 
-      return (data || {}) as DashboardBundle;
+      const raw = data || {};
+      return {
+        ...raw,
+        nextClass: raw.nextClass || null,
+        nextDueTask: raw.nextDueTask || null,
+      } as DashboardBundle;
     },
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
@@ -587,7 +661,7 @@ export function useRecentActivity(userId: string, classInstanceId?: string, role
         .slice(0, 5); // Limit to 5 most recent
     },
     enabled: !!userId,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 5 * 60 * 1000, // 2 minutes
     refetchOnMount: true
   });
 }
@@ -765,7 +839,7 @@ export function useTaskOverview(authUserId: string, classInstanceId?: string) {
       return overview;
     },
     enabled: !!authUserId && !!classInstanceId,
-    staleTime: 2 * 60 * 1000, // 2 minutes - task data changes frequently
+    staleTime: 5 * 60 * 1000, // 2 minutes - task data changes frequently
     refetchOnMount: true,
   });
 }
@@ -903,7 +977,42 @@ export function useSyllabusOverview(classInstanceId: string) {
       };
     },
     enabled: !!classInstanceId,
-    staleTime: 3 * 60 * 1000, // 3 minutes - syllabus progress changes moderately
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: true,
+  });
+}
+
+// ── Management Dashboard Hook ────────────────────────
+export function useManagementDashboard(userId?: string) {
+  return useQuery({
+    queryKey: ['management-dashboard', userId],
+    queryFn: async (): Promise<ManagementDashboard> => {
+      const { data, error } = await supabase.rpc('get_management_dashboard');
+      if (error) throw error;
+
+      const raw = data || {};
+      return {
+        kpis: raw.kpis || {
+          todayAttPct: 0, yesterdayAttPct: 0, feesCollectedToday: 0,
+          pendingFeesTotal: 0, activeClassesMarked: 0, totalClassesScheduled: 0,
+          totalStudents: 0,
+        },
+        attendanceTrend: raw.attendanceTrend || [],
+        feeCollectionTrend: raw.feeCollectionTrend || [],
+        actionItems: raw.actionItems || [],
+        academicSnapshot: raw.academicSnapshot || {
+          avgPerformancePct: 0, topClass: null, lowestClass: null, totalTests: 0,
+        },
+        feeOverview: raw.feeOverview || {
+          totalExpected: 0, totalCollected: 0, outstanding: 0, collectionRate: 0,
+        },
+        upcomingEvents: raw.upcomingEvents || [],
+      } as ManagementDashboard;
+    },
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
 }

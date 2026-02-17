@@ -38,6 +38,7 @@ import {
   BackHandler,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Portal } from './Portal';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -84,7 +85,8 @@ export function Modal({
   testID,
 }: ModalProps) {
   const { colors, spacing, borderRadius, shadows, isDark } = useTheme();
-  
+  const insets = useSafeAreaInsets();
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT * 0.3)).current;
   const isAnimating = useRef(false);
@@ -205,6 +207,7 @@ export function Modal({
                 backgroundColor: colors.surface.primary,
                 borderRadius: size === 'full' ? 0 : borderRadius.lg,
                 padding: spacing.lg,
+                paddingBottom: spacing.lg + insets.bottom,
                 ...(isDark
                   ? { borderWidth: 1, borderColor: colors.border.light }
                   : shadows.lg),

@@ -24,21 +24,40 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
   maximumDate = new Date(2030, 11, 31),
   title = '',
 }) => {
-  const [tempDate, setTempDate] = useState<Date>(initialDate);
+  const normalizeToNoon = (date: Date): Date => {
+    const normalized = new Date(date);
+    normalized.setHours(12, 0, 0, 0);
+    return normalized;
+  };
+
+  const toDateInputValue = (date: Date): string => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const fromDateInputValue = (value: string): Date | null => {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  };
+
+  const [tempDate, setTempDate] = useState<Date>(normalizeToNoon(initialDate));
 
   // Update tempDate when modal opens
   useEffect(() => {
     if (visible) {
-      setTempDate(initialDate);
+      setTempDate(normalizeToNoon(initialDate));
     }
   }, [visible, initialDate]);
 
   const handleConfirm = () => {
-    onConfirm(tempDate);
+    onConfirm(normalizeToNoon(tempDate));
   };
 
   const handleCancel = () => {
-    setTempDate(initialDate);
+    setTempDate(normalizeToNoon(initialDate));
     onDismiss();
   };
 
@@ -55,8 +74,9 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
   const quickSelectDays = (days: number) => {
     const newDate = new Date();
     newDate.setDate(newDate.getDate() - days);
-    if (newDate >= minimumDate && newDate <= maximumDate) {
-      setTempDate(newDate);
+    const normalized = normalizeToNoon(newDate);
+    if (normalized >= minimumDate && normalized <= maximumDate) {
+      setTempDate(normalized);
     }
   };
 
@@ -70,7 +90,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
         onChange={(event, selectedDate) => {
           onDismiss();
           if (selectedDate) {
-            onConfirm(selectedDate);
+            onConfirm(normalizeToNoon(selectedDate));
           }
         }}
         minimumDate={minimumDate}
@@ -98,7 +118,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
               display="spinner"
               onChange={(event, selectedDate) => {
                 if (selectedDate) {
-                  setTempDate(selectedDate);
+                  setTempDate(normalizeToNoon(selectedDate));
                 }
               }}
               minimumDate={minimumDate}
@@ -141,7 +161,7 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
           <View style={styles.quickSelectRow}>
             <TouchableOpacity
               style={styles.quickSelectButton}
-              onPress={() => setTempDate(new Date())}
+              onPress={() => setTempDate(normalizeToNoon(new Date()))}
             >
               <Text style={styles.quickSelectText}>Today</Text>
             </TouchableOpacity>
@@ -169,12 +189,12 @@ export const DatePickerModal: React.FC<DatePickerModalProps> = ({
           <View style={styles.webDateInputContainer}>
             <input
               type="date"
-              value={tempDate.toISOString().split('T')[0]}
-              min={minimumDate.toISOString().split('T')[0]}
-              max={maximumDate.toISOString().split('T')[0]}
+              value={toDateInputValue(tempDate)}
+              min={toDateInputValue(minimumDate)}
+              max={toDateInputValue(maximumDate)}
               onChange={(e) => {
-                const newDate = new Date(e.target.value);
-                if (!isNaN(newDate.getTime())) {
+                const newDate = fromDateInputValue(e.target.value);
+                if (newDate && !isNaN(newDate.getTime())) {
                   setTempDate(newDate);
                 }
               }}

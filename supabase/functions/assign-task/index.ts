@@ -51,10 +51,10 @@ Deno.serve(async (req: Request) => {
             );
         }
 
-        // 3. Get all students in the class
+        // 3. Get all students in the class (student table has auth_user_id, not user_id)
         const { data: students, error: studentsError } = await supabase
             .from('student')
-            .select('user_id')
+            .select('auth_user_id')
             .eq('class_instance_id', task.class_instance_id);
 
         if (studentsError || !students || students.length === 0) {
@@ -67,7 +67,7 @@ Deno.serve(async (req: Request) => {
 
         // 4. Send notifications (fire-and-forget)
         const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
-        const userIds = students.map(s => s.user_id).filter(Boolean) as string[];
+        const userIds = students.map(s => s.auth_user_id).filter(Boolean) as string[];
 
         if (userIds.length > 0) {
             const dueDate = new Date(task.due_date);

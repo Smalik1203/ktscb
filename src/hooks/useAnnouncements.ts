@@ -75,7 +75,7 @@ export function useAnnouncementsFeed(schoolCode?: string) {
         },
         enabled: !!schoolCode,
         getNextPageParam: (lastPage) => lastPage.nextPage,
-        staleTime: 1 * 60 * 1000, // 1 minute
+        staleTime: 5 * 60 * 1000,
         gcTime: 5 * 60 * 1000, // 5 minutes
     });
 }

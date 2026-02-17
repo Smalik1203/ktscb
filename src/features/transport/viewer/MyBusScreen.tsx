@@ -1,32 +1,41 @@
-/**
- * Transport Management System - My Bus Screen (Student)
- *
- * Shows the student's assigned bus live location and pickup status.
- * Features:
- * - Map card showing bus position
- * - Trip status (active / no active trip)
- * - Pickup progress with personal status
- * - Last update time + speed
- */
-
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  Platform,
+  Text,
+  Animated as RNAnimated,
+  Easing,
 } from 'react-native';
-import MapView, { AnimatedRegion, MarkerAnimated } from 'react-native-maps';
+import MapView, { AnimatedRegion, Marker, MarkerAnimated } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import * as Location from 'expo-location';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { Card } from '../../../ui/Card';
 import { Body, Caption, Heading } from '../../../ui/Text';
 import { useMyBus } from './useMyBus';
+import { haversineKm, formatDistance } from '../geo';
 
-// ---------- Helpers ----------
+const METERS_PER_DEG_LAT = 111_320;
+
+function projectBusPosition(
+  lat: number,
+  lng: number,
+  speedMs: number,
+  headingDeg: number,
+  seconds: number,
+): { latitude: number; longitude: number } {
+  const hRad = (headingDeg * Math.PI) / 180;
+  const dist = speedMs * seconds;
+  const dLat = (dist * Math.cos(hRad)) / METERS_PER_DEG_LAT;
+  const dLng =
+    (dist * Math.sin(hRad)) /
+    (METERS_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
+  return { latitude: lat + dLat, longitude: lng + dLng };
+}
 
 function formatSpeed(speedMs: number | null): string {
   if (speedMs === null || speedMs < 0) return '--';
@@ -42,14 +51,40 @@ function formatTime(ts: string | null): string {
   });
 }
 
-// ---------- Screen ----------
+const INACTIVE_THRESHOLD_SEC = 300;
+
+function isBusInactive(recordedAt: string | null): boolean {
+  if (!recordedAt) return true;
+  const ageSec = (Date.now() - new Date(recordedAt).getTime()) / 1000;
+  return ageSec > INACTIVE_THRESHOLD_SEC;
+}
 
 export default function MyBusScreen() {
   const insets = useSafeAreaInsets();
   const { colors, spacing } = useTheme();
   const { busStatus, loading, error, noBusAssigned, refresh } = useMyBus();
   const mapRef = useRef<MapView>(null);
-  const markerRef = useRef<typeof MarkerAnimated | null>(null);
+  const [studentLoc, setStudentLoc] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
+    let cancelled = false;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted' || cancelled) return;
+      const last = await Location.getLastKnownPositionAsync();
+      if (last && !cancelled) {
+        setStudentLoc({ lat: last.coords.latitude, lng: last.coords.longitude });
+      }
+      if (cancelled) return;
+      sub = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.Balanced, timeInterval: 30_000, distanceInterval: 50 },
+        (loc) => {
+          if (!cancelled) setStudentLoc({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        }
+      );
+    })();
+    return () => { cancelled = true; sub?.remove(); };
+  }, []);
 
   // Animated coordinate for smooth marker glide
   const animatedCoord = useRef(
@@ -61,43 +96,107 @@ export default function MyBusScreen() {
     })
   ).current;
 
-  // Animate map + marker when bus position updates
+  // ── Dead-reckoning position animation (Uber-style) ──
+  const runningAnim = useRef<any>(null);
+  const lastBusPos = useRef({ lat: busStatus?.lat ?? 0, lng: busStatus?.lng ?? 0 });
+  const lastGpsMs = useRef(0);
+  const isFirstPos = useRef(true);
+
+  const busSpeed = busStatus?.speed ?? 0;
+  const busHeading = busStatus?.heading ?? 0;
+  const isBusMoving = busSpeed > 0.5;
+
   useEffect(() => {
     const lat = busStatus?.lat;
     const lng = busStatus?.lng;
     if (lat == null || lng == null) return;
 
-    // Animate map camera
+    // Cancel in-progress animation
+    if (runningAnim.current) {
+      runningAnim.current.stop();
+      runningAnim.current = null;
+    }
+
+    const now = Date.now();
+    const rawInterval = lastGpsMs.current > 0 ? now - lastGpsMs.current : 4000;
+    lastGpsMs.current = now;
+
+    const dLat = Math.abs(lat - lastBusPos.current.lat);
+    const dLng = Math.abs(lng - lastBusPos.current.lng);
+    lastBusPos.current = { lat, lng };
+
+    // Animate map camera to actual GPS position
     mapRef.current?.animateToRegion(
       { latitude: lat, longitude: lng, latitudeDelta: 0.005, longitudeDelta: 0.005 },
-      1200
+      1200,
     );
 
-    // Animate marker position
-    if (Platform.OS === 'android' && markerRef.current) {
-      try {
-        (markerRef.current as any).animateMarkerToCoordinate(
-          { latitude: lat, longitude: lng },
-          1500
-        );
-      } catch {
-        animatedCoord.setValue({ latitude: lat, longitude: lng } as any);
-      }
-    } else {
-      animatedCoord
-        .timing({
-          latitude: lat,
-          longitude: lng,
-          latitudeDelta: 0,
-          longitudeDelta: 0,
-          duration: 1500,
-          useNativeDriver: false,
-        })
-        .start();
-    }
-  }, [busStatus?.lat, busStatus?.lng, animatedCoord]);
+    // ── Snap cases: first mount · big jump · GPS silence ──
+    if (isFirstPos.current || dLat > 0.005 || dLng > 0.005 || rawInterval > 10_000) {
+      isFirstPos.current = false;
+      animatedCoord.setValue({ latitude: lat, longitude: lng } as any);
 
-  // ---------- Loading ----------
+      // Start fresh projection from snapped position
+      if (isBusMoving) {
+        const projMs = Math.min(8000, Math.max(2000, rawInterval * 1.3));
+        const target = projectBusPosition(lat, lng, busSpeed, busHeading, projMs / 1000);
+        const anim = animatedCoord.timing({
+          ...target, latitudeDelta: 0, longitudeDelta: 0,
+          duration: projMs, easing: Easing.linear, useNativeDriver: false,
+        });
+        runningAnim.current = anim;
+        anim.start(() => { runningAnim.current = null; });
+      }
+      return;
+    }
+    isFirstPos.current = false;
+
+    if (isBusMoving) {
+      // ── Moving: project ahead at speed + heading (dead reckoning) ──
+      const projMs = Math.min(8000, Math.max(2000, rawInterval * 1.3));
+      const target = projectBusPosition(lat, lng, busSpeed, busHeading, projMs / 1000);
+      const anim = animatedCoord.timing({
+        ...target, latitudeDelta: 0, longitudeDelta: 0,
+        duration: projMs, easing: Easing.linear, useNativeDriver: false,
+      });
+      runningAnim.current = anim;
+      anim.start(() => { runningAnim.current = null; });
+    } else {
+      // ── Stopped: settle to actual GPS position ──
+      const anim = animatedCoord.timing({
+        latitude: lat, longitude: lng, latitudeDelta: 0, longitudeDelta: 0,
+        duration: 500, useNativeDriver: false,
+      });
+      runningAnim.current = anim;
+      anim.start(() => { runningAnim.current = null; });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busStatus?.lat, busStatus?.lng, isBusMoving, animatedCoord]);
+
+  // ── Heading rotation smoothing ──
+  const headingAnim = useRef(new RNAnimated.Value(busStatus?.heading ?? 0)).current;
+  const prevHeading = useRef(busStatus?.heading ?? 0);
+
+  useEffect(() => {
+    const target = busStatus?.heading ?? 0;
+    // Shortest rotation path — avoids 350° spin when 10° would do
+    const delta = ((target - prevHeading.current + 540) % 360) - 180;
+    if (Math.abs(delta) < 1) {
+      prevHeading.current = target;
+      return;
+    }
+    const animTarget = prevHeading.current + delta;
+    RNAnimated.timing(headingAnim, {
+      toValue: animTarget,
+      duration: 400,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(() => {
+      const normalized = ((target % 360) + 360) % 360;
+      prevHeading.current = normalized;
+      headingAnim.setValue(normalized);
+    });
+  }, [busStatus?.heading, headingAnim]);
 
   if (loading) {
     return (
@@ -110,8 +209,6 @@ export default function MyBusScreen() {
     );
   }
 
-  // ---------- No bus assigned ----------
-
   if (noBusAssigned) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background.primary }]}>
@@ -122,13 +219,11 @@ export default function MyBusScreen() {
           No Bus Assigned
         </Heading>
         <Body color="secondary" align="center" style={{ marginTop: spacing.sm, paddingHorizontal: 40 }}>
-          You haven't been assigned to a bus yet. Please contact your school administrator.
+          You haven&apos;t been assigned to a bus yet. Please contact your school administrator.
         </Body>
       </View>
     );
   }
-
-  // ---------- Has bus ----------
 
   const hasTrip = busStatus?.trip_active ?? false;
   const busLat = busStatus?.lat ?? null;
@@ -137,6 +232,10 @@ export default function MyBusScreen() {
   const totalStudents = busStatus?.total_students ?? 0;
   const pickupCount = busStatus?.pickup_count ?? 0;
   const pickupPct = totalStudents > 0 ? (pickupCount / totalStudents) * 100 : 0;
+  const distanceLabel =
+    busLat != null && busLng != null && studentLoc
+      ? formatDistance(haversineKm(busLat, busLng, studentLoc.lat, studentLoc.lng))
+      : null;
 
   return (
     <ScrollView
@@ -196,6 +295,21 @@ export default function MyBusScreen() {
         </View>
       </Card>
 
+      {/* Inactive alert: trip active but no GPS for 5+ min */}
+      {hasTrip && isBusInactive(busStatus?.recorded_at ?? null) && (
+        <Card variant="outlined" padding="md" style={{ marginTop: spacing.md, borderColor: '#F59E0B', backgroundColor: '#FFFBEB' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <MaterialIcons name="warning-amber" size={22} color="#B45309" />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#B45309' }}>Inactive</Text>
+              <Caption color="secondary" style={{ marginTop: 2 }}>
+                No location update for 5+ minutes. Trip is still active — location may resume shortly.
+              </Caption>
+            </View>
+          </View>
+        </Card>
+      )}
+
       {/* Map card */}
       {hasLocation && busLat != null && busLng != null && (
         <View style={[styles.mapWrapper, { borderColor: colors.border.DEFAULT, marginTop: spacing.md }]}>
@@ -225,11 +339,11 @@ export default function MyBusScreen() {
             loadingIndicatorColor={colors.primary.main}
           >
             <MarkerAnimated
-              ref={(ref: any) => { markerRef.current = ref; }}
               coordinate={animatedCoord}
               anchor={{ x: 0.5, y: 0.5 }}
-              rotation={busStatus?.heading ?? 0}
+              rotation={headingAnim as any}
               flat
+              tracksViewChanges={false}
             >
               <View style={[styles.markerOuter, { backgroundColor: `${colors.primary.main}30` }]}>
                 <View style={[styles.markerInner, { backgroundColor: colors.primary.main }]}>
@@ -237,16 +351,35 @@ export default function MyBusScreen() {
                 </View>
               </View>
             </MarkerAnimated>
+
+            {/* Student's own location marker */}
+            {studentLoc && (
+              <Marker
+                coordinate={{ latitude: studentLoc.lat, longitude: studentLoc.lng }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+              >
+                <View style={styles.studentMarkerOuter}>
+                  <View style={styles.studentMarkerInner} />
+                </View>
+              </Marker>
+            )}
           </MapView>
 
-          {/* Speed badge */}
-          {busStatus?.speed != null && busStatus.speed >= 0 && (
-            <View style={[styles.speedBadge, { backgroundColor: colors.background.primary }]}>
-              <Caption style={{ fontWeight: '700', color: colors.text.primary }}>
-                {formatSpeed(busStatus.speed)}
-              </Caption>
+          {/* Distance badge */}
+          {distanceLabel && (
+            <View style={[styles.distanceBadge, { backgroundColor: colors.background.primary }]}>
+              <MaterialIcons name="place" size={13} color="#2563EB" />
+              <Text style={styles.distanceBadgeText}>{distanceLabel}</Text>
             </View>
           )}
+
+          {/* Speed badge — always show; "--" when device doesn't report speed */}
+          <View style={[styles.speedBadge, { backgroundColor: colors.background.primary }]}>
+            <Caption style={{ fontWeight: '700', color: colors.text.primary }}>
+              {formatSpeed(busStatus?.speed ?? null)}
+            </Caption>
+          </View>
 
           {/* Time badge */}
           <View style={[styles.timeBadge, { backgroundColor: colors.background.primary }]}>
@@ -350,14 +483,12 @@ export default function MyBusScreen() {
       <View style={[styles.infoFooter, { marginTop: spacing.lg }]}>
         <MaterialIcons name="info-outline" size={14} color={colors.text.tertiary} />
         <Caption color="tertiary" style={{ marginLeft: 6, flex: 1 }}>
-          Location updates every ~15 seconds when the bus is on route.
+          Location updates are received in real time when the bus is on route.
         </Caption>
       </View>
     </ScrollView>
   );
 }
-
-// ---------- Styles ----------
 
 const styles = StyleSheet.create({
   container: {
@@ -432,6 +563,43 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  studentMarkerOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  studentMarkerInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#2563EB',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  distanceBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 3,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+  },
+  distanceBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#2563EB',
   },
   speedBadge: {
     position: 'absolute',

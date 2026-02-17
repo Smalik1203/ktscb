@@ -888,11 +888,11 @@ export const api = {
     async getBySchool(schoolCode: string, classInstanceId?: string, options?: { limit?: number; offset?: number; test_mode?: 'online' | 'offline' }) {
       const limit = options?.limit ?? 50; // Default to 50 (was unlimited)
       const offset = options?.offset ?? 0;
-      
+      const testsCols = 'id, title, description, class_instance_id, subject_id, school_code, test_type, time_limit_seconds, created_by, created_at, allow_reattempts, chapter_id, test_mode, test_date, status, max_marks';
       let query = supabase
         .from('tests')
         .select(`
-          *,
+          ${testsCols},
           class_instances!inner(
             id,
             grade,
@@ -924,10 +924,11 @@ export const api = {
     },
 
     async getById(testId: string) {
+      const testsCols = 'id, title, description, class_instance_id, subject_id, school_code, test_type, time_limit_seconds, created_by, created_at, allow_reattempts, chapter_id, test_mode, test_date, status, max_marks';
       const { data, error } = await supabase
         .from('tests')
         .select(`
-          *,
+          ${testsCols},
           class_instances!inner(
             id,
             grade,
@@ -1115,7 +1116,7 @@ export const api = {
       const { data, error } = await supabase
         .from('test_marks')
         .select(`
-          *,
+          id, test_id, student_id, marks_obtained, max_marks, remarks, created_by, created_at, updated_at,
           student:student!inner(
             id,
             full_name,
@@ -1133,7 +1134,7 @@ export const api = {
       const { data, error } = await supabase
         .from('test_marks')
         .select(`
-          *,
+          id, test_id, student_id, marks_obtained, max_marks, remarks, created_by, created_at, updated_at,
           tests!inner(
             id,
             title,
@@ -1214,7 +1215,7 @@ export const api = {
       const { data, error } = await supabase
         .from('test_attempts')
         .select(`
-          *,
+          id, test_id, student_id, answers, score, status, evaluated_by, completed_at, started_at, created_at, earned_points, total_points,
           student:student!inner(
             id,
             full_name,
@@ -1232,7 +1233,7 @@ export const api = {
       let query = supabase
         .from('test_attempts')
         .select(`
-          *,
+          id, test_id, student_id, answers, score, status, evaluated_by, completed_at, started_at, created_at, earned_points, total_points,
           tests!inner(
             id,
             title,

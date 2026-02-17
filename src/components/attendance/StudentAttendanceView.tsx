@@ -2,7 +2,7 @@
  * StudentAttendanceView — Production-quality
  *
  * Design:
- * 1. Every day in range is shown — holidays (Sundays + DB holidays), present, or absent
+ * 1. Every day in range is shown — holidays (from DB), present, or absent
  * 2. Unmarked school days are treated as ABSENT (consistent everywhere)
  * 3. Holidays fetched from school_calendar_events where event_type='holiday'
  * 4. Summary + weekly records use the SAME calculation: present / schoolDays
@@ -36,14 +36,14 @@ import {
   endOfWeek,
   eachDayOfInterval,
   isAfter,
-  isSunday,
   min as dateMin,
   max as dateMax,
   parseISO,
 } from 'date-fns';
 import { useCapabilities } from '../../hooks/useCapabilities';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+const isNewArchitecture = Boolean((globalThis as any).nativeFabricUIManager);
+if (Platform.OS === 'android' && !isNewArchitecture && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
@@ -93,6 +93,8 @@ const buildHolidayMap = (
     const end = h.end_date ? parseISO(h.end_date) : start;
     const days = eachDayOfInterval({ start, end });
     for (const d of days) {
+      // Product requirement: do not block Sundays in student attendance calendar.
+      if (d.getDay() === 0) continue;
       map.set(format(d, 'yyyy-MM-dd'), h.title);
     }
   }
@@ -101,7 +103,7 @@ const buildHolidayMap = (
 
 /**
  * Build a complete calendar for the date range.
- * Holiday = Sunday OR in holidayMap.
+ * Holiday = in holidayMap.
  * Unmarked school days = absent (no separate 'unmarked' status).
  */
 const buildCalendar = (
@@ -119,10 +121,9 @@ const buildCalendar = (
     const ds = format(d, 'yyyy-MM-dd');
     const record = recordMap.get(ds);
     const holidayName = holidayMap.get(ds);
-    const isSundayDay = isSunday(d);
 
     let status: DayStatus;
-    if (isSundayDay || holidayName) {
+    if (holidayName) {
       status = 'holiday';
     } else if (record) {
       status = record.status;
@@ -135,7 +136,7 @@ const buildCalendar = (
       date: d,
       dateString: ds,
       status,
-      holidayName: isSundayDay ? 'Sunday' : holidayName,
+      holidayName,
       record,
     };
   });
@@ -262,8 +263,8 @@ export const StudentAttendanceView: React.FC = () => {
   const { data: attendanceRecords = [], isLoading, error, refetch } = useStudentAttendance(studentId || undefined);
 
   // ── Derived date strings ──
-  const startDateString = startDate.toISOString().split('T')[0];
-  const endDateString = endDate.toISOString().split('T')[0];
+  const startDateString = format(startDate, 'yyyy-MM-dd');
+  const endDateString = format(endDate, 'yyyy-MM-dd');
 
   // ── Fetch holidays from school_calendar_events ──
   const { data: dbHolidays = [] } = useSchoolHolidays(schoolCode, startDateString, endDateString);

@@ -90,7 +90,7 @@ export function useClassInstances(schoolCode: string | null | undefined) {
       })) as ClassInstance[];
     },
     enabled: !!schoolCode,
-    staleTime: 30_000, // 30 seconds
+    staleTime: 5 * 60 * 1000,
   });
 }
 

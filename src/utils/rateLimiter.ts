@@ -108,8 +108,6 @@ export function cleanupExpiredEntries(): void {
   }
 }
 
-// Cleanup every 5 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(cleanupExpiredEntries, 5 * 60 * 1000);
-}
+// Cleanup is lazy: expired entries are skipped in isRateLimited().
+// No global setInterval — avoids leaked timers and background CPU.
 

@@ -21,6 +21,7 @@ import { financeService } from './finance';
 // Domain types and validation
 import type {
   DomainInvoice,
+  DomainInvoiceWithItems,
   DomainInvoiceItem,
   DomainInvoicePayment,
   DomainInvoiceDetail,
@@ -59,6 +60,7 @@ import { parseOrThrow } from '../lib/domain-schemas';
 // Re-export domain types for convenience
 export type {
   DomainInvoice as Invoice,
+  DomainInvoiceWithItems as InvoiceWithItems,
   DomainInvoiceItem as InvoiceItem,
   DomainInvoicePayment as InvoicePayment,
   DomainInvoiceDetail,
@@ -164,8 +166,8 @@ export const invoiceService = {
    * OPTIMIZED: Filter by school_code and academic_year_id in SQL, not JavaScript
    * Returns domain-typed invoices
    */
-  async getByStudent(studentId: string, schoolCode: string, academicYearId?: string): Promise<DomainInvoice[]> {
-    // Include student data in query for consistency
+  async getByStudent(studentId: string, schoolCode: string, academicYearId?: string): Promise<DomainInvoiceWithItems[]> {
+    // Single query joins items + payments — no N+1
     let query = supabase
       .from('fee_invoices')
       .select(`
@@ -180,7 +182,9 @@ export const invoiceService = {
         academic_year_id, 
         due_date, 
         created_at,
-        student:student_id (id, full_name, student_code)
+        student:student_id (id, full_name, student_code),
+        items:fee_invoice_items (id, invoice_id, label, amount, created_at),
+        payments:fee_payments (id, invoice_id, amount_inr, payment_method, payment_date, receipt_number, remarks, recorded_by_user_id, recorded_at)
       `)
       .eq('student_id', studentId)
       .eq('school_code', schoolCode); // Security: Always filter by school_code
@@ -189,7 +193,6 @@ export const invoiceService = {
       query = query.eq('academic_year_id', academicYearId);
     }
 
-    // Note: Sorting happens in UI (client-side) for better control
     const { data, error } = await query;
 
     if (error) {
@@ -197,10 +200,12 @@ export const invoiceService = {
       throw error;
     }
 
-    // Map to domain types - extract student from joined data
-    return (data || []).map((dbInvoice: any) =>
-      mapDbInvoiceToDomain(dbInvoice, dbInvoice.student)
-    );
+    // Map to domain types — include items + payments
+    return (data || []).map((dbInvoice: any) => ({
+      ...mapDbInvoiceToDomain(dbInvoice, dbInvoice.student),
+      items: (dbInvoice.items || []).map(mapDbInvoiceItemToDomain),
+      payments: (dbInvoice.payments || []).map((p: any) => mapDbPaymentToDomain(p)),
+    }));
   },
 
   /**
@@ -1160,8 +1165,18 @@ export const invoiceService = {
     });
 
     if (error) {
-      log.error('Failed to send payment reminder', { invoiceId, error });
-      throw error;
+      let message = error.message;
+      const ctx = (error as { context?: { json?: () => Promise<{ error?: string; details?: string }> } }).context;
+      if (typeof ctx?.json === 'function') {
+        try {
+          const body = await ctx.json();
+          message = body?.details ?? body?.error ?? message;
+        } catch (_) {
+          // ignore parse failure
+        }
+      }
+      log.error('Failed to send payment reminder', { invoiceId, error, message });
+      throw new Error(message);
     }
 
     return { success: true };

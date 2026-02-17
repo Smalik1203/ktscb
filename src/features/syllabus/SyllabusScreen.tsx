@@ -472,7 +472,7 @@ function TeacherSyllabusScreen() {
                       </View>
 
                       {node.topics.length === 0 && (
-                        <Text style={styles.emptyTopics}>No topics yet. Tap "+ Add Topic" to create one.</Text>
+                        <Text style={styles.emptyTopics}>No topics yet. Tap &quot;+ Add Topic&quot; to create one.</Text>
                       )}
 
                       {node.topics.map(t => {

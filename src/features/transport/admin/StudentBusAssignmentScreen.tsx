@@ -10,6 +10,7 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -30,9 +31,15 @@ interface StudentRow {
   id: string;
   full_name: string;
   class_instance_id: string | null;
+  class_label: string | null;
   bus_id: string | null;
   bus_number: string | null;
   assignment_id: string | null;
+}
+
+interface ClassOption {
+  id: string;
+  label: string; // "Grade X - Section"
 }
 
 interface BusOption {
@@ -50,9 +57,11 @@ export default function StudentBusAssignmentScreen() {
   // State
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [busOptions, setBusOptions] = useState<BusOption[]>([]);
+  const [classOptions, setClassOptions] = useState<ClassOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
 
   // Assignment modal
   const [selectedStudent, setSelectedStudent] = useState<StudentRow | null>(null);
@@ -96,18 +105,39 @@ export default function StudentBusAssignmentScreen() {
 
       setBusOptions(buses || []);
 
+      // 4. Fetch class instances for filter chips
+      const { data: classRows } = await supabase
+        .from('class_instances')
+        .select('id, grade, section')
+        .eq('school_code', schoolCode)
+        .order('grade')
+        .order('section');
+
+      const classOpts: ClassOption[] = (classRows || []).map((c) => ({
+        id: c.id,
+        label: `Grade ${c.grade} - ${c.section}`,
+      }));
+      setClassOptions(classOpts);
+
       const busMap: Record<string, string> = {};
       for (const b of buses || []) {
         busMap[b.id] = b.bus_number;
       }
 
-      // 4. Merge
+      // Build class lookup
+      const classLabelMap: Record<string, string> = {};
+      for (const c of classOpts) {
+        classLabelMap[c.id] = c.label;
+      }
+
+      // 5. Merge students with assignments
       const merged: StudentRow[] = (studentRows || []).map((s) => {
         const assignment = assignmentMap[s.id];
         return {
           id: s.id,
           full_name: s.full_name,
           class_instance_id: s.class_instance_id,
+          class_label: s.class_instance_id ? classLabelMap[s.class_instance_id] || null : null,
           bus_id: assignment?.bus_id || null,
           bus_number: assignment ? busMap[assignment.bus_id] || null : null,
           assignment_id: assignment?.assignment_id || null,
@@ -135,14 +165,25 @@ export default function StudentBusAssignmentScreen() {
   // ---------- Filtered ----------
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return students;
-    const q = search.toLowerCase();
-    return students.filter(
-      (s) =>
-        s.full_name.toLowerCase().includes(q) ||
-        s.bus_number?.toLowerCase().includes(q)
-    );
-  }, [students, search]);
+    let result = students;
+
+    // Filter by class
+    if (selectedClassId) {
+      result = result.filter((s) => s.class_instance_id === selectedClassId);
+    }
+
+    // Filter by search text
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.full_name.toLowerCase().includes(q) ||
+          s.bus_number?.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [students, search, selectedClassId]);
 
   // ---------- Assign / Unassign ----------
 
@@ -204,6 +245,11 @@ export default function StudentBusAssignmentScreen() {
           <Text style={styles.cardTitle} numberOfLines={1}>
             {item.full_name}
           </Text>
+          {item.class_label && (
+            <Text style={styles.cardSubtitle} numberOfLines={1}>
+              {item.class_label}
+            </Text>
+          )}
         </View>
       </View>
       <View style={styles.cardRight}>
@@ -226,19 +272,50 @@ export default function StudentBusAssignmentScreen() {
     </TouchableOpacity>
   );
 
-  // Counts
-  const assignedCount = students.filter((s) => s.bus_id).length;
-  const unassignedCount = students.length - assignedCount;
+  // Counts (based on filtered list so they reflect the active class filter)
+  const assignedCount = filtered.filter((s) => s.bus_id).length;
+  const unassignedCount = filtered.length - assignedCount;
 
   return (
     <View style={styles.container}>
       <SearchBar value={search} onChangeText={setSearch} placeholder="Search students..." />
 
+      {/* Class filter chips */}
+      {classOptions.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chipRow}
+        >
+          <TouchableOpacity
+            style={[styles.chip, !selectedClassId && styles.chipActive]}
+            onPress={() => setSelectedClassId(null)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.chipText, !selectedClassId && styles.chipTextActive]}>
+              All Classes
+            </Text>
+          </TouchableOpacity>
+          {classOptions.map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              style={[styles.chip, selectedClassId === c.id && styles.chipActive]}
+              onPress={() => setSelectedClassId(selectedClassId === c.id ? null : c.id)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.chipText, selectedClassId === c.id && styles.chipTextActive]}>
+                {c.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
       {/* Summary bar */}
-      {!loading && students.length > 0 && (
+      {!loading && filtered.length > 0 && (
         <View style={styles.summary}>
           <View style={styles.summaryItem}>
-            <Text style={[styles.summaryCount, { color: colors.primary[600] }]}>{students.length}</Text>
+            <Text style={[styles.summaryCount, { color: colors.primary[600] }]}>{filtered.length}</Text>
             <Text style={styles.summaryLabel}>Total</Text>
           </View>
           <View style={styles.summaryItem}>
@@ -326,6 +403,32 @@ function createStyles(colors: any, isDark: boolean) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background.app },
     list: { padding: spacing.md, paddingBottom: 20 },
+    chipRow: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      gap: spacing.xs,
+    },
+    chip: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
+      borderRadius: borderRadius.full,
+      backgroundColor: colors.surface.primary,
+      borderWidth: 1,
+      borderColor: colors.border.light,
+    },
+    chipActive: {
+      backgroundColor: colors.primary[600],
+      borderColor: colors.primary[600],
+    },
+    chipText: {
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.medium as any,
+      color: colors.text.secondary,
+    },
+    chipTextActive: {
+      color: '#FFF',
+      fontWeight: typography.fontWeight.semibold as any,
+    },
     summary: {
       flexDirection: 'row',
       justifyContent: 'space-around',
@@ -372,6 +475,11 @@ function createStyles(colors: any, isDark: boolean) {
       fontSize: typography.fontSize.base,
       fontWeight: typography.fontWeight.medium as any,
       color: colors.text.primary,
+    },
+    cardSubtitle: {
+      fontSize: typography.fontSize.xs,
+      color: colors.text.tertiary,
+      marginTop: 1,
     },
     cardRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     busBadge: {

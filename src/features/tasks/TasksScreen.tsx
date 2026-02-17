@@ -408,15 +408,21 @@ export default function TasksScreen() {
   // Determine if this is a student-only view (can view own but can't manage)
   const isStudentView = canViewOwnTasks && !canManageTasks;
 
-  const { data: adminTasks, isLoading: adminLoading, error: adminError, refetch: refetchAdmin } = useTasks(
-    schoolCode,
-    {
+  // Stable filters object so useTasks query key doesn't change every render (prevents refetch storms and stale UI)
+  const taskFilters = useMemo(
+    () => ({
       classInstanceId: selectedClassId,
       subjectId: selectedSubjectId,
       priority: selectedPriority || undefined,
       startDate,
       endDate,
-    }
+    }),
+    [selectedClassId, selectedSubjectId, selectedPriority, startDate, endDate]
+  );
+
+  const { data: adminTasks, isLoading: adminLoading, error: adminError, refetch: refetchAdmin } = useTasks(
+    schoolCode,
+    taskFilters
   );
 
   const { data: studentTasksData, isLoading: studentLoading, error: studentError, refetch: refetchStudent } = useStudentTasks(
@@ -674,19 +680,12 @@ export default function TasksScreen() {
   };
 
   const handleSubmitTask = async (taskData: any) => {
-    try {
-      if (editingTask) {
-        await updateTask.mutateAsync({ id: editingTask.id, ...taskData });
-        Alert.alert('Success', 'Task updated successfully');
-        return editingTask.id;
-      } else {
-        const newTask = await createTask.mutateAsync(taskData);
-        Alert.alert('Success', 'Task created successfully');
-        return newTask.id;
-      }
-    } catch (error) {
-      throw error; // Let the modal handle it
+    if (editingTask) {
+      const updated = await updateTask.mutateAsync({ id: editingTask.id, ...taskData });
+      return updated?.id ?? editingTask.id;
     }
+    const newTask = await createTask.mutateAsync(taskData);
+    return newTask?.id ?? '';
   };
 
   const toggleTaskMenu = (taskId: string) => {

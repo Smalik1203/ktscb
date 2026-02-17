@@ -76,7 +76,7 @@ module.exports = {
     newArchEnabled: true,
     
     splash: {
-      image: resolveAsset(school.assets?.splash) || "./assets/images/Image.png",
+      image: resolveAsset(school.assets?.splash) || "./assets/images/icon.png",
       resizeMode: "contain",
       backgroundColor: school.branding?.backgroundColor || "#FFFFFF"
     },
@@ -122,7 +122,7 @@ module.exports = {
       jsEngine: "hermes",
       edgeToEdgeEnabled: true,
       adaptiveIcon: {
-        foregroundImage: resolveAsset(school.assets?.adaptiveIcon) || "./assets/images/adaptive-icon.png",
+        foregroundImage: resolveAsset(school.assets?.adaptiveIcon) || "./assets/images/icon.png",
         backgroundColor: school.branding?.primaryColor || "#6B3FA0"
       },
       icon: resolveAsset(school.assets?.icon) || "./assets/images/icon.png",
@@ -156,7 +156,7 @@ module.exports = {
       [
         "expo-splash-screen",
         {
-          image: resolveAsset(school.assets?.splash) || "./assets/images/Image.png",
+          image: resolveAsset(school.assets?.splash) || "./assets/images/icon.png",
           imageWidth: 200,
           resizeMode: "contain",
           backgroundColor: school.branding?.backgroundColor || "#FFFFFF"

@@ -12,6 +12,7 @@ import {
   RefreshControl, ActivityIndicator, Animated, Pressable, Platform,
 } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { format } from 'date-fns';
 import { Button, EmptyStateIllustration, FAB } from '../../ui';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
@@ -69,6 +70,7 @@ export default function CalendarScreen() {
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showFabSheet, setShowFabSheet] = useState(false);
+  const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
 
   const schoolCode = profile?.school_code || '';
   const studentClassId = canReadOwnCalendar ? profile?.class_instance_id || undefined : undefined;
@@ -99,7 +101,7 @@ export default function CalendarScreen() {
   const { startDate, endDate } = useMemo(() => {
     const s = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const e = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    return { startDate: s.toISOString().split('T')[0], endDate: e.toISOString().split('T')[0] };
+    return { startDate: format(s, 'yyyy-MM-dd'), endDate: format(e, 'yyyy-MM-dd') };
   }, [currentDate]);
 
   const effectiveClassId = canReadOwnCalendar ? studentClassId : (selectedClassId || undefined);
@@ -177,9 +179,13 @@ export default function CalendarScreen() {
     }
   };
 
-  const handleDateClick = (_date: Date) => { /* no-op in month view */ };
+  const handleDateClick = (date: Date) => {
+    setDayDetailDate(date);
+  };
   const handleEventClick = (event: CalendarEvent) => {
-    if (canManageEvents) handleEditEvent(event);
+    // For single-event days, show the day detail sheet (everyone can view)
+    const eventDate = new Date(event.start_date + 'T12:00:00');
+    setDayDetailDate(eventDate);
   };
 
   // ── Format helpers ──────────────────────────────────────────
@@ -232,17 +238,40 @@ export default function CalendarScreen() {
     ]).start(() => setShowClassDropdown(false));
   }, [classOverlay, classSlide]);
 
-  // ── Active event type legend (only types present this month) ─
-  const activeTypes = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const e of events) {
-      const key = e.event_type.toLowerCase();
-      if (!seen.has(key)) {
-        seen.set(key, getEventTypeColor(e.event_type, colors.neutral[400]));
-      }
+  // ── Day detail bottom sheet animation ──────────────────────
+  const daySlide = useRef(new Animated.Value(0)).current;
+  const dayOverlay = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (dayDetailDate) {
+      daySlide.setValue(0); dayOverlay.setValue(0);
+      Animated.parallel([
+        Animated.timing(dayOverlay, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(daySlide, { toValue: 1, tension: 65, friction: 11, useNativeDriver: true }),
+      ]).start();
     }
-    return Array.from(seen.entries()).map(([type, color]) => ({ type, color }));
-  }, [events, colors.neutral]);
+  }, [dayDetailDate, daySlide, dayOverlay]);
+
+  const closeDaySheet = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(dayOverlay, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(daySlide, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(() => setDayDetailDate(null));
+  }, [dayOverlay, daySlide]);
+
+  // Events for selected day
+  const dayDetailEvents = useMemo(() => {
+    if (!dayDetailDate) return [];
+    const dateStr = format(dayDetailDate, 'yyyy-MM-dd');
+    return events.filter((event) => {
+      const eventEnd = event.end_date || event.start_date;
+      return dateStr >= event.start_date && dateStr <= eventEnd;
+    }).sort((a, b) => {
+      if (a.is_all_day && !b.is_all_day) return -1;
+      if (!a.is_all_day && b.is_all_day) return 1;
+      return (a.start_time || '').localeCompare(b.start_time || '');
+    });
+  }, [dayDetailDate, events]);
 
   // ── List view ───────────────────────────────────────────────
   const renderListView = () => {
@@ -281,7 +310,7 @@ export default function CalendarScreen() {
             {sortedDates.map((dateKey) => {
               const dateEvents = grouped[dateKey];
               const [yr, mo, dy] = dateKey.split('-').map(Number);
-              const date = new Date(Date.UTC(yr, mo - 1, dy));
+              const date = new Date(yr, mo - 1, dy, 12, 0, 0);
               const now = new Date();
               const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
               const isToday = dateKey === todayKey;
@@ -439,18 +468,6 @@ export default function CalendarScreen() {
         </View>
       </View>
 
-      {/* Event type legend (only shown when events exist) */}
-      {activeTypes.length > 0 && (
-        <View style={styles.legendRow}>
-          {activeTypes.map(({ type, color }) => (
-            <View key={type} style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: color }]} />
-              <Text style={styles.legendText}>{type}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
       {/* Content */}
       {viewMode === 'month' ? (
         isLoading && events.length === 0 ? (
@@ -511,7 +528,94 @@ export default function CalendarScreen() {
         </Animated.View>
       </Modal>
 
-      {/* FAB — speed-dial for Add Event / Add Holiday */}
+      {/* ── Day Detail Bottom Sheet ─────────────────────────── */}
+      <Modal visible={!!dayDetailDate} transparent animationType="none" onRequestClose={closeDaySheet}>
+        <Animated.View style={[styles.overlay, { opacity: dayOverlay }]}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeDaySheet} />
+          <Animated.View style={[styles.sheet, {
+            transform: [{ translateY: daySlide.interpolate({ inputRange: [0, 1], outputRange: [400, 0] }) }],
+          }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>
+              {dayDetailDate
+                ? dayDetailDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+                : ''}
+            </Text>
+            <ScrollView style={styles.sheetScroll} bounces={false}>
+              {dayDetailEvents.length === 0 ? (
+                <View style={styles.dayDetailEmpty}>
+                  <MaterialIcons name="event-busy" size={32} color={colors.text.tertiary} />
+                  <Text style={styles.dayDetailEmptyText}>No events on this day</Text>
+                </View>
+              ) : (
+                dayDetailEvents.map((event) => {
+                  const eColor = event.color || getEventTypeColor(event.event_type, colors.neutral[500]);
+                  const selectedClassName = event.class_instance_id
+                    ? classes.find(c => c.id === event.class_instance_id)
+                    : null;
+
+                  return (
+                    <TouchableOpacity
+                      key={event.id}
+                      style={[styles.dayDetailCard, { borderLeftColor: eColor }]}
+                      activeOpacity={canManageEvents ? 0.6 : 1}
+                      onPress={() => {
+                        if (canManageEvents) {
+                          closeDaySheet();
+                          setTimeout(() => handleEditEvent(event), 300);
+                        }
+                      }}
+                    >
+                      <View style={styles.eventHeader}>
+                        <Text style={styles.eventTitle} numberOfLines={2}>{event.title}</Text>
+                        {event.is_all_day ? (
+                          <View style={[styles.badge, { backgroundColor: `${eColor}18` }]}>
+                            <Text style={[styles.badgeText, { color: eColor }]}>ALL DAY</Text>
+                          </View>
+                        ) : event.start_time ? (
+                          <View style={styles.timeBadge}>
+                            <Text style={styles.timeText}>
+                              {formatTime(event.start_time)}
+                              {event.end_time ? ` – ${formatTime(event.end_time)}` : ''}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
+
+                      <View style={styles.metaRow}>
+                        <View style={[styles.typeBadge, { backgroundColor: `${eColor}20` }]}>
+                          <Text style={[styles.typeText, { color: eColor }]}>
+                            {event.event_type.toUpperCase()}
+                          </Text>
+                        </View>
+                        {selectedClassName && (
+                          <Text style={styles.classMeta}>
+                            Grade {selectedClassName.grade}{selectedClassName.section ? `-${selectedClassName.section}` : ''}
+                          </Text>
+                        )}
+                        {!event.class_instance_id && !canReadOwnCalendar && (
+                          <Text style={styles.classMeta}>All Classes</Text>
+                        )}
+                      </View>
+
+                      {event.description ? (
+                        <Text style={styles.eventDesc} numberOfLines={3}>{event.description}</Text>
+                      ) : null}
+
+                      {canManageEvents && (
+                        <View style={styles.dayDetailEditHint}>
+                          <MaterialIcons name="edit" size={12} color={colors.text.tertiary} />
+                          <Text style={styles.dayDetailEditText}>Tap to edit</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
 
       {/* Event Form Modals */}
       <CalendarEventFormModal
@@ -600,18 +704,6 @@ const createStyles = (
   segText: { fontSize: 13, fontWeight: '500' as const, color: colors.text.tertiary },
   segTextActive: { color: colors.primary[700], fontWeight: '600' as const },
 
-  // ── Legend ───────────────────────────────────────────────────
-  legendRow: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
-    paddingHorizontal: spacing.md + 4, paddingTop: spacing.sm, paddingBottom: 2,
-  },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: {
-    fontSize: 11, fontWeight: '500' as const, color: colors.text.tertiary,
-    textTransform: 'capitalize',
-  },
-
   // ── List view ───────────────────────────────────────────────
   listContainer: { flex: 1, paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
   listContentPad: { paddingBottom: 120 },
@@ -685,6 +777,30 @@ const createStyles = (
   sheetCheck: {
     width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary[600],
     justifyContent: 'center', alignItems: 'center',
+  },
+
+  // ── Day detail sheet ────────────────────────────────────────
+  dayDetailCard: {
+    borderLeftWidth: 4, borderRadius: 10,
+    backgroundColor: isDark ? colors.surface.secondary : colors.neutral[50],
+    paddingVertical: 12, paddingHorizontal: 14,
+    marginBottom: spacing.sm,
+  },
+  dayDetailEmpty: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: spacing.xl, gap: spacing.sm,
+  },
+  dayDetailEmptyText: {
+    fontSize: 14, fontWeight: '500' as const, color: colors.text.tertiary,
+  },
+  dayDetailEditHint: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    marginTop: 8, paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: isDark ? colors.neutral[700] : colors.neutral[200],
+  },
+  dayDetailEditText: {
+    fontSize: 11, fontWeight: '500' as const, color: colors.text.tertiary,
   },
 
   // ── FAB sheet items ─────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
@@ -366,85 +366,95 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // subscribe once
 
-  const api = useMemo<AuthContextValue>(() => {
-    const loading = state.status === 'checking' || state.bootstrapping;
+  // Stable function refs — these never change identity so consumers don't re-render
+  const refreshRef = useRef<() => Promise<void>>(null as any);
+  const signOutRef = useRef<() => Promise<void>>(null as any);
 
-    async function refresh() {
-      try {
-        // Use timeout but make it non-blocking
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((resolve) =>
-          setTimeout(() => resolve({ data: { session: null } }), 8000)
-        );
+  // Keep the implementations up-to-date on every render
+  refreshRef.current = async () => {
+    try {
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((resolve) =>
+        setTimeout(() => resolve({ data: { session: null } }), 8000)
+      );
 
-        const result = await Promise.race([sessionPromise, timeoutPromise]);
-        const session = (result as { data: { session: Session | null } })?.data?.session ?? null;
+      const result = await Promise.race([sessionPromise, timeoutPromise]);
+      const session = (result as { data: { session: Session | null } })?.data?.session ?? null;
 
-        if (session) {
-          const version = `${session.user.id}:${session.expires_at || Date.now()}`;
-          setState((prev) => ({
-            ...prev,
-            status: 'signedIn',
-            session,
-            user: session.user,
-            sessionVersion: version,
-            bootstrapping: true,
-          }));
-          await bootstrapUser(session, version);
-        } else {
-          setState((prev) => ({ ...prev, status: 'signedOut', profile: null }));
-        }
-      } catch (e: any) {
-        // Handle JSON parse errors
-        if (e?.message?.includes('JSON Parse error') || e?.message?.includes('Unexpected character')) {
-          log.error('JSON parse error during refresh - clearing session', e);
-          // Clear corrupted session
-          try {
-            await AsyncStorage.removeItem('cb-session-v1');
-            await supabase.auth.signOut();
-          } catch (cleanupError) {
-            log.warn('Failed to cleanup session during refresh', cleanupError);
-          }
-        }
-        log.error('Auth refresh error', e);
-        setState((prev) => ({ ...prev, status: 'signedOut', profile: null }));
-      }
-    }
-
-    async function signOut() {
-      try {
-        // Clear Sentry user context so subsequent events are anonymous
-        clearUserContext();
-
-        // Get current push token before signing out for cleanup
-        const pushToken = await AsyncStorage.getItem('push-token-v2');
-
-        // Sign out from Supabase first (invalidates session)
-        await supabase.auth.signOut();
-
-        // Remove push token from database (token hygiene) via secure RPC
-        if (pushToken) {
-          const { removeTokenFromServer } = await import('../services/notifications');
-          await removeTokenFromServer(pushToken);
-          await AsyncStorage.removeItem('push-token-v2');
-        }
-      } catch (error) {
-        log.error('Error during signOut cleanup', { error });
-      } finally {
+      if (session) {
+        const version = `${session.user.id}:${session.expires_at || Date.now()}`;
         setState((prev) => ({
           ...prev,
-          status: 'signedOut',
-          session: null,
-          user: null,
-          profile: null,
-          bootstrapping: false,
-          sessionVersion: `${Date.now()}:${Math.random().toString(36).slice(2)}`,
+          status: 'signedIn',
+          session,
+          user: session.user,
+          sessionVersion: version,
+          bootstrapping: true,
         }));
+        await bootstrapUser(session, version);
+      } else {
+        setState((prev) => ({ ...prev, status: 'signedOut', profile: null }));
       }
+    } catch (e: any) {
+      if (e?.message?.includes('JSON Parse error') || e?.message?.includes('Unexpected character')) {
+        log.error('JSON parse error during refresh - clearing session', e);
+        try {
+          await AsyncStorage.removeItem('cb-session-v1');
+          await supabase.auth.signOut();
+        } catch (cleanupError) {
+          log.warn('Failed to cleanup session during refresh', cleanupError);
+        }
+      }
+      log.error('Auth refresh error', e);
+      setState((prev) => ({ ...prev, status: 'signedOut', profile: null }));
     }
+  };
 
+  signOutRef.current = async () => {
+    try {
+      clearUserContext();
+      const pushToken = await AsyncStorage.getItem('push-token-v2');
+      await supabase.auth.signOut();
+      if (pushToken) {
+        const { removeTokenFromServer } = await import('../services/notifications');
+        await removeTokenFromServer(pushToken);
+        await AsyncStorage.removeItem('push-token-v2');
+      }
+    } catch (error) {
+      log.error('Error during signOut cleanup', { error });
+    } finally {
+      setState((prev) => ({
+        ...prev,
+        status: 'signedOut',
+        session: null,
+        user: null,
+        profile: null,
+        bootstrapping: false,
+        sessionVersion: `${Date.now()}:${Math.random().toString(36).slice(2)}`,
+      }));
+    }
+  };
+
+  // Stable callbacks that delegate to refs — identity never changes
+  const refresh = useRef(async () => refreshRef.current()).current;
+  const signOut = useRef(async () => signOutRef.current()).current;
+
+  // Memo on consumer-visible fields only.
+  // TOKEN_REFRESHED only updates session/sessionVersion which are NOT in the dep list,
+  // so 57+ consumers won't re-render on every token refresh.
+  const api = useMemo<AuthContextValue>(() => {
+    const loading = state.status === 'checking' || state.bootstrapping;
     return { ...state, refresh, signOut, loading };
-  }, [state]);
+  }, [
+    state.status,
+    state.user?.id,
+    state.profile,
+    state.bootstrapping,
+    state.accessDeniedReason,
+    state.accessDeniedEmail,
+    refresh,
+    signOut,
+  ]);
 
   return <AuthContext.Provider value={api}>{children}</AuthContext.Provider>;
 }

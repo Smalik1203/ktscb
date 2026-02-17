@@ -1,13 +1,17 @@
 /**
- * Transport Management System - My Bus Hook
+ * Transport Management System - My Bus Hook (Realtime)
  *
- * Polls `get_my_bus_status` RPC every 10 seconds to retrieve
- * the student's assigned bus live position and pickup progress.
+ * Subscribes to Supabase Realtime broadcast for live GPS updates
+ * on the student's assigned bus. Falls back to a single RPC call
+ * on mount / reconnect for initial state.
+ *
+ * Replaces the previous 6-second polling model.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
+import { useIsScreenActive } from '../../../hooks/useIsScreenActive';
 import { log } from '../../../lib/logger';
 
 // ---------- Types ----------
@@ -17,6 +21,8 @@ export interface MyBusStatus {
   bus_number: string;
   plate_number: string;
   driver_name: string;
+  /** Driver ID — used to match Realtime broadcast updates */
+  driver_id: string;
   trip_id: string | null;
   trip_active: boolean;
   lat: number | null;
@@ -42,18 +48,30 @@ interface UseMyBusReturn {
   refresh: () => void;
 }
 
-const POLL_INTERVAL = 6_000; // 6 seconds
-
 // ---------- Hook ----------
 
 export function useMyBus(): UseMyBusReturn {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const isActive = useIsScreenActive();
   const [busStatus, setBusStatus] = useState<MyBusStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noBusAssigned, setNoBusAssigned] = useState(false);
   const mountedRef = useRef(true);
+  const driverIdRef = useRef<string | null>(null);
 
+  // Track mounted state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  // Keep driver_id ref in sync so broadcast callbacks can read latest value
+  useEffect(() => {
+    driverIdRef.current = busStatus?.driver_id ?? null;
+  }, [busStatus?.driver_id]);
+
+  // Fetch full bus status via RPC (used on mount + reconnect)
   const fetchStatus = useCallback(async () => {
     if (!user?.id) return;
 
@@ -91,17 +109,57 @@ export function useMyBus(): UseMyBusReturn {
     }
   }, [user?.id]);
 
-  // Initial fetch + polling
+  // Realtime subscription — subscribe when active, unsubscribe when inactive
   useEffect(() => {
-    mountedRef.current = true;
+    if (!isActive || !profile?.school_code) return;
+
+    // Fetch initial state on (re-)activation
     fetchStatus();
 
-    const interval = setInterval(fetchStatus, POLL_INTERVAL);
+    // Subscribe to school-wide bus channel; filter to own bus's driver_id in handler
+    const channelName = `buses:${profile.school_code}`;
+    const channel = supabase.channel(channelName);
+
+    channel
+      .on('broadcast', { event: 'gps-update' }, ({ payload }) => {
+        if (!mountedRef.current) return;
+        // Use functional update to always read latest busStatus
+        setBusStatus(prev => {
+          if (!prev || prev.driver_id !== payload.driver_id) return prev;
+          return {
+            ...prev,
+            lat: payload.lat,
+            lng: payload.lng,
+            speed: payload.speed,
+            heading: payload.heading,
+            recorded_at: payload.recorded_at,
+          };
+        });
+      })
+      .on('broadcast', { event: 'trip-started' }, ({ payload }) => {
+        // Re-fetch when our bus's driver starts a trip
+        if (mountedRef.current && driverIdRef.current === payload.driver_id) {
+          fetchStatus();
+        }
+      })
+      .on('broadcast', { event: 'trip-ended' }, ({ payload }) => {
+        // Re-fetch when our bus's driver ends a trip
+        if (mountedRef.current && driverIdRef.current === payload.driver_id) {
+          fetchStatus();
+        }
+      })
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') {
+          log.warn('[TMS] Realtime channel error — falling back to single RPC fetch');
+          if (mountedRef.current) fetchStatus();
+        }
+      });
+
+    // Cleanup: remove channel when going inactive or unmounting
     return () => {
-      mountedRef.current = false;
-      clearInterval(interval);
+      supabase.removeChannel(channel);
     };
-  }, [fetchStatus]);
+  }, [isActive, profile?.school_code, fetchStatus]);
 
   return {
     busStatus,

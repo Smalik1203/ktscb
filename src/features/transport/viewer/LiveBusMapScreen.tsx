@@ -7,7 +7,7 @@
  * - Tap a bus marker → opens swipeable card carousel
  * - Swipe left/right to browse buses, map auto-follows
  * - Re-centre pill when user pans away
- * - Polls every 6 seconds
+ * - Receives live updates via Supabase Realtime broadcast
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -34,6 +34,9 @@ import { Card } from '../../../ui/Card';
 import { useLiveBuses, type LiveBus } from './useLiveBuses';
 import { BusMarker } from './BusMarker';
 import { sendLocationPing } from '../locationPing';
+import { haversineKm, formatDistance } from '../geo';
+import { useAuth } from '../../../contexts/AuthContext';
+import { supabase } from '../../../lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_HORIZONTAL_MARGIN = 12;
@@ -41,38 +44,24 @@ const CARD_WIDTH = SCREEN_WIDTH - CARD_HORIZONTAL_MARGIN * 2;
 
 // ---------- Helpers ----------
 
-/** Thresholds for deciding bus movement status */
-const SPEED_THRESHOLD = 0.5;       // m/s (~1.8 km/h) - below this = stopped
-const STALE_THRESHOLD_SEC = 60;    // 60s without GPS update = "No Signal"
-const OLD_THRESHOLD_SEC = 30;      // 30s without update = speed data is uncertain
+/** No signal for 5+ min = inactive (trip may still be active on server). */
+const INACTIVE_THRESHOLD_SEC = 300; // 5 minutes
 
-type BusStatus = 'moving' | 'stopped' | 'no_signal';
+type BusStatus = 'active' | 'inactive';
 
 /**
- * Determine bus status from speed + data freshness.
- *
- * - If last GPS update is > 60s old → "no_signal" (we don't know the real state)
- * - If speed > 0.5 m/s AND data is recent → "moving"
- * - Otherwise → "stopped"
+ * Active = we received a GPS update within the last 5 minutes.
+ * Inactive = no update for 5+ minutes (trip may still be active — show alert).
  */
-function getBusStatus(speed: number | null, recordedAt: string | null): BusStatus {
-  if (!recordedAt) return 'no_signal';
-
+function getBusStatus(_speed: number | null, recordedAt: string | null): BusStatus {
+  if (!recordedAt) return 'inactive';
   const ageSec = Math.max(0, (Date.now() - new Date(recordedAt).getTime()) / 1000);
-
-  // Data is too old — we can't trust it
-  if (ageSec > STALE_THRESHOLD_SEC) return 'no_signal';
-
-  // Recent data — use speed to decide
-  if (speed !== null && speed > SPEED_THRESHOLD) return 'moving';
-
-  return 'stopped';
+  return ageSec <= INACTIVE_THRESHOLD_SEC ? 'active' : 'inactive';
 }
 
 const STATUS_CONFIG = {
-  moving:    { label: 'Moving',    color: '#16A34A', bg: '#DCFCE7', icon: 'directions-bus' as const },
-  stopped:   { label: 'Stopped',   color: '#92400E', bg: '#FEF3C7', icon: 'directions-bus' as const },
-  no_signal: { label: 'No Signal', color: '#6B7280', bg: '#F3F4F6', icon: 'signal-wifi-off' as const },
+  active:   { label: 'Active',   color: '#16A34A', bg: '#DCFCE7', icon: 'directions-bus' as const },
+  inactive: { label: 'Inactive', color: '#6B7280', bg: '#F3F4F6', icon: 'signal-wifi-off' as const },
 };
 
 function formatSpeed(speedMs: number | null): string {
@@ -136,14 +125,22 @@ function BusCard({
   textPrimary,
   textSecondary,
   textTertiary,
+  cardBackground,
+  cardSecondaryBg,
+  borderLight,
   onRequestLocation,
+  schoolCoords,
 }: {
   bus: LiveBus;
   primaryColor: string;
   textPrimary: string;
   textSecondary: string;
   textTertiary: string;
+  cardBackground: string;
+  cardSecondaryBg: string;
+  borderLight: string;
   onRequestLocation: (driverId: string) => void;
+  schoolCoords: { lat: number; lng: number } | null;
 }) {
   const status = getBusStatus(bus.speed, bus.recorded_at);
   const cfg = STATUS_CONFIG[status];
@@ -151,8 +148,14 @@ function BusCard({
     bus.total_students > 0 ? (bus.pickup_count / bus.total_students) * 100 : 0;
   const pickupDone = bus.pickup_count === bus.total_students && bus.total_students > 0;
 
+  // Distance from bus to school
+  const distanceLabel =
+    bus.lat != null && bus.lng != null && schoolCoords
+      ? formatDistance(haversineKm(bus.lat, bus.lng, schoolCoords.lat, schoolCoords.lng))
+      : null;
+
   return (
-    <View style={[styles.cardInner, { width: CARD_WIDTH }]}>
+    <View style={[styles.cardInner, { width: CARD_WIDTH, backgroundColor: cardBackground }]}>
       {/* Header: icon + name + status */}
       <View style={styles.cardHeader}>
         <View style={[styles.busIconBox, { backgroundColor: cfg.bg }]}>
@@ -163,7 +166,7 @@ function BusCard({
           <Text style={[styles.plateText, { color: textTertiary }]}>{bus.plate_number}</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
-          {status !== 'no_signal' ? (
+          {status === 'active' ? (
             <PulsingDot color={cfg.color} size={7} />
           ) : (
             <MaterialIcons name="signal-wifi-off" size={12} color={cfg.color} />
@@ -173,14 +176,14 @@ function BusCard({
       </View>
 
       {/* 3-column stats: Speed | Trip | Driver */}
-      <View style={styles.statsRow}>
+      <View style={[styles.statsRow, { backgroundColor: cardSecondaryBg }]}>
         <View style={styles.statCell}>
           <MaterialIcons name="speed" size={15} color="#2563EB" />
           <Text style={[styles.statValue, { color: textPrimary }]}>
             {formatSpeed(bus.speed)}
           </Text>
         </View>
-        <View style={[styles.statCell, styles.statCellBorder]}>
+        <View style={[styles.statCell, styles.statCellBorder, { borderColor: borderLight }]}>
           <MaterialIcons name="schedule" size={15} color="#9333EA" />
           <Text style={[styles.statValue, { color: textPrimary }]}>
             {formatElapsed(bus.started_at)}
@@ -213,29 +216,43 @@ function BusCard({
         </Text>
       </View>
 
-      {/* Footer: last updated + request location */}
+      {/* Footer: distance + last updated + request location */}
       <View style={styles.footerRow}>
         <View style={styles.footerLeft}>
+          {distanceLabel && (
+            <>
+              <MaterialIcons name="place" size={11} color="#2563EB" />
+              <Text style={[styles.footerText, { color: '#2563EB', fontWeight: '700', marginRight: 6 }]}>
+                {distanceLabel}
+              </Text>
+            </>
+          )}
           <MaterialIcons name="update" size={11} color={textTertiary} />
           <Text style={[styles.footerText, { color: textTertiary }]}>
-            Updated {getTimeSinceUpdate(bus.recorded_at)}
+            {getTimeSinceUpdate(bus.recorded_at)}
           </Text>
         </View>
         <TouchableOpacity
-          style={[styles.refreshPill, { backgroundColor: status === 'no_signal' ? '#2563EB' : `${textTertiary}18` }]}
+          style={[styles.refreshPill, { backgroundColor: status === 'inactive' ? '#2563EB' : `${textTertiary}18` }]}
           onPress={() => onRequestLocation(bus.driver_id)}
           activeOpacity={0.7}
         >
           <MaterialIcons
             name="refresh"
             size={12}
-            color={status === 'no_signal' ? '#FFF' : textSecondary}
+            color={status === 'inactive' ? '#FFF' : textSecondary}
           />
-          <Text style={[styles.refreshPillText, { color: status === 'no_signal' ? '#FFF' : textSecondary }]}>
-            {status === 'no_signal' ? 'Request Location' : 'Refresh'}
+          <Text style={[styles.refreshPillText, { color: status === 'inactive' ? '#FFF' : textSecondary }]}>
+            {status === 'inactive' ? 'Request Location' : 'Refresh'}
           </Text>
         </TouchableOpacity>
       </View>
+      {/* Raw coordinates (latitude, longitude) from device GPS — for verification */}
+      {bus.lat != null && bus.lng != null && (
+        <Text style={[styles.footerText, { color: textTertiary, marginTop: 4, fontSize: 10 }]} numberOfLines={1}>
+          {bus.lat.toFixed(5)}, {bus.lng.toFixed(5)}
+        </Text>
+      )}
     </View>
   );
 }
@@ -245,6 +262,7 @@ function BusCard({
 export default function LiveBusMapScreen() {
   const insets = useSafeAreaInsets();
   const { colors, spacing } = useTheme();
+  const { profile } = useAuth();
   const mapRef = useRef<MapView>(null);
   const {
     allBuses,
@@ -260,6 +278,22 @@ export default function LiveBusMapScreen() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
   const carouselRef = useRef<FlatList<LiveBus>>(null);
+
+  // School coordinates (for distance calculation)
+  const [schoolCoords, setSchoolCoords] = useState<{ lat: number; lng: number } | null>(null);
+  useEffect(() => {
+    if (!profile?.school_code) return;
+    supabase
+      .from('schools')
+      .select('lat, lng')
+      .eq('school_code', profile.school_code)
+      .single()
+      .then(({ data }) => {
+        if (data?.lat != null && data?.lng != null) {
+          setSchoolCoords({ lat: data.lat, lng: data.lng });
+        }
+      });
+  }, [profile?.school_code]);
 
   // Unique buses for filter dropdown
   const uniqueBuses = useMemo(() => {
@@ -315,7 +349,14 @@ export default function LiveBusMapScreen() {
   useEffect(() => {
     if (!selectedBusIdRef.current) return;
     const updated = buses.find((b) => b.bus_id === selectedBusIdRef.current);
-    if (updated) setSelectedBus(updated);
+    if (updated) {
+      setSelectedBus(updated);
+    } else {
+      // Bus was removed (trip ended) — clear selection to prevent stale state
+      setSelectedBus(null);
+      setCardOpen(false);
+      setFollowMode(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buses]);
 
@@ -341,7 +382,7 @@ export default function LiveBusMapScreen() {
       setFollowMode(true);
       // Scroll carousel to this bus after it opens
       const idx = buses.findIndex((b) => b.bus_id === bus.bus_id);
-      if (idx >= 0) {
+      if (idx >= 0 && idx < buses.length) {
         setTimeout(() => {
           carouselRef.current?.scrollToIndex({ index: idx, animated: false });
         }, 50);
@@ -396,10 +437,14 @@ export default function LiveBusMapScreen() {
         textPrimary={colors.text.primary}
         textSecondary={colors.text.secondary}
         textTertiary={colors.text.tertiary}
+        cardBackground={colors.surface.primary}
+        cardSecondaryBg={colors.background.secondary}
+        borderLight={colors.border.light}
         onRequestLocation={handleRequestLocation}
+        schoolCoords={schoolCoords}
       />
     ),
-    [colors, handleRequestLocation]
+    [colors, handleRequestLocation, schoolCoords]
   );
 
   const cardKeyExtractor = useCallback((item: LiveBus) => item.bus_id, []);
@@ -550,6 +595,27 @@ export default function LiveBusMapScreen() {
             />
             ))}
         </MapView>
+
+        {/* Inactive alert: trip still active but no GPS for 5+ min */}
+        {buses.length > 0 && (() => {
+          const inactiveBuses = buses.filter((b) => getBusStatus(b.speed, b.recorded_at) === 'inactive');
+          if (inactiveBuses.length === 0) return null;
+          const selectedInactive = selectedBus && getBusStatus(selectedBus.speed, selectedBus.recorded_at) === 'inactive';
+          return (
+            <View style={styles.inactiveAlertBanner}>
+              <View style={styles.inactiveAlertInner}>
+                <MaterialIcons name="warning-amber" size={18} color="#B45309" />
+                <Text style={styles.inactiveAlertText}>
+                  {selectedInactive && selectedBus
+                    ? `No location update for ${selectedBus.bus_number} in 5+ min. Trip still active.`
+                    : inactiveBuses.length === 1
+                      ? '1 bus has had no location update for 5+ min. Trip still active.'
+                      : `${inactiveBuses.length} buses have had no location update for 5+ min.`}
+                </Text>
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Re-centre pill (overlaid on map) */}
         {selectedBus && !followMode && (
@@ -790,6 +856,21 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   errorText: { fontSize: 12, color: '#DC2626', fontWeight: '500', flex: 1 },
+
+  // Inactive alert (trip active but no GPS 5+ min)
+  inactiveAlertBanner: { position: 'absolute', top: 12, left: 16, right: 16, zIndex: 10 },
+  inactiveAlertInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFBEB',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    gap: 8,
+  },
+  inactiveAlertText: { fontSize: 12, color: '#B45309', fontWeight: '600', flex: 1 },
 
   // ===== Carousel =====
   carouselWrapper: {

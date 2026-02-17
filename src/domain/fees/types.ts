@@ -81,6 +81,13 @@ export const InvoiceSchema = z.object({
 
 export type DomainInvoice = z.infer<typeof InvoiceSchema>;
 
+// ==================== INVOICE WITH INLINE ITEMS + PAYMENTS (student view)
+
+export type DomainInvoiceWithItems = DomainInvoice & {
+  items: DomainInvoiceItem[];
+  payments: DomainInvoicePayment[];
+};
+
 // ==================== INVOICE WITH ITEMS & PAYMENTS ====================
 
 export const InvoiceDetailSchema = z.object({

@@ -5,6 +5,10 @@
  * the `gps_logs` table. The driver's identity (and therefore their assigned
  * bus) is derived from the JWT — the client never sends a bus_id.
  *
+ * Additionally:
+ * - UPSERTs the position into `latest_bus_positions` for fast live queries
+ * - Broadcasts the update via Supabase Realtime so viewers get sub-second updates
+ *
  * Endpoint: POST /functions/v1/gps-update
  * Auth:     Bearer <supabase access token>
  *
@@ -197,7 +201,47 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 6. Success
+    // 6. UPSERT latest_bus_positions (best-effort — don't fail the request)
+    try {
+      const { error: upsertError } = await supabaseAdmin
+        .from('latest_bus_positions')
+        .upsert({
+          driver_id: user.id,
+          school_code: userRecord.school_code,
+          trip_id: payload.trip_id,
+          lat: payload.lat,
+          lng: payload.lng,
+          speed: payload.speed,
+          heading: payload.heading,
+          recorded_at: payload.recorded_at,
+        }, { onConflict: 'driver_id' });
+
+      if (upsertError) {
+        console.error('latest_bus_positions upsert failed:', upsertError.message);
+      }
+    } catch (err) {
+      console.error('latest_bus_positions upsert error:', err);
+    }
+
+    // 7. Broadcast position via Realtime (best-effort)
+    //    Uses httpSend for one-shot HTTP broadcast — no WebSocket subscription needed.
+    try {
+      const channel = supabaseAdmin.channel(`buses:${userRecord.school_code}`);
+      await channel.httpSend('gps-update', {
+        driver_id: user.id,
+        lat: payload.lat,
+        lng: payload.lng,
+        speed: payload.speed,
+        heading: payload.heading,
+        recorded_at: payload.recorded_at,
+        trip_id: payload.trip_id,
+      });
+      supabaseAdmin.removeChannel(channel);
+    } catch (err) {
+      console.error('Broadcast error:', err);
+    }
+
+    // 8. Success
     return new Response(
       JSON.stringify({ success: true }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

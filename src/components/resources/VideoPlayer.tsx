@@ -560,9 +560,7 @@ export function VideoPlayer({ uri, title, onClose }: VideoPlayerProps) {
                   subtree: true
                 });
                 
-                // Run periodically as backup
-                setInterval(applyStyles, 500);
-                
+                // MutationObserver above handles ongoing changes — no polling needed.
                 true;
               })();
             `,

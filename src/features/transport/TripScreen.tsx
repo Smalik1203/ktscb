@@ -29,6 +29,8 @@ import { Button } from '../../ui/Button';
 import { Heading, Body, Caption } from '../../ui/Text';
 import { Badge } from '../../ui/Badge';
 import { useTripManager } from './useTripManager';
+import { useTripStore } from './tripStore';
+import { readTripStateFromStorage } from './tripStore';
 import { DriverMap } from './DriverMap';
 import { PickupChecklist } from './trip/PickupChecklist';
 import { useLocationPingListener } from './locationPing';
@@ -142,6 +144,7 @@ function formatHeading(heading: number | null): string {
 export default function TripScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { profile } = useAuth();
   const { colors, spacing, borderRadius, typography } = useTheme();
   const {
     status,
@@ -164,11 +167,40 @@ export default function TripScreen() {
 
   const elapsed = useElapsedTime(startedAt, isActive);
 
+  // Start Trip is driver-only; redirect others to dashboard
+  useEffect(() => {
+    if (profile && profile.role !== 'driver') {
+      router.replace('/(tabs)');
+    }
+  }, [profile, router]);
+
+  // Sync lastLocation from AsyncStorage — the background task writes there and
+  // Zustand doesn't rehydrate, so we poll when trip is active so the UI updates
+  useEffect(() => {
+    if (!isActive) return;
+    const sync = async () => {
+      const state = await readTripStateFromStorage();
+      if (state?.lastLocation) {
+        const current = useTripStore.getState().lastLocation;
+        const ts = state.lastLocation.recorded_at;
+        if (!current || current.recorded_at !== ts) {
+          useTripStore.getState().updateLastLocation(state.lastLocation);
+        }
+      }
+    };
+    sync();
+    const interval = setInterval(sync, 2500);
+    return () => clearInterval(interval);
+  }, [isActive]);
+
   // Listen for admin location pings — only when trip is active
   const { user } = useAuth();
   useLocationPingListener(isActive ? user?.id : undefined);
 
   // ---------- Render ----------
+  if (profile && profile.role !== 'driver') {
+    return null;
+  }
 
   return (
     <ScrollView

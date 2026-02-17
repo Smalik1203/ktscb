@@ -61,7 +61,7 @@ export default function FeedbackScreen() {
     // Fallback: No access
     return (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface.primary }}>
-            <Text style={{ color: colors.text.secondary }}>You don't have access to the feedback module.</Text>
+            <Text style={{ color: colors.text.secondary }}>You don&apos;t have access to the feedback module.</Text>
         </View>
     );
 }

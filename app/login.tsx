@@ -217,7 +217,7 @@ export default function LoginScreen() {
               ...(isDark ? { borderWidth: 1, borderColor: colors.border.light } : shadows.lg),
             }]}>
               <Image
-                source={require('../assets/images/Image.png')}
+                source={require('../assets/images/icon.png')}
                 style={styles.loadingLogo}
                 contentFit="cover"
                 cachePolicy="memory-disk"
@@ -410,7 +410,7 @@ export default function LoginScreen() {
                           }),
                     }]}>
                       <Image
-                        source={require('../assets/images/Image.png')}
+                        source={require('../assets/images/icon.png')}
                         style={styles.logoImage}
                         contentFit="cover"
                         transition={200}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { ThemeColors } from '../../theme/types';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, TextInput as RNTextInput } from 'react-native';
@@ -59,6 +59,11 @@ export function TaskFormModal({
   const [showClassModal, setShowClassModal] = useState(false);
   const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showPriorityModal, setShowPriorityModal] = useState(false);
+  // Defer list render so modal open doesn't block the main thread (fixes freeze when tapping Class)
+  const [classListReady, setClassListReady] = useState(false);
+  const [subjectListReady, setSubjectListReady] = useState(false);
+  const classModalOpenedRef = useRef(false);
+  const subjectModalOpenedRef = useRef(false);
 
   const { data: classes } = useClasses(schoolCode);
   const { data: subjectsResult } = useSubjects(schoolCode);
@@ -97,6 +102,39 @@ export function TaskFormModal({
     setUploadProgress(0);
     setUploadingStatus('');
   };
+
+  // Defer class list render until after modal is visible to avoid UI freeze when tapping Class
+  useEffect(() => {
+    if (showClassModal) {
+      if (!classModalOpenedRef.current) {
+        classModalOpenedRef.current = true;
+        setClassListReady(false);
+        const id = requestAnimationFrame(() => {
+          requestAnimationFrame(() => setClassListReady(true));
+        });
+        return () => cancelAnimationFrame(id);
+      }
+    } else {
+      classModalOpenedRef.current = false;
+      setClassListReady(false);
+    }
+  }, [showClassModal]);
+
+  useEffect(() => {
+    if (showSubjectModal) {
+      if (!subjectModalOpenedRef.current) {
+        subjectModalOpenedRef.current = true;
+        setSubjectListReady(false);
+        const id = requestAnimationFrame(() => {
+          requestAnimationFrame(() => setSubjectListReady(true));
+        });
+        return () => cancelAnimationFrame(id);
+      }
+    } else {
+      subjectModalOpenedRef.current = false;
+      setSubjectListReady(false);
+    }
+  }, [showSubjectModal]);
 
   const handlePickDocument = async () => {
     try {
@@ -264,6 +302,7 @@ export function TaskFormModal({
 
       // Submit task and get the task ID
       const taskId = await onSubmit(tempTaskData);
+      const isEdit = !!task;
 
       // Upload attachments if any
       if (attachments.length > 0) {
@@ -277,22 +316,21 @@ export function TaskFormModal({
           // Update task with attachment URLs via service (capability assertion happens there)
           try {
             await tasksService.updateAttachments(taskId, uploadedAttachments);
-            Alert.alert('Success', `Task created with ${uploadedAttachments.length} file(s)!`);
+            Alert.alert('Success', isEdit ? `Task updated with ${uploadedAttachments.length} file(s)!` : `Task created with ${uploadedAttachments.length} file(s)!`);
           } catch (updateError: any) {
             Alert.alert(
               'Warning',
-              `Task created but failed to save attachments: ${updateError.message}. Please try editing the task to add files.`
+              isEdit ? `Task updated but failed to save attachments: ${updateError.message}. Please try editing again.` : `Task created but failed to save attachments: ${updateError.message}. Please try editing the task to add files.`
             );
           }
         } catch (uploadError: any) {
-          // File upload failed - alert shown below
           Alert.alert(
             'Warning',
-            `Task created but file upload failed: ${uploadError.message || 'Unknown error'}. Please try editing the task to add files.`
+            isEdit ? `Task updated but file upload failed: ${uploadError.message || 'Unknown error'}.` : `Task created but file upload failed: ${uploadError.message || 'Unknown error'}. Please try editing the task to add files.`
           );
         }
       } else {
-        Alert.alert('Success', 'Task created successfully!');
+        Alert.alert('Success', isEdit ? 'Task updated successfully!' : 'Task created successfully!');
       }
 
       resetForm();
@@ -574,75 +612,87 @@ export function TaskFormModal({
         </Button>
       </ThemedModal>
 
-      {/* Class Selection Modal */}
+      {/* Class Selection Modal - list deferred so opening it doesn't freeze the UI */}
       <ThemedModal
         visible={showClassModal}
         onDismiss={() => setShowClassModal(false)}
         contentContainerStyle={styles.selectionModal}
       >
         <Text style={styles.selectionModalTitle}>Select Class</Text>
-        <ScrollView style={styles.selectionList} showsVerticalScrollIndicator={true}>
-          {classes?.map((cls) => (
-            <TouchableOpacity
-              key={cls.id}
-              style={[
-                styles.selectionItem,
-                selectedClassId === cls.id && styles.selectionItemSelected,
-              ]}
-              onPress={() => {
-                setSelectedClassId(cls.id);
-                setShowClassModal(false);
-              }}
-            >
-              <Text style={[
-                styles.selectionItemText,
-                selectedClassId === cls.id && styles.selectionItemTextSelected,
-              ]}>
-                Grade {cls.grade} - Section {cls.section}
-              </Text>
-              {selectedClassId === cls.id && (
-                <MaterialIcons name="check" size={18} color={colors.primary[600]} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {classListReady ? (
+          <ScrollView style={styles.selectionList} showsVerticalScrollIndicator={true}>
+            {classes?.map((cls) => (
+              <TouchableOpacity
+                key={cls.id}
+                style={[
+                  styles.selectionItem,
+                  selectedClassId === cls.id && styles.selectionItemSelected,
+                ]}
+                onPress={() => {
+                  setSelectedClassId(cls.id);
+                  setShowClassModal(false);
+                }}
+              >
+                <Text style={[
+                  styles.selectionItemText,
+                  selectedClassId === cls.id && styles.selectionItemTextSelected,
+                ]}>
+                  Grade {cls.grade} - Section {cls.section}
+                </Text>
+                {selectedClassId === cls.id && (
+                  <MaterialIcons name="check" size={18} color={colors.primary[600]} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={[styles.selectionList, { justifyContent: 'center', alignItems: 'center', minHeight: 80 }]}>
+            <ActivityIndicator size="small" color={colors.primary[600]} />
+          </View>
+        )}
         <Button variant="outline" onPress={() => setShowClassModal(false)} style={styles.selectionModalButton}>
           Close
         </Button>
       </ThemedModal>
 
-      {/* Subject Selection Modal */}
+      {/* Subject Selection Modal - list deferred so opening doesn't freeze */}
       <ThemedModal
         visible={showSubjectModal}
         onDismiss={() => setShowSubjectModal(false)}
         contentContainerStyle={styles.selectionModal}
       >
         <Text style={styles.selectionModalTitle}>Select Subject</Text>
-        <ScrollView style={styles.selectionList} showsVerticalScrollIndicator={true}>
-          {filteredSubjects?.map((subject) => (
-            <TouchableOpacity
-              key={subject.id}
-              style={[
-                styles.selectionItem,
-                selectedSubjectId === subject.id && styles.selectionItemSelected,
-              ]}
-              onPress={() => {
-                setSelectedSubjectId(subject.id);
-                setShowSubjectModal(false);
-              }}
-            >
-              <Text style={[
-                styles.selectionItemText,
-                selectedSubjectId === subject.id && styles.selectionItemTextSelected,
-              ]}>
-                {subject.subject_name}
-              </Text>
-              {selectedSubjectId === subject.id && (
-                <MaterialIcons name="check" size={18} color={colors.primary[600]} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {subjectListReady ? (
+          <ScrollView style={styles.selectionList} showsVerticalScrollIndicator={true}>
+            {filteredSubjects?.map((subject) => (
+              <TouchableOpacity
+                key={subject.id}
+                style={[
+                  styles.selectionItem,
+                  selectedSubjectId === subject.id && styles.selectionItemSelected,
+                ]}
+                onPress={() => {
+                  setSelectedSubjectId(subject.id);
+                  setShowSubjectModal(false);
+                }}
+              >
+                <Text style={[
+                  styles.selectionItemText,
+                  selectedSubjectId === subject.id && styles.selectionItemTextSelected,
+                ]}>
+                  {subject.subject_name}
+                </Text>
+                {selectedSubjectId === subject.id && (
+                  <MaterialIcons name="check" size={18} color={colors.primary[600]} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={[styles.selectionList, { justifyContent: 'center', alignItems: 'center', minHeight: 80 }]}>
+            <ActivityIndicator size="small" color={colors.primary[600]} />
+          </View>
+        )}
         <Button variant="outline" onPress={() => setShowSubjectModal(false)} style={styles.selectionModalButton}>
           Close
         </Button>

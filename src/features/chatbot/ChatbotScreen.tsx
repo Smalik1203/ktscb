@@ -62,7 +62,7 @@ export function ChatbotScreen() {
                 </View>
 
                 <Text style={[styles.comingSoonDescription, { color: colors.text.tertiary }]}>
-                    We're working on bringing you an intelligent AI assistant to help with your studies. Stay tuned!
+                    We&apos;re working on bringing you an intelligent AI assistant to help with your studies. Stay tuned!
                 </Text>
             </ScrollView>
         </View>

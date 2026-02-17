@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { Tabs, useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { AppNavbar } from '../../src/components/layout/AppNavbarExpo';
 import { useCapabilities } from '../../src/hooks/useCapabilities';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   const { profile, status, loading, bootstrapping } = useAuth();
   const { can, isLoading: capabilitiesLoading } = useCapabilities();
   const router = useRouter();
@@ -58,6 +60,10 @@ export default function TabLayout() {
             />
           ),
           tabBarStyle: { display: 'none' }, // Hide bottom navigation bar - sidebar is enough
+          freezeOnBlur: true,               // Prevent re-renders on unfocused screens
+          lazy: true,                       // Only mount screen when first visited
+          // Ensure all tab screens respect bottom safe area (home indicator, etc.)
+          sceneStyle: { flex: 1, paddingBottom: insets.bottom },
         }}
       >
         <Tabs.Screen
@@ -209,13 +215,13 @@ export default function TabLayout() {
           }}
         />
 
-        {/* Transport Screen - Driver / Admin */}
+        {/* Transport Screen - Driver only (Start Trip); admins use Buses/Live etc. */}
         <Tabs.Screen
           name="transport"
           options={{
             title: 'Transport',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="directions-bus" size={size} color={color} />,
-            href: canTrackTransport ? '/(tabs)/transport' : null,
+            href: isDriver && canTrackTransport ? '/(tabs)/transport' : null,
           }}
         />
 
@@ -256,6 +262,15 @@ export default function TabLayout() {
             title: 'Live Tracking',
             tabBarIcon: ({ size, color }) => <MaterialIcons name="my-location" size={size} color={color} />,
             href: canManageTransport ? '/(tabs)/transport-live' : null,
+          }}
+        />
+
+        {/* Transport Admin: School Location (hidden from tab bar, accessed via Buses screen) */}
+        <Tabs.Screen
+          name="transport-school-location"
+          options={{
+            title: 'School Location',
+            href: null,
           }}
         />
 

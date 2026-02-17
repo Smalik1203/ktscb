@@ -220,20 +220,11 @@ export const getHolidayInfo = async (
   classInstanceId?: string
 ): Promise<CalendarEvent | null> => {
   try {
-    // Check for Sunday
-    const dayOfWeek = new Date(date).getDay();
-    if (dayOfWeek === 0) {
-      return {
-        id: 'sunday',
-        title: 'Sunday',
-        description: 'Sunday is a weekend day. No timetable can be scheduled.',
-        event_type: 'holiday',
-        start_date: date,
-        is_all_day: true,
-        is_active: true,
-        color: '#faad14',
-        school_code: schoolCode,
-      };
+    // Product requirement: never auto-block Sundays in attendance flow.
+    const [year, month, day] = date.split('-').map(Number);
+    const weekday = new Date(year, month - 1, day, 12, 0, 0, 0).getDay();
+    if (weekday === 0) {
+      return null;
     }
 
     // Check for explicit holidays in the database
@@ -242,20 +233,23 @@ export const getHolidayInfo = async (
       .select('id, school_code, academic_year_id, title, description, event_type, start_date, end_date, is_all_day, start_time, end_time, is_recurring, recurrence_pattern, recurrence_interval, recurrence_end_date, color, is_active, created_by, created_at, updated_at, class_instance_id')
       .eq('school_code', schoolCode)
       .eq('event_type', 'holiday')
-      .lte('start_date', date)
-      .gte('end_date', date)
       .eq('is_active', true);
 
     if (classInstanceId) {
       query = query.or(`class_instance_id.eq.${classInstanceId},class_instance_id.is.null`);
     }
 
-    const { data, error } = await query.maybeSingle();
+    const { data, error } = await query.order('start_date', { ascending: false }).limit(200);
+    if (error) throw error;
 
-    if (error && error.code !== 'PGRST116') throw error;
-    return data ? {
-      ...data,
-      description: data.description || undefined,
+    const holiday = (data || []).find((item) => {
+      const endDate = item.end_date || item.start_date;
+      return item.start_date <= date && endDate >= date;
+    });
+
+    return holiday ? {
+      ...holiday,
+      description: holiday.description || undefined,
     } as CalendarEvent : null;
   } catch (error) {
     return null;
@@ -295,4 +289,3 @@ export const getStudentCalendarData = async (
     throw error;
   }
 };
-

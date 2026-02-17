@@ -13,7 +13,8 @@ import { Body, Caption, Heading } from '../../../ui';
 import { GeneratedQuestion } from '../../../services/aiTestGeneratorFetch';
 
 // Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+const isNewArchitecture = Boolean((globalThis as any).nativeFabricUIManager);
+if (Platform.OS === 'android' && !isNewArchitecture && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 

@@ -9,7 +9,7 @@
  * - Recent completed trips with duration and pickup count
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -22,6 +22,7 @@ import {
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -119,9 +120,12 @@ export default function DriverDashboard() {
     }
   }, [profile?.auth_id]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // Refetch whenever this screen gains focus (prevents stale data after navigating back)
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+    }, [fetchData])
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);

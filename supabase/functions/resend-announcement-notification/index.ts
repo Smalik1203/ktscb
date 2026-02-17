@@ -47,12 +47,12 @@ Deno.serve(async (req: Request) => {
                 .eq('school_code', announcement.school_code);
             userIds = users?.map(u => u.id) || [];
         } else if (announcement.target_type === 'class' && announcement.class_instance_id) {
-            // Get all students in class
+            // Get all students in class (student table has auth_user_id, not user_id)
             const { data: students } = await supabase
                 .from('student')
-                .select('user_id')
+                .select('auth_user_id')
                 .eq('class_instance_id', announcement.class_instance_id);
-            userIds = students?.map(s => s.user_id).filter(Boolean) || [];
+            userIds = students?.map(s => s.auth_user_id).filter(Boolean) || [];
         } else if (announcement.target_type === 'role' && announcement.target_role) {
             // Get all users with specific role
             const { data: users } = await supabase

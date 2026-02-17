@@ -578,7 +578,7 @@ export default function ProgressTrackingScreen() {
               <MaterialIcons name="auto-awesome" size={18} color={colors.primary[600]} />
             </View>
             <View style={styles.aiInsightsContent}>
-              <Text style={styles.aiInsightsTitle}>Sage's Insight</Text>
+              <Text style={styles.aiInsightsTitle}>Sage&apos;s Insight</Text>
               <Text style={styles.aiInsightsSubtitle}>
                 {reportComment ? 'View generated comment' : 'Generate personalized comment'}
               </Text>
@@ -612,7 +612,7 @@ export default function ProgressTrackingScreen() {
                   <MaterialIcons name="auto-awesome" size={24} color={colors.primary[600]} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.commentModalTitle}>Sage's Insight</Text>
+                  <Text style={styles.commentModalTitle}>Sage&apos;s Insight</Text>
                   <Text style={styles.commentModalSubtitle}>
                     Personalized for {selectedStudentName || 'student'}
                   </Text>
@@ -633,11 +633,11 @@ export default function ProgressTrackingScreen() {
               ) : reportComment ? (
                 <ScrollView style={styles.commentModalScroll} showsVerticalScrollIndicator={false}>
                   <View style={styles.commentModalTextBox}>
-                    <Text style={styles.commentModalQuote}>"</Text>
+                    <Text style={styles.commentModalQuote}>&quot;</Text>
                     <Text style={styles.commentModalText}>
                       {reportComment.generatedComment}
                     </Text>
-                    <Text style={[styles.commentModalQuote, styles.commentModalQuoteEnd]}>"</Text>
+                    <Text style={[styles.commentModalQuote, styles.commentModalQuoteEnd]}>&quot;</Text>
                   </View>
 
                   <View style={styles.commentModalChips}>

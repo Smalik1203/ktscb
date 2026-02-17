@@ -16,8 +16,8 @@
   
   "assets": {
     "icon": "./assets/images/icon.png",
-    "adaptiveIcon": "./assets/images/adaptive-icon.png",
-    "splash": "./assets/images/Image.png",
+    "adaptiveIcon": "./assets/images/icon.png",
+    "splash": "./assets/images/icon.png",
     "notificationIcon": "./assets/images/notification-icon.png"
   },
   

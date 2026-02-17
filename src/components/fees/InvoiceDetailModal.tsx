@@ -259,7 +259,7 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
             <View style={styles.loading}>
               <Text style={styles.errorText}>Invoice not found</Text>
               <Text style={styles.errorSubtext}>
-                This invoice may have been deleted or you don't have access to it.
+                This invoice may have been deleted or you don&apos;t have access to it.
               </Text>
               <Button
                 variant="outline"
@@ -706,8 +706,8 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
             </ScrollView>
           )}
 
-          {/* Footer */}
-          {invoice && !showPaymentForm && (
+          {/* Footer — admin-only actions */}
+          {invoice && !showPaymentForm && canAddItems && (
             <View style={styles.footer}>
               {balance > 0 && (
                 <View style={styles.footerButtonRow}>

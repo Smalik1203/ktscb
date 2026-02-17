@@ -11,6 +11,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Dimensions, RefreshControlProps, Platform,
 } from 'react-native';
+import { format } from 'date-fns';
 import { useTheme, ThemeColors } from '../../contexts/ThemeContext';
 import { CalendarEvent } from '../../hooks/useCalendarEvents';
 
@@ -24,7 +25,7 @@ interface CalendarMonthViewProps {
 
 const { width, height } = Dimensions.get('window');
 const cellWidth = width / 7;
-const cellHeight = Math.max((height - 220) / 6, 90);
+const cellHeight = Math.max((height - 220) / 6, 72);
 
 // ── Event type → color mapping (shared with CalendarScreen) ────────
 const EVENT_TYPE_COLORS: Record<string, string> = {
@@ -54,12 +55,10 @@ export default function CalendarMonthView({
 
   // ── Helpers ──────────────────────────────────────────────────
   const getEventsForDate = (date: Date): CalendarEvent[] => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = format(date, 'yyyy-MM-dd');
     return events.filter((event) => {
-      const eventStart = new Date(event.start_date);
-      const eventEnd = event.end_date ? new Date(event.end_date) : eventStart;
-      const checkDate = new Date(dateStr);
-      return checkDate >= eventStart && checkDate <= eventEnd;
+      const eventEnd = event.end_date || event.start_date;
+      return dateStr >= event.start_date && dateStr <= eventEnd;
     });
   };
 
@@ -127,7 +126,6 @@ export default function CalendarMonthView({
               const isHoliday = isHolidayDate(day);
               const dayEvents = getEventsForDate(day);
               const dots = getUniqueDots(dayEvents);
-              const eventCount = dayEvents.length;
 
               return (
                 <TouchableOpacity
@@ -144,42 +142,28 @@ export default function CalendarMonthView({
                   }}
                   activeOpacity={0.6}
                 >
-                  {/* Date number + count badge */}
-                  <View style={styles.dateRow}>
-                    <View style={[
-                      styles.dateCircle,
-                      isToday && styles.dateCircleToday,
+                  {/* Date number */}
+                  <View style={[
+                    styles.dateCircle,
+                    isToday && styles.dateCircleToday,
+                  ]}>
+                    <Text style={[
+                      styles.dateText,
+                      !isCurrentMonth && styles.dateTextMuted,
+                      isToday && styles.dateTextToday,
+                      (isWeekend || isHoliday) && isCurrentMonth && !isToday && styles.dateTextSpecial,
                     ]}>
-                      <Text style={[
-                        styles.dateText,
-                        !isCurrentMonth && styles.dateTextMuted,
-                        isToday && styles.dateTextToday,
-                        (isWeekend || isHoliday) && isCurrentMonth && !isToday && styles.dateTextSpecial,
-                      ]}>
-                        {day.getDate()}
-                      </Text>
-                    </View>
-                    {eventCount > 0 && isCurrentMonth && (
-                      <View style={styles.countBadge}>
-                        <Text style={styles.countBadgeText}>{eventCount}</Text>
-                      </View>
-                    )}
+                      {day.getDate()}
+                    </Text>
                   </View>
 
-                  {/* Colored dots row */}
+                  {/* Colored dots — anchored to bottom of cell */}
                   {dots.length > 0 && isCurrentMonth && (
                     <View style={styles.dotsRow}>
                       {dots.map((dotColor, i) => (
                         <View key={i} style={[styles.dot, { backgroundColor: dotColor }]} />
                       ))}
                     </View>
-                  )}
-
-                  {/* First event title preview (if space) */}
-                  {dayEvents.length > 0 && isCurrentMonth && (
-                    <Text style={styles.eventPreview} numberOfLines={1}>
-                      {dayEvents[0].title}
-                    </Text>
                   )}
                 </TouchableOpacity>
               );
@@ -229,7 +213,10 @@ const createStyles = (
     borderRightWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderColor: isDark ? colors.neutral[700] : colors.neutral[100],
-    paddingHorizontal: 4, paddingTop: 4, paddingBottom: 2,
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 6,
+    justifyContent: 'space-between',
     backgroundColor: colors.surface.primary,
   },
   todayCell: {
@@ -242,41 +229,22 @@ const createStyles = (
     backgroundColor: isDark ? `${colors.success[600]}12` : '#f0fdf4',
   },
 
-  // ── Date number row ────────────────────────────────────────
-  dateRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 2,
-  },
+  // ── Date number ────────────────────────────────────────────
   dateCircle: {
-    width: 26, height: 26, borderRadius: 13,
+    width: 28, height: 28, borderRadius: 14,
     justifyContent: 'center', alignItems: 'center',
   },
   dateCircleToday: {
     backgroundColor: colors.primary[600],
   },
   dateText: {
-    fontSize: 13, fontWeight: '600' as const, color: colors.text.primary,
+    fontSize: 13, fontWeight: '500' as const, color: colors.text.primary,
   },
   dateTextMuted: { color: colors.text.tertiary, fontWeight: '400' as const },
   dateTextToday: { color: '#fff', fontWeight: '700' as const },
   dateTextSpecial: { color: colors.error[500] },
 
-  // ── Count badge ────────────────────────────────────────────
-  countBadge: {
-    minWidth: 16, height: 16, borderRadius: 8,
-    backgroundColor: isDark ? colors.neutral[600] : colors.neutral[200],
-    justifyContent: 'center', alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  countBadgeText: { fontSize: 9, fontWeight: '700' as const, color: colors.text.secondary },
-
-  // ── Dots ───────────────────────────────────────────────────
-  dotsRow: { flexDirection: 'row', gap: 3, marginBottom: 2, paddingLeft: 2 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
-
-  // ── Event preview ──────────────────────────────────────────
-  eventPreview: {
-    fontSize: 9, fontWeight: '500' as const, color: colors.text.secondary,
-    lineHeight: 12, paddingLeft: 2,
-  },
+  // ── Dots (anchored at bottom) ──────────────────────────────
+  dotsRow: { flexDirection: 'row', gap: 3, justifyContent: 'center' },
+  dot: { width: 5, height: 5, borderRadius: 2.5 },
 });

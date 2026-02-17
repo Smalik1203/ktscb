@@ -74,7 +74,8 @@ export function useTasks(schoolCode: string, filters?: TaskFilters) {
         `)
         .eq('school_code', schoolCode)
         .eq('is_active', true)
-        .order('due_date', { ascending: true });
+        .order('due_date', { ascending: true })
+        .limit(200);
 
       if (filters?.classInstanceId) {
         query = query.eq('class_instance_id', filters.classInstanceId);
@@ -133,7 +134,8 @@ export function useStudentTasks(studentId: string) {
         .eq('school_code', studentSchoolCode)
         .eq('class_instance_id', student.class_instance_id || '')
         .eq('is_active', true)
-        .order('due_date', { ascending: true });
+        .order('due_date', { ascending: true })
+        .limit(100);
 
       if (tasksError) throw tasksError;
 
@@ -141,7 +143,8 @@ export function useStudentTasks(studentId: string) {
       const { data: submissions, error: submissionsError } = await supabase
         .from('task_submissions')
         .select('task_id, status, submitted_at')
-        .eq('student_id', studentId);
+        .eq('student_id', studentId)
+        .limit(200);
 
       if (submissionsError) throw submissionsError;
 

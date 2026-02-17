@@ -17,6 +17,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -45,6 +46,7 @@ interface Bus {
 export default function BusManagementScreen() {
   const { colors, isDark } = useTheme();
   const { profile } = useAuth();
+  const router = useRouter();
   const schoolCode = profile?.school_code;
 
   // List state
@@ -344,6 +346,22 @@ export default function BusManagementScreen() {
           renderItem={renderBusCard}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          ListHeaderComponent={
+            <TouchableOpacity
+              style={styles.locationCard}
+              onPress={() => router.push('/(tabs)/transport-school-location')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.locationIcon, { backgroundColor: `${colors.primary[600]}12` }]}>
+                <MaterialIcons name="place" size={22} color={colors.primary[600]} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.locationTitle, { color: colors.text.primary }]}>School Location</Text>
+                <Text style={[styles.locationSub, { color: colors.text.tertiary }]}>Set destination for bus distance</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={22} color={colors.text.tertiary} />
+            </TouchableOpacity>
+          }
         />
       )}
 
@@ -419,6 +437,32 @@ function createStyles(colors: any, isDark: boolean) {
     statText: {
       fontSize: typography.fontSize.sm,
       color: colors.text.tertiary,
+    },
+    // School location card
+    locationCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface.primary,
+      borderRadius: borderRadius.md,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      gap: spacing.sm,
+      ...shadows.sm,
+    },
+    locationIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    locationTitle: {
+      fontSize: typography.fontSize.base,
+      fontWeight: typography.fontWeight.semibold as any,
+    },
+    locationSub: {
+      fontSize: typography.fontSize.xs,
+      marginTop: 1,
     },
     // Form
     formHeader: {

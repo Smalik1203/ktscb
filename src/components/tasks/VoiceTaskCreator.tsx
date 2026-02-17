@@ -539,7 +539,7 @@ export function VoiceTaskCreator({
                         </Text>
                         {field?.source === 'inferred' && field.raw_input && (
                             <Text style={styles.previewFieldHint}>
-                                Parsed from: "{field.raw_input}"
+                                Parsed from: &quot;{field.raw_input}&quot;
                             </Text>
                         )}
                     </View>

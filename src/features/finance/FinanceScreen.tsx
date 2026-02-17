@@ -276,7 +276,7 @@ export default function FinanceScreen() {
     queryKey: ['finance-reports', 'income-vs-expense', schoolCode, dateRange.startDate, dateRange.endDate],
     queryFn: () => financeReportsService.getIncomeVsExpense(schoolCode!, dateRange.startDate, dateRange.endDate),
     enabled: !!schoolCode,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 5 * 60 * 1000, // 2 minutes
     gcTime: 10 * 60 * 1000,
     refetchOnMount: true,
   });
@@ -290,7 +290,7 @@ export default function FinanceScreen() {
       limit: 100,
     }),
     enabled: !!schoolCode,
-    staleTime: 2 * 60 * 1000, // 2 minutes
+    staleTime: 5 * 60 * 1000, // 2 minutes
     gcTime: 10 * 60 * 1000,
     refetchOnMount: true,
   });

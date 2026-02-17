@@ -16,8 +16,94 @@ export interface StepIndicatorProps {
     labels?: string[];
 }
 
+function StepDot({
+    stepIndex,
+    currentStep,
+    label,
+}: {
+    stepIndex: number;
+    currentStep: number;
+    label?: string;
+}) {
+    const { colors } = useTheme();
+    const isCompleted = stepIndex < currentStep;
+    const isCurrent = stepIndex === currentStep;
+    const scaleAnim = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+        if (isCurrent) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(scaleAnim, {
+                        toValue: 1.1,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(scaleAnim, {
+                        toValue: 1,
+                        duration: 800,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+        } else {
+            scaleAnim.setValue(1);
+        }
+    }, [isCurrent, scaleAnim]);
+
+    return (
+        <View style={styles.stepContainer}>
+            <Animated.View
+                style={[
+                    styles.stepDot,
+                    {
+                        backgroundColor: isCompleted
+                            ? colors.success[500]
+                            : isCurrent
+                                ? colors.primary[600]
+                                : colors.neutral[200],
+                        transform: [{ scale: isCurrent ? scaleAnim : 1 }],
+                        borderWidth: isCurrent ? 3 : 0,
+                        borderColor: colors.primary[200],
+                    },
+                ]}
+            >
+                {isCompleted ? (
+                    <MaterialIcons name="check" size={14} color={colors.text.inverse} />
+                ) : (
+                    <View
+                        style={[
+                            styles.stepDotInner,
+                            {
+                                backgroundColor: isCurrent ? colors.text.inverse : 'transparent',
+                            },
+                        ]}
+                    />
+                )}
+            </Animated.View>
+            {label != null && label !== '' && (
+                <Animated.Text
+                    style={[
+                        styles.stepLabel,
+                        {
+                            color: isCurrent
+                                ? colors.primary[600]
+                                : isCompleted
+                                    ? colors.success[600]
+                                    : colors.text.tertiary,
+                            fontWeight: isCurrent ? '600' : '400',
+                        },
+                    ]}
+                >
+                    {label}
+                </Animated.Text>
+            )}
+        </View>
+    );
+}
+
 export function StepIndicator({ currentStep, totalSteps, labels }: StepIndicatorProps) {
-    const { colors, spacing, borderRadius } = useTheme();
+    const { colors } = useTheme();
     const progressAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -28,86 +114,6 @@ export function StepIndicator({ currentStep, totalSteps, labels }: StepIndicator
             useNativeDriver: false,
         }).start();
     }, [currentStep, progressAnim]);
-
-    const renderStep = (stepIndex: number) => {
-        const isCompleted = stepIndex < currentStep;
-        const isCurrent = stepIndex === currentStep;
-        const isUpcoming = stepIndex > currentStep;
-
-        // Animated scale for current step
-        const scaleAnim = useRef(new Animated.Value(1)).current;
-
-        useEffect(() => {
-            if (isCurrent) {
-                Animated.loop(
-                    Animated.sequence([
-                        Animated.timing(scaleAnim, {
-                            toValue: 1.1,
-                            duration: 800,
-                            useNativeDriver: true,
-                        }),
-                        Animated.timing(scaleAnim, {
-                            toValue: 1,
-                            duration: 800,
-                            useNativeDriver: true,
-                        }),
-                    ])
-                ).start();
-            } else {
-                scaleAnim.setValue(1);
-            }
-        }, [isCurrent, scaleAnim]);
-
-        return (
-            <View key={stepIndex} style={styles.stepContainer}>
-                <Animated.View
-                    style={[
-                        styles.stepDot,
-                        {
-                            backgroundColor: isCompleted
-                                ? colors.success[500]
-                                : isCurrent
-                                    ? colors.primary[600]
-                                    : colors.neutral[200],
-                            transform: [{ scale: isCurrent ? scaleAnim : 1 }],
-                            borderWidth: isCurrent ? 3 : 0,
-                            borderColor: colors.primary[200],
-                        },
-                    ]}
-                >
-                    {isCompleted ? (
-                        <MaterialIcons name="check" size={14} color={colors.text.inverse} />
-                    ) : (
-                        <View
-                            style={[
-                                styles.stepDotInner,
-                                {
-                                    backgroundColor: isCurrent ? colors.text.inverse : 'transparent',
-                                },
-                            ]}
-                        />
-                    )}
-                </Animated.View>
-                {labels && labels[stepIndex] && (
-                    <Animated.Text
-                        style={[
-                            styles.stepLabel,
-                            {
-                                color: isCurrent
-                                    ? colors.primary[600]
-                                    : isCompleted
-                                        ? colors.success[600]
-                                        : colors.text.tertiary,
-                                fontWeight: isCurrent ? '600' : '400',
-                            },
-                        ]}
-                    >
-                        {labels[stepIndex]}
-                    </Animated.Text>
-                )}
-            </View>
-        );
-    };
 
     const renderConnector = (index: number) => {
         const isCompleted = index < currentStep;
@@ -144,7 +150,11 @@ export function StepIndicator({ currentStep, totalSteps, labels }: StepIndicator
         <View style={styles.container}>
             {Array.from({ length: totalSteps }).map((_, index) => (
                 <React.Fragment key={index}>
-                    {renderStep(index)}
+                    <StepDot
+                        stepIndex={index}
+                        currentStep={currentStep}
+                        label={labels?.[index]}
+                    />
                     {index < totalSteps - 1 && renderConnector(index)}
                 </React.Fragment>
             ))}

@@ -43,7 +43,8 @@ export function DriverMap({ lat, lng, heading, speed, recordedAt }: DriverMapPro
     );
   }, [lat, lng]);
 
-  const speedKmh = speed !== null && speed >= 0 ? Math.round(speed * 3.6) : null;
+  const speedLabel =
+    speed !== null && speed >= 0 ? `${Math.round(speed * 3.6)} km/h` : '--';
 
   return (
     <View style={[styles.wrapper, { borderColor: colors.border.DEFAULT }]}>
@@ -91,14 +92,12 @@ export function DriverMap({ lat, lng, heading, speed, recordedAt }: DriverMapPro
         </Marker>
       </MapView>
 
-      {/* Overlay: speed badge (top-left) */}
-      {speedKmh !== null && (
-        <View style={[styles.speedBadge, { backgroundColor: colors.background.primary }]}>
-          <Caption style={{ fontWeight: '700', color: colors.text.primary }}>
-            {speedKmh} km/h
-          </Caption>
-        </View>
-      )}
+      {/* Overlay: speed badge (top-left) — always show; "--" when device doesn't report speed */}
+      <View style={[styles.speedBadge, { backgroundColor: colors.background.primary }]}>
+        <Caption style={{ fontWeight: '700', color: colors.text.primary }}>
+          {speedLabel}
+        </Caption>
+      </View>
 
       {/* Overlay: timestamp (bottom-right) */}
       <View style={[styles.timeBadge, { backgroundColor: colors.background.primary }]}>

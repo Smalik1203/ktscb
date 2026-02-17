@@ -56,7 +56,7 @@ export function useAcademicYears(schoolCode: string | null | undefined) {
       return (data as AcademicYear[]) || [];
     },
     enabled: !!schoolCode,
-    staleTime: 60_000, // 1 minute
+    staleTime: 5 * 60 * 1000, // 1 minute
   });
 }
 
@@ -88,7 +88,7 @@ export function useActiveAcademicYear(schoolCode: string | null | undefined) {
       return (data as AcademicYear | null) || null;
     },
     enabled: !!schoolCode,
-    staleTime: 60_000, // 1 minute
+    staleTime: 5 * 60 * 1000, // 1 minute
   });
 }
 

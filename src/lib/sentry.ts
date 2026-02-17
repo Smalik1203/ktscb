@@ -1,25 +1,29 @@
-// src/lib/sentry.ts
-// Sentry error tracking configuration
-//
-// IMPORTANT: Every public function is wrapped in try-catch so that a broken
-// or misconfigured Sentry SDK can never crash the app.
+import Constants from 'expo-constants';
 
 let Sentry: typeof import('@sentry/react-native') | null = null;
+let devSkippedLogged = false;
 
 try {
   Sentry = require('@sentry/react-native');
 } catch (e) {
-  // Native module failed to load – Sentry is disabled for this session.
-  console.warn('[Sentry] Failed to load native module:', e);
+  if (__DEV__) {
+    console.warn('[Sentry] Failed to load native module:', e);
+  }
+}
+
+function getRelease(): string {
+  const slug = Constants.expoConfig?.slug ?? 'classbridge';
+  const version = Constants.expoConfig?.version ?? '1.0.0';
+  return `${slug}@${version}`;
 }
 
 export function initSentry() {
   try {
-    // Only initialize in production or if DSN is provided
     const sentryDSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
 
     if (!sentryDSN || !Sentry) {
-      if (__DEV__) {
+      if (__DEV__ && !devSkippedLogged) {
+        devSkippedLogged = true;
         console.log('Sentry DSN not configured or module unavailable – error tracking disabled');
       }
       return;
@@ -27,96 +31,96 @@ export function initSentry() {
 
     Sentry.init({
       dsn: sentryDSN,
-
-      // Set environment
       environment: __DEV__ ? 'development' : 'production',
-
-      // Enable native crash reporting
       enableNative: true,
-
-      // Enable in-app tracing for performance monitoring
-      tracesSampleRate: __DEV__ ? 1.0 : 0.2, // 100% in dev, 20% in production
-
-      // Capture 100% of errors
+      tracesSampleRate: __DEV__ ? 1.0 : 0.2,
       sampleRate: 1.0,
-
-      // Attach stack traces to messages
       attachStacktrace: true,
-
-      // Only send events in production (or if specifically enabled)
       enabled: !__DEV__ || !!sentryDSN,
+      release: getRelease(),
+      dist: Constants.expoConfig?.version ?? '1',
 
-      // Set app version from package.json
-      release: 'classbridge@1.0.0',
-      dist: '1',
-
-      // Filter out sensitive data
       beforeSend(event) {
-        // Don't send console.logs as events
-        if (event.level === 'log') {
+        if (event.level === 'log' || event.level === 'info' || event.level === 'warning') {
           return null;
         }
 
-        // Scrub sensitive data from breadcrumbs
-        if (event.breadcrumbs) {
-          event.breadcrumbs = event.breadcrumbs.map(breadcrumb => {
-            if (breadcrumb.data) {
-              const sanitized = { ...breadcrumb.data };
-              Object.keys(sanitized).forEach(key => {
-                if (/password|token|secret|key|auth/i.test(key)) {
-                  sanitized[key] = '[Filtered]';
-                }
-              });
-              breadcrumb.data = sanitized;
-            }
-            return breadcrumb;
-          });
+        const messages: string[] = [event.message ?? ''];
+        const exceptionValues = event.exception?.values ?? [];
+        for (const ex of exceptionValues) {
+          if (ex.value) messages.push(ex.value);
+          if (ex.type) messages.push(ex.type);
         }
+
+        const combined = messages.join(' ');
+        const IGNORE_PATTERNS = [
+          /Network request failed/i,
+          /Failed to fetch/i,
+          /fetch (aborted|failed)/i,
+          /JWT expired|Invalid Refresh Token|Refresh Token Not found/i,
+          /permission denied|row-level security|RLS/i,
+          /AuthApiError|AuthSessionMissingError/i,
+          /Warning: Cannot update a component/i,
+          /AbortError|Request aborted/i,
+          /timeout|ETIMEDOUT|ENOTFOUND|ECONNRESET|network error/i,
+        ];
+
+        if (IGNORE_PATTERNS.some((re) => re.test(combined))) {
+          return null;
+        }
+
+        const scrub = (obj: Record<string, unknown> | undefined) => {
+          if (!obj) return;
+          for (const k of Object.keys(obj)) {
+            if (/token|password|secret|auth|key/i.test(k)) {
+              obj[k] = '[REDACTED]';
+            }
+          }
+        };
+
+        scrub(event.extra as Record<string, unknown>);
+        event.breadcrumbs?.forEach((b) => scrub(b.data as Record<string, unknown>));
 
         return event;
       },
-
-      // Ignore certain errors
       ignoreErrors: [
         'Network request failed',
         'Failed to fetch',
         'Invalid Refresh Token',
         'Refresh Token Not Found',
         'Warning: Cannot update a component',
+        'AbortError',
+        /^Network (request )?failed$/i,
+        /^Failed to fetch$/i,
       ],
     });
   } catch (e) {
-    console.warn('[Sentry] initSentry() failed – error tracking disabled:', e);
+    if (__DEV__) {
+      console.warn('[Sentry] initSentry() failed – error tracking disabled:', e);
+    }
   }
 }
 
-// Helper function to capture errors with context
 export function captureError(error: Error, context?: Record<string, any>) {
   try {
     if (!__DEV__ && Sentry) {
       Sentry.captureException(error, { extra: context });
-    } else {
+    } else if (__DEV__) {
       console.error('Error captured:', error, context);
     }
-  } catch {
-    // Sentry itself failed – swallow silently
-  }
+  } catch {}
 }
 
-// Helper function to capture messages
 export function captureMessage(message: string, level: 'fatal' | 'error' | 'warning' | 'log' | 'info' | 'debug' = 'info') {
   try {
     if (!__DEV__ && Sentry) {
       Sentry.captureMessage(message, level);
-    } else {
+    } else if (__DEV__) {
       console.log(`[${level}]`, message);
     }
-  } catch {
-    // Sentry itself failed – swallow silently
-  }
+  } catch {}
 }
 
-// Helper to set user context (called after successful login/bootstrap)
 export function setUserContext(user: {
   id: string;
   email?: string;
@@ -132,20 +136,14 @@ export function setUserContext(user: {
     });
     if (user.role) Sentry.setTag('user.role', user.role);
     if (user.school_code) Sentry.setTag('school_code', user.school_code);
-  } catch {
-    // Sentry itself failed – swallow silently
-  }
+  } catch {}
 }
 
-// Helper to clear user context (on logout)
 export function clearUserContext() {
   try {
     if (!Sentry) return;
     Sentry.setUser(null);
-  } catch {
-    // Sentry itself failed – swallow silently
-  }
+  } catch {}
 }
 
-// Re-export Sentry for advanced usage (may be null if module failed to load)
 export { Sentry };

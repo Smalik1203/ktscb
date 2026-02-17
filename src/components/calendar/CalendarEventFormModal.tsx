@@ -77,6 +77,13 @@ export default function CalendarEventFormModal({
   const [showClassSelector, setShowClassSelector] = useState(false);
   const [datePickerMode, setDatePickerMode] = useState<'start' | 'end'>('start');
 
+  const parseDateOnlyLocal = (dateStr?: string | null): Date => {
+    if (!dateStr) return new Date();
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return new Date();
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  };
+
   // Reset form when modal opens/closes or event changes
   useEffect(() => {
     if (visible) {
@@ -86,8 +93,8 @@ export default function CalendarEventFormModal({
         setDescription(event.description || '');
         setEventType(event.event_type || ''); // Direct assignment
         setClassInstanceId(event.class_instance_id || null);
-        setStartDate(event.start_date ? new Date(event.start_date) : new Date());
-        setEndDate(event.end_date ? new Date(event.end_date) : null);
+        setStartDate(parseDateOnlyLocal(event.start_date));
+        setEndDate(event.end_date ? parseDateOnlyLocal(event.end_date) : null);
         setIsAllDay(event.is_all_day ?? true);
         setStartTime(event.start_time ? new Date(`2000-01-01T${event.start_time}`) : new Date());
         setEndTime(event.end_time ? new Date(`2000-01-01T${event.end_time}`) : new Date());

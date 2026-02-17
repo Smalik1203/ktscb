@@ -88,6 +88,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     // 1. Check trip is active
     const tripState = await readTripStateFromStorage();
     if (!tripState || tripState.status !== 'active') {
+      log.warn('[TMS Task] Skipped — trip not active', { status: tripState?.status ?? 'no state' });
       return;
     }
 
@@ -116,6 +117,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     // 3. Deduplicate — skip if same or older timestamp
     const isNewer = await isNewerThanLastSent(timestamp);
     if (!isNewer) {
+      log.warn('[TMS Task] Skipped — duplicate or older timestamp', { timestamp });
       return;
     }
 
@@ -152,6 +154,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
     if (result.success) {
       await setLastSentTimestamp(timestamp);
+      log.debug('[TMS Task] GPS sent', { lat: payload.lat.toFixed(5), lng: payload.lng.toFixed(5) });
     } else {
       log.warn('[TMS Task] Send failed, queuing for retry:', result.error);
       await enqueue(payload);

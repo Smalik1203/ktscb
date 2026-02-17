@@ -33,24 +33,43 @@ const formatDate = (dateString: string) => {
     }
 };
 
-Deno.serve(async (req: Request) => {
-    try {
-        const input: FeeNotificationInput = await req.json();
+const CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
-        const supabase = createClient(
-            Deno.env.get('SUPABASE_URL')!,
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-        );
+const jsonResponse = (body: object, status: number) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } });
+
+Deno.serve(async (req: Request) => {
+    if (req.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    try {
+        let input: FeeNotificationInput;
+        try {
+            input = await req.json();
+        } catch {
+            return jsonResponse({ error: 'Invalid JSON body' }, 400);
+        }
+
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        if (!supabaseUrl || !serviceRoleKey) {
+            console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+            return jsonResponse({ error: 'Server configuration error' }, 500);
+        }
+
+        const supabase = createClient(supabaseUrl, serviceRoleKey);
 
         // Validate input
         if (!input.type) {
-            return new Response(
-                JSON.stringify({ error: 'Missing required field: type' }),
-                { status: 400, headers: { 'Content-Type': 'application/json' } }
-            );
+            return jsonResponse({ error: 'Missing required field: type' }, 400);
         }
 
-        const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
+        const authHeader = `Bearer ${serviceRoleKey}`;
 
         // Handle bulk invoice generation
         if (input.type === 'invoice_generated' && input.invoice_ids && input.invoice_ids.length > 0) {
@@ -63,28 +82,22 @@ Deno.serve(async (req: Request) => {
                     total_amount,
                     due_date,
                     billing_period,
-                    student:student_id(id, user_id, full_name)
+                    student:student_id(id, auth_user_id, full_name)
                 `)
                 .in('id', input.invoice_ids);
 
             if (invoicesError || !invoices || invoices.length === 0) {
                 console.warn('No invoices found for notification');
-                return new Response(
-                    JSON.stringify({ success: true, notified: 0 }),
-                    { status: 200, headers: { 'Content-Type': 'application/json' } }
-                );
+                return jsonResponse({ success: true, notified: 0 }, 200);
             }
 
-            // Get user IDs for students with accounts
+            // Get user IDs for students with accounts (auth_user_id = users.id for push targets)
             const userIds = invoices
-                .map(inv => (inv.student as any)?.user_id)
+                .map(inv => (inv.student as { auth_user_id?: string } | null)?.auth_user_id)
                 .filter(Boolean) as string[];
 
             if (userIds.length === 0) {
-                return new Response(
-                    JSON.stringify({ success: true, notified: 0, message: 'No student accounts found' }),
-                    { status: 200, headers: { 'Content-Type': 'application/json' } }
-                );
+                return jsonResponse({ success: true, notified: 0, message: 'No student accounts found' }, 200);
             }
 
             // Send batch notification
@@ -93,8 +106,8 @@ Deno.serve(async (req: Request) => {
             const avgAmount = totalAmount / invoices.length;
 
             const notificationUrl = userIds.length > 50 
-                ? `${Deno.env.get('SUPABASE_URL')}/functions/v1/queue-notification`
-                : `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
+                ? `${supabaseUrl}/functions/v1/queue-notification`
+                : `${supabaseUrl}/functions/v1/send-notification`;
 
             const payload = {
                 event: 'fee_invoice_generated',
@@ -124,21 +137,15 @@ Deno.serve(async (req: Request) => {
                 });
             }
 
-            return new Response(
-                JSON.stringify({ success: true, notified: userIds.length }),
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
-            );
+            return jsonResponse({ success: true, notified: userIds.length }, 200);
         }
 
         // Single invoice operations
         if (!input.invoice_id) {
-            return new Response(
-                JSON.stringify({ error: 'Missing required field: invoice_id' }),
-                { status: 400, headers: { 'Content-Type': 'application/json' } }
-            );
+            return jsonResponse({ error: 'Missing required field: invoice_id' }, 400);
         }
 
-        // Fetch invoice with student info
+        // Fetch invoice with student info (student table has auth_user_id, not user_id)
         const { data: invoice, error: invoiceError } = await supabase
             .from('fee_invoices')
             .select(`
@@ -149,24 +156,21 @@ Deno.serve(async (req: Request) => {
                 due_date,
                 billing_period,
                 status,
-                student:student_id(id, user_id, full_name)
+                student:student_id(id, auth_user_id, full_name)
             `)
             .eq('id', input.invoice_id)
             .single();
 
         if (invoiceError || !invoice) {
-            return new Response(
-                JSON.stringify({ error: 'Invoice not found' }),
-                { status: 404, headers: { 'Content-Type': 'application/json' } }
-            );
+            const dbMessage = invoiceError?.message ?? (invoiceError as any)?.details ?? 'unknown';
+            console.error('Invoice fetch failed', { invoice_id: input.invoice_id, error: invoiceError });
+            return jsonResponse({ error: 'Invoice not found', details: String(dbMessage) }, 404);
         }
 
-        const student = invoice.student as any;
-        if (!student?.user_id) {
-            return new Response(
-                JSON.stringify({ success: true, notified: 0, message: 'Student has no user account' }),
-                { status: 200, headers: { 'Content-Type': 'application/json' } }
-            );
+        const student = invoice.student as { auth_user_id?: string; full_name?: string } | null;
+        const targetUserId = student?.auth_user_id;
+        if (!targetUserId) {
+            return jsonResponse({ success: true, notified: 0, message: 'Student has no user account' }, 200);
         }
 
         let title: string;
@@ -174,7 +178,6 @@ Deno.serve(async (req: Request) => {
         let event: string;
 
         const balance = Number(invoice.total_amount) - Number(invoice.paid_amount);
-        const studentName = student.full_name || 'Student';
 
         switch (input.type) {
             case 'invoice_generated':
@@ -206,14 +209,11 @@ Deno.serve(async (req: Request) => {
                 break;
 
             default:
-                return new Response(
-                    JSON.stringify({ error: 'Invalid notification type' }),
-                    { status: 400, headers: { 'Content-Type': 'application/json' } }
-                );
+                return jsonResponse({ error: 'Invalid notification type' }, 400);
         }
 
         // Send notification
-        const notificationUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-notification`;
+        const notificationUrl = `${supabaseUrl}/functions/v1/send-notification`;
         
         await fetch(notificationUrl, {
             method: 'POST',
@@ -223,7 +223,7 @@ Deno.serve(async (req: Request) => {
             },
             body: JSON.stringify({
                 event,
-                targets: { user_ids: [student.user_id] },
+                targets: { user_ids: [targetUserId] },
                 payload: {
                     title,
                     body,
@@ -236,15 +236,9 @@ Deno.serve(async (req: Request) => {
             }),
         });
 
-        return new Response(
-            JSON.stringify({ success: true, notified: 1 }),
-            { status: 200, headers: { 'Content-Type': 'application/json' } }
-        );
+        return jsonResponse({ success: true, notified: 1 }, 200);
     } catch (error) {
         console.error('Unexpected error:', error);
-        return new Response(
-            JSON.stringify({ error: (error as Error).message }),
-            { status: 500, headers: { 'Content-Type': 'application/json' } }
-        );
+        return jsonResponse({ error: (error as Error).message }, 500);
     }
 });

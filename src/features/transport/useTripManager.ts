@@ -1,13 +1,3 @@
-/**
- * Transport Management System - Trip Manager Hook
- *
- * React hook that orchestrates:
- * - Location permission requests
- * - Starting / stopping background location tracking
- * - Trip state via Zustand store
- * - Offline queue monitoring & flushing
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
@@ -21,8 +11,6 @@ import { flush as flushQueue, getQueueSize } from './locationQueue';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { log } from '../../lib/logger';
-
-// ---------- Types ----------
 
 interface TripManagerReturn {
   /** Current trip status */
@@ -57,8 +45,6 @@ interface TripManagerReturn {
   openSettings: () => void;
 }
 
-// ---------- Hook ----------
-
 export function useTripManager(): TripManagerReturn {
   const store = useTripStore();
   const { user, profile } = useAuth();
@@ -68,10 +54,8 @@ export function useTripManager(): TripManagerReturn {
   const [permissionStatus, setPermissionStatus] =
     useState<TmsPermissionStatus>('undetermined');
 
-  // Prevent double-start
   const startingRef = useRef(false);
-
-  // ---------- Fetch driver's bus ID ----------
+  const busIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -85,57 +69,163 @@ export function useTripManager(): TripManagerReturn {
           .single();
         if (mounted && data?.bus_id) {
           setBusId(data.bus_id);
+          busIdRef.current = data.bus_id;
         }
-      } catch {
-        // Non-critical — pickup checklist will show empty
-      }
+      } catch {}
     };
     fetchBusId();
     return () => { mounted = false; };
   }, [user?.id]);
 
-  // ---------- Queue polling ----------
-
   useEffect(() => {
     let mounted = true;
-    const poll = async () => {
+
+    const init = async () => {
+      // Flush any GPS data queued before a crash/restart
+      try {
+        const session = await supabase.auth.getSession();
+        const token = session.data.session?.access_token;
+        if (token) await flushQueue(token);
+      } catch {
+        // Non-critical — will retry on next poll
+      }
+
       const size = await getQueueSize();
       if (mounted) setQueueSize(size);
     };
-    poll();
-    const interval = setInterval(poll, 10_000); // every 10s
+    init();
+
+    const interval = setInterval(async () => {
+      const size = await getQueueSize();
+      if (mounted) setQueueSize(size);
+    }, 10_000);
     return () => {
       mounted = false;
       clearInterval(interval);
     };
   }, []);
 
-  // ---------- Restore on mount ----------
+  const recoveryDone = useRef(false);
 
   useEffect(() => {
-    // Zustand persist handles rehydration automatically.
-    // We just need to sync the background task state with the store.
-    const syncTaskState = async () => {
+    if (store.status !== 'active' || recoveryDone.current) return;
+    if (!user?.id) return; // Wait for auth
+
+    let cancelled = false;
+
+    const recover = async () => {
       try {
-        const isRegistered = await TaskManager.isTaskRegisteredAsync(
-          LOCATION_TASK_NAME
-        );
-        if (store.status === 'active' && !isRegistered) {
-          // Store says active but task isn't running — clean up
-          log.warn('[TMS] Trip state active but task not registered — resetting');
+        const isRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+        if (isRunning || cancelled) return; // Background task is alive — nothing to recover
+
+        recoveryDone.current = true;
+        const tripId = store.tripId;
+        if (!tripId) { store.stopTrip(); return; }
+
+        // Check server trip status
+        const { data } = await supabase
+          .from('trips')
+          .select('status')
+          .eq('id', tripId)
+          .single();
+
+        if (cancelled) return;
+
+        if (!data || data.status !== 'active') {
+          // Server already ended this trip (auto-timeout or manual)
+          log.info('[TMS] Interrupted trip was already ended server-side. Cleaning up.');
           store.stopTrip();
+          return;
         }
+
+        // Trip is still active on server — ask the driver
+        Alert.alert(
+          'Interrupted Trip',
+          'Your previous trip was interrupted (app closed or phone restarted). What would you like to do?',
+          [
+            {
+              text: 'End Trip',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await supabase
+                    .from('trips')
+                    .update({ status: 'completed', ended_at: new Date().toISOString() })
+                    .eq('id', tripId);
+
+                  // Broadcast trip-ended so viewers update instantly
+                  if (profile?.school_code && user?.id) {
+                    try {
+                      const ch = supabase.channel(`buses:${profile.school_code}`);
+                      await ch.httpSend('trip-ended', {
+                        driver_id: user.id,
+                        trip_id: tripId,
+                      });
+                      supabase.removeChannel(ch);
+                    } catch {
+                      // Best-effort
+                    }
+                  }
+
+                  // Notify parents — use ref to avoid stale closure
+                  if (busIdRef.current) {
+                    supabase.functions.invoke('notify-bus-trip', {
+                      body: { bus_id: busIdRef.current, trip_id: tripId, event: 'trip_ended' },
+                    }).catch(() => {});
+                  }
+                } catch (err) {
+                  log.error('[TMS] Failed to end interrupted trip:', err);
+                } finally {
+                  store.stopTrip();
+                }
+              },
+            },
+            {
+              text: 'Resume Trip',
+              onPress: async () => {
+                try {
+                  const hasPermission = await checkAndRequestPermissions();
+                  if (!hasPermission) {
+                    log.warn('[TMS] Cannot resume — no permission. Ending trip.');
+                    store.stopTrip();
+                    return;
+                  }
+                  await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+                    accuracy: Location.Accuracy.Balanced,
+                    timeInterval: 10_000,
+                    distanceInterval: 0,
+                    deferredUpdatesInterval: 10_000,
+                    showsBackgroundLocationIndicator: true,
+                    foregroundService: {
+                      notificationTitle: 'Trip Active',
+                      notificationBody: 'Live location tracking is running',
+                      notificationColor: '#6B3FA0',
+                    },
+                    ...(Platform.OS === 'android' && {
+                      pausesUpdatesAutomatically: false,
+                    }),
+                  });
+                  log.info('[TMS] Resumed interrupted trip successfully');
+                } catch (err) {
+                  log.error('[TMS] Failed to resume trip:', err);
+                  store.stopTrip();
+                }
+              },
+            },
+          ],
+          { cancelable: false },
+        );
       } catch {
-        // TaskManager may not be available in all contexts
+        // TaskManager not available or other error — clean up
+        if (!cancelled) store.stopTrip();
       }
     };
-    syncTaskState();
+
+    recover();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id, store.status]);
 
-  // ---------- Permissions ----------
-
-  /** Open the app's own location permission settings page (Android) */
   const openAppLocationSettings = useCallback(() => {
     if (Platform.OS === 'android') {
       const pkg = Constants.expoConfig?.android?.package ?? 'com.kts.mobile';
@@ -238,8 +328,6 @@ export function useTripManager(): TripManagerReturn {
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [openAppLocationSettings]);
 
-  // ---------- Start Trip ----------
-
   const startTrip = useCallback(async () => {
     if (startingRef.current || store.status === 'active') {
       log.warn('[TMS] Start trip called while already active or starting');
@@ -285,27 +373,48 @@ export function useTripManager(): TripManagerReturn {
         if (tripInsertError) {
           // Log but don't block — local tracking still works
           log.warn('[TMS] Failed to create server trip record:', tripInsertError.message);
+        } else {
+          // Broadcast trip-started so viewers see the bus appear instantly
+          // Uses httpSend — one-shot HTTP broadcast, no WebSocket subscription needed
+          try {
+            const ch = supabase.channel(`buses:${profile.school_code}`);
+            await ch.httpSend('trip-started', {
+              driver_id: user.id,
+              trip_id: tripState.tripId,
+            });
+            supabase.removeChannel(ch);
+          } catch (broadcastErr) {
+            log.warn('[TMS] trip-started broadcast failed:', broadcastErr);
+          }
+
+          // Push notification to parents — fire-and-forget, don't block trip start
+          // Use busIdRef (not busId state) to avoid stale closure
+          if (busIdRef.current) {
+            supabase.functions.invoke('notify-bus-trip', {
+              body: { bus_id: busIdRef.current, trip_id: tripState.tripId, event: 'trip_started' },
+            }).catch((err) => log.warn('[TMS] trip-started notification failed:', err));
+          }
         }
       }
 
       // 5. Start background location updates
       //
-      // distanceInterval: 0 ensures updates keep coming even when the bus is
-      // stationary (at a stop, in traffic, etc.). Without this, Android requires
-      // the device to move N metres before firing the next update, which causes
-      // the admin to see "Xm ago" growing while the bus is just sitting still.
+      // Shorter timeInterval (10s) helps Android keep the foreground service
+      // active when app is in background or screen off — less likely to be
+      // throttled or batched. distanceInterval: 0 ensures updates even when
+      // the bus is stationary.
       await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
         accuracy: Location.Accuracy.Balanced,
-        timeInterval: 15_000, // ~15 seconds
-        distanceInterval: 0,  // send updates even when stationary
-        deferredUpdatesInterval: 15_000,
+        timeInterval: 10_000, // 10s — more frequent to reduce background throttling
+        distanceInterval: 0,   // send updates even when stationary
+        deferredUpdatesInterval: 10_000,
         showsBackgroundLocationIndicator: true, // iOS
         foregroundService: {
           notificationTitle: 'Trip Active',
           notificationBody: 'Live location tracking is running',
           notificationColor: '#6B3FA0',
         },
-        // Android: keep the task alive even when screen is off
+        // Android: do not pause when app backgrounds or screen off
         ...(Platform.OS === 'android' && {
           pausesUpdatesAutomatically: false,
         }),
@@ -324,8 +433,6 @@ export function useTripManager(): TripManagerReturn {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.status, checkAndRequestPermissions]);
-
-  // ---------- Stop Trip ----------
 
   const stopTrip = useCallback(async () => {
     if (store.status === 'idle') {
@@ -350,6 +457,27 @@ export function useTripManager(): TripManagerReturn {
 
         if (tripUpdateError) {
           log.warn('[TMS] Failed to close server trip record:', tripUpdateError.message);
+        } else if (profile?.school_code && user?.id) {
+          // Broadcast trip-ended so viewers see the bus disappear instantly
+          // Uses httpSend — one-shot HTTP broadcast, no WebSocket subscription needed
+          try {
+            const ch = supabase.channel(`buses:${profile.school_code}`);
+            await ch.httpSend('trip-ended', {
+              driver_id: user.id,
+              trip_id: currentTripId,
+            });
+            supabase.removeChannel(ch);
+          } catch (broadcastErr) {
+            log.warn('[TMS] trip-ended broadcast failed:', broadcastErr);
+          }
+
+          // Push notification to parents — fire-and-forget, don't block trip end
+          // Use busIdRef (not busId state) to avoid stale closure
+          if (busIdRef.current) {
+            supabase.functions.invoke('notify-bus-trip', {
+              body: { bus_id: busIdRef.current, trip_id: currentTripId, event: 'trip_ended' },
+            }).catch((err) => log.warn('[TMS] trip-ended notification failed:', err));
+          }
         }
       }
 
@@ -391,13 +519,9 @@ export function useTripManager(): TripManagerReturn {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.status]);
 
-  // ---------- Settings ----------
-
   const openSettings = useCallback(() => {
     openAppLocationSettings();
   }, [openAppLocationSettings]);
-
-  // ---------- Return ----------
 
   return {
     status: store.status,

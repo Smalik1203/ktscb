@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TestCard } from './TestCard';
 import { StudentTestCard } from './StudentTestCard';
 import { TestWithDetails, TestAttempt } from '../../types/test.types';
@@ -40,6 +41,7 @@ export function TestList({
   studentMarks = {},
   filteredCount,
 }: TestListProps) {
+  const insets = useSafeAreaInsets();
   const { colors, isDark, spacing, typography, borderRadius } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [studentFilter, setStudentFilter] = useState<StudentFilter>('all');
@@ -221,7 +223,7 @@ export function TestList({
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
           style={styles.flatList}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: spacing.xl * 2 + insets.bottom }]}
           showsVerticalScrollIndicator={false}
           removeClippedSubviews={true}
           initialNumToRender={10}

@@ -20,7 +20,7 @@ export function useInventoryItems(schoolCode: string | null | undefined) {
       return inventoryItemsService.list(schoolCode);
     },
     enabled: !!schoolCode,
-    staleTime: 30_000, // 30 seconds
+    staleTime: 5 * 60 * 1000, // 30 seconds
   });
 }
 
@@ -35,7 +35,7 @@ export function useInventoryItem(itemId: string | null | undefined) {
       return inventoryItemsService.getById(itemId);
     },
     enabled: !!itemId,
-    staleTime: 30_000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -139,7 +139,7 @@ export function useInventoryIssues(
       return inventoryItemsService.listIssues(schoolCode, filters);
     },
     enabled: !!schoolCode,
-    staleTime: 30_000, // 30 seconds
+    staleTime: 5 * 60 * 1000, // 30 seconds
   });
 }
 

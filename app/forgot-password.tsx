@@ -145,7 +145,7 @@ export default function ForgotPasswordScreen() {
                   <Stack spacing="md">
                     <Heading level={2} align="center">Reset Password</Heading>
                     <Body color="secondary" align="center" style={{ marginBottom: spacing.lg }}>
-                      Enter your email address and we'll send you a link to reset your password.
+                      Enter your email address and we&apos;ll send you a link to reset your password.
                     </Body>
 
                     <Input

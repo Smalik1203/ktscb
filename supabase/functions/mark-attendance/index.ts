@@ -122,14 +122,14 @@ Deno.serve(async (req: Request) => {
             const authHeader = `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`;
             const baseUrl = Deno.env.get('SUPABASE_URL');
 
-            // Fetch student user_ids
+            // Fetch student auth_user_id (student table has auth_user_id, not user_id)
             const { data: students } = await supabase
                 .from('student')
-                .select('id, user_id')
+                .select('id, auth_user_id')
                 .in('id', studentIds);
 
             if (students && students.length > 0) {
-                const studentMap = new Map(students.map(s => [s.id, s.user_id]));
+                const studentMap = new Map(students.map(s => [s.id, s.auth_user_id]));
 
                 const presentUserIds: string[] = [];
                 const absentUserIds: string[] = [];

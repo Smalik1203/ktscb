@@ -85,8 +85,9 @@ class OfflineQueue {
 
 export const offlineQueue = new OfflineQueue();
 
-// Auto-process queue when connection is restored
-NetInfo.addEventListener(state => {
+// Auto-process queue when connection is restored.
+// Listener is stored so it can be unsubscribed if needed.
+export const _unsubscribeNetInfo = NetInfo.addEventListener(state => {
   if (state.isConnected) {
     offlineQueue.processQueue();
   }

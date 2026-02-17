@@ -50,14 +50,22 @@ CREATE POLICY "Admins can read school drivers"
     )
   );
 
--- Super Admins can insert/update/delete drivers for their school
-CREATE POLICY "Super Admins can manage drivers"
+-- Admins can insert/update/delete drivers for their school
+CREATE POLICY "Admins can manage school drivers"
   ON drivers FOR ALL
   USING (
     EXISTS (
       SELECT 1 FROM users
       WHERE users.id = auth.uid()
-        AND users.role = 'superadmin'
+        AND users.role IN ('superadmin', 'cb_admin', 'admin')
+        AND users.school_code = drivers.school_code
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users
+      WHERE users.id = auth.uid()
+        AND users.role IN ('superadmin', 'cb_admin', 'admin')
         AND users.school_code = drivers.school_code
     )
   );

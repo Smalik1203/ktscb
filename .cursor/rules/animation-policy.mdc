@@ -1,0 +1,101 @@
+---
+description: Animation rules for the Transport Management System (TMS) — bus tracking maps and related UI.
+globs:
+  - src/features/transport/**
+  - src/components/transport/**
+alwaysApply: false
+---
+
+# TMS Animation Policy
+
+> "We animate to communicate state, not to fabricate movement."
+
+## Core Principle
+
+Between GPS updates, **project the marker forward** at last known speed + heading
+(dead reckoning). When new data arrives, smoothly course-correct and continue.
+This is the Uber/Rapido model — the marker never sits still while the bus is moving.
+
+---
+
+## Position Animation (Dead Reckoning)
+
+On each GPS update at position P with speed S and heading H:
+
+1. **Cancel** running animation
+2. **Calculate** projected target T = P + (S × H × projectionSeconds)
+3. **Animate** from current marker position to T over projectionDuration (linear easing)
+4. When next GPS arrives → repeat from step 1
+
+The `timing()` starts from wherever the marker currently IS, so drift from the
+previous projection is **naturally corrected** without any visible snap.
+
+### Projection Duration
+
+Adaptive: `observedGpsInterval × 1.3`, clamped to [2s, 8s].
+The 1.3× buffer ensures the marker doesn't pause before the next update.
+
+### Snap Cases (no animation)
+
+- First mount
+- Position jump > ~0.5 km (JUMP_THRESHOLD_DEG = 0.005)
+- GPS silence > 10s between updates
+
+After snapping, immediately start fresh projection if bus is still moving.
+
+### Stopped Bus
+
+When speed drops below threshold (0.5 m/s) → settle to actual GPS position
+over 500ms. No projection.
+
+---
+
+## Heading Rotation Smoothing
+
+- Animated via `Animated.Value`, 400ms `Easing.out(cubic)`
+- Uses shortest-path delta (avoids 350° spins)
+- Skips animation for changes < 1°
+
+## Entry Animation
+
+- Fade (0→1) + scale (0.6→1) over 300ms on mount
+- Prevents "teleport" feel when bus appears
+
+## State Colour Coding
+
+| State | Colour | Condition |
+|-------|--------|-----------|
+| Moving | Green #16A34A | speed > 0.5 m/s AND data < 60s |
+| Stopped | Amber #F59E0B | speed ≤ 0.5 AND data < 60s |
+| No signal | Grey #9CA3AF | data > 60s old |
+
+## UI Animations Outside Map
+
+Bottom sheets, status pills, cards, switchers — animate freely.
+This is where the app should feel premium.
+
+---
+
+## ❌ Forbidden
+
+1. **Bounce / overshoot** on markers — cars don't bounce
+2. **Interpolating across big jumps** — snap honestly
+3. **Moving without data** — if GPS gap > 10s, freeze the marker
+
+---
+
+## Constants Reference
+
+```typescript
+DEFAULT_GPS_INTERVAL = 4000    // ms — assumed first interval
+MIN_PROJECTION_MS    = 2000    // ms — minimum projection
+MAX_PROJECTION_MS    = 8000    // ms — maximum projection
+INTERVAL_BUFFER      = 1.3     // project slightly past next expected update
+SETTLE_DURATION      = 500     // ms — settle when stopped
+HEADING_DURATION     = 400     // ms — rotation smoothing
+ENTRY_DURATION       = 300     // ms — mount fade+scale
+SPEED_THRESHOLD      = 0.5     // m/s — below = stopped
+STALE_THRESHOLD_SEC  = 60      // s — grey colour
+JUMP_THRESHOLD_DEG   = 0.005   // ~0.5 km — snap
+GPS_SILENCE_MS       = 10_000  // 10s — snap + freeze
+```

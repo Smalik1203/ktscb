@@ -72,7 +72,7 @@ export function useSubjects(
       };
     },
     enabled: !!schoolCode,
-    staleTime: 60_000, // 1 minute
+    staleTime: 5 * 60 * 1000,
   });
 
   const createSubject = useMutation({

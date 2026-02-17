@@ -241,7 +241,7 @@ export function AdminFeedbackList() {
                     No Feedback Yet
                 </RNText>
                 <RNText style={{ fontSize: 15, color: colors.text.secondary, textAlign: 'center', paddingHorizontal: spacing.xl }}>
-                    You haven't received any student feedback. Check back later!
+                    You haven&apos;t received any student feedback. Check back later!
                 </RNText>
             </View>
         );

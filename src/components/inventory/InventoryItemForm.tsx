@@ -323,7 +323,7 @@ export function InventoryItemForm({
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>How is it tracked?</Text>
       <Text style={styles.stepDescription}>
-        Choose how you want to track this item's quantity.
+        Choose how you want to track this item&apos;s quantity.
       </Text>
 
       <View style={styles.toggleGroup}>
