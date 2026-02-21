@@ -31,11 +31,49 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import type { Theme, ThemeId, ThemeContextValue, ThemeColors, Typography, Spacing, BorderRadius, Shadows } from '../theme/types';
 import { getTheme, lightTheme, darkTheme } from '../theme/themes';
+import { generatePalette } from '../theme/generatePalette';
 
 // Storage key for persisted theme preference
 const THEME_STORAGE_KEY = '@kts_theme_preference';
+
+// ============================================================================
+// WHITE-LABEL BRANDING (read once at module load)
+// ============================================================================
+
+const schoolBranding = Constants.expoConfig?.extra?.school?.branding as {
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+} | undefined;
+
+// Pre-generate palettes so they're not recalculated on every render
+const brandPrimaryPalette = schoolBranding?.primaryColor
+  ? generatePalette(schoolBranding.primaryColor)
+  : null;
+
+/** Apply school branding overrides to a theme's colors */
+function applyBranding(theme: Theme): Theme {
+  if (!brandPrimaryPalette) return theme;
+
+  return {
+    ...theme,
+    colors: {
+      ...theme.colors,
+      primary: { ...theme.colors.primary, ...brandPrimaryPalette },
+      text: {
+        ...theme.colors.text,
+        accent: brandPrimaryPalette.main,
+      },
+      border: {
+        ...theme.colors.border,
+        accent: brandPrimaryPalette.main,
+      },
+    },
+  };
+}
 
 // ============================================================================
 // CONTEXT
@@ -46,8 +84,8 @@ const defaultContextValue: ThemeContextValue = {
   theme: lightTheme,
   themeId: 'light',
   isDark: false,
-  setTheme: () => {},
-  toggleTheme: () => {},
+  setTheme: () => { },
+  toggleTheme: () => { },
   colors: lightTheme.colors,
   typography: lightTheme.typography,
   spacing: lightTheme.spacing,
@@ -70,10 +108,10 @@ interface ThemeProviderProps {
   disableSystemTheme?: boolean;
 }
 
-export function ThemeProvider({ 
-  children, 
+export function ThemeProvider({
+  children,
   initialTheme,
-  disableSystemTheme = false 
+  disableSystemTheme = false
 }: ThemeProviderProps) {
   const systemColorScheme = useColorScheme();
   const [themeId, setThemeId] = useState<ThemeId>(initialTheme || 'system');
@@ -103,12 +141,16 @@ export function ThemeProvider({
     return ['light', 'dark', 'schoolA', 'schoolB', 'system'].includes(id);
   };
 
-  // Resolve the actual theme based on themeId and system preference
+  // Resolve the actual theme based on themeId and system preference,
+  // then apply white-label branding overrides from school config
   const resolvedTheme = useMemo((): Theme => {
+    let base: Theme;
     if (themeId === 'system' && !disableSystemTheme) {
-      return systemColorScheme === 'dark' ? darkTheme : lightTheme;
+      base = systemColorScheme === 'dark' ? darkTheme : lightTheme;
+    } else {
+      base = getTheme(themeId === 'system' ? 'light' : themeId);
     }
-    return getTheme(themeId === 'system' ? 'light' : themeId);
+    return applyBranding(base);
   }, [themeId, systemColorScheme, disableSystemTheme]);
 
   // Set theme with persistence
@@ -147,7 +189,7 @@ export function ThemeProvider({
   if (!isLoaded) {
     return null;
   }
-  
+
   return (
     <ThemeContext.Provider value={value}>
       {children}
