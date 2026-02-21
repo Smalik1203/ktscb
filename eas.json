@@ -29,7 +29,6 @@
         "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
       }
     },
-
     "kts:preview": {
       "extends": "preview",
       "env": {
@@ -41,6 +40,20 @@
       "extends": "production",
       "env": {
         "SCHOOL": "kts",
+        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
+      }
+    },
+    "classbridge:preview": {
+      "extends": "preview",
+      "env": {
+        "SCHOOL": "classbridge",
+        "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
+      }
+    },
+    "classbridge:production": {
+      "extends": "production",
+      "env": {
+        "SCHOOL": "classbridge",
         "EXPO_PUBLIC_NEW_ARCH_ENABLED": "1"
       }
     }

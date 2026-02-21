@@ -5,7 +5,6 @@
   "bundleId": "com.ktsboduppal",
   "scheme": "kts",
   "owner": "krishnaveni-talent-school",
-  
   "branding": {
     "primaryColor": "#6B3FA0",
     "secondaryColor": "#4A90D9",
@@ -13,23 +12,19 @@
     "backgroundColor": "#FFFFFF",
     "tagline": "Nurturing Excellence"
   },
-  
   "assets": {
     "icon": "./assets/images/icon.png",
     "adaptiveIcon": "./assets/images/icon.png",
     "splash": "./assets/images/icon.png",
     "notificationIcon": "./assets/images/notification-icon.png"
   },
-  
   "firebase": {
     "projectId": "kts-3bd1d",
-    "googleServicesFile": "./google-services.json"
+    "googleServicesFile": "./schools/kts/google-services.json"
   },
-  
   "stores": {
     "playStoreUrl": "https://play.google.com/store/apps/details?id=com.ktsboduppal",
     "appStoreUrl": null
   },
-  
   "easProjectId": "f9bfdbf0-86d0-462d-b627-2a4edad56adc"
 }
