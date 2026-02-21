@@ -12,25 +12,25 @@ const fs = require('fs');
 const path = require('path');
 
 // Get school from environment variable, default to 'kts'
-const SCHOOL = process.env.SCHOOL || 'kts';
+const SCHOOL = process.env.SCHOOL || 'classbridge';
 
 // Load school configuration
 function loadSchoolConfig(schoolCode) {
   const configPath = path.join(__dirname, 'schools', schoolCode.toLowerCase(), 'config.json');
-  
+
   if (!fs.existsSync(configPath)) {
     // If already trying the default and it doesn't exist, throw instead of infinite recursion
-    if (schoolCode.toLowerCase() === 'kts') {
+    if (schoolCode.toLowerCase() === 'classbridge') {
       throw new Error(
         `Default school config not found at ${configPath}. ` +
-        `Create schools/kts/config.json or set SCHOOL env to a valid school code.`
+        `Create schools/classbridge/config.json or set SCHOOL env to a valid school code.`
       );
     }
     console.warn(`⚠️  School config not found: ${configPath}`);
-    console.warn(`   Using default school: kts`);
-    return loadSchoolConfig('kts');
+    console.warn(`   Using default school: classbridge`);
+    return loadSchoolConfig('classbridge');
   }
-  
+
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   console.log(`📱 Building for: ${config.appName} (${config.schoolCode})`);
   return config;
@@ -41,7 +41,7 @@ const school = loadSchoolConfig(SCHOOL);
 // Resolve asset paths - use school-specific if exists, otherwise default
 function resolveAsset(assetPath) {
   if (!assetPath) return null;
-  
+
   // If path starts with ./schools/, check if it exists
   if (assetPath.startsWith('./schools/')) {
     if (fs.existsSync(path.join(__dirname, assetPath.substring(2)))) {
@@ -51,7 +51,7 @@ function resolveAsset(assetPath) {
     const filename = path.basename(assetPath);
     return `./assets/images/${filename}`;
   }
-  
+
   return assetPath;
 }
 
@@ -74,13 +74,13 @@ module.exports = {
     icon: resolveAsset(school.assets?.icon) || "./assets/images/icon.png",
     userInterfaceStyle: "light",
     newArchEnabled: true,
-    
+
     splash: {
       image: resolveAsset(school.assets?.splash) || "./assets/images/icon.png",
       resizeMode: "contain",
       backgroundColor: school.branding?.backgroundColor || "#FFFFFF"
     },
-    
+
     ios: {
       supportsTablet: true,
       bundleIdentifier: school.bundleId,
@@ -114,7 +114,7 @@ module.exports = {
         ]
       }
     },
-    
+
     android: {
       package: school.bundleId,
       googleServicesFile: resolveFirebaseConfig(),
@@ -143,12 +143,12 @@ module.exports = {
       ],
       playStoreUrl: school.stores?.playStoreUrl || undefined
     },
-    
+
     web: {
       bundler: "metro",
       output: "single"
     },
-    
+
     plugins: [
       "expo-router",
       "expo-font",
@@ -193,16 +193,16 @@ module.exports = {
       // invalid native config that can crash the app at launch.
       ...(process.env.SENTRY_ORG
         ? [["@sentry/react-native/expo", {
-            organization: process.env.SENTRY_ORG,
-            project: process.env.SENTRY_PROJECT || "classbridge-mobile",
-          }]]
+          organization: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT || "classbridge-mobile",
+        }]]
         : []),
     ],
-    
+
     experiments: {
       typedRoutes: true
     },
-    
+
     extra: {
       router: {},
       eas: {
@@ -215,7 +215,7 @@ module.exports = {
         branding: school.branding
       }
     },
-    
+
     owner: school.owner
   }
 };

@@ -1,0 +1,30 @@
+{
+    "schoolCode": "CLASSBRIDGE",
+    "appName": "ClassBridge",
+    "appSlug": "classbridge",
+    "bundleId": "com.classbridge.mobile",
+    "scheme": "classbridge",
+    "owner": "krishnaveni-talent-school",
+    "branding": {
+        "primaryColor": "#2678BE",
+        "secondaryColor": "#4A90D9",
+        "accentColor": "#F59E0B",
+        "backgroundColor": "#FFFFFF",
+        "tagline": "Smart School Management"
+    },
+    "assets": {
+        "icon": "./schools/classbridge/assets/icon.png",
+        "adaptiveIcon": "./schools/classbridge/assets/adaptive-icon.png",
+        "splash": "./schools/classbridge/assets/splash.png",
+        "notificationIcon": "./schools/classbridge/assets/notification-icon.png"
+    },
+    "firebase": {
+        "projectId": "",
+        "googleServicesFile": "./schools/classbridge/google-services.json"
+    },
+    "stores": {
+        "playStoreUrl": "https://play.google.com/store/apps/details?id=com.classbridge.mobile",
+        "appStoreUrl": null
+    },
+    "easProjectId": "b364796a-abfd-4a5c-bf65-0d122433bc2c"
+}
