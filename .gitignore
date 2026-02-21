@@ -75,3 +75,7 @@ rls_security_fixes.sql
 database_optimization_queries.sql
 PREVENT_OVERPAYMENT_TRIGGER.sql
 CREATE_TASK_SUBMISSIONS_BUCKET.sql
+
+# Ignore generated native folders to enforce white-label prebuilds
+android/
+ios/
