@@ -145,13 +145,15 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
         receipt_number: receiptNo || undefined,
       });
 
-      Alert.alert('Success', 'Payment recorded successfully');
       setShowPaymentForm(false);
       setPaymentAmount('');
       setReceiptNo('');
       refetch();
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       onPaymentRecorded?.();
+      setTimeout(() => {
+        Alert.alert('Success', 'Payment recorded successfully');
+      }, 300);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to record payment');
     } finally {
@@ -203,11 +205,13 @@ export function InvoiceDetailModal({ invoiceId, visible, onClose, onPaymentRecor
         })),
       });
 
-      Alert.alert('Success', 'Items added successfully');
       setShowAddItemsForm(false);
       setNewItems([{ id: '1', label: '', amount: '' }]);
       await refetch();
       onPaymentRecorded?.();
+      setTimeout(() => {
+        Alert.alert('Success', 'Items added successfully');
+      }, 300);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add items';
       Alert.alert('Error', errorMessage);

@@ -4,7 +4,6 @@ import type { ThemeColors } from '../../theme/types';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal as RNModal, Animated, ActivityIndicator, Text, TextInput as RNTextInput } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Modal, Button, ProgressBar } from '../../ui';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 import { typography, spacing, borderRadius, colors } from '../../../lib/design-system';
@@ -269,18 +268,21 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
         uploaded_by: profile?.auth_id
       };
 
-      if (editingResource) {
+      const isUpdate = !!editingResource;
+      if (isUpdate) {
         // Update existing resource via service (capability assertion happens there)
         await api.resources.update(editingResource.id, resourceData);
-        Alert.alert('Success', 'Resource updated successfully');
       } else {
         // Create new resource via service (capability assertion happens there)
         await api.resources.create(resourceData as any);
-        Alert.alert('Success', 'Resource created successfully');
       }
 
+      // Close modal FIRST, then show alert after modal has dismissed
       onSuccess();
       onDismiss();
+      setTimeout(() => {
+        Alert.alert('Success', isUpdate ? 'Resource updated successfully' : 'Resource created successfully');
+      }, 300);
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to save resource');
     } finally {
@@ -307,242 +309,242 @@ export const AddResourceModal: React.FC<AddResourceModalProps> = ({
       onDismiss={onDismiss}
       title={editingResource ? 'Edit Resource' : 'Add New Resource'}
     >
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.form}>
-            {/* Title */}
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.form}>
+          {/* Title */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Resource Title *</Text>
+            <RNTextInput
+              value={formData.title}
+              onChangeText={(text) => handleInputChange('title', text)}
+              placeholder="Enter resource title"
+              placeholderTextColor={colors.text.secondary}
+              style={styles.input}
+            />
+          </View>
+
+          {/* Description */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Description *</Text>
+            <RNTextInput
+              value={formData.description}
+              onChangeText={(text) => handleInputChange('description', text)}
+              placeholder="Enter resource description"
+              placeholderTextColor={colors.text.secondary}
+              style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          {/* Resource Type */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Resource Type *</Text>
+            <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
+              <TouchableOpacity
+                style={[styles.segmentBtn, formData.resource_type === 'video' && styles.segmentBtnActive]}
+                onPress={() => handleInputChange('resource_type', 'video')}
+              >
+                <MaterialIcons name="videocam" size={18} color={formData.resource_type === 'video' ? colors.text.inverse : colors.text.secondary} />
+                <Text style={[styles.segmentBtnText, formData.resource_type === 'video' && styles.segmentBtnTextActive]}>Video</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.segmentBtn, formData.resource_type === 'pdf' && styles.segmentBtnActive]}
+                onPress={() => handleInputChange('resource_type', 'pdf')}
+              >
+                <MaterialIcons name="description" size={18} color={formData.resource_type === 'pdf' ? colors.text.inverse : colors.text.secondary} />
+                <Text style={[styles.segmentBtnText, formData.resource_type === 'pdf' && styles.segmentBtnTextActive]}>PDF</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Subject Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Subject *</Text>
+            <TouchableOpacity onPress={() => setShowSubjectDropdown(true)} style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+              <Text style={{ color: formData.subject_id ? colors.text.primary : colors.text.secondary, fontSize: typography.fontSize.sm }}>
+                {formData.subject_id
+                  ? subjects.find(s => s.id === formData.subject_id)?.subject_name || 'Select Subject'
+                  : 'Select Subject'}
+              </Text>
+              <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Class Selection */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Class *</Text>
+            <TouchableOpacity onPress={() => setShowClassDropdown(true)} style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+              <Text style={{ color: formData.class_instance_id ? colors.text.primary : colors.text.secondary, fontSize: typography.fontSize.sm }}>
+                {formData.class_instance_id
+                  ? classes.find(c => c.id === formData.class_instance_id)
+                    ? `Grade ${classes.find(c => c.id === formData.class_instance_id)?.grade} - ${classes.find(c => c.id === formData.class_instance_id)?.section}`
+                    : 'Select Class'
+                  : 'Select Class'}
+              </Text>
+              <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Content Source Toggle */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Content Source</Text>
+            <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
+              <TouchableOpacity
+                style={[styles.segmentBtn, !useFileUpload && styles.segmentBtnActive]}
+                onPress={() => setUseFileUpload(false)}
+              >
+                <Text style={[styles.segmentBtnText, !useFileUpload && styles.segmentBtnTextActive]}>Use URL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.segmentBtn, useFileUpload && styles.segmentBtnActive]}
+                onPress={() => setUseFileUpload(true)}
+              >
+                <Text style={[styles.segmentBtnText, useFileUpload && styles.segmentBtnTextActive]}>Upload File</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Content URL or File Upload */}
+          {!useFileUpload ? (
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Resource Title *</Text>
+              <Text style={styles.label}>Content URL *</Text>
               <RNTextInput
-                value={formData.title}
-                onChangeText={(text) => handleInputChange('title', text)}
-                placeholder="Enter resource title"
+                value={formData.content_url}
+                onChangeText={(text) => handleInputChange('content_url', text)}
+                placeholder="Enter URL to video or PDF content"
                 placeholderTextColor={colors.text.secondary}
                 style={styles.input}
               />
             </View>
-
-            {/* Description */}
+          ) : (
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Description *</Text>
-              <RNTextInput
-                value={formData.description}
-                onChangeText={(text) => handleInputChange('description', text)}
-                placeholder="Enter resource description"
-                placeholderTextColor={colors.text.secondary}
-                style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
-                multiline
-                numberOfLines={3}
-              />
-            </View>
-
-            {/* Resource Type */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Resource Type *</Text>
-              <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
-                <TouchableOpacity
-                  style={[styles.segmentBtn, formData.resource_type === 'video' && styles.segmentBtnActive]}
-                  onPress={() => handleInputChange('resource_type', 'video')}
-                >
-                  <MaterialIcons name="videocam" size={18} color={formData.resource_type === 'video' ? colors.text.inverse : colors.text.secondary} />
-                  <Text style={[styles.segmentBtnText, formData.resource_type === 'video' && styles.segmentBtnTextActive]}>Video</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.segmentBtn, formData.resource_type === 'pdf' && styles.segmentBtnActive]}
-                  onPress={() => handleInputChange('resource_type', 'pdf')}
-                >
-                  <MaterialIcons name="description" size={18} color={formData.resource_type === 'pdf' ? colors.text.inverse : colors.text.secondary} />
-                  <Text style={[styles.segmentBtnText, formData.resource_type === 'pdf' && styles.segmentBtnTextActive]}>PDF</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Subject Selection */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Subject *</Text>
-              <TouchableOpacity onPress={() => setShowSubjectDropdown(true)} style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-                <Text style={{ color: formData.subject_id ? colors.text.primary : colors.text.secondary, fontSize: typography.fontSize.sm }}>
-                  {formData.subject_id
-                    ? subjects.find(s => s.id === formData.subject_id)?.subject_name || 'Select Subject'
-                    : 'Select Subject'}
-                </Text>
-                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Class Selection */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Class *</Text>
-              <TouchableOpacity onPress={() => setShowClassDropdown(true)} style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-                <Text style={{ color: formData.class_instance_id ? colors.text.primary : colors.text.secondary, fontSize: typography.fontSize.sm }}>
-                  {formData.class_instance_id
-                    ? classes.find(c => c.id === formData.class_instance_id)
-                      ? `Grade ${classes.find(c => c.id === formData.class_instance_id)?.grade} - ${classes.find(c => c.id === formData.class_instance_id)?.section}`
-                      : 'Select Class'
-                    : 'Select Class'}
-                </Text>
-                <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text.secondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Content Source Toggle */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Content Source</Text>
-              <View style={[styles.segmentedButtons, { flexDirection: 'row', gap: spacing.sm }]}>
-                <TouchableOpacity
-                  style={[styles.segmentBtn, !useFileUpload && styles.segmentBtnActive]}
-                  onPress={() => setUseFileUpload(false)}
-                >
-                  <Text style={[styles.segmentBtnText, !useFileUpload && styles.segmentBtnTextActive]}>Use URL</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.segmentBtn, useFileUpload && styles.segmentBtnActive]}
-                  onPress={() => setUseFileUpload(true)}
-                >
-                  <Text style={[styles.segmentBtnText, useFileUpload && styles.segmentBtnTextActive]}>Upload File</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Content URL or File Upload */}
-            {!useFileUpload ? (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Content URL *</Text>
-                <RNTextInput
-                  value={formData.content_url}
-                  onChangeText={(text) => handleInputChange('content_url', text)}
-                  placeholder="Enter URL to video or PDF content"
-                  placeholderTextColor={colors.text.secondary}
-                  style={styles.input}
-                />
-              </View>
-            ) : (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Upload File *</Text>
-                <TouchableOpacity
-                  style={styles.fileUploadButton}
-                  onPress={handleFilePick}
-                  disabled={uploading}
-                >
-                  <MaterialIcons name="upload" size={20} color={colors.primary[600]} />
-                  <Text style={styles.fileUploadText}>
-                    {selectedFile ? selectedFile.name : 'Choose File'}
-                  </Text>
-                </TouchableOpacity>
-                <Text style={styles.fileUploadHint}>
-                  Supported: Videos (mp4, etc.), PDFs. Will be stored in Supabase Storage.
-                </Text>
-
-                {/* Upload Progress Indicator */}
-                {uploading && (
-                  <View style={styles.uploadProgressContainer}>
-                    <View style={styles.uploadProgressHeader}>
-                      <ActivityIndicator size={16} color={colors.primary[600]} />
-                      <Text style={styles.uploadStatusText}>{uploadingStatus}</Text>
-                      <Text style={styles.uploadProgressText}>{Math.round(uploadProgress)}%</Text>
-                    </View>
-                    <View style={[styles.progressBar, { backgroundColor: colors.primary[100] }]}>
-                      <View style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: colors.primary[600], borderRadius: borderRadius.sm }} />
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* Action Buttons */}
-            <View style={styles.actions}>
+              <Text style={styles.label}>Upload File *</Text>
               <TouchableOpacity
-                onPress={onDismiss}
-                style={[styles.cancelButton, { backgroundColor: colors.surface.secondary, borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center' }]}
-              >
-                <Text style={{ color: colors.text.primary, fontWeight: '600' }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSubmit}
+                style={styles.fileUploadButton}
+                onPress={handleFilePick}
                 disabled={uploading}
-                style={[styles.submitButton, { backgroundColor: colors.primary[600], borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center', opacity: uploading ? 0.6 : 1 }]}
               >
-                {uploading ? (
-                  <ActivityIndicator size="small" color={colors.text.inverse} />
-                ) : (
-                  <Text style={{ color: colors.text.inverse, fontWeight: '600' }}>
-                    {editingResource ? 'Update Resource' : 'Create Resource'}
-                  </Text>
-                )}
+                <MaterialIcons name="upload" size={20} color={colors.primary[600]} />
+                <Text style={styles.fileUploadText}>
+                  {selectedFile ? selectedFile.name : 'Choose File'}
+                </Text>
               </TouchableOpacity>
-            </View>
-          </View>
-        </ScrollView>
+              <Text style={styles.fileUploadHint}>
+                Supported: Videos (mp4, etc.), PDFs. Will be stored in Supabase Storage.
+              </Text>
 
-        {/* Subject Dropdown Modal */}
-        <RNModal
-          visible={showSubjectDropdown}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowSubjectDropdown(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={() => setShowSubjectDropdown(false)}
-            />
-            <View style={styles.dropdownModal}>
-              <Text style={styles.dropdownTitle}>Select Subject</Text>
-              <ScrollView style={styles.dropdownList}>
-                {subjects.map((subject) => (
-                  <TouchableOpacity
-                    key={subject.id}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      handleInputChange('subject_id', subject.id);
-                      setShowSubjectDropdown(false);
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>{subject.subject_name}</Text>
-                    {formData.subject_id === subject.id && <Text style={styles.checkmark}>✓</Text>}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              {/* Upload Progress Indicator */}
+              {uploading && (
+                <View style={styles.uploadProgressContainer}>
+                  <View style={styles.uploadProgressHeader}>
+                    <ActivityIndicator size={16} color={colors.primary[600]} />
+                    <Text style={styles.uploadStatusText}>{uploadingStatus}</Text>
+                    <Text style={styles.uploadProgressText}>{Math.round(uploadProgress)}%</Text>
+                  </View>
+                  <View style={[styles.progressBar, { backgroundColor: colors.primary[100] }]}>
+                    <View style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: colors.primary[600], borderRadius: borderRadius.sm }} />
+                  </View>
+                </View>
+              )}
             </View>
-          </View>
-        </RNModal>
+          )}
 
-        {/* Class Dropdown Modal */}
-        <RNModal
-          visible={showClassDropdown}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowClassDropdown(false)}
-        >
-          <View style={styles.modalOverlay}>
+          {/* Action Buttons */}
+          <View style={styles.actions}>
             <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              activeOpacity={1}
-              onPress={() => setShowClassDropdown(false)}
-            />
-            <View style={styles.dropdownModal}>
-              <Text style={styles.dropdownTitle}>Select Class</Text>
-              <ScrollView style={styles.dropdownList}>
-                {classes.map((cls) => (
-                  <TouchableOpacity
-                    key={cls.id}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      handleInputChange('class_instance_id', cls.id);
-                      setShowClassDropdown(false);
-                    }}
-                  >
-                    <Text style={styles.dropdownItemText}>
-                      Grade {cls.grade} - Section {cls.section}
-                    </Text>
-                    {formData.class_instance_id === cls.id && <Text style={styles.checkmark}>✓</Text>}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
+              onPress={onDismiss}
+              style={[styles.cancelButton, { backgroundColor: colors.surface.secondary, borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center' }]}
+            >
+              <Text style={{ color: colors.text.primary, fontWeight: '600' }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={uploading}
+              style={[styles.submitButton, { backgroundColor: colors.primary[600], borderRadius: borderRadius.md, paddingVertical: spacing.md, alignItems: 'center', opacity: uploading ? 0.6 : 1 }]}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color={colors.text.inverse} />
+              ) : (
+                <Text style={{ color: colors.text.inverse, fontWeight: '600' }}>
+                  {editingResource ? 'Update Resource' : 'Create Resource'}
+                </Text>
+              )}
+            </TouchableOpacity>
           </View>
-        </RNModal>
-      </Modal>
+        </View>
+      </ScrollView>
+
+      {/* Subject Dropdown Modal */}
+      <RNModal
+        visible={showSubjectDropdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSubjectDropdown(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowSubjectDropdown(false)}
+          />
+          <View style={styles.dropdownModal}>
+            <Text style={styles.dropdownTitle}>Select Subject</Text>
+            <ScrollView style={styles.dropdownList}>
+              {subjects.map((subject) => (
+                <TouchableOpacity
+                  key={subject.id}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    handleInputChange('subject_id', subject.id);
+                    setShowSubjectDropdown(false);
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>{subject.subject_name}</Text>
+                  {formData.subject_id === subject.id && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </RNModal>
+
+      {/* Class Dropdown Modal */}
+      <RNModal
+        visible={showClassDropdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowClassDropdown(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowClassDropdown(false)}
+          />
+          <View style={styles.dropdownModal}>
+            <Text style={styles.dropdownTitle}>Select Class</Text>
+            <ScrollView style={styles.dropdownList}>
+              {classes.map((cls) => (
+                <TouchableOpacity
+                  key={cls.id}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    handleInputChange('class_instance_id', cls.id);
+                    setShowClassDropdown(false);
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>
+                    Grade {cls.grade} - Section {cls.section}
+                  </Text>
+                  {formData.class_instance_id === cls.id && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </RNModal>
+    </Modal>
   );
 };
 

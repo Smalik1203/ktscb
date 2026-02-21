@@ -146,11 +146,16 @@ function TeacherSyllabusScreen() {
 
   // ── CRUD handlers ───────────────────────────────────────────────
   const onAddChapter = async (title: string, description: string) => {
-    setBusy(true);
-    const sid = await ensureSyllabusId(selectedClassId, selectedSubjectId);
-    await addChapter(sid, { title, description: description || '' });
-    await loadDetails();
-    setBusy(false);
+    try {
+      setBusy(true);
+      const sid = await ensureSyllabusId(selectedClassId, selectedSubjectId);
+      await addChapter(sid, { title, description: description || '' });
+      await loadDetails();
+    } catch (e: any) {
+      Alert.alert('Add Failed', e?.message || 'Failed to add chapter');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onUpdateChapter = async (chapterId: string, next: { title?: string; description?: string }) => {
@@ -173,11 +178,19 @@ function TeacherSyllabusScreen() {
   };
 
   const onAddTopic = async (title: string, description: string) => {
-    if (!targetChapterId) throw new Error('No chapter selected');
-    setBusy(true);
-    await addTopic(targetChapterId, { title, description: description || '' });
-    await loadDetails();
-    setBusy(false);
+    if (!targetChapterId) {
+      Alert.alert('Error', 'No chapter selected');
+      return;
+    }
+    try {
+      setBusy(true);
+      await addTopic(targetChapterId, { title, description: description || '' });
+      await loadDetails();
+    } catch (e: any) {
+      Alert.alert('Add Failed', e?.message || 'Failed to add topic');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onUpdateTopic = async (topicId: string, next: { title?: string; description?: string }) => {

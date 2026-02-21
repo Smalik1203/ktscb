@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal as RNModal, Text, TextInput as RNTextInput, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, FlatList, TouchableOpacity, Alert, Modal as RNModal, Text, TextInput as RNTextInput, ActivityIndicator } from 'react-native';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Modal } from '../../ui';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -206,14 +206,11 @@ export function IssueInventoryModal({
         charge_amount_override: chargeAmountOverride ? parseFloat(chargeAmountOverride) : undefined,
       });
 
-      Alert.alert('Success', 'Item issued successfully', [
-        {
-          text: 'OK', onPress: () => {
-            onSuccess();
-            handleClose();
-          }
-        },
-      ]);
+      onSuccess();
+      handleClose();
+      setTimeout(() => {
+        Alert.alert('Success', 'Item issued successfully');
+      }, 300);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to issue item');
     } finally {
@@ -245,12 +242,12 @@ export function IssueInventoryModal({
 
   return (
     <>
-    <Modal
-      visible={visible}
-      onDismiss={handleClose}
-      title="Issue Item"
-    >
-      <View style={styles.container}>
+      <Modal
+        visible={visible}
+        onDismiss={handleClose}
+        title="Issue Item"
+      >
+        <View style={styles.container}>
           {/* Item Info */}
           <View style={styles.itemInfoCard}>
             <Text style={styles.itemName}>{inventoryItem.name}</Text>
@@ -318,10 +315,13 @@ export function IssueInventoryModal({
                         />
                       </View>
                     </View>
-                    <ScrollView style={styles.pickerList} nestedScrollEnabled>
-                      {filteredStudents.map((student: any) => (
+                    <FlatList
+                      style={styles.pickerList}
+                      nestedScrollEnabled
+                      data={filteredStudents}
+                      keyExtractor={(item: any) => item.id}
+                      renderItem={({ item: student }: { item: any }) => (
                         <TouchableOpacity
-                          key={student.id}
                           style={[
                             styles.pickerItem,
                             selectedStudentId === student.id && styles.pickerItemSelected,
@@ -335,11 +335,11 @@ export function IssueInventoryModal({
                             {student.full_name} ({student.student_code})
                           </Text>
                         </TouchableOpacity>
-                      ))}
-                      {filteredStudents.length === 0 && (
-                        <Text style={styles.emptyText}>No students found</Text>
                       )}
-                    </ScrollView>
+                      ListEmptyComponent={
+                        <Text style={styles.emptyText}>No students found</Text>
+                      }
+                    />
                   </View>
                 )}
               </>
@@ -364,10 +364,13 @@ export function IssueInventoryModal({
                 {loadingStaff ? (
                   <ActivityIndicator size="small" color={colors.primary[600]} />
                 ) : (
-                  <ScrollView style={styles.pickerList} nestedScrollEnabled>
-                    {filteredStaff.map((staffMember: any) => (
+                  <FlatList
+                    style={styles.pickerList}
+                    nestedScrollEnabled
+                    data={filteredStaff}
+                    keyExtractor={(item: any) => item.id}
+                    renderItem={({ item: staffMember }: { item: any }) => (
                       <TouchableOpacity
-                        key={staffMember.id}
                         style={[
                           styles.pickerItem,
                           selectedStaffId === staffMember.id && styles.pickerItemSelected,
@@ -381,11 +384,11 @@ export function IssueInventoryModal({
                           {staffMember.full_name} ({staffMember.role})
                         </Text>
                       </TouchableOpacity>
-                    ))}
-                    {filteredStaff.length === 0 && (
-                      <Text style={styles.emptyText}>No staff found</Text>
                     )}
-                  </ScrollView>
+                    ListEmptyComponent={
+                      <Text style={styles.emptyText}>No staff found</Text>
+                    }
+                  />
                 )}
               </View>
             )}

@@ -164,16 +164,20 @@ export default function CalendarScreen() {
 
   const handleSaveEvent = async (eventData: any) => {
     try {
-      if (selectedEvent) {
+      const isEdit = !!selectedEvent;
+      if (isEdit) {
         await updateEventMutation.mutateAsync({ id: selectedEvent.id, ...eventData });
-        Alert.alert('Success', 'Event updated');
       } else {
         await createEventMutation.mutateAsync(eventData);
-        Alert.alert('Success', 'Event created');
       }
+      // Close modals FIRST
       setIsEventModalVisible(false);
       setIsHolidayModalVisible(false);
       setSelectedEvent(null);
+      // Show alert AFTER modal has time to dismiss
+      setTimeout(() => {
+        Alert.alert('Success', isEdit ? 'Event updated' : 'Event created');
+      }, 300);
     } catch (_e) {
       Alert.alert('Error', 'Failed to save event');
     }
@@ -389,7 +393,7 @@ export default function CalendarScreen() {
                               {
                                 backgroundColor: status === 'today' ? colors.success[500]
                                   : status === 'upcoming' ? colors.primary[500]
-                                  : colors.neutral[300],
+                                    : colors.neutral[300],
                               },
                             ]} />
                             <Text style={styles.statusText}>
@@ -623,6 +627,7 @@ export default function CalendarScreen() {
         event={selectedEvent || undefined}
         academicYearId={undefined} schoolCode={schoolCode} classes={classes}
         userId={profile?.auth_id || ''}
+        initialDate={dayDetailDate || currentDate}
         onCancel={() => { setIsEventModalVisible(false); setSelectedEvent(null); }}
         onSuccess={handleSaveEvent}
         onDelete={selectedEvent ? () => handleDeleteEvent(selectedEvent) : undefined}
@@ -632,6 +637,7 @@ export default function CalendarScreen() {
         event={selectedEvent || undefined}
         academicYearId={undefined} schoolCode={schoolCode} classes={classes}
         isHoliday userId={profile?.auth_id || ''}
+        initialDate={dayDetailDate || currentDate}
         onCancel={() => { setIsHolidayModalVisible(false); setSelectedEvent(null); }}
         onSuccess={handleSaveEvent}
         onDelete={selectedEvent ? () => handleDeleteEvent(selectedEvent) : undefined}

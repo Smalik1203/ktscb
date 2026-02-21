@@ -304,6 +304,10 @@ export function TaskFormModal({
       const taskId = await onSubmit(tempTaskData);
       const isEdit = !!task;
 
+      // Determine result message for after dismiss
+      let alertTitle = 'Success';
+      let alertMessage = isEdit ? 'Task updated successfully!' : 'Task created successfully!';
+
       // Upload attachments if any
       if (attachments.length > 0) {
         try {
@@ -316,27 +320,25 @@ export function TaskFormModal({
           // Update task with attachment URLs via service (capability assertion happens there)
           try {
             await tasksService.updateAttachments(taskId, uploadedAttachments);
-            Alert.alert('Success', isEdit ? `Task updated with ${uploadedAttachments.length} file(s)!` : `Task created with ${uploadedAttachments.length} file(s)!`);
+            alertMessage = isEdit ? `Task updated with ${uploadedAttachments.length} file(s)!` : `Task created with ${uploadedAttachments.length} file(s)!`;
           } catch (updateError: any) {
-            Alert.alert(
-              'Warning',
-              isEdit ? `Task updated but failed to save attachments: ${updateError.message}. Please try editing again.` : `Task created but failed to save attachments: ${updateError.message}. Please try editing the task to add files.`
-            );
+            alertTitle = 'Warning';
+            alertMessage = isEdit ? `Task updated but failed to save attachments: ${updateError.message}. Please try editing again.` : `Task created but failed to save attachments: ${updateError.message}. Please try editing the task to add files.`;
           }
         } catch (uploadError: any) {
-          Alert.alert(
-            'Warning',
-            isEdit ? `Task updated but file upload failed: ${uploadError.message || 'Unknown error'}.` : `Task created but file upload failed: ${uploadError.message || 'Unknown error'}. Please try editing the task to add files.`
-          );
+          alertTitle = 'Warning';
+          alertMessage = isEdit ? `Task updated but file upload failed: ${uploadError.message || 'Unknown error'}.` : `Task created but file upload failed: ${uploadError.message || 'Unknown error'}. Please try editing the task to add files.`;
         }
-      } else {
-        Alert.alert('Success', isEdit ? 'Task updated successfully!' : 'Task created successfully!');
       }
 
+      // Close modal FIRST, then show alert after modal has dismissed
       resetForm();
       setUploadProgress(0);
       setUploadingStatus('');
       onDismiss();
+      setTimeout(() => {
+        Alert.alert(alertTitle, alertMessage);
+      }, 300);
     } catch (error) {
       // Task submission failed
       setUploadProgress(0);

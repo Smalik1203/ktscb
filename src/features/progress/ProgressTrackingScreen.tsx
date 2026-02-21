@@ -21,7 +21,6 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Card, ProgressBar, LoadingView, ErrorView } from '../../ui';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -40,7 +39,6 @@ export default function ProgressTrackingScreen() {
   const { colors, isDark } = useTheme();
   const { profile } = useAuth();
   const { can } = useCapabilities();
-  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   // Check if user is admin (can view all students' progress)
@@ -291,7 +289,7 @@ export default function ProgressTrackingScreen() {
                     </View>
                   </TouchableOpacity>
                 ))}
-                <View style={{ height: insets.bottom + 16 }} />
+                <View style={{ height: 16 }} />
               </ScrollView>
             )}
           </View>
@@ -405,7 +403,7 @@ export default function ProgressTrackingScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 16 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 16 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} colors={[colors.primary[600]]} />
@@ -665,8 +663,12 @@ export default function ProgressTrackingScreen() {
                     <TouchableOpacity
                       style={styles.commentModalActionBtn}
                       onPress={async () => {
-                        await Clipboard.setStringAsync(reportComment.generatedComment);
-                        Alert.alert('Copied!', 'Comment copied to clipboard');
+                        try {
+                          await Clipboard.setStringAsync(reportComment.generatedComment);
+                          Alert.alert('Copied!', 'Comment copied to clipboard');
+                        } catch {
+                          Alert.alert('Error', 'Failed to copy to clipboard');
+                        }
                       }}
                       activeOpacity={0.7}
                     >
